@@ -1,0 +1,110 @@
+use axum::{
+    Json,
+    body::{Body, Bytes},
+    extract::Request,
+    http::{StatusCode, header},
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
+use http_body_util::BodyExt;
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+
+use crate::{auth::token::parse_bearer_token, domain::error::ApiError, http::AppState};
+
+pub async fn idempotency_middleware(
+    axum::Extension(state): axum::Extension<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, ApiError> {
+    let headers = req.headers().clone();
+    let idempotency_key = match headers.get("Idempotency-Key").and_then(|h| h.to_str().ok()) {
+        Some(k) => k.to_string(),
+        None => return Ok(next.run(req).await),
+    };
+
+    let auth_header = match headers
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+    {
+        Some(h) => h,
+        None => return Ok(next.run(req).await),
+    };
+
+    let parsed_token = match parse_bearer_token(auth_header) {
+        Some(t) => t,
+        None => return Ok(next.run(req).await),
+    };
+    let token_id = parsed_token.id;
+
+    let (parts, body) = req.into_parts();
+    let bytes = body
+        .collect()
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+        .to_bytes();
+
+    let mut hasher = Sha256::new();
+    hasher.update(parts.method.as_str().as_bytes());
+    hasher.update(parts.uri.path().as_bytes());
+    hasher.update(&bytes);
+    let request_hash = hex::encode(hasher.finalize());
+
+    let existing = sqlx::query!(
+        r#"
+        SELECT request_hash, response_status, response_body
+        FROM idempotency_keys
+        WHERE token_id = $1 AND key = $2
+        "#,
+        token_id,
+        idempotency_key
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if let Some(row) = existing {
+        if row.request_hash != request_hash {
+            return Err(ApiError::IdempotencyConflict);
+        }
+
+        let status = StatusCode::from_u16(row.response_status as u16).unwrap_or(StatusCode::OK);
+        return Ok((status, Json(row.response_body)).into_response());
+    }
+
+    let req = Request::from_parts(parts, Body::from(bytes));
+    let response = next.run(req).await;
+
+    let (resp_parts, resp_body) = response.into_parts();
+    let resp_bytes = match resp_body.collect().await {
+        Ok(b) => b.to_bytes(),
+        Err(_) => Bytes::new(), // If we can't collect response body, just return what we have (this shouldn't happen for our JSON responses)
+    };
+
+    if resp_parts.status.is_success()
+        && !resp_bytes.is_empty()
+        && let Ok(json_body) = serde_json::from_slice::<Value>(&resp_bytes)
+    {
+        let pool = state.pool.clone();
+        let status = resp_parts.status.as_u16() as i16;
+        let key = idempotency_key.clone();
+        tokio::spawn(async move {
+            let _ = sqlx::query!(
+                r#"
+                INSERT INTO idempotency_keys (token_id, key, request_hash, response_status, response_body)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (token_id, key) DO NOTHING
+                "#,
+                token_id,
+                key,
+                request_hash,
+                status,
+                json_body
+            )
+            .execute(&pool)
+            .await;
+        });
+    }
+
+    Ok(Response::from_parts(resp_parts, Body::from(resp_bytes)))
+}

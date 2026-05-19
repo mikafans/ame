@@ -13,7 +13,10 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             # postgres client only — engine runs in docker
-            postgresql_18
+            postgresql_17
+
+            # database migrations
+            sqlx-cli
 
             # docker (CLI; daemon is OrbStack / Docker Desktop / Colima on the host)
             docker-client

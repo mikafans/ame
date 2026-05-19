@@ -1,8 +1,19 @@
-use axum::{routing::get, Json, Router};
-use serde_json::{json, Value};
+use axum::{Json, Router, routing::get};
+use serde_json::{Value, json};
+use sqlx::PgPool;
 
-pub fn router() -> Router {
-    Router::new().route("/healthz", get(healthz))
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: PgPool,
+}
+
+pub mod idempotency;
+
+pub fn router(pool: PgPool) -> Router {
+    let state = AppState { pool };
+    Router::new()
+        .route("/healthz", get(healthz))
+        .with_state(state)
 }
 
 async fn healthz() -> Json<Value> {
