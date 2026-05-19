@@ -6,7 +6,7 @@ help:
 fmt: ## Format Rust + frontend + SQL (mutates files)
 	cd api && mise exec -- cargo fmt
 	cd web && mise exec -- bunx prettier --write .
-	sqlfluff format db/migrations || true
+	mise exec -- uvx sqlfluff format db/migrations || true
 
 fmt-check: ## Verify formatting without mutating
 	cd api && mise exec -- cargo fmt --check
@@ -16,7 +16,7 @@ lint: ## Clippy + eslint + tsc + sqlfluff lint
 	cd api && mise exec -- cargo clippy --all-targets -- -D warnings
 	cd web && mise exec -- bun run lint
 	cd web && mise exec -- bun run type-check
-	sqlfluff lint db/migrations || true
+	mise exec -- uvx sqlfluff lint db/migrations || true
 
 test: ## Backend + frontend unit / integration tests
 	cd api && mise exec -- cargo test

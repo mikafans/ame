@@ -12,7 +12,31 @@ cd api && cargo run &              # backend on :8080
 cd web && bun install && bun run dev   # frontend on :3000
 ```
 
-## Where things are
+## Local Database & Docker Setup
+
+Postgres requires a Docker daemon. On macOS, this project recommends [Colima](https://github.com/abiosoft/colima).
+
+```bash
+# Start colima (docker daemon)
+colima start
+
+# Start the local database
+make db-up
+
+# Check database status
+docker compose -f db/docker-compose.yml ps
+
+# When finished working, bring down the database and daemon to save resources
+make db-down
+colima stop
+```
+
+To clean up persistent database data and start entirely fresh:
+```bash
+make db-down
+rm -rf db/data/
+make db-up
+```
 
 - `docs/specs/` — design specs.
 - `docs/plans/` — implementation plans (executed sequentially).

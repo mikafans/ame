@@ -1,6 +1,7 @@
 [tools]
 rust = "latest"
 bun = "latest"
+uv = "latest"
 
 [env]
 # `nix develop` exports these; mise repeats them so non-nix shells still work.
