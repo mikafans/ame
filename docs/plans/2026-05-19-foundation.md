@@ -624,8 +624,29 @@ export default nextConfig;
 
 ```js
 export default {
-  plugins: { "@tailwindcss/postcss": {} },
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
 };
+```
+
+- [ ] **Step 4.5: Write `web/tailwind.config.ts`**
+
+```ts
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+export default config;
 ```
 
 - [ ] **Step 5: Write `web/.eslintrc.json`**
@@ -718,7 +739,7 @@ Kill the dev server before continuing.
 
 ```bash
 git add web/package.json web/bun.lockb web/tsconfig.json web/next.config.mjs \
-        web/postcss.config.mjs web/.eslintrc.json web/app/ web/public/
+        web/postcss.config.mjs web/tailwind.config.ts web/.eslintrc.json web/app/ web/public/
 git commit -m "feat: bootstrap Next.js 15 app with placeholder landing page"
 ```
 
@@ -1130,5 +1151,8 @@ Plan complete and saved to `docs/plans/2026-05-19-foundation.md`. Two execution 
 
 1. **Subagent-Driven (recommended)** — dispatch a fresh subagent per task, review between tasks, fast iteration.
 2. **Inline Execution** — execute tasks in this session using `superpowers:executing-plans`, batch execution with checkpoints.
+
+Which approach?
+
 
 Which approach?
