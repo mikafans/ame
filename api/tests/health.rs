@@ -7,8 +7,7 @@ async fn healthz_returns_ok() {
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/ame".to_string());
     let pool = PgPoolOptions::new()
         .max_connections(1)
-        .connect(&database_url)
-        .await
+        .connect_lazy(&database_url)
         .unwrap();
 
     let app = ame_api::http::router(pool);

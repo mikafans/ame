@@ -1,7 +1,7 @@
 use axum::{
     Json,
     body::{Body, Bytes},
-    extract::Request,
+    extract::{Request, State},
     http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -9,11 +9,12 @@ use axum::{
 use http_body_util::BodyExt;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use sqlx::Row;
 
 use crate::{auth::token::parse_bearer_token, domain::error::ApiError, http::AppState};
 
 pub async fn idempotency_middleware(
-    axum::Extension(state): axum::Extension<AppState>,
+    State(state): State<AppState>,
     req: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
@@ -50,26 +51,29 @@ pub async fn idempotency_middleware(
     hasher.update(&bytes);
     let request_hash = hex::encode(hasher.finalize());
 
-    let existing = sqlx::query!(
+    let existing = sqlx::query(
         r#"
         SELECT request_hash, response_status, response_body
         FROM idempotency_keys
         WHERE token_id = $1 AND key = $2
         "#,
-        token_id,
-        idempotency_key
     )
+    .bind(token_id)
+    .bind(&idempotency_key)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     if let Some(row) = existing {
-        if row.request_hash != request_hash {
+        let stored_request_hash: String = row.get("request_hash");
+        if stored_request_hash != request_hash {
             return Err(ApiError::IdempotencyConflict);
         }
 
-        let status = StatusCode::from_u16(row.response_status as u16).unwrap_or(StatusCode::OK);
-        return Ok((status, Json(row.response_body)).into_response());
+        let response_status: i16 = row.get("response_status");
+        let response_body: Value = row.get("response_body");
+        let status = StatusCode::from_u16(response_status as u16).unwrap_or(StatusCode::OK);
+        return Ok((status, Json(response_body)).into_response());
     }
 
     let req = Request::from_parts(parts, Body::from(bytes));
@@ -89,18 +93,18 @@ pub async fn idempotency_middleware(
         let status = resp_parts.status.as_u16() as i16;
         let key = idempotency_key.clone();
         tokio::spawn(async move {
-            let _ = sqlx::query!(
+            let _ = sqlx::query(
                 r#"
                 INSERT INTO idempotency_keys (token_id, key, request_hash, response_status, response_body)
                 VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (token_id, key) DO NOTHING
                 "#,
-                token_id,
-                key,
-                request_hash,
-                status,
-                json_body
             )
+            .bind(token_id)
+            .bind(key)
+            .bind(request_hash)
+            .bind(status)
+            .bind(json_body)
             .execute(&pool)
             .await;
         });
