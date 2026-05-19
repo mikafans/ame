@@ -935,7 +935,7 @@ Plan 1 (Foundation) — replacing the Dioxus scaffold with Axum + Next.js + Post
 - No `docs/superpowers/` subdirectory. Plans live in `docs/plans/`.
 - Worktrees by default for isolated work (see global CLAUDE.md).
 - Sub-agents by default for independent tasks.
-- Solo developer on NAS over Tailscale; friends-later is in scope for schema, not UX.
+- Solo developer, production in Kubernetes; friends-later is in scope for schema, not UX.
 ```
 
 - [ ] **Step 5: Write `.agents/CURRENT_TASK.md` (placeholder; session skill overwrites)**

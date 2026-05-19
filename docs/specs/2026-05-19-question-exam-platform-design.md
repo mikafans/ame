@@ -76,7 +76,7 @@ Each is additive: the schema, APIs, and module boundaries leave room.
   updates, exam blueprint resolution, level mapping.
 - **`web/`** — Next.js 15 App Router, TypeScript. One deployment, public
   `/*` routes for taking, `/admin/*` routes gated on `users.role = 'admin'`.
-- **Postgres** — Docker container on the NAS. Schema-versioned via `sqlx migrate`
+- **Postgres** — Docker container for local dev, Kubernetes for production. Schema-versioned via `sqlx migrate`
   with migrations checked into `db/migrations/`.
 - **Auth** — opaque API tokens (argon2id-hashed at rest) carried as
   `Authorization: Bearer …`. Each token has one or more *scopes* selected
