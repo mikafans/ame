@@ -1,0 +1,603 @@
+openapi: 3.1.0
+info:
+  title: ame API
+  description: 'Question collector + exam platform. Plan 3 surface: tags + questions CRUD with versioning.'
+  license:
+    name: ''
+  version: 0.1.0
+paths:
+  /questions:
+    get:
+      tags:
+      - crate::http::questions
+      operationId: list_questions
+      parameters:
+      - name: tag
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: status
+        in: path
+        required: true
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/QuestionStatus'
+      - name: min_rating
+        in: path
+        required: true
+        schema:
+          type:
+          - number
+          - 'null'
+          format: double
+      - name: max_rating
+        in: path
+        required: true
+        schema:
+          type:
+          - number
+          - 'null'
+          format: double
+      - name: limit
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      - name: offset
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      responses:
+        '200':
+          description: Filtered list of questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionListResponse'
+        '401':
+          description: Missing or invalid token
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - crate::http::questions
+      operationId: create_questions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionsBody'
+        required: true
+      responses:
+        '201':
+          description: Batch of created questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateQuestionsResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '409':
+          description: Idempotency key conflict
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /questions/{id}:
+    get:
+      tags:
+      - crate::http::questions
+      operationId: get_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question by id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+    patch:
+      tags:
+      - crate::http::questions
+      operationId: update_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionPatch'
+        required: true
+      responses:
+        '200':
+          description: Updated question
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '404':
+          description: No such question
+        '422':
+          description: Cannot edit archived question
+      security:
+      - bearer_auth: []
+  /questions/{id}/archive:
+    post:
+      tags:
+      - crate::http::questions
+      operationId: archive_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+  /questions/{id}/promote:
+    post:
+      tags:
+      - crate::http::questions
+      operationId: promote_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question promoted to live
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+  /questions/{id}/versions:
+    get:
+      tags:
+      - crate::http::questions
+      operationId: list_versions
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Historical versions, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionVersionsResponse'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+  /tags:
+    get:
+      tags:
+      - crate::http::tags
+      operationId: list_tags
+      responses:
+        '200':
+          description: All tags, sorted by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          description: Missing or invalid token
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - crate::http::tags
+      operationId: create_tag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTagBody'
+        required: true
+      responses:
+        '201':
+          description: Tag created (or already existed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+      security:
+      - bearer_auth: []
+components:
+  schemas:
+    ClozePayload:
+      type: object
+      required:
+      - template
+      - blanks
+      - normalize
+      properties:
+        blanks:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        normalize:
+          $ref: '#/components/schemas/Normalize'
+        template:
+          type: string
+    CodeSnippet:
+      type: object
+      required:
+      - language
+      - body
+      properties:
+        body:
+          type: string
+        caption:
+          type:
+          - string
+          - 'null'
+        language:
+          type: string
+    CreateQuestionsBody:
+      type: object
+      required:
+      - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionInsert'
+    CreateQuestionsResponse:
+      type: object
+      required:
+      - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+    CreateTagBody:
+      type: object
+      required:
+      - name
+      properties:
+        description:
+          type:
+          - string
+          - 'null'
+        name:
+          type: string
+    FreeTextPayload:
+      type: object
+      required:
+      - accepted
+      - normalize
+      - judge
+      properties:
+        accepted:
+          type: array
+          items:
+            type: string
+        judge:
+          $ref: '#/components/schemas/Judge'
+        normalize:
+          $ref: '#/components/schemas/Normalize'
+    Judge:
+      type: string
+      description: |-
+        Free-text judge. Only `exact` is supported in MVP; `llm` is reserved for
+        the deferred LLM-as-judge feature.
+      enum:
+      - exact
+    McqPayload:
+      type: object
+      required:
+      - options
+      - correct_index
+      properties:
+        correct_index:
+          type: integer
+          minimum: 0
+        options:
+          type: array
+          items:
+            type: string
+    Normalize:
+      type: string
+      description: |-
+        Normalization rule applied to *both* the stored accepted answers and the
+        user's response at grade time. See spec §"Normalize semantics".
+      enum:
+      - exact
+      - case_insensitive_strip_accents
+    Question:
+      type: object
+      required:
+      - id
+      - kind
+      - prompt
+      - payload
+      - status
+      - rating
+      - attempts_count
+      - version
+      - created_by
+      - created_at
+      - updated_at
+      properties:
+        attempts_count:
+          type: integer
+          format: int32
+        code_snippet:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CodeSnippet'
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        explanation:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        payload:
+          type: object
+        prompt:
+          type: string
+        rating:
+          type: number
+          format: double
+        source:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/QuestionStatus'
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int32
+    QuestionFilter:
+      type: object
+      properties:
+        limit:
+          type: integer
+          format: int64
+        max_rating:
+          type:
+          - number
+          - 'null'
+          format: double
+        min_rating:
+          type:
+          - number
+          - 'null'
+          format: double
+        offset:
+          type: integer
+          format: int64
+        status:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/QuestionStatus'
+        tag:
+          type:
+          - string
+          - 'null'
+    QuestionInsert:
+      type: object
+      required:
+      - kind
+      - prompt
+      - payload
+      properties:
+        code_snippet:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CodeSnippet'
+        explanation:
+          type:
+          - string
+          - 'null'
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        payload:
+          type: object
+        prompt:
+          type: string
+        source:
+          type:
+          - string
+          - 'null'
+        tags:
+          type: array
+          items:
+            type: string
+    QuestionKind:
+      type: string
+      enum:
+      - mcq
+      - free_text
+      - cloze
+    QuestionListResponse:
+      type: object
+      required:
+      - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+    QuestionPatch:
+      type: object
+      description: |-
+        Partial update body for `PATCH /questions/:id`.
+
+        Field semantics: `None` means "leave unchanged", `Some(v)` means "set to v".
+        Clearing a nullable field (e.g. removing `explanation`) is not supported in
+        MVP — rewrite via a new question if you need to.
+      properties:
+        code_snippet:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CodeSnippet'
+        explanation:
+          type:
+          - string
+          - 'null'
+        payload:
+          type: object
+        prompt:
+          type:
+          - string
+          - 'null'
+        tags:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+    QuestionStatus:
+      type: string
+      enum:
+      - draft
+      - live
+      - archived
+    QuestionVersion:
+      type: object
+      description: |-
+        Historical snapshot of a question's editable fields, written when a `live`
+        question is edited (see spec §"Versioning rule").
+      required:
+      - question_id
+      - version
+      - prompt
+      - payload
+      - archived_at
+      properties:
+        archived_at:
+          type: string
+          format: date-time
+        code_snippet:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/CodeSnippet'
+        explanation:
+          type:
+          - string
+          - 'null'
+        payload:
+          type: object
+        prompt:
+          type: string
+        question_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int32
+    QuestionVersionsResponse:
+      type: object
+      required:
+      - versions
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionVersion'
+    Tag:
+      type: object
+      required:
+      - id
+      - name
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: uuid_secret

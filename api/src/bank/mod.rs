@@ -1,1 +1,4 @@
-//! Question bank: questions, versions, tags. Populated in Plan 3.
+//! Question bank: questions, versions, tags.
+
+pub mod questions;
+pub mod tags;

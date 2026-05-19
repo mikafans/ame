@@ -10,18 +10,22 @@ pub struct AppState {
 }
 
 pub mod idempotency;
+pub mod openapi;
+pub mod questions;
+pub mod tags;
 
 /// Build the production HTTP router.
 ///
-/// Plan 3 (`docs/plans/2026-05-19-plan-3-bank.md`) introduces the first POST
-/// routes that accept `Idempotency-Key`; those will attach
-/// [`idempotency::idempotency_middleware`] via `route_layer`. `/healthz` is
-/// intentionally outside any middleware so a misconfigured DB cannot mask a
-/// healthy process.
+/// `/healthz` is intentionally outside any middleware so a misconfigured DB
+/// cannot mask a healthy process. Question/tag routes live under their own
+/// modules and bring their own scope guards + idempotency wiring.
 pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
     Router::new()
         .route("/healthz", get(healthz))
+        .merge(tags::router(state.clone()))
+        .merge(questions::router(state.clone()))
+        .merge(openapi::router(state.clone()))
         .with_state(state)
 }
 

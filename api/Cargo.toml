@@ -11,6 +11,10 @@ path = "src/lib.rs"
 name = "ame-api"
 path = "src/main.rs"
 
+[[bin]]
+name = "gen-openapi"
+path = "src/bin/gen_openapi.rs"
+
 [dependencies]
 anyhow = "1"
 axum = "0.8.1"
@@ -32,6 +36,8 @@ async-trait = "0.1"
 sha2 = "0.10"
 hex = "0.4"
 http-body-util = "0.1"
+utoipa = { version = "5", features = ["uuid", "time"] }
+serde_yaml = "0.9"
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

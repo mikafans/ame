@@ -53,3 +53,35 @@ where
         Ok(RequireScope(auth_user, std::marker::PhantomData))
     }
 }
+
+/// Marker trait used by [`RequireAnyScope`] for endpoints that accept any one
+/// of several scopes (e.g. question writes accept either `human` or
+/// `agent:write-questions`).
+///
+/// The first scope in `SCOPES` is the one reported in the 403 error payload —
+/// keep it as the most natural/expected scope for that endpoint.
+pub trait ScopeOneOf: Send + Sync {
+    const SCOPES: &'static [Scope];
+}
+
+pub struct RequireAnyScope<T: ScopeOneOf>(pub AuthenticatedUser, std::marker::PhantomData<T>);
+
+impl<T> FromRequestParts<AppState> for RequireAnyScope<T>
+where
+    T: ScopeOneOf + Send + Sync + 'static,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let auth_user = AuthenticatedUser::from_request_parts(parts, state).await?;
+
+        if T::SCOPES.iter().any(|s| auth_user.token_scopes.contains(s)) {
+            Ok(RequireAnyScope(auth_user, std::marker::PhantomData))
+        } else {
+            Err(ApiError::ScopeRequired(T::SCOPES[0].as_str()))
+        }
+    }
+}

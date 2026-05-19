@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-db e2e check validate db-up db-down hooks-install
+.PHONY: help fmt fmt-check lint test test-db test-bank e2e check validate db-up db-down hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -24,6 +24,13 @@ test: ## Backend + frontend unit / integration tests
 
 test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test auth -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
+
+test-bank: ## Bank integration tests only (requires `make db-up`)
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
+
+openapi: ## Regenerate api/openapi.yaml snapshot
+	cd api && mise exec -- cargo run --quiet --bin gen-openapi
 
 e2e: ## Playwright (requires `make db-up`)
 	cd web && mise exec -- bun run e2e --if-present || true
