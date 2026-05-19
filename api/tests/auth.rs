@@ -49,35 +49,31 @@ fn create_test_router(pool: PgPool) -> Router {
         .with_state(state)
 }
 
-async fn setup_db() -> Option<PgPool> {
+async fn setup_db() -> PgPool {
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/ame".to_string());
 
-    let pool = match sqlx::postgres::PgPoolOptions::new()
+    let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(5)
-        .acquire_timeout(std::time::Duration::from_secs(1))
         .connect(&database_url)
         .await
-    {
-        Ok(pool) => pool,
-        Err(error) => {
-            eprintln!("skipping auth integration test: cannot connect to {database_url}: {error}");
-            return None;
-        }
-    };
+        .expect("set DATABASE_URL to a reachable Postgres database before AME_RUN_DB_TESTS=1");
 
     if let Err(error) = MIGRATOR.run(&pool).await {
         panic!("failed to run migrations for auth integration test: {error}");
     }
 
-    Some(pool)
+    pool
 }
 
 #[tokio::test]
 async fn test_auth_and_idempotency() {
-    let Some(pool) = setup_db().await else {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
         return;
-    };
+    }
+
+    let pool = setup_db().await;
 
     let app = create_test_router(pool.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -148,6 +144,8 @@ async fn test_auth_and_idempotency() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "agent:write-questions"
+    let body: Value = res.json().await.unwrap();
+    assert_eq!(body["error"]["details"]["scope"], "agent:write-questions");
 
     // Test 4: Idempotency
     let idem_key = "test-key-1";
@@ -163,9 +161,6 @@ async fn test_auth_and_idempotency() {
         .unwrap();
     assert_eq!(res1.status(), StatusCode::OK);
 
-    // Give background task time to save to DB
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
     // Same request -> should succeed (replay)
     let res2 = client
         .post(format!("{base_url}/idempotent"))
@@ -178,6 +173,22 @@ async fn test_auth_and_idempotency() {
     assert_eq!(res2.status(), StatusCode::OK);
     let body2: Value = res2.json().await.unwrap();
     assert_eq!(body2, payload);
+
+    // Same token id and idempotency key with the wrong secret must not replay
+    // the stored response before authentication runs.
+    let invalid_bearer_token = format!("{}_wrong_secret", token_id);
+    let res = client
+        .post(format!("{base_url}/idempotent"))
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", invalid_bearer_token),
+        )
+        .header("Idempotency-Key", idem_key)
+        .json(&payload)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
     // Different body -> conflict
     let new_payload = json!({ "question": "different" });

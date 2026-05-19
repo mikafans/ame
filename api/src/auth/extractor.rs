@@ -71,7 +71,12 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let role: String = record.get("role");
         let role = match role.as_str() {
             "admin" => crate::domain::user::Role::Admin,
-            _ => crate::domain::user::Role::User,
+            "user" => crate::domain::user::Role::User,
+            _ => {
+                return Err(ApiError::Internal(anyhow::anyhow!(
+                    "unknown role in users.role: {role}"
+                )));
+            }
         };
 
         let user = User {

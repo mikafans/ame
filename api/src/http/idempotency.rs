@@ -11,7 +11,11 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 
-use crate::{auth::token::parse_bearer_token, domain::error::ApiError, http::AppState};
+use crate::{
+    auth::token::{parse_bearer_token, verify_token_secret},
+    domain::error::ApiError,
+    http::AppState,
+};
 
 pub async fn idempotency_middleware(
     State(state): State<AppState>,
@@ -37,6 +41,28 @@ pub async fn idempotency_middleware(
         None => return Ok(next.run(req).await),
     };
     let token_id = parsed_token.id;
+
+    let token_record = sqlx::query(
+        r#"
+        SELECT token_hash, revoked_at
+        FROM api_tokens
+        WHERE id = $1
+        "#,
+    )
+    .bind(token_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let Some(token_record) = token_record else {
+        return Ok(next.run(req).await);
+    };
+
+    let revoked_at: Option<time::OffsetDateTime> = token_record.get("revoked_at");
+    let token_hash: String = token_record.get("token_hash");
+    if revoked_at.is_some() || !verify_token_secret(&token_hash, &parsed_token.secret) {
+        return Ok(next.run(req).await);
+    }
 
     let (parts, body) = req.into_parts();
     let bytes = body
@@ -89,25 +115,22 @@ pub async fn idempotency_middleware(
         && !resp_bytes.is_empty()
         && let Ok(json_body) = serde_json::from_slice::<Value>(&resp_bytes)
     {
-        let pool = state.pool.clone();
         let status = resp_parts.status.as_u16() as i16;
-        let key = idempotency_key.clone();
-        tokio::spawn(async move {
-            let _ = sqlx::query(
-                r#"
-                INSERT INTO idempotency_keys (token_id, key, request_hash, response_status, response_body)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (token_id, key) DO NOTHING
-                "#,
-            )
-            .bind(token_id)
-            .bind(key)
-            .bind(request_hash)
-            .bind(status)
-            .bind(json_body)
-            .execute(&pool)
-            .await;
-        });
+        sqlx::query(
+            r#"
+            INSERT INTO idempotency_keys (token_id, key, request_hash, response_status, response_body)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (token_id, key) DO NOTHING
+            "#,
+        )
+        .bind(token_id)
+        .bind(idempotency_key)
+        .bind(request_hash)
+        .bind(status)
+        .bind(json_body)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
     Ok(Response::from_parts(resp_parts, Body::from(resp_bytes)))

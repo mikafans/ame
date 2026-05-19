@@ -11,6 +11,7 @@ This file is the canonical, machine-readable rundown of how to work in this repo
 ## Commands
 - `make check` — fmt-check + lint + test. Required before every commit (pre-commit hook enforces).
 - `make validate` — `make check` + e2e. Required before opening a PR.
+- `make test-db` — DB-backed API integration tests. Requires `make db-up`; `make check` skips these unless `AME_RUN_DB_TESTS=1`.
 - `make db-up` / `make db-down` — start / stop Postgres.
 - `cd api && mise exec -- cargo run` — boot the API on `:8080`.
 - `cd web && mise exec -- bun run dev` — boot the frontend on `:3000`.

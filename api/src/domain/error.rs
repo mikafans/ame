@@ -55,7 +55,7 @@ impl IntoResponse for ApiError {
                 StatusCode::FORBIDDEN,
                 "scope_required",
                 format!("token lacks required scope: {}", scope),
-                None,
+                Some(json!({ "scope": scope })),
             ),
             ApiError::NotFound { resource } => (
                 StatusCode::NOT_FOUND,
@@ -110,8 +110,6 @@ impl IntoResponse for ApiError {
                 None,
             ),
             ApiError::Internal(err) => {
-                // Use nil or random, or better: build from time.
-                // Since this is internal error reporting, uuid v7 is fine.
                 let request_id = uuid::Uuid::now_v7().to_string();
                 error!(%request_id, "internal error: {:#}", err);
                 (

@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test e2e check validate db-up db-down hooks-install
+.PHONY: help fmt fmt-check lint test test-db e2e check validate db-up db-down hooks-install
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -21,6 +21,9 @@ lint: ## Clippy + eslint + tsc + sqlfluff lint
 test: ## Backend + frontend unit / integration tests
 	cd api && mise exec -- cargo test
 	cd web && mise exec -- bun test --if-present || true
+
+test-db: ## DB-backed backend integration tests (requires `make db-up`)
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test auth -- --nocapture
 
 e2e: ## Playwright (requires `make db-up`)
 	cd web && mise exec -- bun run e2e --if-present || true
