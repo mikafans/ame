@@ -177,8 +177,9 @@ pub async fn list_questions(
     let limit = filter.limit.clamp(1, 200);
     let offset = filter.offset.max(0);
 
-    let rows = sqlx::query(&format!(
-        "SELECT DISTINCT {QUESTION_COLUMNS} \
+    let rows = sqlx::query(
+        "SELECT DISTINCT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.status, \
+              q.source, q.rating, q.attempts_count, q.version, q.created_by, q.created_at, q.updated_at \
          FROM questions q \
          LEFT JOIN question_tags qt ON qt.question_id = q.id \
          LEFT JOIN tags t ON t.id = qt.tag_id \
@@ -186,9 +187,9 @@ pub async fn list_questions(
            AND ($2::text IS NULL OR q.status = $2) \
            AND ($3::double precision IS NULL OR q.rating >= $3) \
            AND ($4::double precision IS NULL OR q.rating <= $4) \
-         ORDER BY created_at DESC \
-         LIMIT $5 OFFSET $6"
-    ))
+         ORDER BY q.created_at DESC \
+         LIMIT $5 OFFSET $6",
+    )
     .bind(filter.tag.as_deref())
     .bind(status_str)
     .bind(filter.min_rating)

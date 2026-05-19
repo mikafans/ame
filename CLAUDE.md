@@ -1,4 +1,13 @@
-# CLAUDE.md — Claude-specific rules
+# CLAUDE.md
+
+...
+
+## Database & Testing Standards
+
+- **SQL Ambiguity**: Always fully qualify column names in SQL queries involving multiple tables (e.g., `q.id` instead of `id`) in both `SELECT` and `ORDER BY` clauses to prevent ambiguous column reference errors.
+- **Query Formatting**: Use plain string literals for SQL queries; avoid `format!` unless dynamic construction is strictly necessary.
+- **DB Test Stability**: When writing integration tests that filter database records, use set-membership assertions rather than exact order comparisons to avoid non-deterministic failures from index/result ordering variations.
+ — Claude-specific rules
 
 Inherits everything from `AGENTS.md`.
 
