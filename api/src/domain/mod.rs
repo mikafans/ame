@@ -1,0 +1,1 @@
+//! Shared domain types. Grows with each subsequent plan.
