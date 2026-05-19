@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use axum::{
     extract::FromRequestParts,
     http::{header, request::Parts},
@@ -5,15 +7,23 @@ use axum::{
 use sqlx::Row;
 
 use crate::{
-    domain::{error::ApiError, user::User},
+    domain::{
+        error::ApiError,
+        user::{Scope, User},
+    },
     http::AppState,
 };
 
 use super::token::{parse_bearer_token, verify_token_secret};
 
+/// Authenticated request context produced by [`AuthenticatedUser::from_request_parts`].
+///
+/// `token_scopes` holds the parsed [`Scope`] enum (not raw strings) so downstream
+/// code cannot accidentally accept a scope that drifts from the `api_tokens.scopes`
+/// CHECK constraint in `db/migrations/20260519092355_init.sql`.
 pub struct AuthenticatedUser {
     pub user: User,
-    pub token_scopes: Vec<String>,
+    pub token_scopes: Vec<Scope>,
 }
 
 impl FromRequestParts<AppState> for AuthenticatedUser {
@@ -87,9 +97,17 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             created_at: record.get("created_at"),
         };
 
-        Ok(AuthenticatedUser {
-            user,
-            token_scopes: record.get("scopes"),
-        })
+        // The DB CHECK constraint on api_tokens.scopes restricts values to the
+        // three known wire strings. We still parse defensively: a row that
+        // bypasses the constraint (manual SQL, dropped check, etc.) becomes a
+        // 500 instead of a silently accepted unknown scope.
+        let raw_scopes: Vec<String> = record.get("scopes");
+        let token_scopes = raw_scopes
+            .into_iter()
+            .map(|s| Scope::from_str(&s))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid scope in api_tokens: {e}")))?;
+
+        Ok(AuthenticatedUser { user, token_scopes })
     }
 }

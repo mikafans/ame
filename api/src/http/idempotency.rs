@@ -1,3 +1,28 @@
+//! Idempotency-Key middleware.
+//!
+//! Implements the contract from `docs/specs/2026-05-19-question-exam-platform-design.md`:
+//!
+//! - **No `Idempotency-Key` header** → pass through unchanged.
+//! - **Header present, no bearer token (or token unknown/revoked/wrong secret)**
+//!   → pass through. The downstream auth extractor will reject the request with
+//!   401; the middleware never stores or replays without an authenticated token.
+//!   This is what keeps a stolen idempotency key from echoing a victim's stored
+//!   response back at an attacker.
+//! - **Header present, auth valid, no prior record** → forward the request,
+//!   capture the response, and store it only if the status is 2xx AND the body
+//!   parses as JSON. Non-2xx and non-JSON responses are returned to the caller
+//!   but **not** cached — a transient 500 must not be replayed as the "answer"
+//!   on retry.
+//! - **Header present, auth valid, prior record with the same request hash**
+//!   → replay the stored `(status, body)` without invoking the handler.
+//! - **Header present, auth valid, prior record with a different request hash**
+//!   → return `409 idempotency_conflict` (caller reused a key with a different
+//!   payload).
+//!
+//! The request hash is `sha256(method || path || body)`. The pair
+//! `(token_id, key)` is the storage primary key, so two different tokens can
+//! reuse the same idempotency key without colliding.
+
 use axum::{
     Json,
     body::{Body, Bytes},
@@ -17,6 +42,10 @@ use crate::{
     http::AppState,
 };
 
+/// Axum middleware implementing the idempotency contract documented at the
+/// module level. Apply it as a `route_layer` on the subset of POST routes that
+/// accept `Idempotency-Key`; routes without the header pass through with zero
+/// extra DB work.
 pub async fn idempotency_middleware(
     State(state): State<AppState>,
     req: Request,

@@ -12,12 +12,13 @@ use sqlx::PgPool;
 
 use ame_api::{
     auth::{extractor::AuthenticatedUser, scope::RequireScope, scope::ScopeConstraint},
+    domain::user::Scope,
     http::{AppState, idempotency::idempotency_middleware},
 };
 
 struct WriteQuestionsScope;
 impl ScopeConstraint for WriteQuestionsScope {
-    const SCOPE: &'static str = "agent:write-questions";
+    const SCOPE: Scope = Scope::AgentWriteQuestions;
 }
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -201,4 +202,65 @@ async fn test_auth_and_idempotency() {
         .await
         .unwrap();
     assert_eq!(res3.status(), StatusCode::CONFLICT);
+}
+
+/// Tokens with `revoked_at IS NOT NULL` must be rejected even when the bearer
+/// secret matches. This guards the revocation branch in
+/// `api/src/auth/extractor.rs`; without this test, a regression that flipped
+/// the conditional would only surface in production.
+#[tokio::test]
+async fn revoked_token_returns_unauthorized() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = create_test_router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let user_id = uuid::Uuid::now_v7();
+    let token_id = uuid::Uuid::now_v7();
+    let secret = "revoked_secret_xyz";
+
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(secret.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
+
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, 'Revoked User', 'user')")
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // revoked_at set at insert time — the secret hash is still valid, so any
+    // 200 here would prove the extractor stopped checking revocation.
+    let scopes = vec!["human".to_string()];
+    sqlx::query(
+        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
+         VALUES ($1, $2, 'revoked token', $3, $4, now())",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind(hash)
+    .bind(&scopes)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let bearer_token = format!("{}_{}", token_id, secret);
+    let client = reqwest::Client::new();
+    let res = client
+        .get(format!("http://{addr}/protected"))
+        .header(header::AUTHORIZATION, format!("Bearer {}", bearer_token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
