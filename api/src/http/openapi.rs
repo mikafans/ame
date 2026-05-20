@@ -99,6 +99,9 @@ impl Modify for SecurityAddon {
         crate::http::messages::send_message,
         crate::http::plans::create_plan,
         crate::http::plans::get_plan,
+        crate::http::quizzes::list_quizzes,
+        crate::http::me::get_me,
+        crate::http::me::list_attempts,
     ),
     components(schemas(
         Tag,
@@ -155,6 +158,10 @@ impl Modify for SecurityAddon {
         StudyPlanWeek,
         StudyPlanItem,
         CreatePlanBody,
+        crate::http::quizzes::QuizSummary,
+        crate::http::quizzes::ListQuizzesResponse,
+        crate::http::me::MeResponse,
+        crate::http::me::ListAttemptsResponse,
     )),
     modifiers(&SecurityAddon),
 )]

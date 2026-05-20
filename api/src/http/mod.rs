@@ -19,6 +19,7 @@ pub mod messages;
 pub mod openapi;
 pub mod plans;
 pub mod questions;
+pub mod quizzes;
 pub mod sessions;
 pub mod shares;
 pub mod stats;
@@ -42,6 +43,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(sessions::router(state.clone()))
         .merge(exams::router(state.clone()))
         .merge(plans::router(state.clone()))
+        .merge(quizzes::router(state.clone()))
         .merge(stats::router(state.clone()))
         .merge(messages::router(state.clone()))
         .merge(me::router(state.clone()))
