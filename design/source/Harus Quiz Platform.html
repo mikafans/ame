@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Harus — Assessment Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0e1116;
+    --surface: #161b22;
+    --surface-2: #1d232c;
+    --surface-3: #232a35;
+    --border: #262d38;
+    --border-strong: #353e4c;
+    --text: #e8ecf1;
+    --text-2: #b4bdc9;
+    --muted: #7c8696;
+    --accent: #22d3a8;
+    --accent-dim: rgba(34, 211, 168, 0.12);
+    --accent-line: rgba(34, 211, 168, 0.35);
+    --amber: #f5b85a;
+    --amber-dim: rgba(245, 184, 90, 0.14);
+    --red: #e76e6e;
+    --red-dim: rgba(231, 110, 110, 0.14);
+    --blue: #6aa7f5;
+    --blue-dim: rgba(106, 167, 245, 0.14);
+    --serif: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+    color-scheme: dark;
+  }
+  /* PAPER theme (light academic) */
+  [data-theme="paper"] {
+    --bg: #f6f3ec;
+    --surface: #fbf9f3;
+    --surface-2: #f1ecdf;
+    --surface-3: #e7e0cc;
+    --border: #d9d1bc;
+    --border-strong: #b9ad8e;
+    --text: #1d1a14;
+    --text-2: #3a352a;
+    --muted: #6e6753;
+    --accent: #0f6b53;
+    --accent-dim: rgba(15, 107, 83, 0.10);
+    --accent-line: rgba(15, 107, 83, 0.35);
+    --amber: #a05c12;
+    --amber-dim: rgba(160, 92, 18, 0.10);
+    --red: #a83b3b;
+    --red-dim: rgba(168, 59, 59, 0.10);
+    --blue: #2c5b8f;
+    --blue-dim: rgba(44, 91, 143, 0.10);
+    color-scheme: light;
+  }
+  /* COBALT theme (deep blue academic) */
+  [data-theme="cobalt"] {
+    --bg: #0b1530;
+    --surface: #11203f;
+    --surface-2: #182a52;
+    --surface-3: #213665;
+    --border: #243868;
+    --border-strong: #355088;
+    --text: #eaf0ff;
+    --text-2: #b6c4e6;
+    --muted: #7c8cb4;
+    --accent: #f5c14a;
+    --accent-dim: rgba(245, 193, 74, 0.13);
+    --accent-line: rgba(245, 193, 74, 0.40);
+    --amber: #f08a3c;
+    --amber-dim: rgba(240, 138, 60, 0.14);
+    --red: #ef6e6e;
+    --red-dim: rgba(239, 110, 110, 0.14);
+    --blue: #8db4ff;
+    --blue-dim: rgba(141, 180, 255, 0.14);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  #root { min-height: 100vh; }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea, select { font-family: inherit; }
+  ::selection { background: var(--accent-dim); color: var(--text); }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- Tweak defaults (editable inline) -->
+  <script>
+    window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "theme": "slate",
+      "statsDepth": "full",
+      "showAgentPanel": true,
+      "density": "comfortable"
+    }/*EDITMODE-END*/;
+  </script>
+
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="src/data.jsx"></script>
+  <script type="text/babel" src="src/atoms.jsx"></script>
+  <script type="text/babel" src="src/charts.jsx"></script>
+  <script type="text/babel" src="src/share.jsx"></script>
+  <script type="text/babel" src="src/sidebar.jsx"></script>
+  <script type="text/babel" src="src/screen-signup.jsx"></script>
+  <script type="text/babel" src="src/screen-library.jsx"></script>
+  <script type="text/babel" src="src/screen-exams.jsx"></script>
+  <script type="text/babel" src="src/screen-quiz.jsx"></script>
+  <script type="text/babel" src="src/screen-results.jsx"></script>
+  <script type="text/babel" src="src/screen-dashboard.jsx"></script>
+  <script type="text/babel" src="src/screen-author.jsx"></script>
+  <script type="text/babel" src="src/screen-agent.jsx"></script>
+  <script type="text/babel" src="src/app.jsx"></script>
+</body>
+</html>

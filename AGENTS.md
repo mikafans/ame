@@ -23,8 +23,8 @@ This file is the canonical, machine-readable rundown of how to work in this repo
 - Always ask before committing or pushing.
 
 ## Layout
-See `docs/specs/2026-05-19-question-exam-platform-design.md` for the full architecture spec.
-See `docs/plans/` for implementation plans.
+See `docs/specs/2026-05-20-harus-platform-design.md` for the current architecture spec. It replaces `2026-05-19-question-exam-platform-design.md` (kept on disk as historical reference only).
+See `docs/plans/` for implementation plans, including `docs/plans/2026-05-20-design-gap-analysis.md` for the latest design ↔ spec gap audit.
 
 ## Module boundaries (api/src/)
 `engine/` and `assess/` may depend on `bank/` and `domain/`. Reverse is forbidden. `bank/` does not know that attempts exist.

@@ -22,6 +22,7 @@ result-*
 
 # Docker / db
 db/data/
+db/data.*-backup-*/
 
 # Misc
 .env
@@ -31,3 +32,6 @@ db/data/
 # Session skill fallback files (MCP is canonical)
 .agents/CURRENT_TASK.md
 .agents/MEMORY.md
+
+# Local agent CLI scratch (not part of repo)
+.antigravitycli/
