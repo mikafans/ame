@@ -34,8 +34,10 @@ time = { version = "0.3", features = ["serde"] }
 argon2 = "0.5"
 async-trait = "0.1"
 sha2 = "0.10"
+hmac = "0.12"
 hex = "0.4"
 http-body-util = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 utoipa = { version = "5", features = ["uuid", "time"] }
 serde_yaml = "0.9"
 

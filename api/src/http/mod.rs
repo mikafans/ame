@@ -1,4 +1,4 @@
-use axum::{Json, Router, routing::get};
+use axum::{Json, Router, middleware, routing::get};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -9,7 +9,9 @@ pub struct AppState {
     pub pool: PgPool,
 }
 
+pub mod activity;
 pub mod admin;
+pub mod agents;
 pub mod exams;
 pub mod idempotency;
 pub mod me;
@@ -18,6 +20,7 @@ pub mod openapi;
 pub mod plans;
 pub mod questions;
 pub mod sessions;
+pub mod shares;
 pub mod stats;
 pub mod tags;
 
@@ -26,10 +29,14 @@ pub mod tags;
 /// `/healthz` is intentionally outside any middleware so a misconfigured DB
 /// cannot mask a healthy process. Question/tag routes live under their own
 /// modules and bring their own scope guards + idempotency wiring.
+///
+/// Embed routes are declared inside `shares::router` before the plain resource
+/// routes so the longer `/embed` path wins in Axum's router.
 pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
-    Router::new()
-        .route("/healthz", get(healthz))
+
+    // Routes wrapped with activity-log middleware (records all authenticated calls)
+    let logged = Router::new()
         .merge(tags::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(sessions::router(state.clone()))
@@ -39,7 +46,17 @@ pub fn router(pool: PgPool) -> Router {
         .merge(messages::router(state.clone()))
         .merge(me::router(state.clone()))
         .merge(admin::router(state.clone()))
+        .merge(agents::router(state.clone()))
+        .merge(shares::router(state.clone()))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            activity::activity_log_middleware,
+        ));
+
+    Router::new()
+        .route("/healthz", get(healthz))
         .merge(openapi::router(state.clone()))
+        .merge(logged)
         .with_state(state)
 }
 

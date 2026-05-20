@@ -28,3 +28,12 @@ See `docs/plans/` for implementation plans, including `docs/plans/2026-05-20-des
 
 ## Module boundaries (api/src/)
 `engine/` and `assess/` may depend on `bank/` and `domain/`. Reverse is forbidden. `bank/` does not know that attempts exist.
+
+## Agent operations
+`agents/` at the project root contains skill markdowns for agent-driven workflows:
+- `agents/generate-questions/SKILL.md` — fetch weakest tags, generate targeted questions.
+- `agents/analyze-performance/SKILL.md` — read tag stats and recent attempts.
+- `agents/adaptive-generation/SKILL.md` — full adaptive loop with pool-insufficient retry.
+
+Agent discovery starts at `GET /v1/agents/mcp.json` (public). Add `?strict=1` for strict MCP consumers.
+Register a new agent key: `POST /v1/agents/register` (unauthenticated; returns `apiKey` + discovery URLs).

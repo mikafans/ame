@@ -103,12 +103,58 @@ pub async fn create_study_plan(
         })
         .collect();
 
-    Ok(StudyPlan {
+    let plan = StudyPlan {
         id: Uuid::now_v7(),
         user_id,
         goal: goal.to_string(),
         lookback_days,
         generated_at: time::OffsetDateTime::now_utc(),
+        weeks,
+    };
+
+    let weeks_json = serde_json::to_value(&plan.weeks).map_err(|e| ApiError::Internal(e.into()))?;
+
+    sqlx::query(
+        "INSERT INTO study_plans (id, user_id, goal, lookback_days, generated_at, weeks)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(plan.id)
+    .bind(plan.user_id)
+    .bind(&plan.goal)
+    .bind(plan.lookback_days)
+    .bind(plan.generated_at)
+    .bind(&weeks_json)
+    .execute(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(plan)
+}
+
+/// Retrieve a previously generated study plan by id.
+pub async fn get_study_plan(pool: &PgPool, plan_id: Uuid) -> Result<StudyPlan, ApiError> {
+    let row = sqlx::query(
+        "SELECT id, user_id, goal, lookback_days, generated_at, weeks
+         FROM study_plans WHERE id = $1",
+    )
+    .bind(plan_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?
+    .ok_or(ApiError::NotFound {
+        resource: "study_plan",
+    })?;
+
+    let weeks: serde_json::Value = row.get("weeks");
+    let weeks: Vec<StudyPlanWeek> =
+        serde_json::from_value(weeks).map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(StudyPlan {
+        id: row.get("id"),
+        user_id: row.get("user_id"),
+        goal: row.get("goal"),
+        lookback_days: row.get("lookback_days"),
+        generated_at: row.get("generated_at"),
         weeks,
     })
 }

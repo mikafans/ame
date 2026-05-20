@@ -305,18 +305,20 @@ pub async fn create_webhook(
     let hash = hash_secret(&secret)?;
 
     sqlx::query(
-        "INSERT INTO webhooks (id, user_id, url, events, secret_hash) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO webhooks (id, user_id, url, events, secret_hash, signing_key)
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(webhook_id)
     .bind(user.user.id)
     .bind(&body.url)
     .bind(&body.events)
     .bind(&hash)
+    .bind(&secret)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    // Secret shown once; not stored in cleartext
+    // Secret shown once; signing_key stored for outbound HMAC dispatch
     Ok((
         StatusCode::CREATED,
         Json(CreateWebhookResponse {
@@ -352,14 +354,14 @@ pub async fn delete_webhook(
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-fn generate_secret() -> String {
+pub fn generate_secret() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 24];
     OsRng.fill_bytes(&mut bytes);
     hex::encode(bytes)
 }
 
-fn hash_secret(secret: &str) -> Result<String, ApiError> {
+pub fn hash_secret(secret: &str) -> Result<String, ApiError> {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
         .hash_password(secret.as_bytes(), &salt)
