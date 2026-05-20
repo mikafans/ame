@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Pre-commit gate: run `make check` (fmt-check + lint + test) from the repo root.
+# Enable with `make hooks-install` (sets core.hooksPath to .githooks/).
+# DB-backed tests are skipped unless AME_RUN_DB_TESTS=1 — use `make test-db` for those.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+echo "[pre-commit] running make check"
+make check
