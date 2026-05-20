@@ -141,6 +141,7 @@ pub async fn create_session(
         kind,
         filter,
         questions,
+        affects_rating: ar_override,
     } = build_plan(&state.pool, user.0.user.id, &body).await?;
     let question_plan = QuestionPlan {
         items: questions
@@ -161,7 +162,7 @@ pub async fn create_session(
         exam_id: body.exam_id,
         filter,
         question_plan,
-        affects_rating: kind != SessionKind::Exam,
+        affects_rating: ar_override.unwrap_or(kind != SessionKind::Exam),
         rating_snapshot: Default::default(),
         duration_min: body.duration,
         now: started_at,
@@ -285,6 +286,8 @@ struct CreatePlan {
     kind: SessionKind,
     filter: Option<serde_json::Value>,
     questions: Vec<PlannedQuestion>,
+    /// None = derive from kind; Some = override (exam uses exam.affects_rating)
+    affects_rating: Option<bool>,
 }
 
 async fn build_plan(
@@ -298,11 +301,8 @@ async fn build_plan(
             message: "quiz session hydration waits for Plan 4 quiz tables".to_string(),
         }]));
     }
-    if body.exam_id.is_some() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "examId".to_string(),
-            message: "exam session hydration waits for Plan 6 exam sections".to_string(),
-        }]));
+    if let Some(exam_id) = body.exam_id {
+        return build_exam_plan(pool, exam_id).await;
     }
 
     let count = body.count.unwrap_or(10).clamp(1, 100);
@@ -379,6 +379,96 @@ async fn build_plan(
             "diff": body.diff,
         })),
         questions,
+        affects_rating: None,
+    })
+}
+
+async fn build_exam_plan(pool: &PgPool, exam_id: Uuid) -> Result<CreatePlan, ApiError> {
+    let exam_row =
+        sqlx::query("SELECT id, affects_rating FROM exams WHERE id = $1 AND status = 'published'")
+            .bind(exam_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(internal)?
+            .ok_or(ApiError::NotFound { resource: "exam" })?;
+
+    let affects_rating: bool = exam_row.get("affects_rating");
+
+    let section_rows = sqlx::query(
+        "SELECT question_ids, order_index FROM exam_sections \
+         WHERE exam_id = $1 ORDER BY order_index ASC",
+    )
+    .bind(exam_id)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    if section_rows.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "examId".to_string(),
+            message: "exam has no sections".to_string(),
+        }]));
+    }
+
+    // Collect all question_ids across sections in order
+    let mut all_ids: Vec<Uuid> = Vec::new();
+    for row in &section_rows {
+        let ids: Option<Vec<Uuid>> = row.get("question_ids");
+        if let Some(ids) = ids {
+            all_ids.extend(ids);
+        }
+    }
+
+    if all_ids.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "examId".to_string(),
+            message: "exam sections contain no questions".to_string(),
+        }]));
+    }
+
+    let q_rows = sqlx::query(
+        "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
+         FROM questions q WHERE q.id = ANY($1::uuid[]) AND q.status = 'live'",
+    )
+    .bind(&all_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    // Build ordered questions matching all_ids order
+    let q_map: std::collections::HashMap<Uuid, _> = q_rows
+        .into_iter()
+        .map(|r| (r.get::<Uuid, _>("id"), r))
+        .collect();
+
+    let mut questions = Vec::new();
+    for id in &all_ids {
+        let row = q_map.get(id).ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+        let kind_str: String = row.get("kind");
+        let kind = QuestionKind::from_str(&kind_str)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid kind in DB: {e}")))?;
+        let payload: serde_json::Value = row.get("payload");
+        let option_order = option_order(kind, &payload)?;
+        questions.push(PlannedQuestion {
+            question: SessionQuestion {
+                id: *id,
+                kind,
+                prompt: row.get("prompt"),
+                version: row.get("version"),
+                points: row.get("points"),
+                payload,
+                option_order,
+            },
+        });
+    }
+
+    Ok(CreatePlan {
+        kind: SessionKind::Exam,
+        filter: None,
+        questions,
+        affects_rating: Some(affects_rating),
     })
 }
 

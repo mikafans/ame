@@ -2,6 +2,7 @@
 
 pub mod attempt;
 pub mod error;
+pub mod exam;
 pub mod question;
 pub mod session;
 pub mod user;

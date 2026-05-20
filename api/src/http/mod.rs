@@ -9,6 +9,7 @@ pub struct AppState {
     pub pool: PgPool,
 }
 
+pub mod exams;
 pub mod idempotency;
 pub mod openapi;
 pub mod plans;
@@ -28,6 +29,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(tags::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(sessions::router(state.clone()))
+        .merge(exams::router(state.clone()))
         .merge(plans::router(state.clone()))
         .merge(openapi::router(state.clone()))
         .with_state(state)
