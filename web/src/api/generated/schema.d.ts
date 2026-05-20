@@ -453,6 +453,32 @@ export interface components {
             result: components["schemas"]["SessionResult"];
             session: components["schemas"]["Session"];
         };
+        GenerateBody: {
+            objectives?: string[] | null;
+            /** Format: int32 */
+            questionCount?: number;
+            source: string;
+            types?: components["schemas"]["QuestionKind"][] | null;
+        };
+        GenerateResponse: {
+            candidates: unknown[];
+            objectives: string[];
+            warnings: string[];
+        };
+        GetQuizResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            /** Format: uuid */
+            id: string;
+            objectives: string[];
+            questions: components["schemas"]["QuizQuestion"][];
+            status: string;
+            title: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         GetSessionResponse: {
             attempts: components["schemas"]["Attempt"][];
             session: components["schemas"]["Session"];
@@ -533,6 +559,14 @@ export interface components {
          * @enum {string}
          */
         Normalize: "exact" | "case_insensitive_strip_accents";
+        PatchQuizResponse: {
+            /** Format: uuid */
+            id: string;
+            objectives: string[];
+            status: string;
+            title: string;
+            warnings: string[];
+        };
         PlanItem: {
             option_order?: number[] | null;
             /** Format: uuid */
@@ -634,6 +668,25 @@ export interface components {
         QuestionVersionsResponse: {
             versions: components["schemas"]["QuestionVersion"][];
         };
+        QuizPatch: {
+            objectives?: string[] | null;
+            status?: string | null;
+            title?: string | null;
+        };
+        QuizQuestion: {
+            codeSnippet?: unknown;
+            explanation?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: int32 */
+            orderIndex: number;
+            payload: unknown;
+            /** Format: int32 */
+            points: number;
+            prompt: string;
+            status: string;
+        };
         QuizStatsResponse: {
             /** Format: double */
             avg: number;
@@ -649,6 +702,7 @@ export interface components {
             createdBy: string;
             /** Format: uuid */
             id: string;
+            objectives: string[];
             status: string;
             title: string;
             /** Format: date-time */
