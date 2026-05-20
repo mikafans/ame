@@ -1015,6 +1015,83 @@ components:
           $ref: '#/components/schemas/SessionResult'
         session:
           $ref: '#/components/schemas/Session'
+    GenerateBody:
+      type: object
+      required:
+      - source
+      properties:
+        objectives:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        questionCount:
+          type: integer
+          format: int32
+          minimum: 0
+        source:
+          type: string
+        types:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/QuestionKind'
+    GenerateResponse:
+      type: object
+      required:
+      - candidates
+      - objectives
+      - warnings
+      properties:
+        candidates:
+          type: array
+          items: {}
+        objectives:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+    GetQuizResponse:
+      type: object
+      required:
+      - id
+      - title
+      - status
+      - objectives
+      - createdBy
+      - createdAt
+      - updatedAt
+      - questions
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        objectives:
+          type: array
+          items:
+            type: string
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuizQuestion'
+        status:
+          type: string
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
     GetSessionResponse:
       type: object
       required:
@@ -1208,6 +1285,30 @@ components:
       enum:
       - exact
       - case_insensitive_strip_accents
+    PatchQuizResponse:
+      type: object
+      required:
+      - id
+      - title
+      - status
+      - objectives
+      - warnings
+      properties:
+        id:
+          type: string
+          format: uuid
+        objectives:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        title:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
     PlanItem:
       type: object
       required:
@@ -1458,6 +1559,55 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/QuestionVersion'
+    QuizPatch:
+      type: object
+      properties:
+        objectives:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        status:
+          type:
+          - string
+          - 'null'
+        title:
+          type:
+          - string
+          - 'null'
+    QuizQuestion:
+      type: object
+      required:
+      - id
+      - kind
+      - prompt
+      - payload
+      - points
+      - status
+      - orderIndex
+      properties:
+        codeSnippet: {}
+        explanation:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        payload: {}
+        points:
+          type: integer
+          format: int32
+        prompt:
+          type: string
+        status:
+          type: string
     QuizStatsResponse:
       type: object
       required:
@@ -1486,6 +1636,7 @@ components:
       - id
       - title
       - status
+      - objectives
       - createdBy
       - createdAt
       - updatedAt
@@ -1499,6 +1650,10 @@ components:
         id:
           type: string
           format: uuid
+        objectives:
+          type: array
+          items:
+            type: string
         status:
           type: string
         title:
