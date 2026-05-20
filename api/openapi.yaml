@@ -294,6 +294,62 @@ paths:
           description: Exam not found
       security:
       - bearer_auth: []
+  /v1/me:
+    get:
+      tags:
+      - me
+      summary: Get the authenticated user's profile.
+      operationId: get_me
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /v1/me/attempts:
+    get:
+      tags:
+      - me
+      summary: List the current user's attempts.
+      operationId: list_attempts
+      parameters:
+      - name: limit
+        in: query
+        description: 'Page size (default: 50)'
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        description: Page offset
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: session_id
+        in: query
+        description: Filter by session
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Attempt list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAttemptsResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
   /v1/messages:
     post:
       tags:
@@ -374,6 +430,44 @@ paths:
           description: Not found
       security:
       - bearer_auth: []
+  /v1/quizzes:
+    get:
+      tags:
+      - quizzes
+      summary: List quizzes.
+      operationId: list_quizzes
+      parameters:
+      - name: status
+        in: query
+        description: 'Filter by status (default: active)'
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: 'Page size (default: 50)'
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        description: Page offset
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Quiz list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListQuizzesResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
   /v1/quizzes/{id}/stats:
     get:
       tags:
@@ -1018,6 +1112,19 @@ components:
           type: array
           items:
             type: string
+    ListAttemptsResponse:
+      type: object
+      required:
+      - attempts
+      - total
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attempt'
+        total:
+          type: integer
+          format: int64
     ListKeysResponse:
       type: object
       required:
@@ -1027,6 +1134,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/KeySummary'
+    ListQuizzesResponse:
+      type: object
+      required:
+      - quizzes
+      - total
+      properties:
+        quizzes:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuizSummary'
+        total:
+          type: integer
+          format: int64
     ListUsersResponse:
       type: object
       required:
@@ -1058,6 +1178,28 @@ components:
           type: array
           items:
             type: string
+    MeResponse:
+      type: object
+      required:
+      - id
+      - displayName
+      - role
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        email:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/Role'
     Normalize:
       type: string
       description: |-
@@ -1338,6 +1480,32 @@ components:
         median:
           type: number
           format: double
+    QuizSummary:
+      type: object
+      required:
+      - id
+      - title
+      - status
+      - createdBy
+      - createdAt
+      - updatedAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
     Role:
       type: string
       enum:

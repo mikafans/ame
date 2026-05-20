@@ -1,9 +1,9 @@
-//! Key and webhook management routes: /v1/me/keys, /v1/me/webhooks.
+//! Profile, key and webhook management routes: /v1/me, /v1/me/keys, /v1/me/webhooks, /v1/me/attempts.
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
@@ -16,10 +16,14 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::extractor::AuthenticatedUser,
+    auth::{
+        extractor::AuthenticatedUser,
+        scope::{RequireAnyScope, ScopeOneOf},
+    },
     domain::{
+        attempt::Attempt,
         error::{ApiError, FieldError},
-        user::Scope,
+        user::{Role, Scope},
     },
     http::AppState,
 };
@@ -369,8 +373,161 @@ pub fn hash_secret(secret: &str) -> Result<String, ApiError> {
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("argon2 hash failed: {e}")))
 }
 
+// ── profile ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MeResponse {
+    pub id: Uuid,
+    pub display_name: String,
+    pub email: Option<String>,
+    pub role: Role,
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
+}
+
+/// Get the authenticated user's profile.
+#[utoipa::path(
+    get,
+    path = "/v1/me",
+    responses(
+        (status = 200, description = "Current user profile", body = MeResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+async fn get_me(auth: AuthenticatedUser) -> Result<Json<MeResponse>, ApiError> {
+    Ok(Json(MeResponse {
+        id: auth.user.id,
+        display_name: auth.user.display_name,
+        email: auth.user.email,
+        role: auth.user.role,
+        created_at: auth.user.created_at,
+    }))
+}
+
+// ── attempts ──────────────────────────────────────────────────────────────────
+
+pub struct AttemptReadScopes;
+impl ScopeOneOf for AttemptReadScopes {
+    const SCOPES: &'static [Scope] = &[Scope::Human, Scope::AttemptRead];
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAttemptsQuery {
+    #[serde(default = "default_attempts_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+    /// Filter to attempts within a specific session.
+    pub session_id: Option<Uuid>,
+}
+
+fn default_attempts_limit() -> i64 {
+    50
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAttemptsResponse {
+    pub attempts: Vec<Attempt>,
+    pub total: i64,
+}
+
+/// List the current user's attempts.
+#[utoipa::path(
+    get,
+    path = "/v1/me/attempts",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size (default: 50)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+        ("session_id" = Option<Uuid>, Query, description = "Filter by session"),
+    ),
+    responses(
+        (status = 200, description = "Attempt list", body = ListAttemptsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+async fn list_attempts(
+    State(state): State<AppState>,
+    auth: RequireAnyScope<AttemptReadScopes>,
+    Query(q): Query<ListAttemptsQuery>,
+) -> Result<Json<ListAttemptsResponse>, ApiError> {
+    let rows = if let Some(sid) = q.session_id {
+        sqlx::query(
+            "SELECT id, user_id, question_id, question_version, session_id, response,
+                    presentation, is_correct, score, time_to_answer_ms,
+                    rating_before_user_avg, rating_before_question,
+                    user_tag_deltas, question_delta, created_at,
+                    COUNT(*) OVER() AS total
+             FROM attempts
+             WHERE user_id = $1 AND session_id = $2
+             ORDER BY created_at DESC
+             LIMIT $3 OFFSET $4",
+        )
+        .bind(auth.0.user.id)
+        .bind(sid)
+        .bind(q.limit)
+        .bind(q.offset)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+    } else {
+        sqlx::query(
+            "SELECT id, user_id, question_id, question_version, session_id, response,
+                    presentation, is_correct, score, time_to_answer_ms,
+                    rating_before_user_avg, rating_before_question,
+                    user_tag_deltas, question_delta, created_at,
+                    COUNT(*) OVER() AS total
+             FROM attempts
+             WHERE user_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2 OFFSET $3",
+        )
+        .bind(auth.0.user.id)
+        .bind(q.limit)
+        .bind(q.offset)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+    };
+
+    let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+    let attempts = rows
+        .into_iter()
+        .map(|r| Attempt {
+            id: r.get("id"),
+            user_id: r.get("user_id"),
+            question_id: r.get("question_id"),
+            question_version: r.get("question_version"),
+            session_id: r.get("session_id"),
+            response: serde_json::from_value(r.get("response")).unwrap_or(
+                crate::domain::attempt::AttemptResponse::Short {
+                    answer: String::new(),
+                },
+            ),
+            presentation: serde_json::from_value(r.get("presentation")).unwrap_or_default(),
+            is_correct: r.get("is_correct"),
+            score: r.get("score"),
+            time_to_answer_ms: r.get("time_to_answer_ms"),
+            rating_before_user_avg: r.get("rating_before_user_avg"),
+            rating_before_question: r.get("rating_before_question"),
+            user_tag_deltas: serde_json::from_value(r.get("user_tag_deltas")).unwrap_or_default(),
+            question_delta: r.get("question_delta"),
+            created_at: r.get("created_at"),
+        })
+        .collect();
+
+    Ok(Json(ListAttemptsResponse { attempts, total }))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/v1/me", get(get_me))
         .route("/v1/me/keys", get(list_keys))
         .route("/v1/me/keys", post(create_key))
         .route("/v1/me/keys/{id}/rotate", post(rotate_key))
@@ -378,5 +535,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/me/webhooks", get(list_webhooks))
         .route("/v1/me/webhooks", post(create_webhook))
         .route("/v1/me/webhooks/{id}", delete(delete_webhook))
+        .route("/v1/me/attempts", get(list_attempts))
         .with_state(state)
 }

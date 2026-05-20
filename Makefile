@@ -20,10 +20,10 @@ fmt-check: ## Verify formatting without mutating
 		echo "[web] skipping prettier --check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
-lint: ## Clippy + eslint + tsc + sqlfluff lint
+lint: ## Clippy + eslint + tsc + api drift check + sqlfluff lint
 	cd api && mise exec -- cargo clippy --all-targets -- -D warnings
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run lint && mise exec -- bun run type-check; \
+		cd web && mise exec -- bun run lint && mise exec -- bun run type-check && mise exec -- bun run api:check; \
 	else \
 		echo "[web] skipping lint + type-check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
