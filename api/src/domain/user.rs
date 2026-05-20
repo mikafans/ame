@@ -2,16 +2,17 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Admin,
     User,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct User {
     pub id: Uuid,
     pub email: Option<String>,
@@ -25,8 +26,8 @@ pub struct User {
 ///
 /// The wire strings (used in JSON and stored in Postgres `text[]`) must stay in
 /// lock-step with the migration's CHECK list — see
-/// `db/migrations/20260519092355_init.sql`. `from_str` is the single point of
-/// translation; anything not listed here is rejected as `UnknownScope`.
+/// `db/migrations/20260520210000_p7_stats_feedback_keys.sql`. `from_str` is the
+/// single point of translation; anything not listed here is rejected as `UnknownScope`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Scope {
     #[serde(rename = "human")]
@@ -35,6 +36,24 @@ pub enum Scope {
     AgentWriteQuestions,
     #[serde(rename = "agent:read-only")]
     AgentReadOnly,
+    #[serde(rename = "quiz.read")]
+    QuizRead,
+    #[serde(rename = "quiz.write")]
+    QuizWrite,
+    #[serde(rename = "attempt.read")]
+    AttemptRead,
+    #[serde(rename = "attempt.write")]
+    AttemptWrite,
+    #[serde(rename = "stats.read")]
+    StatsRead,
+    #[serde(rename = "feedback.write")]
+    FeedbackWrite,
+    #[serde(rename = "plan.read")]
+    PlanRead,
+    #[serde(rename = "plan.write")]
+    PlanWrite,
+    #[serde(rename = "admin")]
+    Admin,
 }
 
 impl Scope {
@@ -47,6 +66,15 @@ impl Scope {
             Scope::Human => "human",
             Scope::AgentWriteQuestions => "agent:write-questions",
             Scope::AgentReadOnly => "agent:read-only",
+            Scope::QuizRead => "quiz.read",
+            Scope::QuizWrite => "quiz.write",
+            Scope::AttemptRead => "attempt.read",
+            Scope::AttemptWrite => "attempt.write",
+            Scope::StatsRead => "stats.read",
+            Scope::FeedbackWrite => "feedback.write",
+            Scope::PlanRead => "plan.read",
+            Scope::PlanWrite => "plan.write",
+            Scope::Admin => "admin",
         }
     }
 }
@@ -69,6 +97,15 @@ impl FromStr for Scope {
             "human" => Ok(Scope::Human),
             "agent:write-questions" => Ok(Scope::AgentWriteQuestions),
             "agent:read-only" => Ok(Scope::AgentReadOnly),
+            "quiz.read" => Ok(Scope::QuizRead),
+            "quiz.write" => Ok(Scope::QuizWrite),
+            "attempt.read" => Ok(Scope::AttemptRead),
+            "attempt.write" => Ok(Scope::AttemptWrite),
+            "stats.read" => Ok(Scope::StatsRead),
+            "feedback.write" => Ok(Scope::FeedbackWrite),
+            "plan.read" => Ok(Scope::PlanRead),
+            "plan.write" => Ok(Scope::PlanWrite),
+            "admin" => Ok(Scope::Admin),
             other => Err(UnknownScope(other.to_string())),
         }
     }
@@ -84,6 +121,15 @@ mod tests {
             Scope::Human,
             Scope::AgentWriteQuestions,
             Scope::AgentReadOnly,
+            Scope::QuizRead,
+            Scope::QuizWrite,
+            Scope::AttemptRead,
+            Scope::AttemptWrite,
+            Scope::StatsRead,
+            Scope::FeedbackWrite,
+            Scope::PlanRead,
+            Scope::PlanWrite,
+            Scope::Admin,
         ] {
             let s = scope.as_str();
             let parsed: Scope = s.parse().expect("known scope should parse");

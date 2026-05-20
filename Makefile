@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank e2e check validate db-up db-down hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess e2e check validate db-up db-down hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -46,12 +46,16 @@ test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test sessions -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
 
 test-bank: ## Bank integration tests only (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
 
 test-assess: ## Exam composition integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
+
+test-stats: ## Stats, messages, keys integration tests (requires `make db-up`)
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
 
 openapi: ## Regenerate api/openapi.yaml snapshot
 	cd api && mise exec -- cargo run --quiet --bin gen-openapi

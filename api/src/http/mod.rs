@@ -9,12 +9,16 @@ pub struct AppState {
     pub pool: PgPool,
 }
 
+pub mod admin;
 pub mod exams;
 pub mod idempotency;
+pub mod me;
+pub mod messages;
 pub mod openapi;
 pub mod plans;
 pub mod questions;
 pub mod sessions;
+pub mod stats;
 pub mod tags;
 
 /// Build the production HTTP router.
@@ -31,6 +35,10 @@ pub fn router(pool: PgPool) -> Router {
         .merge(sessions::router(state.clone()))
         .merge(exams::router(state.clone()))
         .merge(plans::router(state.clone()))
+        .merge(stats::router(state.clone()))
+        .merge(messages::router(state.clone()))
+        .merge(me::router(state.clone()))
+        .merge(admin::router(state.clone()))
         .merge(openapi::router(state.clone()))
         .with_state(state)
 }

@@ -268,6 +268,97 @@ paths:
           description: Token lacks required scope
       security:
       - bearer_auth: []
+  /v1/exams/{id}/stats:
+    get:
+      tags:
+      - crate::http::stats
+      operationId: exam_stats
+      parameters:
+      - name: id
+        in: path
+        description: Exam id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Exam stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamStatsResponse'
+        '403':
+          description: Requires stats.read scope
+        '404':
+          description: Exam not found
+      security:
+      - bearer_auth: []
+  /v1/messages:
+    post:
+      tags:
+      - crate::http::messages
+      operationId: send_message
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageBody'
+        required: true
+      responses:
+        '201':
+          description: Message queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Requires feedback.write scope
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/quizzes/{id}/stats:
+    get:
+      tags:
+      - crate::http::stats
+      operationId: quiz_stats
+      parameters:
+      - name: id
+        in: path
+        description: Quiz id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: cohortId
+        in: query
+        description: Filter by cohort (future)
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: window
+        in: query
+        description: '''last30d'' | ''all'''
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Quiz stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizStatsResponse'
+        '403':
+          description: Requires stats.read scope
+        '404':
+          description: Quiz not found
+      security:
+      - bearer_auth: []
   /v1/sessions:
     post:
       tags:
@@ -569,6 +660,32 @@ components:
           type: string
         name:
           type: string
+    CreateKeyBody:
+      type: object
+      required:
+      - label
+      - scopes
+      properties:
+        label:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    CreateKeyResponse:
+      type: object
+      required:
+      - apiKey
+      - prefix
+      - id
+      properties:
+        apiKey:
+          type: string
+        id:
+          type: string
+          format: uuid
+        prefix:
+          type: string
     CreateQuestionsBody:
       type: object
       required:
@@ -654,6 +771,41 @@ components:
           - 'null'
         name:
           type: string
+    CreateWebhookBody:
+      type: object
+      required:
+      - url
+      - events
+      properties:
+        events:
+          type: array
+          items:
+            type: string
+        url:
+          type: string
+    CreateWebhookResponse:
+      type: object
+      required:
+      - id
+      - secret
+      properties:
+        id:
+          type: string
+          format: uuid
+        secret:
+          type: string
+    DistributionBucket:
+      type: object
+      required:
+      - bucket
+      - count
+      properties:
+        bucket:
+          type: integer
+          format: int32
+        count:
+          type: integer
+          format: int64
     EssayPayload:
       type: object
       required:
@@ -670,6 +822,29 @@ components:
           type:
           - string
           - 'null'
+    ExamStatsResponse:
+      type: object
+      required:
+      - passRate
+      - sectionAvgs
+      properties:
+        passRate:
+          type: number
+          format: double
+        sectionAvgs:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionAvg'
+        timeP50:
+          type:
+          - number
+          - 'null'
+          format: double
+        timeP95:
+          type:
+          - number
+          - 'null'
+          format: double
     FinishSessionResponse:
       type: object
       required:
@@ -722,6 +897,27 @@ components:
       enum:
       - graded
       - pending_manual
+    ItemStats:
+      type: object
+      required:
+      - questionId
+      - correctRate
+      - avgTimeMs
+      properties:
+        avgTimeMs:
+          type: number
+          format: double
+        correctRate:
+          type: number
+          format: double
+        discriminationIdx:
+          type:
+          - number
+          - 'null'
+          format: double
+        questionId:
+          type: string
+          format: uuid
     Judge:
       type: string
       description: |-
@@ -731,6 +927,58 @@ components:
       - exact
       - manual
       - llm
+    KeySummary:
+      type: object
+      required:
+      - id
+      - name
+      - scopes
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        lastUsedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    ListKeysResponse:
+      type: object
+      required:
+      - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeySummary'
+    ListUsersResponse:
+      type: object
+      required:
+      - users
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    ListWebhooksResponse:
+      type: object
+      required:
+      - webhooks
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookSummary'
     McPayload:
       type: object
       required:
@@ -1002,6 +1250,85 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/QuestionVersion'
+    QuizStatsResponse:
+      type: object
+      required:
+      - avg
+      - median
+      - distribution
+      - items
+      properties:
+        avg:
+          type: number
+          format: double
+        distribution:
+          type: array
+          items:
+            $ref: '#/components/schemas/DistributionBucket'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemStats'
+        median:
+          type: number
+          format: double
+    Role:
+      type: string
+      enum:
+      - admin
+      - user
+    RotateKeyResponse:
+      type: object
+      required:
+      - apiKey
+      properties:
+        apiKey:
+          type: string
+    SectionAvg:
+      type: object
+      required:
+      - sectionId
+      - title
+      - avgScore
+      properties:
+        avgScore:
+          type: number
+          format: double
+        sectionId:
+          type: string
+          format: uuid
+        title:
+          type: string
+    SendMessageBody:
+      type: object
+      required:
+      - userId
+      - channel
+      - body
+      properties:
+        body:
+          type: string
+        channel:
+          type: string
+        linkQuizId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+    SendMessageResponse:
+      type: object
+      required:
+      - messageId
+      - status
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        status:
+          type: string
     Session:
       type: object
       required:
@@ -1166,6 +1493,55 @@ components:
       properties:
         correct:
           type: boolean
+    UpdateUserRoleBody:
+      type: object
+      required:
+      - role
+      properties:
+        role:
+          type: string
+    User:
+      type: object
+      required:
+      - id
+      - display_name
+      - role
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        display_name:
+          type: string
+        email:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/Role'
+    WebhookSummary:
+      type: object
+      required:
+      - id
+      - url
+      - events
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
   securitySchemes:
     bearer_auth:
       type: http
