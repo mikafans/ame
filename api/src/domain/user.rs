@@ -10,6 +10,7 @@ use uuid::Uuid;
 pub enum Role {
     Admin,
     User,
+    Agent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

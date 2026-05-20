@@ -32,6 +32,8 @@ pub enum ApiError {
     IdempotencyConflict,
     #[error("scoring unavailable")]
     ScoringUnavailable,
+    #[error("too many requests")]
+    TooManyRequests,
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -107,6 +109,12 @@ impl IntoResponse for ApiError {
                 StatusCode::SERVICE_UNAVAILABLE,
                 "scoring_unavailable",
                 "grade required an unavailable dependency".to_string(),
+                None,
+            ),
+            ApiError::TooManyRequests => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "anonymous_attempt_rate_limited",
+                "rate limit exceeded for anonymous attempts".to_string(),
                 None,
             ),
             ApiError::Internal(err) => {

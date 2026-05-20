@@ -31,6 +31,7 @@ use crate::{
         QuestionKind, QuestionStatus, QuestionVersion, ShortPayload, Tag, TfPayload,
     },
     domain::{attempt::Attempt, session::Session, user::User},
+    engine::planner::{StudyPlan, StudyPlanItem, StudyPlanWeek},
     http::{
         AppState,
         admin::{ListUsersResponse, UpdateUserRoleBody},
@@ -39,6 +40,7 @@ use crate::{
             ListKeysResponse, ListWebhooksResponse, RotateKeyResponse, WebhookSummary,
         },
         messages::{SendMessageBody, SendMessageResponse},
+        plans::CreatePlanBody,
         questions::{
             CreateQuestionsBody, CreateQuestionsResponse, QuestionListResponse,
             QuestionVersionsResponse,
@@ -76,7 +78,7 @@ impl Modify for SecurityAddon {
     info(
         title = "ame API",
         version = "0.1.0",
-        description = "Question collector + exam platform. Plan 3 surface: tags + questions CRUD with versioning."
+        description = "Question collector + exam platform."
     ),
     paths(
         crate::http::tags::list_tags,
@@ -95,6 +97,8 @@ impl Modify for SecurityAddon {
         crate::http::stats::quiz_stats,
         crate::http::stats::exam_stats,
         crate::http::messages::send_message,
+        crate::http::plans::create_plan,
+        crate::http::plans::get_plan,
     ),
     components(schemas(
         Tag,
@@ -147,6 +151,10 @@ impl Modify for SecurityAddon {
         ListWebhooksResponse,
         CreateWebhookBody,
         CreateWebhookResponse,
+        StudyPlan,
+        StudyPlanWeek,
+        StudyPlanItem,
+        CreatePlanBody,
     )),
     modifiers(&SecurityAddon),
 )]

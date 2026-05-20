@@ -4,3 +4,4 @@ pub mod elo;
 pub mod graders;
 pub mod planner;
 pub mod sessions;
+pub mod webhooks;
