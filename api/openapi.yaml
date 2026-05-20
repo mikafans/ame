@@ -268,25 +268,283 @@ paths:
           description: Token lacks required scope
       security:
       - bearer_auth: []
+  /v1/sessions:
+    post:
+      tags:
+      - crate::http::sessions
+      operationId: create_session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionBody'
+        required: true
+      responses:
+        '201':
+          description: Created session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/sessions/{id}:
+    get:
+      tags:
+      - crate::http::sessions
+      operationId: get_session
+      parameters:
+      - name: id
+        in: path
+        description: Session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Session resume state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSessionResponse'
+        '404':
+          description: No such session
+      security:
+      - bearer_auth: []
+  /v1/sessions/{id}/answer:
+    post:
+      tags:
+      - crate::http::sessions
+      operationId: answer
+      parameters:
+      - name: id
+        in: path
+        description: Session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnswerSessionBody'
+        required: true
+      responses:
+        '200':
+          description: Stored answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerSessionResponse'
+        '410':
+          description: Session expired
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/sessions/{id}/finish:
+    post:
+      tags:
+      - crate::http::sessions
+      operationId: finish
+      parameters:
+      - name: id
+        in: path
+        description: Session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Finished session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinishSessionResponse'
+        '404':
+          description: No such session
+      security:
+      - bearer_auth: []
 components:
   schemas:
-    ClozePayload:
+    AnswerSessionBody:
       type: object
       required:
-      - template
-      - blanks
-      - normalize
+      - questionId
+      - response
       properties:
-        blanks:
+        questionId:
+          type: string
+          format: uuid
+        response:
+          $ref: '#/components/schemas/AttemptResponse'
+        timeToAnswerMs:
+          type:
+          - integer
+          - 'null'
+          format: int32
+    AnswerSessionResponse:
+      type: object
+      required:
+      - attempt
+      - grade
+      - replayed
+      properties:
+        attempt:
+          $ref: '#/components/schemas/Attempt'
+        grade:
+          $ref: '#/components/schemas/GradeOutcome'
+        replayed:
+          type: boolean
+    Attempt:
+      type: object
+      required:
+      - id
+      - user_id
+      - question_id
+      - question_version
+      - response
+      - presentation
+      - is_correct
+      - score
+      - rating_before_user_avg
+      - rating_before_question
+      - user_tag_deltas
+      - question_delta
+      - created_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        is_correct:
+          type: boolean
+        presentation:
+          $ref: '#/components/schemas/AttemptPresentation'
+        question_delta:
+          type: number
+          format: double
+        question_id:
+          type: string
+          format: uuid
+        question_version:
+          type: integer
+          format: int32
+        rating_before_question:
+          type: number
+          format: double
+        rating_before_user_avg:
+          type: number
+          format: double
+        response:
+          $ref: '#/components/schemas/AttemptResponse'
+        score:
+          type: number
+          format: double
+        session_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        time_to_answer_ms:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        user_id:
+          type: string
+          format: uuid
+        user_tag_deltas:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          propertyNames:
+            type: string
+    AttemptPresentation:
+      type: object
+      properties:
+        option_order:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+            minimum: 0
+    AttemptResponse:
+      oneOf:
+      - type: object
+        required:
+        - selected_position
+        properties:
+          selected_position:
+            type: integer
+            minimum: 0
+      - type: object
+        required:
+        - answer
+        properties:
+          answer:
+            type: boolean
+      - type: object
+        required:
+        - answer
+        properties:
+          answer:
+            type: string
+      - type: object
+        required:
+        - body
+        - word_count
+        properties:
+          body:
+            type: string
+          word_count:
+            type: integer
+            format: int32
+      - type: object
+        required:
+        - source
+        - language
+        properties:
+          language:
+            type: string
+          source:
+            type: string
+    CodePayload:
+      type: object
+      required:
+      - language
+      - starter
+      properties:
+        exemplar:
+          type:
+          - string
+          - 'null'
+        language:
+          type: string
+        starter:
+          type: string
+        tests:
           type: array
           items:
-            type: array
-            items:
-              type: string
-        normalize:
-          $ref: '#/components/schemas/Normalize'
-        template:
-          type: string
+            $ref: '#/components/schemas/CodeTest'
+        time_limit_ms:
+          type:
+          - integer
+          - 'null'
+          format: int32
     CodeSnippet:
       type: object
       required:
@@ -300,6 +558,16 @@ components:
           - string
           - 'null'
         language:
+          type: string
+    CodeTest:
+      type: object
+      required:
+      - name
+      - body
+      properties:
+        body:
+          type: string
+        name:
           type: string
     CreateQuestionsBody:
       type: object
@@ -319,6 +587,62 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Question'
+    CreateSessionBody:
+      type: object
+      properties:
+        cats:
+          type: array
+          items:
+            type: string
+        count:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        diff:
+          type:
+          - string
+          - 'null'
+        duration:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        examId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        mode:
+          type:
+          - string
+          - 'null'
+        quizId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionKind'
+    CreateSessionResponse:
+      type: object
+      required:
+      - sessionId
+      - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionQuestion'
+        sessionId:
+          type: string
+          format: uuid
     CreateTagBody:
       type: object
       required:
@@ -330,21 +654,74 @@ components:
           - 'null'
         name:
           type: string
-    FreeTextPayload:
+    EssayPayload:
       type: object
       required:
-      - accepted
-      - normalize
       - judge
       properties:
-        accepted:
-          type: array
-          items:
-            type: string
         judge:
           $ref: '#/components/schemas/Judge'
-        normalize:
-          $ref: '#/components/schemas/Normalize'
+        min_words:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        rubric:
+          type:
+          - string
+          - 'null'
+    FinishSessionResponse:
+      type: object
+      required:
+      - session
+      - result
+      properties:
+        result:
+          $ref: '#/components/schemas/SessionResult'
+        session:
+          $ref: '#/components/schemas/Session'
+    GetSessionResponse:
+      type: object
+      required:
+      - session
+      - attempts
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attempt'
+        session:
+          $ref: '#/components/schemas/Session'
+    GradeOutcome:
+      type: object
+      required:
+      - status
+      - correct
+      - points_awarded
+      - max
+      - correct_answer
+      properties:
+        correct:
+          type: boolean
+        correct_answer:
+          type: object
+        max:
+          type: integer
+          format: int32
+        note:
+          type:
+          - string
+          - 'null'
+        points_awarded:
+          type: integer
+          format: int32
+        status:
+          $ref: '#/components/schemas/GradeStatus'
+    GradeStatus:
+      type: string
+      enum:
+      - graded
+      - pending_manual
     Judge:
       type: string
       description: |-
@@ -352,7 +729,9 @@ components:
         the deferred LLM-as-judge feature.
       enum:
       - exact
-    McqPayload:
+      - manual
+      - llm
+    McPayload:
       type: object
       required:
       - options
@@ -373,6 +752,29 @@ components:
       enum:
       - exact
       - case_insensitive_strip_accents
+    PlanItem:
+      type: object
+      required:
+      - question_id
+      - version
+      properties:
+        option_order:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+            minimum: 0
+        question_id:
+          type: string
+          format: uuid
+        section:
+          type:
+          - string
+          - 'null'
+        version:
+          type: integer
+          format: int32
     Question:
       type: object
       required:
@@ -381,6 +783,7 @@ components:
       - prompt
       - payload
       - status
+      - points
       - rating
       - attempts_count
       - version
@@ -412,6 +815,9 @@ components:
           $ref: '#/components/schemas/QuestionKind'
         payload:
           type: object
+        points:
+          type: integer
+          format: int32
         prompt:
           type: string
         rating:
@@ -475,6 +881,9 @@ components:
           $ref: '#/components/schemas/QuestionKind'
         payload:
           type: object
+        points:
+          type: integer
+          format: int32
         prompt:
           type: string
         source:
@@ -488,9 +897,11 @@ components:
     QuestionKind:
       type: string
       enum:
-      - mcq
-      - free_text
-      - cloze
+      - mc
+      - tf
+      - short
+      - essay
+      - code
     QuestionListResponse:
       type: object
       required:
@@ -519,6 +930,11 @@ components:
           - 'null'
         payload:
           type: object
+        points:
+          type:
+          - integer
+          - 'null'
+          format: int32
         prompt:
           type:
           - string
@@ -529,6 +945,15 @@ components:
           - 'null'
           items:
             type: string
+    QuestionPlan:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanItem'
     QuestionStatus:
       type: string
       enum:
@@ -577,6 +1002,144 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/QuestionVersion'
+    Session:
+      type: object
+      required:
+      - id
+      - user_id
+      - kind
+      - question_plan
+      - status
+      - affects_rating
+      - rating_snapshot
+      - started_at
+      properties:
+        affects_rating:
+          type: boolean
+        deadline_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        exam_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        filter:
+          type: object
+        finished_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/SessionKind'
+        question_plan:
+          $ref: '#/components/schemas/QuestionPlan'
+        quiz_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        rating_snapshot:
+          type: object
+        result:
+          type: object
+        started_at:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+        user_id:
+          type: string
+          format: uuid
+    SessionKind:
+      type: string
+      enum:
+      - quiz
+      - exam
+      - practice
+    SessionQuestion:
+      type: object
+      required:
+      - id
+      - kind
+      - prompt
+      - version
+      - points
+      - payload
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        option_order:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+            minimum: 0
+        payload:
+          type: object
+        points:
+          type: integer
+          format: int32
+        prompt:
+          type: string
+        version:
+          type: integer
+          format: int32
+    SessionResult:
+      type: object
+      required:
+      - points_awarded
+      - max_points
+      - percent
+      - graded_count
+      - pending_manual_count
+      properties:
+        graded_count:
+          type: integer
+          minimum: 0
+        max_points:
+          type: integer
+          format: int32
+        pending_manual_count:
+          type: integer
+          minimum: 0
+        percent:
+          type: number
+          format: double
+        points_awarded:
+          type: integer
+          format: int32
+    SessionStatus:
+      type: string
+      enum:
+      - in_progress
+      - finished
+      - abandoned
+    ShortPayload:
+      type: object
+      required:
+      - accepted
+      - normalize
+      - judge
+      properties:
+        accepted:
+          type: array
+          items:
+            type: string
+        judge:
+          $ref: '#/components/schemas/Judge'
+        normalize:
+          $ref: '#/components/schemas/Normalize'
     Tag:
       type: object
       required:
@@ -596,6 +1159,13 @@ components:
           format: uuid
         name:
           type: string
+    TfPayload:
+      type: object
+      required:
+      - correct
+      properties:
+        correct:
+          type: boolean
   securitySchemes:
     bearer_auth:
       type: http

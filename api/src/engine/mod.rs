@@ -1,1 +1,6 @@
-//! Sessions, attempts, grading, Elo. Populated in Plan 4.
+//! Sessions, attempts, grading, Elo.
+
+pub mod elo;
+pub mod graders;
+pub mod planner;
+pub mod sessions;

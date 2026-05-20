@@ -5,7 +5,7 @@
 //! `make check` run prints "skipping" and exits 0 so the pre-commit gate
 //! stays fast; CI / pre-PR runs hit them via `make test-db` or `make test-bank`.
 //!
-//! Coverage targets per `docs/plans/2026-05-19-plan-3-bank.md` §Testing:
+//! Coverage targets per `docs/plans/2026-05-20-plan-3-question-bank.md` §Testing:
 //!
 //! - Tag get-or-create lowercases + dedupes.
 //! - Batch create enforces the 50-question cap.
@@ -23,7 +23,7 @@ use ame_api::{
     },
     domain::{
         error::ApiError,
-        question::{McqPayload, QuestionKind, QuestionStatus},
+        question::{McPayload, QuestionKind, QuestionStatus},
     },
 };
 
@@ -67,19 +67,20 @@ async fn make_user(pool: &PgPool) -> Uuid {
     id
 }
 
-fn mcq_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
-    let payload = serde_json::to_value(McqPayload {
+fn mc_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
+    let payload = serde_json::to_value(McPayload {
         options: vec!["a".into(), "b".into(), "c".into()],
         correct_index: 1,
     })
     .unwrap();
     QuestionInsert {
-        kind: QuestionKind::Mcq,
+        kind: QuestionKind::Mc,
         prompt: prompt.to_string(),
         code_snippet: None,
         payload,
         explanation: None,
         source: None,
+        points: 1,
         tags: tags.iter().map(|s| s.to_string()).collect(),
     }
 }
@@ -112,9 +113,9 @@ async fn create_questions_batch_inserts_and_links_tags() {
     let user_id = make_user(&pool).await;
 
     let batch = vec![
-        mcq_insert("Q1", &["rust:async", "rust:lifetimes"]),
-        mcq_insert("Q2", &["rust:async"]),
-        mcq_insert("Q3", &[]),
+        mc_insert("Q1", &["rust:async", "rust:lifetimes"]),
+        mc_insert("Q2", &["rust:async"]),
+        mc_insert("Q3", &[]),
     ];
     let created = q_repo::create_questions(&pool, user_id, batch)
         .await
@@ -167,7 +168,7 @@ async fn create_questions_rejects_oversized_batch() {
     let user_id = make_user(&pool).await;
 
     let batch: Vec<_> = (0..MAX_BATCH + 1)
-        .map(|i| mcq_insert(&format!("over{}", i), &[]))
+        .map(|i| mc_insert(&format!("over{}", i), &[]))
         .collect();
     let err = q_repo::create_questions(&pool, user_id, batch)
         .await
@@ -190,7 +191,7 @@ async fn update_live_question_bumps_version_and_writes_history() {
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
 
-    let q = q_repo::create_questions(&pool, user_id, vec![mcq_insert("live-q", &[])])
+    let q = q_repo::create_questions(&pool, user_id, vec![mc_insert("live-q", &[])])
         .await
         .unwrap()
         .pop()
@@ -225,7 +226,7 @@ async fn update_draft_question_does_not_bump_version() {
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
 
-    let q = q_repo::create_questions(&pool, user_id, vec![mcq_insert("draft-q", &[])])
+    let q = q_repo::create_questions(&pool, user_id, vec![mc_insert("draft-q", &[])])
         .await
         .unwrap()
         .pop()
@@ -252,7 +253,7 @@ async fn cannot_edit_archived_question() {
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
 
-    let q = q_repo::create_questions(&pool, user_id, vec![mcq_insert("archive-me", &[])])
+    let q = q_repo::create_questions(&pool, user_id, vec![mc_insert("archive-me", &[])])
         .await
         .unwrap()
         .pop()

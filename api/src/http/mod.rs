@@ -12,6 +12,7 @@ pub struct AppState {
 pub mod idempotency;
 pub mod openapi;
 pub mod questions;
+pub mod sessions;
 pub mod tags;
 
 /// Build the production HTTP router.
@@ -25,6 +26,7 @@ pub fn router(pool: PgPool) -> Router {
         .route("/healthz", get(healthz))
         .merge(tags::router(state.clone()))
         .merge(questions::router(state.clone()))
+        .merge(sessions::router(state.clone()))
         .merge(openapi::router(state.clone()))
         .with_state(state)
 }

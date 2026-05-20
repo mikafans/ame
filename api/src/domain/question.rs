@@ -2,7 +2,7 @@
 //!
 //! These mirror the storage shape in `db/migrations/20260519092355_init.sql`
 //! and the wire shapes defined in
-//! `docs/specs/2026-05-19-question-exam-platform-design.md`.
+//! `docs/specs/2026-05-20-harus-platform-design.md`.
 //!
 //! The `kind` / `status` enums are the single point of translation between the
 //! Postgres `text` columns (constrained by CHECK clauses) and Rust. If the DB
@@ -11,8 +11,7 @@
 //!
 //! Payload shapes are kept as separate per-kind structs. `Question::payload`
 //! stays as `serde_json::Value` to match the jsonb column 1:1; typed decoding
-//! into [`McqPayload`] / [`FreeTextPayload`] / [`ClozePayload`] happens at the
-//! repository / HTTP boundary.
+//! happens at the repository / HTTP boundary.
 
 use std::str::FromStr;
 
@@ -24,17 +23,21 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestionKind {
-    Mcq,
-    FreeText,
-    Cloze,
+    Mc,
+    Tf,
+    Short,
+    Essay,
+    Code,
 }
 
 impl QuestionKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            QuestionKind::Mcq => "mcq",
-            QuestionKind::FreeText => "free_text",
-            QuestionKind::Cloze => "cloze",
+            QuestionKind::Mc => "mc",
+            QuestionKind::Tf => "tf",
+            QuestionKind::Short => "short",
+            QuestionKind::Essay => "essay",
+            QuestionKind::Code => "code",
         }
     }
 }
@@ -54,9 +57,11 @@ impl FromStr for QuestionKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "mcq" => Ok(QuestionKind::Mcq),
-            "free_text" => Ok(QuestionKind::FreeText),
-            "cloze" => Ok(QuestionKind::Cloze),
+            "mc" => Ok(QuestionKind::Mc),
+            "tf" => Ok(QuestionKind::Tf),
+            "short" => Ok(QuestionKind::Short),
+            "essay" => Ok(QuestionKind::Essay),
+            "code" => Ok(QuestionKind::Code),
             other => Err(UnknownQuestionKind(other.to_string())),
         }
     }
@@ -118,6 +123,8 @@ pub enum Normalize {
 #[serde(rename_all = "snake_case")]
 pub enum Judge {
     Exact,
+    Manual,
+    Llm,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
@@ -129,23 +136,48 @@ pub struct CodeSnippet {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct McqPayload {
+pub struct McPayload {
     pub options: Vec<String>,
     pub correct_index: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct FreeTextPayload {
+pub struct TfPayload {
+    pub correct: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ShortPayload {
     pub accepted: Vec<String>,
     pub normalize: Normalize,
     pub judge: Judge,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct ClozePayload {
-    pub template: String,
-    pub blanks: Vec<Vec<String>>,
-    pub normalize: Normalize,
+pub struct EssayPayload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_words: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rubric: Option<String>,
+    pub judge: Judge,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct CodeTest {
+    pub name: String,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct CodePayload {
+    pub language: String,
+    pub starter: String,
+    #[serde(default)]
+    pub tests: Vec<CodeTest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limit_ms: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exemplar: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -173,6 +205,7 @@ pub struct Question {
     pub status: QuestionStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    pub points: i32,
     pub rating: f64,
     pub attempts_count: i32,
     pub version: i32,
@@ -210,9 +243,11 @@ mod tests {
     #[test]
     fn question_kind_string_roundtrip() {
         for kind in [
-            QuestionKind::Mcq,
-            QuestionKind::FreeText,
-            QuestionKind::Cloze,
+            QuestionKind::Mc,
+            QuestionKind::Tf,
+            QuestionKind::Short,
+            QuestionKind::Essay,
+            QuestionKind::Code,
         ] {
             let parsed: QuestionKind = kind.as_str().parse().expect("known kind should parse");
             assert_eq!(parsed, kind);
@@ -221,18 +256,18 @@ mod tests {
 
     #[test]
     fn question_kind_rejects_unknown() {
-        let err = "code".parse::<QuestionKind>().unwrap_err();
-        assert_eq!(err.0, "code");
+        let err = "cloze".parse::<QuestionKind>().unwrap_err();
+        assert_eq!(err.0, "cloze");
     }
 
     #[test]
     fn question_kind_serde_matches_db_strings() {
         assert_eq!(
-            serde_json::to_string(&QuestionKind::FreeText).unwrap(),
-            "\"free_text\""
+            serde_json::to_string(&QuestionKind::Short).unwrap(),
+            "\"short\""
         );
-        let parsed: QuestionKind = serde_json::from_str("\"mcq\"").unwrap();
-        assert_eq!(parsed, QuestionKind::Mcq);
+        let parsed: QuestionKind = serde_json::from_str("\"mc\"").unwrap();
+        assert_eq!(parsed, QuestionKind::Mc);
     }
 
     #[test]
@@ -254,14 +289,14 @@ mod tests {
     }
 
     #[test]
-    fn mcq_payload_serde() {
-        let p = McqPayload {
+    fn mc_payload_serde() {
+        let p = McPayload {
             options: vec!["a".into(), "b".into(), "c".into()],
             correct_index: 1,
         };
         let json = serde_json::to_value(&p).unwrap();
         assert_eq!(json["correct_index"], 1);
-        let back: McqPayload = serde_json::from_value(json).unwrap();
+        let back: McPayload = serde_json::from_value(json).unwrap();
         assert_eq!(back, p);
     }
 

@@ -40,5 +40,6 @@ utoipa = { version = "5", features = ["uuid", "time"] }
 serde_yaml = "0.9"
 
 [dev-dependencies]
+proptest = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1.43", features = ["full", "test-util"] }

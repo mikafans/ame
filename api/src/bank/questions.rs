@@ -45,6 +45,8 @@ pub struct QuestionInsert {
     pub explanation: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    #[serde(default = "default_points")]
+    pub points: i32,
     #[serde(default)]
     pub tags: Vec<String>,
 }
@@ -65,6 +67,8 @@ pub struct QuestionPatch {
     pub payload: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explanation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub points: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
 }
@@ -89,6 +93,10 @@ fn default_limit() -> i64 {
     50
 }
 
+fn default_points() -> i32 {
+    1
+}
+
 fn row_to_question(row: &sqlx::postgres::PgRow) -> Result<Question, ApiError> {
     let kind_str: String = row.get("kind");
     let status_str: String = row.get("status");
@@ -109,6 +117,7 @@ fn row_to_question(row: &sqlx::postgres::PgRow) -> Result<Question, ApiError> {
         status: QuestionStatus::from_str(&status_str)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid status in DB: {e}")))?,
         source: row.get("source"),
+        points: row.get("points"),
         rating: row.get("rating"),
         attempts_count: row.get("attempts_count"),
         version: row.get("version"),
@@ -119,7 +128,7 @@ fn row_to_question(row: &sqlx::postgres::PgRow) -> Result<Question, ApiError> {
 }
 
 const QUESTION_COLUMNS: &str = "id, kind, prompt, code_snippet, payload, explanation, status, \
-     source, rating, attempts_count, version, created_by, created_at, updated_at";
+     source, points, rating, attempts_count, version, created_by, created_at, updated_at";
 
 pub async fn get_question(pool: &PgPool, id: Uuid) -> Result<Option<Question>, ApiError> {
     let row = sqlx::query(&format!(
@@ -179,7 +188,7 @@ pub async fn list_questions(
 
     let rows = sqlx::query(
         "SELECT DISTINCT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.status, \
-              q.source, q.rating, q.attempts_count, q.version, q.created_by, q.created_at, q.updated_at \
+              q.source, q.points, q.rating, q.attempts_count, q.version, q.created_by, q.created_at, q.updated_at \
          FROM questions q \
          LEFT JOIN question_tags qt ON qt.question_id = q.id \
          LEFT JOIN tags t ON t.id = qt.tag_id \
@@ -225,6 +234,13 @@ pub async fn create_questions(
     let mut created = Vec::with_capacity(batch.len());
 
     for input in batch {
+        if input.points < 0 {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "points".into(),
+                message: "points must be >= 0".into(),
+            }]));
+        }
+
         let code_snippet_value = input
             .code_snippet
             .as_ref()
@@ -233,8 +249,8 @@ pub async fn create_questions(
             .map_err(internal)?;
 
         let row = sqlx::query(&format!(
-            "INSERT INTO questions (kind, prompt, code_snippet, payload, explanation, source, created_by) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7) \
+            "INSERT INTO questions (kind, prompt, code_snippet, payload, explanation, source, points, created_by) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
              RETURNING {QUESTION_COLUMNS}"
         ))
         .bind(input.kind.as_str())
@@ -243,6 +259,7 @@ pub async fn create_questions(
         .bind(&input.payload)
         .bind(input.explanation.as_deref())
         .bind(input.source.as_deref())
+        .bind(input.points)
         .bind(created_by)
         .fetch_one(&mut *tx)
         .await
@@ -293,6 +310,12 @@ pub async fn update_question(
             message: "cannot edit an archived question".into(),
         }]));
     }
+    if matches!(patch.points, Some(points) if points < 0) {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "points".into(),
+            message: "points must be >= 0".into(),
+        }]));
+    }
 
     if current_status == QuestionStatus::Live {
         let prev_version: i32 = current_row.get("version");
@@ -331,6 +354,7 @@ pub async fn update_question(
             code_snippet = COALESCE($3, code_snippet), \
             payload = COALESCE($4, payload), \
             explanation = COALESCE($5, explanation), \
+            points = COALESCE($6, points), \
             version = version + 1, \
             updated_at = now() \
          WHERE id = $1"
@@ -340,6 +364,7 @@ pub async fn update_question(
             code_snippet = COALESCE($3, code_snippet), \
             payload = COALESCE($4, payload), \
             explanation = COALESCE($5, explanation), \
+            points = COALESCE($6, points), \
             updated_at = now() \
          WHERE id = $1"
     };
@@ -350,6 +375,7 @@ pub async fn update_question(
         .bind(code_snippet_value)
         .bind(patch.payload.as_ref())
         .bind(patch.explanation.as_deref())
+        .bind(patch.points)
         .execute(&mut *tx)
         .await
         .map_err(internal)?;
