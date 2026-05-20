@@ -23,8 +23,7 @@ fmt-check: ## Verify formatting without mutating
 lint: ## Clippy + eslint + tsc + sqlfluff lint
 	cd api && mise exec -- cargo clippy --all-targets -- -D warnings
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run lint; \
-		cd web && mise exec -- bun run type-check; \
+		cd web && mise exec -- bun run lint && mise exec -- bun run type-check; \
 	else \
 		echo "[web] skipping lint + type-check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi

@@ -29,7 +29,7 @@ use crate::{
         user::Scope,
     },
     engine::{
-        elo::{QuestionRating, UserTagRating},
+        elo::{EloUpdate, QuestionRating, UserTagRating},
         sessions::{
             AnswerInput, AnswerOutcome, RuntimeQuestion, SessionResult, StartSessionInput,
             answer_session, finish_session, start_session,
@@ -235,6 +235,9 @@ pub async fn answer(
 
     if !outcome.replayed {
         insert_attempt(&state.pool, &outcome).await?;
+        if let Some(ref elo) = outcome.elo {
+            persist_elo(&state.pool, user.0.user.id, body.question_id, elo).await?;
+        }
     }
 
     Ok(Json(AnswerSessionResponse {
@@ -636,6 +639,41 @@ async fn update_finished_session(pool: &PgPool, session: &Session) -> Result<(),
         .execute(pool)
         .await
         .map_err(internal)?;
+    Ok(())
+}
+
+async fn persist_elo(
+    pool: &PgPool,
+    user_id: Uuid,
+    question_id: Uuid,
+    elo: &EloUpdate,
+) -> Result<(), ApiError> {
+    sqlx::query("UPDATE questions SET rating = $2, attempts_count = $3 WHERE id = $1")
+        .bind(question_id)
+        .bind(elo.question.rating_after)
+        .bind(elo.question.attempts_after)
+        .execute(pool)
+        .await
+        .map_err(internal)?;
+
+    for tag in &elo.user_tags {
+        sqlx::query(
+            "INSERT INTO user_tag_ratings (user_id, tag_id, rating, attempts_count, last_updated) \
+             VALUES ($1, $2, $3, $4, now()) \
+             ON CONFLICT (user_id, tag_id) DO UPDATE \
+             SET rating = EXCLUDED.rating, \
+                 attempts_count = EXCLUDED.attempts_count, \
+                 last_updated = now()",
+        )
+        .bind(user_id)
+        .bind(tag.tag_id)
+        .bind(tag.rating_after)
+        .bind(tag.attempts_after)
+        .execute(pool)
+        .await
+        .map_err(internal)?;
+    }
+
     Ok(())
 }
 

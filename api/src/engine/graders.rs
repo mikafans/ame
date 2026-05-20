@@ -452,4 +452,67 @@ mod tests {
         assert!(outcome.correct);
         assert_eq!(outcome.points_awarded, 4);
     }
+
+    #[test]
+    fn tf_wrong_answer_returns_incorrect() {
+        let outcome = grade_response(
+            QuestionKind::Tf,
+            &serde_json::json!({ "correct": true }),
+            &AttemptResponse::Tf { answer: false },
+            &AttemptPresentation::default(),
+            2,
+        )
+        .unwrap();
+
+        assert!(!outcome.correct);
+        assert_eq!(outcome.points_awarded, 0);
+        assert_eq!(outcome.max, 2);
+    }
+
+    #[test]
+    fn essay_below_min_words_returns_incorrect() {
+        let outcome = grade_response(
+            QuestionKind::Essay,
+            &serde_json::json!({
+                "min_words": 10,
+                "rubric": "Explain thoroughly",
+                "judge": "manual"
+            }),
+            &AttemptResponse::Essay {
+                body: "too short".to_string(),
+                word_count: 2,
+            },
+            &AttemptPresentation::default(),
+            5,
+        )
+        .unwrap();
+
+        assert_eq!(outcome.status, GradeStatus::Graded);
+        assert!(!outcome.correct);
+        assert_eq!(outcome.points_awarded, 0);
+    }
+
+    #[test]
+    fn code_wrong_answer_returns_incorrect() {
+        let outcome = grade_response(
+            QuestionKind::Code,
+            &serde_json::json!({
+                "language": "rust",
+                "starter": "fn main() {}",
+                "tests": [],
+                "exemplar": "fn main() { println!(\"ok\"); }"
+            }),
+            &AttemptResponse::Code {
+                source: "fn main() { println!(\"wrong\"); }".to_string(),
+                language: "rust".to_string(),
+            },
+            &AttemptPresentation::default(),
+            4,
+        )
+        .unwrap();
+
+        assert!(!outcome.correct);
+        assert_eq!(outcome.points_awarded, 0);
+        assert_eq!(outcome.max, 4);
+    }
 }

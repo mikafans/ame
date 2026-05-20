@@ -5,6 +5,7 @@ use std::str::FromStr;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
+use time;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -15,6 +16,102 @@ use crate::domain::session::{PlanItem, QuestionPlan};
 pub const DEFAULT_QUIZ_COUNT: usize = 10;
 pub const MAX_QUIZ_COUNT: usize = 100;
 pub const DEFAULT_EXCLUDE_RECENT_HOURS: i64 = 24;
+pub const DEFAULT_LOOKBACK_DAYS: i64 = 30;
+pub const PLAN_WEEKS: usize = 4;
+pub const WEAKEST_TAGS_LIMIT: i64 = 5;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct StudyPlanItem {
+    pub kind: String,
+    pub ref_id: String,
+    pub hours_est: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct StudyPlanWeek {
+    pub week_num: usize,
+    pub focus: String,
+    pub items: Vec<StudyPlanItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct StudyPlan {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub goal: String,
+    pub lookback_days: i64,
+    pub generated_at: time::OffsetDateTime,
+    pub weeks: Vec<StudyPlanWeek>,
+}
+
+pub async fn create_study_plan(
+    pool: &PgPool,
+    user_id: Uuid,
+    goal: &str,
+    lookback_days: i64,
+) -> Result<StudyPlan, ApiError> {
+    let rows = sqlx::query(
+        "SELECT t.name, \
+                COUNT(a.id) AS attempts, \
+                AVG(a.score::double precision) AS avg_score \
+         FROM attempts a \
+         JOIN question_tags qt ON qt.question_id = a.question_id \
+         JOIN tags t ON t.id = qt.tag_id \
+         WHERE a.user_id = $1 \
+           AND a.created_at >= now() - ($2::bigint * interval '1 day') \
+         GROUP BY t.name \
+         ORDER BY avg_score ASC \
+         LIMIT $3",
+    )
+    .bind(user_id)
+    .bind(lookback_days)
+    .bind(WEAKEST_TAGS_LIMIT)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    let weakest_tags: Vec<String> = rows
+        .into_iter()
+        .map(|row| {
+            let name: String = row.get("name");
+            name
+        })
+        .collect();
+
+    let weeks = (1..=PLAN_WEEKS)
+        .map(|week_num| {
+            let focus = weakest_tags
+                .get(week_num - 1)
+                .cloned()
+                .unwrap_or_else(|| goal.to_string());
+            StudyPlanWeek {
+                week_num,
+                focus: focus.clone(),
+                items: vec![
+                    StudyPlanItem {
+                        kind: "practice".to_string(),
+                        ref_id: focus.clone(),
+                        hours_est: 0.5,
+                    },
+                    StudyPlanItem {
+                        kind: "practice".to_string(),
+                        ref_id: focus,
+                        hours_est: 0.5,
+                    },
+                ],
+            }
+        })
+        .collect();
+
+    Ok(StudyPlan {
+        id: Uuid::now_v7(),
+        user_id,
+        goal: goal.to_string(),
+        lookback_days,
+        generated_at: time::OffsetDateTime::now_utc(),
+        weeks,
+    })
+}
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
