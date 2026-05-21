@@ -15,7 +15,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   // Learn
-  { href: "/", label: "Library", section: "Learn" },
+  { href: "/library", label: "Library", section: "Learn" },
   { href: "/exams", label: "Exams", section: "Learn" },
   { href: "/practice", label: "Practice", section: "Learn" },
   { href: "/progress", label: "Progress", section: "Learn" },
@@ -157,10 +157,7 @@ export default function LearnerLayout({
                 {sec}
               </div>
               {items.map((item) => {
-                const active =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(item.href);
+                const active = pathname.startsWith(item.href);
                 return (
                   <a
                     key={item.href}

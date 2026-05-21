@@ -40,4 +40,4 @@ __pycache__/
 .agents/MEMORY.md
 
 # Local agent CLI scratch (not part of repo)
-.antigravitycli/
+.antigravitycli/api/.env

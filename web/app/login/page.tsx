@@ -23,7 +23,7 @@ export default function LoginPage() {
         return;
       }
       setAuthToken(token.trim());
-      router.push("/");
+      router.push("/library");
     } catch {
       setError("Could not reach the API. Is the server running?");
     } finally {

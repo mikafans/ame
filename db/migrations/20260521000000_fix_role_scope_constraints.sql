@@ -28,15 +28,16 @@ ALTER TABLE api_tokens
 -- 'human'               → 'quiz.write' + 'attempt.write' + 'plan.write' + 'stats.read' + 'feedback.write'
 -- 'agent:write-questions' → 'quiz.write'
 -- 'agent:read-only'     → 'quiz.read'
-UPDATE api_tokens SET scopes = (
-    SELECT array_agg(DISTINCT mapped) FROM (
-        SELECT CASE s
-            WHEN 'human'                 THEN unnest(ARRAY['quiz.read','quiz.write','attempt.read','attempt.write','stats.read','feedback.write','plan.read','plan.write'])
-            WHEN 'agent:write-questions' THEN 'quiz.write'
-            WHEN 'agent:read-only'       THEN 'quiz.read'
-            ELSE s
-        END AS mapped
-        FROM unnest(scopes) AS s
-    ) sub
+UPDATE api_tokens t SET scopes = (
+    SELECT array_agg(DISTINCT new_scope)
+    FROM unnest(t.scopes) AS s
+    CROSS JOIN LATERAL unnest(
+        CASE s
+            WHEN 'human'                 THEN ARRAY['quiz.read','quiz.write','attempt.read','attempt.write','stats.read','feedback.write','plan.read','plan.write']
+            WHEN 'agent:write-questions' THEN ARRAY['quiz.write']
+            WHEN 'agent:read-only'       THEN ARRAY['quiz.read']
+            ELSE ARRAY[s]
+        END
+    ) AS new_scope
 )
-WHERE scopes && ARRAY['human','agent:write-questions','agent:read-only']::text[];
+WHERE t.scopes && ARRAY['human','agent:write-questions','agent:read-only']::text[];
