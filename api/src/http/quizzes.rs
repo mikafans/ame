@@ -334,6 +334,151 @@ async fn patch_quiz(
     }))
 }
 
+// ── create ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateQuizBody {
+    pub title: String,
+    #[serde(default)]
+    pub course: Option<String>,
+    #[serde(default)]
+    pub difficulty: Option<String>,
+    #[serde(default)]
+    pub duration: Option<i32>,
+    #[serde(default)]
+    pub objectives: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateQuizResponse {
+    pub quiz_id: String,
+    pub quiz: CreatedQuiz,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatedQuiz {
+    pub id: Uuid,
+    pub title: String,
+    pub status: String,
+    pub objectives: Vec<String>,
+    pub created_by: Uuid,
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
+}
+
+/// Create a new quiz.
+///
+/// Only instructors and admins may create quizzes. Learners receive 403.
+#[utoipa::path(
+    post,
+    path = "/v1/quizzes",
+    responses(
+        (status = 201, description = "Quiz created", body = CreateQuizResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden (learner cannot create)"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
+async fn create_quiz(
+    State(state): State<AppState>,
+    auth: RequireAnyScope<QuizWriteScopes>,
+    Json(body): Json<CreateQuizBody>,
+) -> Result<(axum::http::StatusCode, Json<CreateQuizResponse>), ApiError> {
+    // Only instructor/admin may create; learner role is forbidden
+    use crate::domain::user::Role;
+    if auth.0.user.role == Role::Learner {
+        return Err(ApiError::ScopeRequired("quiz.write"));
+    }
+
+    let objectives = body.objectives.unwrap_or_default();
+
+    let result = sqlx::query(
+        "INSERT INTO quizzes (title, objectives, status, created_by)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, title, status, objectives, created_by, created_at",
+    )
+    .bind(&body.title)
+    .bind(&objectives)
+    .bind("draft")
+    .bind(auth.0.user.id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let quiz = CreatedQuiz {
+        id: result.get("id"),
+        title: result.get("title"),
+        status: result.get("status"),
+        objectives: result.get::<Vec<String>, _>("objectives"),
+        created_by: result.get("created_by"),
+        created_at: result.get("created_at"),
+    };
+
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(CreateQuizResponse {
+            quiz_id: quiz.id.to_string(),
+            quiz,
+        }),
+    ))
+}
+
+// ── count ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CountQuizzesQuery {
+    #[serde(default)]
+    pub cats: Option<String>,
+    #[serde(default)]
+    pub tags: Option<String>,
+    #[serde(default)]
+    pub diff: Option<String>,
+    #[serde(default)]
+    pub types: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CountQuizzesResponse {
+    pub count: i64,
+}
+
+/// Get quiz count with optional filters.
+#[utoipa::path(
+    get,
+    path = "/v1/quizzes/count",
+    params(
+        ("cats" = Option<String>, Query, description = "Comma-separated categories"),
+        ("tags" = Option<String>, Query, description = "Comma-separated tags"),
+        ("diff" = Option<String>, Query, description = "Difficulty filter"),
+        ("types" = Option<String>, Query, description = "Comma-separated types"),
+    ),
+    responses(
+        (status = 200, description = "Quiz count", body = CountQuizzesResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
+async fn count_quizzes(
+    State(state): State<AppState>,
+    _auth: RequireAnyScope<QuizReadScopes>,
+    Query(_q): Query<CountQuizzesQuery>,
+) -> Result<Json<CountQuizzesResponse>, ApiError> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM quizzes WHERE status = $1")
+        .bind("active")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(CountQuizzesResponse { count }))
+}
+
 // ── generate (stub) ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -374,7 +519,8 @@ async fn generate_quiz(
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/v1/quizzes", get(list_quizzes))
+        .route("/v1/quizzes", get(list_quizzes).post(create_quiz))
+        .route("/v1/quizzes/count", get(count_quizzes))
         .route("/v1/quizzes/generate", post(generate_quiz))
         .route("/v1/quizzes/{id}", get(get_quiz).patch(patch_quiz))
         .with_state(state)

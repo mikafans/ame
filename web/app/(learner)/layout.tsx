@@ -3,37 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { Sidebar } from "@/components/Sidebar";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
-
-interface NavItem {
-  href: string;
-  label: string;
-  section: string;
-  roles?: string[];
-}
-
-const NAV: NavItem[] = [
-  // Learn
-  { href: "/library", label: "Library", section: "Learn" },
-  { href: "/exams", label: "Exams", section: "Learn" },
-  { href: "/practice", label: "Practice", section: "Learn" },
-  { href: "/progress", label: "Progress", section: "Learn" },
-  // Teach — instructor / admin only
-  {
-    href: "/author",
-    label: "Author studio",
-    section: "Teach",
-    roles: ["instructor", "admin"],
-  },
-  // Integrate — instructor / admin only
-  {
-    href: "/agent",
-    label: "Agent API",
-    section: "Integrate",
-    roles: ["instructor", "admin"],
-  },
-];
 
 export default function LearnerLayout({
   children,
@@ -98,162 +70,49 @@ export default function LearnerLayout({
   if (!user) return null;
 
   const role = user.role;
-  const canSeeItem = (item: NavItem) =>
-    !item.roles || item.roles.includes(role);
 
-  const sections = ["Learn", "Teach", "Integrate"];
+  // Map pathname to route ID for Sidebar
+  const getRouteId = () => {
+    if (pathname.startsWith("/library")) return "library";
+    if (pathname.startsWith("/exams")) return "exams";
+    if (pathname.startsWith("/practice")) return "quiz";
+    if (pathname.startsWith("/results")) return "results";
+    if (pathname.startsWith("/progress")) return "dashboard";
+    if (pathname.startsWith("/author")) return "author";
+    if (pathname.startsWith("/agent")) return "agent";
+    return "library";
+  };
+
+  const currentRoute = getRouteId();
+
+  const handleRouteChange = (route: string) => {
+    const routeMap: Record<string, string> = {
+      library: "/library",
+      exams: "/exams",
+      quiz: "/practice",
+      results: "/results",
+      dashboard: "/progress",
+      author: "/author",
+      agent: "/agent",
+    };
+    router.push(routeMap[route] || "/library");
+  };
 
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "220px 1fr",
+        display: "flex",
         minHeight: "100vh",
       }}
     >
-      {/* Sidebar */}
-      <nav
-        style={{
-          background: "var(--surface)",
-          borderRight: "1px solid var(--border)",
-          padding: "20px 12px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 0,
-          height: "100vh",
-          position: "sticky",
-          top: 0,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 11,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            color: "var(--accent)",
-            marginBottom: 20,
-            padding: "0 10px",
-          }}
-        >
-          Harus
-        </div>
-
-        {sections.map((sec) => {
-          const items = NAV.filter((n) => n.section === sec && canSeeItem(n));
-          if (items.length === 0) return null;
-          return (
-            <div key={sec} style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  padding: "4px 10px 6px",
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.4,
-                  color: "var(--muted)",
-                  textTransform: "uppercase",
-                }}
-              >
-                {sec}
-              </div>
-              {items.map((item) => {
-                const active = pathname.startsWith(item.href);
-                return (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    style={{
-                      display: "block",
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      color: active ? "var(--accent)" : "var(--text-2)",
-                      textDecoration: "none",
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 500,
-                      background: active
-                        ? "var(--accent-dim, rgba(0,200,100,0.08))"
-                        : "transparent",
-                      borderLeft: `2px solid ${active ? "var(--accent)" : "transparent"}`,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {item.label}
-                  </a>
-                );
-              })}
-            </div>
-          );
-        })}
-
-        {/* Footer */}
-        <div
-          style={{
-            marginTop: "auto",
-            borderTop: "1px solid var(--border)",
-            paddingTop: 14,
-          }}
-        >
-          <div
-            style={{
-              padding: "0 10px",
-              color: "var(--muted)",
-              fontSize: 12,
-              marginBottom: 4,
-            }}
-          >
-            {user.displayName}
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10,
-                marginLeft: 6,
-                textTransform: "uppercase",
-                letterSpacing: 0.8,
-              }}
-            >
-              {role}
-            </span>
-          </div>
-          {DEMO_MODE && (
-            <button
-              onClick={() => setShowTweaks(true)}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "5px 10px",
-                textAlign: "left",
-                background: "transparent",
-                border: "none",
-                color: "var(--muted)",
-                fontSize: 11,
-                fontFamily: "var(--mono)",
-                cursor: "pointer",
-                marginBottom: 4,
-              }}
-            >
-              ⚙ Tweaks (demo)
-            </button>
-          )}
-          <a
-            href="/login"
-            onClick={() => {
-              document.cookie = "ame_token=; path=/; max-age=0";
-            }}
-            style={{
-              display: "block",
-              padding: "5px 10px",
-              color: "var(--muted)",
-              fontSize: 12,
-              textDecoration: "none",
-            }}
-          >
-            Sign out
-          </a>
-        </div>
-      </nav>
+      <Sidebar
+        route={currentRoute}
+        setRoute={handleRouteChange}
+        showAgent={role !== "learner"}
+      />
 
       {/* Main */}
-      <main style={{ overflowY: "auto" }}>{children}</main>
+      <main style={{ flex: 1, overflowY: "auto" }}>{children}</main>
 
       {/* Tweaks panel (demo-only, never in production) */}
       {DEMO_MODE && showTweaks && (

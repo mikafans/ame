@@ -12,6 +12,7 @@ pub struct AppState {
 pub mod activity;
 pub mod admin;
 pub mod agents;
+pub mod auth;
 pub mod exams;
 pub mod idempotency;
 pub mod me;
@@ -58,6 +59,7 @@ pub fn router(pool: PgPool) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .merge(openapi::router(state.clone()))
+        .merge(auth::router(state.clone()))
         .merge(logged)
         .with_state(state)
 }

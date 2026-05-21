@@ -21,8 +21,26 @@
   --red-dim: rgba(231, 110, 110, 0.14);
   --blue: #6aa7f5;
   --blue-dim: rgba(106, 167, 245, 0.14);
-  --mono: "JetBrains Mono", "Fira Code", monospace;
+  --serif: var(--font-serif), "Georgia", serif;
+  --sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --mono: var(--font-mono), "Fira Code", monospace;
   --radius: 6px;
+  --radius-lg: 10px;
+}
+
+[data-theme="cobalt"] {
+  --bg: #0b1220;
+  --surface: #101c30;
+  --surface-2: #152540;
+  --surface-3: #1a2e50;
+  --border: #1e3356;
+  --border-strong: #2a4a78;
+  --text: #dce8f8;
+  --text-2: #94b4d8;
+  --muted: #5c7a9e;
+  --accent: #4da6ff;
+  --accent-dim: rgba(77, 166, 255, 0.12);
+  --accent-line: rgba(77, 166, 255, 0.35);
 }
 
 [data-theme="paper"] {
@@ -35,6 +53,15 @@
   --text: #1d1a14;
   --text-2: #3a352a;
   --muted: #6e6753;
+  --accent: #0d9e6e;
+  --accent-dim: rgba(13, 158, 110, 0.12);
+  --accent-line: rgba(13, 158, 110, 0.3);
+  --amber: #c97b10;
+  --amber-dim: rgba(201, 123, 16, 0.14);
+  --red: #c94040;
+  --red-dim: rgba(201, 64, 64, 0.14);
+  --blue: #2e6fcc;
+  --blue-dim: rgba(46, 111, 204, 0.14);
 }
 
 html,
@@ -43,5 +70,5 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--sans);
 }

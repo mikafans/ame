@@ -4,29 +4,28 @@ import { useState, useEffect, use } from "react";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ShareModal } from "@/components/ShareModal";
+import { Button, Tag, Card } from "@/components/ui";
 
-interface AttemptItem {
+interface Answer {
+  qid: string;
+  correct: boolean;
+  points: number;
+  max: number;
+  type: "mc" | "tf" | "short" | "essay" | "code";
+  given: string;
+  note: string;
+}
+
+interface ResultData {
   id: string;
-  questionId: string;
-  isCorrect: boolean;
+  quiz_title: string;
+  course: string;
+  attempt_number: number;
+  total_attempts: number;
   score: number;
-  response: Record<string, unknown>;
-}
-
-interface ResultSession {
-  id: string;
-  status: string;
-  result?: {
-    correct: number;
-    total: number;
-    score: number;
-    needs_work: string[];
-  };
-}
-
-interface SessionData {
-  session: ResultSession;
-  attempts: AttemptItem[];
+  total: number;
+  feedback?: string;
+  answers: Answer[];
 }
 
 export default function ResultsPage({
@@ -36,14 +35,19 @@ export default function ResultsPage({
 }) {
   const { id } = use(params);
   const { token } = useAuth();
-  const [data, setData] = useState<SessionData | null>(null);
-  const [showShare, setShowShare] = useState(false);
+  const [data, setData] = useState<ResultData | null>(null);
+  const [shareModal, setShareModal] = useState<{
+    open: boolean;
+    kind: string;
+    itemId?: string;
+  } | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!token) return;
     makeClient(token)
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
-      .then(({ data: d }: { data?: SessionData }) => {
+      .then(({ data: d }: { data?: ResultData }) => {
         if (d) setData(d);
       })
       .catch(console.error);
@@ -67,26 +71,37 @@ export default function ResultsPage({
     );
   }
 
-  const result = data.session.result;
-  const pct = result ? Math.round(result.score * 100) : null;
-  const scoreColor =
-    pct === null
-      ? "var(--muted)"
-      : pct >= 80
-        ? "var(--accent)"
-        : pct >= 60
-          ? "var(--amber)"
-          : "var(--red)";
+  const pct = Math.round((data.score / data.total) * 100);
+  const passed = pct >= 70;
+  const kicker = `${data.course.toUpperCase()} · ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`;
+
+  const toggleExpanded = (qid: string) => {
+    const next = new Set(expandedItems);
+    if (next.has(qid)) {
+      next.delete(qid);
+    } else {
+      next.add(qid);
+    }
+    setExpandedItems(next);
+  };
+
+  const handleShareQuiz = () => {
+    setShareModal({ open: true, kind: "quiz" });
+  };
+
+  const handleShareItem = (qid: string) => {
+    setShareModal({ open: true, kind: "item", itemId: qid });
+  };
 
   return (
-    <div style={{ padding: "36px 40px 64px", maxWidth: 720 }}>
-      {/* Header */}
+    <div style={{ padding: "28px 36px 56px" }}>
+      {/* Page header */}
       <div
         style={{
           display: "flex",
           alignItems: "flex-start",
           justifyContent: "space-between",
-          marginBottom: 32,
+          marginBottom: 28,
         }}
       >
         <div>
@@ -100,129 +115,323 @@ export default function ResultsPage({
               marginBottom: 8,
             }}
           >
-            Session complete
+            {kicker}
           </div>
-          {result && (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
-              <span
-                style={{
-                  fontSize: 52,
-                  fontWeight: 700,
-                  color: scoreColor,
-                  lineHeight: 1,
-                }}
-              >
-                {pct}%
-              </span>
-              <span style={{ color: "var(--text-2)", fontSize: 16 }}>
-                {result.correct}/{result.total} correct
-              </span>
-            </div>
-          )}
+          <h1
+            style={{
+              fontFamily: "var(--serif)",
+              fontSize: 40,
+              fontWeight: 500,
+              letterSpacing: -0.8,
+              lineHeight: 1.1,
+              color: "var(--text)",
+              margin: 0,
+            }}
+          >
+            {data.quiz_title} — Results
+          </h1>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setShowShare(true)}
-            style={{
-              padding: "8px 14px",
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--text-2)",
-              cursor: "pointer",
-              fontSize: 13,
-              fontFamily: "var(--mono)",
-            }}
-          >
-            Share
-          </button>
-          <a
-            href="/practice"
-            style={{
-              padding: "8px 16px",
-              background: "var(--accent)",
-              border: "none",
-              borderRadius: 4,
-              color: "#000",
-              fontWeight: 700,
-              fontSize: 13,
-              textDecoration: "none",
-              display: "inline-block",
-            }}
-          >
-            Practice again
-          </a>
+        <div style={{ display: "flex", gap: 12 }}>
+          <Button variant="outline">Export PDF</Button>
+          <Button variant="primary" onClick={handleShareQuiz}>
+            Share quiz
+          </Button>
         </div>
       </div>
 
-      {/* Needs work tags */}
-      {result?.needs_work && result.needs_work.length > 0 && (
-        <div
-          style={{
-            padding: "14px 18px",
-            background: "var(--amber-dim)",
-            border: "1px solid var(--amber)",
-            borderRadius: 6,
-            marginBottom: 28,
-          }}
-        >
+      {/* Top row: two cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.3fr 1fr",
+          gap: 18,
+          marginBottom: 24,
+        }}
+      >
+        {/* Score card */}
+        <Card style={{ padding: 28 }}>
+          <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
+            {/* Donut chart */}
+            <DonutChart correct={data.score} total={data.total} size={140} />
+
+            <div style={{ flex: 1 }}>
+              {/* Badges */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  marginBottom: 10,
+                }}
+              >
+                <Tag color={passed ? "accent" : "red"}>
+                  {passed ? "PASS" : "FAIL"}
+                </Tag>
+              </div>
+
+              {/* Score fraction */}
+              <div
+                style={{
+                  fontFamily: "var(--serif)",
+                  fontSize: 26,
+                  fontWeight: 500,
+                  letterSpacing: -0.5,
+                  lineHeight: 1,
+                }}
+              >
+                {data.score}{" "}
+                <span style={{ color: "var(--muted)", fontSize: 16 }}>
+                  / {data.total} pts
+                </span>
+              </div>
+
+              {/* AI feedback */}
+              <div
+                style={{
+                  marginTop: 14,
+                  color: "var(--text-2)",
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  maxWidth: 460,
+                  fontStyle: "italic",
+                }}
+              >
+                {data.feedback || "No feedback provided for this quiz."}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Cohort distribution */}
+        <Card style={{ padding: 24 }}>
           <div
             style={{
               fontFamily: "var(--mono)",
               fontSize: 10,
               letterSpacing: 1.3,
               textTransform: "uppercase",
-              color: "var(--amber)",
+              color: "var(--muted)",
               marginBottom: 8,
             }}
           >
-            Needs more practice
+            Cohort distribution
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {result.needs_work.map((tag) => (
+          <CohortHistogram userBin={Math.floor(pct / 10)} />
+          <div
+            style={{
+              marginTop: 12,
+              fontSize: 12,
+              color: "var(--muted)",
+              display: "flex",
+              gap: 16,
+              fontFamily: "var(--mono)",
+              letterSpacing: 0.5,
+            }}
+          >
+            <span>
               <span
-                key={tag}
                 style={{
-                  padding: "3px 10px",
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  fontFamily: "var(--mono)",
-                  fontSize: 12,
-                  color: "var(--text-2)",
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  background: "var(--accent)",
+                  marginRight: 4,
                 }}
-              >
-                {tag}
-              </span>
-            ))}
+              />{" "}
+              Your bin
+            </span>
+            <span>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  background: "var(--surface-3)",
+                  marginRight: 4,
+                }}
+              />{" "}
+              Cohort
+            </span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Per-item review */}
+      <Card style={{ padding: 0 }}>
+        <div
+          style={{
+            padding: "16px 22px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                letterSpacing: 1.3,
+                textTransform: "uppercase",
+                color: "var(--muted)",
+              }}
+            >
+              Per-item
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--serif)",
+                fontSize: 18,
+                fontWeight: 500,
+                marginTop: 2,
+              }}
+            >
+              Answer review
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <Tag color="accent">
+              {data.answers.filter((a) => a.correct).length} correct
+            </Tag>
+            <Tag color="red">
+              {data.answers.filter((a) => !a.correct).length} needs work
+            </Tag>
           </div>
         </div>
-      )}
+        <div>
+          {data.answers.map((answer, i) => (
+            <div
+              key={answer.qid}
+              style={{
+                padding: "18px 22px",
+                borderBottom:
+                  i < data.answers.length - 1
+                    ? "1px solid var(--border)"
+                    : "none",
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: 18,
+                alignItems: "start",
+              }}
+            >
+              {/* Left: question info */}
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--mono)",
+                      fontSize: 11,
+                      color: "var(--muted)",
+                      letterSpacing: 1.1,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Q{i + 1} · {answer.type.toUpperCase()}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontFamily: "var(--serif)",
+                    fontSize: 15,
+                    lineHeight: 1.5,
+                    color: "var(--text)",
+                    marginBottom: 10,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {answer.given.substring(0, 80)}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-2)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {answer.note}
+                </div>
 
-      {/* Per-attempt breakdown */}
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 10,
-          letterSpacing: 1.3,
-          textTransform: "uppercase",
-          color: "var(--muted)",
-          marginBottom: 14,
-        }}
-      >
-        Item breakdown · {data.attempts.length} question
-        {data.attempts.length !== 1 ? "s" : ""}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {data.attempts.map((attempt, i) => (
-          <AttemptRow key={attempt.id} attempt={attempt} index={i} />
-        ))}
-      </div>
+                {/* Expanded explanation */}
+                {expandedItems.has(answer.qid) && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: "1px solid var(--border)",
+                      fontSize: 13,
+                      color: "var(--text-2)",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Explanation would appear here.
+                  </div>
+                )}
+              </div>
 
-      {showShare && token && (
+              {/* Right: score + actions */}
+              <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                <div
+                  style={{
+                    fontFamily: "var(--serif)",
+                    fontSize: 22,
+                    fontWeight: 500,
+                    color: answer.correct ? "var(--text)" : "var(--text-2)",
+                    marginBottom: 8,
+                  }}
+                >
+                  {answer.points}
+                  <span style={{ color: "var(--muted)", fontSize: 14 }}>
+                    {" "}
+                    / {answer.max}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleShareItem(answer.qid)}
+                  >
+                    Share
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toggleExpanded(answer.qid)}
+                  >
+                    {expandedItems.has(answer.qid) ? "Hide" : "See"} solution
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Share modal */}
+      {shareModal?.open && token && (
         <ShareModal
-          payload={{ kind: "quiz", id, title: "Session results" }}
-          onClose={() => setShowShare(false)}
+          payload={{
+            kind: shareModal.kind as "quiz" | "item",
+            id: shareModal.itemId || id,
+            title: shareModal.kind === "item" ? "Question" : data.quiz_title,
+          }}
+          onClose={() => setShareModal(null)}
           bearerToken={token}
         />
       )}
@@ -230,94 +439,101 @@ export default function ResultsPage({
   );
 }
 
-function AttemptRow({
-  attempt,
-  index,
+function DonutChart({
+  correct,
+  total,
+  size = 140,
 }: {
-  attempt: AttemptItem;
-  index: number;
+  correct: number;
+  total: number;
+  size: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const pct = Math.round(attempt.score * 100);
+  const pct = (correct / total) * 100;
+  const circumference = 2 * Math.PI * (size / 2 - 12);
+  const strokeDashoffset = circumference * (1 - pct / 100);
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: `1px solid ${attempt.isCorrect ? "var(--border)" : "var(--border-strong)"}`,
-        borderLeft: `3px solid ${attempt.isCorrect ? "var(--accent)" : "var(--red)"}`,
-        borderRadius: 6,
-        overflow: "hidden",
-      }}
-    >
-      <button
-        onClick={() => setExpanded((v) => !v)}
+    <div style={{ position: "relative", width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={size / 2 - 12}
+          fill="none"
+          stroke="var(--surface-2)"
+          strokeWidth={8}
+        />
+        {/* Progress circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={size / 2 - 12}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={8}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 300ms" }}
+        />
+      </svg>
+      {/* Percentage text */}
+      <div
         style={{
-          width: "100%",
+          position: "absolute",
+          inset: 0,
           display: "flex",
           alignItems: "center",
-          gap: 14,
-          padding: "14px 18px",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "left",
+          justifyContent: "center",
+          flexDirection: "column",
         }}
       >
-        <span
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 12,
-            color: "var(--muted)",
-            flexShrink: 0,
-            width: 24,
-          }}
-        >
-          {index + 1}
-        </span>
-        <span
-          style={{
-            fontSize: 13,
-            color: "var(--text-2)",
-            flex: 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {attempt.questionId}
-        </span>
-        <span
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 13,
-            fontWeight: 600,
-            color: attempt.isCorrect ? "var(--accent)" : "var(--red)",
-            flexShrink: 0,
-          }}
-        >
-          {attempt.isCorrect ? "✓" : "✗"} {pct}%
-        </span>
-      </button>
-      {expanded && (
         <div
           style={{
-            padding: "12px 18px 16px",
-            borderTop: "1px solid var(--border)",
-            background: "var(--surface-2)",
+            fontFamily: "var(--serif)",
+            fontSize: 36,
+            fontWeight: 600,
+            lineHeight: 1,
+            letterSpacing: -0.5,
           }}
         >
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
-              color: "var(--muted)",
-            }}
-          >
-            Response: {JSON.stringify(attempt.response)}
-          </div>
+          {Math.round(pct)}%
         </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+function CohortHistogram({ userBin }: { userBin: number }) {
+  const bins = Array.from({ length: 10 }, (_, i) => i);
+
+  return (
+    <svg
+      width="100%"
+      height={170}
+      style={{ display: "block", marginBottom: 8 }}
+    >
+      {bins.map((bin) => {
+        const x = (bin / 10) * 100;
+        const height = Math.random() * 0.8 + 0.2;
+        const barWidth = 100 / 10 / 1.5;
+        const isUserBin = bin === userBin;
+
+        return (
+          <g key={bin}>
+            {/* Bar */}
+            <rect
+              x={`${x + (10 - barWidth) / 2}%`}
+              y={`${100 - height * 100}%`}
+              width={`${barWidth}%`}
+              height={`${height * 100}%`}
+              fill={isUserBin ? "var(--accent)" : "var(--surface-3)"}
+              rx={2}
+            />
+          </g>
+        );
+      })}
+    </svg>
   );
 }

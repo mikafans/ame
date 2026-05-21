@@ -29,6 +29,8 @@ interface Exam {
   objectives: string[];
   sections: ExamSection[];
   totalPoints: number;
+  course?: string;
+  tags?: string[];
 }
 
 type TabId = "all" | "active" | "scheduled" | "draft";
@@ -197,23 +199,41 @@ export default function ExamsPage() {
             Exams
           </h1>
         </div>
-        {isInstructor && (
-          <button
-            onClick={() => setShowCompose(true)}
-            style={{
-              padding: "8px 16px",
-              background: "var(--accent)",
-              border: "none",
-              borderRadius: 4,
-              color: "#000",
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            + Compose exam
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {isInstructor && (
+            <button
+              style={{
+                padding: "8px 16px",
+                background: "var(--surface-2)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                color: "var(--text)",
+                fontWeight: 500,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Filter
+            </button>
+          )}
+          {isInstructor && (
+            <button
+              onClick={() => setShowCompose(true)}
+              style={{
+                padding: "8px 16px",
+                background: "var(--accent)",
+                border: "none",
+                borderRadius: 4,
+                color: "#000",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              + Compose exam
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -410,7 +430,7 @@ function ExamListItem({
             color: "var(--muted)",
           }}
         >
-          {exam.method === "agent" ? "◇ agent" : "◇ manual"}
+          {exam.course || "—"}
         </span>
         <span
           style={{
@@ -426,23 +446,38 @@ function ExamListItem({
       </div>
       <div
         style={{
-          fontSize: 15,
-          fontWeight: 600,
+          fontFamily: "var(--serif, serif)",
+          fontSize: 16,
+          fontWeight: 500,
+          lineHeight: 1.3,
+          letterSpacing: -0.1,
           color: "var(--text)",
-          marginBottom: 4,
+          marginBottom: 8,
         }}
       >
         {exam.name}
       </div>
       <div
         style={{
+          display: "flex",
+          gap: 14,
+          alignItems: "center",
           fontFamily: "var(--mono)",
           fontSize: 11,
           color: "var(--muted)",
+          letterSpacing: 0.4,
         }}
       >
-        {exam.sections.length} section{exam.sections.length !== 1 ? "s" : ""} ·{" "}
-        {exam.durationMin ?? "—"}m · {exam.totalPoints} pts
+        <span>◆ {exam.durationMin ?? "—"}m</span>
+        <span>▪ {exam.sections.length} sec</span>
+        <span
+          style={{
+            marginLeft: "auto",
+            color: exam.method === "agent" ? "var(--accent)" : "var(--text-2)",
+          }}
+        >
+          {exam.method === "agent" ? "◇ agent" : "◇ manual"}
+        </span>
       </div>
     </button>
   );
@@ -482,31 +517,80 @@ function ExamDetail({
         <div
           style={{
             display: "flex",
+            gap: 8,
+            marginBottom: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 9,
+              letterSpacing: 1.1,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              background: "var(--surface-2)",
+              padding: "4px 8px",
+              borderRadius: 3,
+              border: "1px solid var(--border)",
+            }}
+          >
+            {exam.status}
+          </span>
+          {exam.course && (
+            <span
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 9,
+                letterSpacing: 1.1,
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                background: "var(--surface-2)",
+                padding: "4px 8px",
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+              }}
+            >
+              {exam.course}
+            </span>
+          )}
+          {exam.tags?.map((tag) => (
+            <span
+              key={tag}
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 9,
+                letterSpacing: 1.1,
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                background: "var(--surface-2)",
+                padding: "4px 8px",
+                borderRadius: 3,
+                border: "1px solid var(--border)",
+              }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
             gap: 24,
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10,
-                letterSpacing: 1.2,
-                textTransform: "uppercase",
-                color: "var(--muted)",
-                marginBottom: 6,
-              }}
-            >
-              {exam.status} ·{" "}
-              {exam.method === "agent" ? "Agent-composed" : "Manually composed"}
-            </div>
             <h2
               style={{
                 margin: 0,
-                fontSize: 26,
-                fontWeight: 600,
+                fontFamily: "var(--serif, serif)",
+                fontSize: 30,
+                fontWeight: 500,
+                letterSpacing: -0.4,
                 color: "var(--text)",
+                marginBottom: 6,
               }}
             >
               {exam.name}
@@ -517,7 +601,8 @@ function ExamDetail({
                   color: "var(--text-2)",
                   fontSize: 13.5,
                   lineHeight: 1.6,
-                  margin: "10px 0 0",
+                  margin: 0,
+                  maxWidth: 600,
                 }}
               >
                 {exam.description}
@@ -647,7 +732,14 @@ function ExamDetail({
             marginBottom: 14,
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
+          <div
+            style={{
+              fontFamily: "var(--serif, serif)",
+              fontSize: 17,
+              fontWeight: 500,
+              color: "var(--text)",
+            }}
+          >
             Composition
           </div>
           <div
