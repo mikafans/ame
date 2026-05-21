@@ -411,7 +411,7 @@ async fn get_me(auth: AuthenticatedUser) -> Result<Json<MeResponse>, ApiError> {
 
 pub struct AttemptReadScopes;
 impl ScopeOneOf for AttemptReadScopes {
-    const SCOPES: &'static [Scope] = &[Scope::Human, Scope::AttemptRead];
+    const SCOPES: &'static [Scope] = &[Scope::AttemptRead];
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

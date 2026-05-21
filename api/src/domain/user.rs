@@ -8,8 +8,9 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
+    Learner,
+    Instructor,
     Admin,
-    User,
     Agent,
 }
 
@@ -31,12 +32,6 @@ pub struct User {
 /// single point of translation; anything not listed here is rejected as `UnknownScope`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Scope {
-    #[serde(rename = "human")]
-    Human,
-    #[serde(rename = "agent:write-questions")]
-    AgentWriteQuestions,
-    #[serde(rename = "agent:read-only")]
-    AgentReadOnly,
     #[serde(rename = "quiz.read")]
     QuizRead,
     #[serde(rename = "quiz.write")]
@@ -64,9 +59,6 @@ impl Scope {
     /// can both be derived from one source of truth.
     pub const fn as_str(self) -> &'static str {
         match self {
-            Scope::Human => "human",
-            Scope::AgentWriteQuestions => "agent:write-questions",
-            Scope::AgentReadOnly => "agent:read-only",
             Scope::QuizRead => "quiz.read",
             Scope::QuizWrite => "quiz.write",
             Scope::AttemptRead => "attempt.read",
@@ -95,9 +87,6 @@ impl FromStr for Scope {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "human" => Ok(Scope::Human),
-            "agent:write-questions" => Ok(Scope::AgentWriteQuestions),
-            "agent:read-only" => Ok(Scope::AgentReadOnly),
             "quiz.read" => Ok(Scope::QuizRead),
             "quiz.write" => Ok(Scope::QuizWrite),
             "attempt.read" => Ok(Scope::AttemptRead),
@@ -119,9 +108,6 @@ mod tests {
     #[test]
     fn scope_string_roundtrip() {
         for scope in [
-            Scope::Human,
-            Scope::AgentWriteQuestions,
-            Scope::AgentReadOnly,
             Scope::QuizRead,
             Scope::QuizWrite,
             Scope::AttemptRead,
@@ -146,9 +132,6 @@ mod tests {
 
     #[test]
     fn scope_display_matches_as_str() {
-        assert_eq!(
-            Scope::AgentWriteQuestions.to_string(),
-            "agent:write-questions"
-        );
+        assert_eq!(Scope::QuizWrite.to_string(), "quiz.write");
     }
 }

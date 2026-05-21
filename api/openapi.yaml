@@ -6,268 +6,6 @@ info:
     name: ''
   version: 0.1.0
 paths:
-  /questions:
-    get:
-      tags:
-      - crate::http::questions
-      operationId: list_questions
-      parameters:
-      - name: tag
-        in: path
-        required: true
-        schema:
-          type:
-          - string
-          - 'null'
-      - name: status
-        in: path
-        required: true
-        schema:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/QuestionStatus'
-      - name: min_rating
-        in: path
-        required: true
-        schema:
-          type:
-          - number
-          - 'null'
-          format: double
-      - name: max_rating
-        in: path
-        required: true
-        schema:
-          type:
-          - number
-          - 'null'
-          format: double
-      - name: limit
-        in: path
-        required: true
-        schema:
-          type:
-          - integer
-          - 'null'
-          format: int64
-      - name: offset
-        in: path
-        required: true
-        schema:
-          type:
-          - integer
-          - 'null'
-          format: int64
-      responses:
-        '200':
-          description: Filtered list of questions
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/QuestionListResponse'
-        '401':
-          description: Missing or invalid token
-      security:
-      - bearer_auth: []
-    post:
-      tags:
-      - crate::http::questions
-      operationId: create_questions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateQuestionsBody'
-        required: true
-      responses:
-        '201':
-          description: Batch of created questions
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateQuestionsResponse'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '409':
-          description: Idempotency key conflict
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /questions/{id}:
-    get:
-      tags:
-      - crate::http::questions
-      operationId: get_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question by id
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: No such question
-      security:
-      - bearer_auth: []
-    patch:
-      tags:
-      - crate::http::questions
-      operationId: update_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/QuestionPatch'
-        required: true
-      responses:
-        '200':
-          description: Updated question
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '404':
-          description: No such question
-        '422':
-          description: Cannot edit archived question
-      security:
-      - bearer_auth: []
-  /questions/{id}/archive:
-    post:
-      tags:
-      - crate::http::questions
-      operationId: archive_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question archived
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: No such question
-      security:
-      - bearer_auth: []
-  /questions/{id}/promote:
-    post:
-      tags:
-      - crate::http::questions
-      operationId: promote_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question promoted to live
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: No such question
-      security:
-      - bearer_auth: []
-  /questions/{id}/versions:
-    get:
-      tags:
-      - crate::http::questions
-      operationId: list_versions
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Historical versions, newest first
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/QuestionVersionsResponse'
-        '404':
-          description: No such question
-      security:
-      - bearer_auth: []
-  /tags:
-    get:
-      tags:
-      - crate::http::tags
-      operationId: list_tags
-      responses:
-        '200':
-          description: All tags, sorted by name
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Tag'
-        '401':
-          description: Missing or invalid token
-      security:
-      - bearer_auth: []
-    post:
-      tags:
-      - crate::http::tags
-      operationId: create_tag
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateTagBody'
-        required: true
-      responses:
-        '201':
-          description: Tag created (or already existed)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Tag'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-      security:
-      - bearer_auth: []
   /v1/exams/{id}/stats:
     get:
       tags:
@@ -428,6 +166,227 @@ paths:
           description: Token lacks required scope
         '404':
           description: Not found
+      security:
+      - bearer_auth: []
+  /v1/questions:
+    get:
+      tags:
+      - crate::http::questions
+      operationId: list_questions
+      parameters:
+      - name: tag
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: status
+        in: path
+        required: true
+        schema:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/QuestionStatus'
+      - name: min_rating
+        in: path
+        required: true
+        schema:
+          type:
+          - number
+          - 'null'
+          format: double
+      - name: max_rating
+        in: path
+        required: true
+        schema:
+          type:
+          - number
+          - 'null'
+          format: double
+      - name: limit
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      - name: offset
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      responses:
+        '200':
+          description: Filtered list of questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionListResponse'
+        '401':
+          description: Missing or invalid token
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - crate::http::questions
+      operationId: create_questions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionsBody'
+        required: true
+      responses:
+        '201':
+          description: Batch of created questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateQuestionsResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '409':
+          description: Idempotency key conflict
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/questions/{id}:
+    get:
+      tags:
+      - crate::http::questions
+      operationId: get_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question by id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+    patch:
+      tags:
+      - crate::http::questions
+      operationId: update_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionPatch'
+        required: true
+      responses:
+        '200':
+          description: Updated question
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '404':
+          description: No such question
+        '422':
+          description: Cannot edit archived question
+      security:
+      - bearer_auth: []
+  /v1/questions/{id}/archive:
+    post:
+      tags:
+      - crate::http::questions
+      operationId: archive_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+  /v1/questions/{id}/promote:
+    post:
+      tags:
+      - crate::http::questions
+      operationId: promote_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question promoted to live
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: No such question
+      security:
+      - bearer_auth: []
+  /v1/questions/{id}/versions:
+    get:
+      tags:
+      - crate::http::questions
+      operationId: list_versions
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Historical versions, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionVersionsResponse'
+        '404':
+          description: No such question
       security:
       - bearer_auth: []
   /v1/quizzes:
@@ -611,6 +570,47 @@ paths:
                 $ref: '#/components/schemas/FinishSessionResponse'
         '404':
           description: No such session
+      security:
+      - bearer_auth: []
+  /v1/tags:
+    get:
+      tags:
+      - crate::http::tags
+      operationId: list_tags
+      responses:
+        '200':
+          description: All tags, sorted by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '401':
+          description: Missing or invalid token
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - crate::http::tags
+      operationId: create_tag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTagBody'
+        required: true
+      responses:
+        '201':
+          description: Tag created (or already existed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
       security:
       - bearer_auth: []
 components:
@@ -1664,8 +1664,9 @@ components:
     Role:
       type: string
       enum:
+      - learner
+      - instructor
       - admin
-      - user
       - agent
     RotateKeyResponse:
       type: object

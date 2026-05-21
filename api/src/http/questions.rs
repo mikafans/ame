@@ -37,7 +37,7 @@ use crate::{
 
 pub struct WriteQuestionScopes;
 impl ScopeOneOf for WriteQuestionScopes {
-    const SCOPES: &'static [Scope] = &[Scope::Human, Scope::AgentWriteQuestions];
+    const SCOPES: &'static [Scope] = &[Scope::QuizWrite];
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -78,7 +78,7 @@ pub struct QuestionVersionsResponse {
 
 #[utoipa::path(
     get,
-    path = "/questions",
+    path = "/v1/questions",
     params(ListQuestionsQuery),
     responses(
         (status = 200, description = "Filtered list of questions", body = QuestionListResponse),
@@ -105,7 +105,7 @@ pub async fn list_questions(
 
 #[utoipa::path(
     get,
-    path = "/questions/{id}",
+    path = "/v1/questions/{id}",
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
         (status = 200, description = "Question by id", body = Question),
@@ -128,7 +128,7 @@ pub async fn get_question(
 
 #[utoipa::path(
     get,
-    path = "/questions/{id}/versions",
+    path = "/v1/questions/{id}/versions",
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
         (status = 200, description = "Historical versions, newest first", body = QuestionVersionsResponse),
@@ -154,7 +154,7 @@ pub async fn list_versions(
 
 #[utoipa::path(
     post,
-    path = "/questions",
+    path = "/v1/questions",
     request_body = CreateQuestionsBody,
     responses(
         (status = 201, description = "Batch of created questions", body = CreateQuestionsResponse),
@@ -185,7 +185,7 @@ pub async fn create_questions(
 
 #[utoipa::path(
     patch,
-    path = "/questions/{id}",
+    path = "/v1/questions/{id}",
     params(("id" = Uuid, Path, description = "Question id")),
     request_body = repo::QuestionPatch,
     responses(
@@ -209,7 +209,7 @@ pub async fn update_question(
 
 #[utoipa::path(
     post,
-    path = "/questions/{id}/promote",
+    path = "/v1/questions/{id}/promote",
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
         (status = 200, description = "Question promoted to live", body = Question),
@@ -227,7 +227,7 @@ pub async fn promote_question(
 
 #[utoipa::path(
     post,
-    path = "/questions/{id}/archive",
+    path = "/v1/questions/{id}/archive",
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
         (status = 200, description = "Question archived", body = Question),
@@ -248,18 +248,21 @@ pub fn router(state: AppState) -> Router<AppState> {
     // ingests don't double-insert; the other routes don't accept the header
     // and don't need it.
     let create_only = Router::new()
-        .route("/questions", post(create_questions))
+        .route("/v1/questions", post(create_questions))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             idempotency_middleware,
         ));
 
     let rest = Router::new()
-        .route("/questions", get(list_questions))
-        .route("/questions/{id}", get(get_question).patch(update_question))
-        .route("/questions/{id}/versions", get(list_versions))
-        .route("/questions/{id}/promote", post(promote_question))
-        .route("/questions/{id}/archive", post(archive_question));
+        .route("/v1/questions", get(list_questions))
+        .route(
+            "/v1/questions/{id}",
+            get(get_question).patch(update_question),
+        )
+        .route("/v1/questions/{id}/versions", get(list_versions))
+        .route("/v1/questions/{id}/promote", post(promote_question))
+        .route("/v1/questions/{id}/archive", post(archive_question));
 
     create_only.merge(rest).with_state(state)
 }

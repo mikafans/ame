@@ -48,7 +48,7 @@ async fn make_bearer(pool: &PgPool) -> String {
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
         .bind(user_id)
         .bind(format!("exam-user-{user_id}"))
         .execute(pool)
@@ -57,14 +57,14 @@ async fn make_bearer(pool: &PgPool) -> String {
     sqlx::query(
         "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
     )
-    .bind(token_id).bind(user_id).bind(hash).bind(vec!["human".to_string()])
+    .bind(token_id).bind(user_id).bind(hash).bind(vec!["quiz.write".to_string(), "attempt.write".to_string()])
     .execute(pool).await.unwrap();
     format!("{token_id}_{secret}")
 }
 
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
     let author = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
         .bind(author)
         .bind(format!("author-{author}"))
         .execute(pool)

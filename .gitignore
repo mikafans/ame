@@ -24,6 +24,12 @@ result-*
 db/data/
 db/data.*-backup-*/
 
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # Misc
 .env
 .env.local

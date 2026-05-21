@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess e2e check validate db-up db-down hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -56,6 +56,9 @@ test-assess: ## Exam composition integration tests (requires `make db-up`)
 
 test-stats: ## Stats, messages, keys integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
+
+test-api: ## Black-box HTTP tests against a running API (requires `make db-up` + API running)
+	uv run pytest api_tests -v
 
 openapi: ## Regenerate api/openapi.yaml snapshot
 	cd api && mise exec -- cargo run --quiet --bin gen-openapi

@@ -80,8 +80,9 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
         let role: String = record.get("role");
         let role = match role.as_str() {
+            "learner" | "user" => crate::domain::user::Role::Learner,
+            "instructor" => crate::domain::user::Role::Instructor,
             "admin" => crate::domain::user::Role::Admin,
-            "user" => crate::domain::user::Role::User,
             "agent" => crate::domain::user::Role::Agent,
             _ => {
                 return Err(ApiError::Internal(anyhow::anyhow!(

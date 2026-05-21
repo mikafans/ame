@@ -61,7 +61,7 @@ async fn make_bearer(pool: &PgPool) -> String {
         .unwrap()
         .to_string();
 
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
         .bind(user_id)
         .bind(format!("session-user-{user_id}"))
         .execute(pool)
@@ -74,7 +74,7 @@ async fn make_bearer(pool: &PgPool) -> String {
     .bind(token_id)
     .bind(user_id)
     .bind(hash)
-    .bind(vec!["human".to_string()])
+    .bind(vec!["attempt.write".to_string(), "quiz.write".to_string()])
     .execute(pool)
     .await
     .unwrap();
@@ -84,7 +84,7 @@ async fn make_bearer(pool: &PgPool) -> String {
 
 async fn make_live_mc_question(pool: &PgPool) -> Uuid {
     let author_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
         .bind(author_id)
         .bind(format!("author-{author_id}"))
         .execute(pool)

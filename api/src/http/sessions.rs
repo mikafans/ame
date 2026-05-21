@@ -40,7 +40,7 @@ use crate::{
 
 pub struct SessionWriteScopes;
 impl ScopeOneOf for SessionWriteScopes {
-    const SCOPES: &'static [Scope] = &[Scope::Human, Scope::AgentWriteQuestions];
+    const SCOPES: &'static [Scope] = &[Scope::AttemptWrite];
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

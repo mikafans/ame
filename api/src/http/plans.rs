@@ -20,17 +20,12 @@ use crate::{
 
 pub struct PlanWriteScopes;
 impl ScopeOneOf for PlanWriteScopes {
-    const SCOPES: &'static [Scope] = &[Scope::PlanWrite, Scope::Human, Scope::Admin];
+    const SCOPES: &'static [Scope] = &[Scope::PlanWrite, Scope::Admin];
 }
 
 pub struct PlanReadScopes;
 impl ScopeOneOf for PlanReadScopes {
-    const SCOPES: &'static [Scope] = &[
-        Scope::PlanRead,
-        Scope::PlanWrite,
-        Scope::Human,
-        Scope::Admin,
-    ];
+    const SCOPES: &'static [Scope] = &[Scope::PlanRead, Scope::PlanWrite, Scope::Admin];
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

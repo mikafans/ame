@@ -19,9 +19,9 @@ use crate::{
     http::AppState,
 };
 
-pub struct HumanScope;
-impl ScopeConstraint for HumanScope {
-    const SCOPE: Scope = Scope::Human;
+pub struct TagWriteScope;
+impl ScopeConstraint for TagWriteScope {
+    const SCOPE: Scope = Scope::QuizWrite;
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -33,7 +33,7 @@ pub struct CreateTagBody {
 
 #[utoipa::path(
     get,
-    path = "/tags",
+    path = "/v1/tags",
     responses(
         (status = 200, description = "All tags, sorted by name", body = Vec<Tag>),
         (status = 401, description = "Missing or invalid token"),
@@ -50,7 +50,7 @@ pub async fn list_tags(
 
 #[utoipa::path(
     post,
-    path = "/tags",
+    path = "/v1/tags",
     request_body = CreateTagBody,
     responses(
         (status = 201, description = "Tag created (or already existed)", body = Tag),
@@ -61,7 +61,7 @@ pub async fn list_tags(
 )]
 pub async fn create_tag(
     State(state): State<AppState>,
-    _user: RequireScope<HumanScope>,
+    _user: RequireScope<TagWriteScope>,
     Json(body): Json<CreateTagBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     let tag = repo::create_tag(&state.pool, &body.name, body.description.as_deref()).await?;
@@ -70,6 +70,6 @@ pub async fn create_tag(
 
 pub fn router(state: AppState) -> axum::Router<AppState> {
     axum::Router::new()
-        .route("/tags", get(list_tags).post(create_tag))
+        .route("/v1/tags", get(list_tags).post(create_tag))
         .with_state(state)
 }

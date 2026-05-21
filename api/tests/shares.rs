@@ -48,7 +48,7 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
         .bind(user_id)
         .bind(format!("test-user-{user_id}"))
         .execute(pool)
