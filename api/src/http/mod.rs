@@ -2,6 +2,8 @@ use axum::{Json, Router, middleware, routing::get};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tracing::Level;
 
 /// Shared HTTP state. Cloned per request by Axum, so anything added here must
 /// be cheap to clone (PgPool is internally an `Arc`).
@@ -62,12 +64,17 @@ pub fn router(pool: PgPool) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let trace = TraceLayer::new_for_http()
+        .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+        .on_response(DefaultOnResponse::new().level(Level::INFO));
+
     Router::new()
         .route("/healthz", get(healthz))
         .merge(openapi::router(state.clone()))
         .merge(auth::router(state.clone()))
         .merge(logged)
         .layer(cors)
+        .layer(trace)
         .with_state(state)
 }
 

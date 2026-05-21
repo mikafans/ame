@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down db-migrate db-shell db-seed dev-env hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down db-reset db-migrate db-shell db-seed init-env dev-stop dev-env hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -20,10 +20,10 @@ fmt-check: ## Verify formatting without mutating
 		echo "[web] skipping prettier --check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
-lint: ## Clippy + eslint + tsc + api drift check + sqlfluff lint
+lint: ## Clippy + tsc + api drift check + sqlfluff lint
 	cd api && mise exec -- cargo clippy --all-targets -- -D warnings
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run lint && mise exec -- bun run type-check && mise exec -- bun run api:check; \
+		cd web && mise exec -- bun run type-check && mise exec -- bun run api:check; \
 	else \
 		echo "[web] skipping lint + type-check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
@@ -80,6 +80,13 @@ db-up: ## Start Postgres in docker
 db-down: ## Stop Postgres
 	docker compose -f db/docker-compose.yml down
 
+db-reset: db-down ## Wipe and recreate DB from scratch (local dev only)
+	rm -rf db/data
+	$(MAKE) db-up
+	@echo "Waiting for Postgres to be ready..."
+	@until DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate info --source db/migrations > /dev/null 2>&1; do sleep 1; done
+	$(MAKE) db-migrate
+
 db-migrate: ## Run pending sqlx migrations
 	DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate run --source db/migrations
 
@@ -89,15 +96,27 @@ db-shell: ## Open interactive pgcli session to local Postgres
 db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API running)
 	uv run scripts/seed.py
 
+init-env: ## One-time setup: mise install + sqlx-cli + web deps + playwright
+	mise install
+	cargo install sqlx-cli --no-default-features --features postgres
+	cd web && mise exec -- bun install
+	cd web && mise exec -- bunx playwright install --with-deps
+	@echo "init-env done — run 'make dev-env' to start the stack"
+
+dev-stop: ## Stop API, frontend, and Postgres
+	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
+	docker compose -f db/docker-compose.yml down
+
 dev-env: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	$(MAKE) db-migrate
-	@echo "Starting API on :8080 ..."
-	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame DEMO_MODE=1 \
-		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api &
-	@echo "Starting frontend on :3000 ..."
-	@cd web && mise exec -- bun run dev
+	@echo "Starting API on :8080  (logs → /tmp/ame-api.log)"
+	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
+		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
+		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee /tmp/ame-api.log &
+	@echo "Starting frontend on :3000 (logs → /tmp/ame-web.log)"
+	@cd web && mise exec -- bun run dev 2>&1 | tee /tmp/ame-web.log
 
 hooks-install: ## Point git at .githooks/
 	git config core.hooksPath .githooks

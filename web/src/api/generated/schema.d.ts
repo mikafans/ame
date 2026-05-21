@@ -479,8 +479,20 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        GetSessionQuestion: {
+            codeSnippet?: unknown;
+            kind: components["schemas"]["QuestionKind"];
+            optionOrder?: number[] | null;
+            options?: unknown[] | null;
+            /** Format: int32 */
+            points: number;
+            prompt: string;
+            /** Format: uuid */
+            questionId: string;
+        };
         GetSessionResponse: {
             attempts: components["schemas"]["Attempt"][];
+            questions: components["schemas"]["GetSessionQuestion"][];
             session: components["schemas"]["Session"];
         };
         GradeOutcome: {

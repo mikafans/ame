@@ -5,7 +5,13 @@ use tracing_subscriber::EnvFilter;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "ame_api=debug,tower_http=info,sqlx=warn".into()),
+        )
+        .with_target(true)
+        .with_thread_ids(false)
+        .compact()
         .init();
 
     let database_url = std::env::var("DATABASE_URL")

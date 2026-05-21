@@ -47,8 +47,53 @@ export default function ResultsPage({
     if (!token) return;
     makeClient(token)
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
-      .then(({ data: d }: { data?: ResultData }) => {
-        if (d) setData(d);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then(({ data: d }: { data?: any }) => {
+        if (!d) return;
+        const session = d.session ?? {};
+        const attempts: any[] = d.attempts ?? [];
+        const questions: any[] = d.questions ?? [];
+
+        // Build a points lookup from the question plan
+        const pointsById: Record<string, number> = {};
+        for (const q of questions) {
+          pointsById[q.questionId ?? q.id] = q.points ?? 1;
+        }
+
+        const answers: Answer[] = attempts.map((a: any) => ({
+          qid: a.question_id ?? a.questionId ?? "",
+          correct: a.is_correct ?? false,
+          points:
+            a.score != null
+              ? Math.round(
+                  a.score * (pointsById[a.question_id ?? a.questionId] ?? 1),
+                )
+              : 0,
+          max: pointsById[a.question_id ?? a.questionId] ?? 1,
+          type: a.kind ?? "mc",
+          given:
+            typeof a.response === "object"
+              ? JSON.stringify(a.response)
+              : String(a.response ?? ""),
+          note: a.explanation ?? "",
+        }));
+
+        const score = answers.reduce((s, a) => s + a.points, 0);
+        const total = answers.reduce((s, a) => s + a.max, 0) || 1;
+
+        // Use stored result if available (set by /finish)
+        const stored = session.result;
+        setData({
+          id: session.id ?? id,
+          quiz_title: session.quiz_title ?? "Quiz Results",
+          course: session.course ?? session.kind ?? "quiz",
+          attempt_number: 1,
+          total_attempts: 1,
+          score: stored?.points_awarded ?? score,
+          total: stored?.max_points ?? total,
+          feedback: stored?.feedback,
+          answers,
+        });
       })
       .catch(console.error);
   }, [token, id]);
@@ -73,7 +118,7 @@ export default function ResultsPage({
 
   const pct = Math.round((data.score / data.total) * 100);
   const passed = pct >= 70;
-  const kicker = `${data.course.toUpperCase()} · ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`;
+  const kicker = `${(data.course ?? "quiz").toUpperCase()} · ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`;
 
   const toggleExpanded = (qid: string) => {
     const next = new Set(expandedItems);

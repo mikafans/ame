@@ -41,6 +41,7 @@ export default function LibraryPage() {
   });
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,17 +81,24 @@ export default function LibraryPage() {
   async function startQuiz(quizId: string) {
     if (!token) return;
     setStarting(quizId);
+    setStartError(null);
     try {
       const client = makeClient(token);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (client as any).POST("/v1/sessions", {
+      const { data, error } = await (client as any).POST("/v1/sessions", {
         body: { quizId },
       });
-      if (data) {
-        router.push(`/sessions/${(data as { sessionId: string }).sessionId}`);
+      if (error) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setStartError((error as any)?.message ?? "Failed to start quiz");
+        return;
+      }
+      if (data?.sessionId) {
+        router.push(`/sessions/${data.sessionId}`);
       }
     } catch (err) {
       console.error(err);
+      setStartError("Unexpected error — check the console");
     } finally {
       setStarting(null);
     }
@@ -181,6 +189,40 @@ export default function LibraryPage() {
           </Button>
         )}
       </div>
+
+      {/* Start error */}
+      {startError && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "10px 14px",
+            background: "var(--red-subtle, #fff1f0)",
+            border: "1px solid var(--red, #f5222d)",
+            borderRadius: 6,
+            color: "var(--red, #cf1322)",
+            fontSize: 13,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>{startError}</span>
+          <button
+            onClick={() => setStartError(null)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "inherit",
+              fontWeight: 600,
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div

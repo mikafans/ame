@@ -1092,16 +1092,52 @@ components:
         updatedAt:
           type: string
           format: date-time
+    GetSessionQuestion:
+      type: object
+      required:
+      - questionId
+      - kind
+      - prompt
+      - points
+      properties:
+        codeSnippet: {}
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        optionOrder:
+          type:
+          - array
+          - 'null'
+          items:
+            type: integer
+            minimum: 0
+        options:
+          type:
+          - array
+          - 'null'
+          items: {}
+        points:
+          type: integer
+          format: int32
+        prompt:
+          type: string
+        questionId:
+          type: string
+          format: uuid
     GetSessionResponse:
       type: object
       required:
       - session
+      - questions
       - attempts
       properties:
         attempts:
           type: array
           items:
             $ref: '#/components/schemas/Attempt'
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GetSessionQuestion'
         session:
           $ref: '#/components/schemas/Session'
     GradeOutcome:

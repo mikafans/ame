@@ -74,8 +74,24 @@ pub struct CreateSessionResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GetSessionQuestion {
+    pub question_id: Uuid,
+    pub kind: QuestionKind,
+    pub prompt: String,
+    pub points: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_snippet: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<Vec<serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub option_order: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct GetSessionResponse {
     pub session: Session,
+    pub questions: Vec<GetSessionQuestion>,
     pub attempts: Vec<Attempt>,
 }
 
@@ -198,7 +214,73 @@ pub async fn get_session(
 ) -> Result<Json<GetSessionResponse>, ApiError> {
     let session = get_owned_session(&state.pool, id, user.user.id).await?;
     let attempts = list_session_attempts(&state.pool, session.id).await?;
-    Ok(Json(GetSessionResponse { session, attempts }))
+    let questions = hydrate_session_questions(&state.pool, &session).await?;
+    Ok(Json(GetSessionResponse {
+        session,
+        questions,
+        attempts,
+    }))
+}
+
+async fn hydrate_session_questions(
+    pool: &PgPool,
+    session: &Session,
+) -> Result<Vec<GetSessionQuestion>, ApiError> {
+    let plan_ids: Vec<Uuid> = session
+        .question_plan
+        .items
+        .iter()
+        .map(|i| i.question_id)
+        .collect();
+
+    if plan_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let rows = sqlx::query(
+        "SELECT id, kind, prompt, points, code_snippet, payload \
+         FROM questions WHERE id = ANY($1)",
+    )
+    .bind(&plan_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    // preserve plan order
+    let mut by_id: std::collections::HashMap<Uuid, _> = rows
+        .into_iter()
+        .map(|r| (r.get::<Uuid, _>("id"), r))
+        .collect();
+
+    session
+        .question_plan
+        .items
+        .iter()
+        .filter_map(|item| {
+            let row = by_id.remove(&item.question_id)?;
+            let kind_str: String = row.get("kind");
+            let kind = QuestionKind::from_str(&kind_str).ok()?;
+            let payload: serde_json::Value = row.get("payload");
+            let options = payload
+                .get("options")
+                .cloned()
+                .and_then(|v| v.as_array().cloned())
+                .map(|arr| {
+                    arr.into_iter()
+                        .map(|opt| serde_json::json!({"text": opt}))
+                        .collect()
+                });
+            Some(Ok(GetSessionQuestion {
+                question_id: item.question_id,
+                kind,
+                prompt: row.get("prompt"),
+                points: row.get("points"),
+                code_snippet: row.get("code_snippet"),
+                options,
+                option_order: item.option_order.clone(),
+            }))
+        })
+        .collect()
 }
 
 #[utoipa::path(
@@ -295,11 +377,8 @@ async fn build_plan(
     user_id: Uuid,
     body: &CreateSessionBody,
 ) -> Result<CreatePlan, ApiError> {
-    if body.quiz_id.is_some() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "quizId".to_string(),
-            message: "quiz session hydration waits for Plan 4 quiz tables".to_string(),
-        }]));
+    if let Some(quiz_id) = body.quiz_id {
+        return build_quiz_plan(pool, quiz_id).await;
     }
     if let Some(exam_id) = body.exam_id {
         return build_exam_plan(pool, exam_id).await;
@@ -378,6 +457,62 @@ async fn build_plan(
             "cats": body.cats,
             "diff": body.diff,
         })),
+        questions,
+        affects_rating: None,
+    })
+}
+
+async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, ApiError> {
+    sqlx::query("SELECT id FROM quizzes WHERE id = $1 AND status = 'active'")
+        .bind(quiz_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(internal)?
+        .ok_or(ApiError::NotFound { resource: "quiz" })?;
+
+    let rows = sqlx::query(
+        "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
+         FROM quiz_questions qq \
+         JOIN questions q ON q.id = qq.question_id \
+         WHERE qq.quiz_id = $1 AND q.status = 'live' \
+         ORDER BY qq.order_index ASC",
+    )
+    .bind(quiz_id)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    if rows.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "quizId".to_string(),
+            message: "quiz has no live questions".to_string(),
+        }]));
+    }
+
+    let mut questions = Vec::with_capacity(rows.len());
+    for row in rows {
+        let id = row.get("id");
+        let kind_str: String = row.get("kind");
+        let kind = QuestionKind::from_str(&kind_str)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid kind in DB: {e}")))?;
+        let payload: serde_json::Value = row.get("payload");
+        let option_order = option_order(kind, &payload)?;
+        questions.push(PlannedQuestion {
+            question: SessionQuestion {
+                id,
+                kind,
+                prompt: row.get("prompt"),
+                version: row.get("version"),
+                points: row.get("points"),
+                payload,
+                option_order,
+            },
+        });
+    }
+
+    Ok(CreatePlan {
+        kind: SessionKind::Quiz,
+        filter: None,
         questions,
         affects_rating: None,
     })

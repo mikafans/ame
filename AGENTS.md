@@ -9,6 +9,9 @@ This file is the canonical, machine-readable rundown of how to work in this repo
 - Toolchain: `mise` for language runtimes (rust, bun, uv). SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`; migrations: `sqlx migrate run` (sqlx-cli via cargo); sqlfluff via `uvx sqlfluff`.
 
 ## Commands
+- `make init-env` — one-time setup on a fresh checkout: `mise install` (rust, bun, uv runtimes) + `sqlx-cli` via cargo + `bun install` for web deps + Playwright browsers. Run before `make dev-env`.
+- `make dev-env` — start full local stack: DB up → migrate → API on `:8080` → frontend on `:3000`.
+- `make db-seed` — seed demo data (requires API running).
 - `make check` — fmt-check + lint + test. Required before every commit (pre-commit hook enforces).
 - `make validate` — `make check` + e2e. Required before opening a PR.
 - `make test-db` — DB-backed API integration tests. Requires `make db-up`; `make check` skips these unless `AME_RUN_DB_TESTS=1`.
