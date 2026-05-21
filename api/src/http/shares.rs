@@ -34,7 +34,7 @@ use crate::{
 
 pub struct ShareScopes;
 impl ScopeOneOf for ShareScopes {
-    const SCOPES: &'static [Scope] = &[Scope::QuizRead, Scope::Human, Scope::Admin];
+    const SCOPES: &'static [Scope] = &[Scope::QuizRead, Scope::Admin];
 }
 
 // ── shapes ────────────────────────────────────────────────────────────────────

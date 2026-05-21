@@ -26,7 +26,7 @@ use crate::{
 
 pub struct AgentReadScopes;
 impl ScopeOneOf for AgentReadScopes {
-    const SCOPES: &'static [Scope] = &[Scope::QuizRead, Scope::Human, Scope::Admin];
+    const SCOPES: &'static [Scope] = &[Scope::QuizRead, Scope::Admin];
 }
 
 // ── shapes ────────────────────────────────────────────────────────────────────

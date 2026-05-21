@@ -49,7 +49,7 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
         .bind(user_id)
         .bind(format!("test-user-{user_id}"))
         .execute(pool)
@@ -210,7 +210,7 @@ async fn exam_stats_returns_correct_shape() {
         return;
     }
     let pool = setup_db().await;
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["stats.read", "human"]).await;
+    let (user_id, bearer) = make_user_with_scopes(&pool, &["stats.read", "quiz.write"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -264,8 +264,8 @@ async fn stats_endpoints_require_stats_read_scope() {
         return;
     }
     let pool = setup_db().await;
-    // token with human scope (no stats.read)
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["human"]).await;
+    // token with quiz.read only (no stats.read)
+    let (user_id, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
     let quiz_id = make_quiz(&pool, user_id).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
@@ -315,7 +315,7 @@ async fn post_message_in_app_creates_record() {
     }
     let pool = setup_db().await;
     let (from_id, bearer) = make_user_with_scopes(&pool, &["feedback.write"]).await;
-    let (to_id, _) = make_user_with_scopes(&pool, &["human"]).await;
+    let (to_id, _) = make_user_with_scopes(&pool, &["quiz.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -358,7 +358,7 @@ async fn post_message_email_channel_queues_without_sending() {
     }
     let pool = setup_db().await;
     let (from_id, bearer) = make_user_with_scopes(&pool, &["feedback.write"]).await;
-    let (to_id, _) = make_user_with_scopes(&pool, &["human"]).await;
+    let (to_id, _) = make_user_with_scopes(&pool, &["quiz.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -398,7 +398,7 @@ async fn key_rotation_invalidates_old_token() {
         return;
     }
     let pool = setup_db().await;
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["human"]).await;
+    let (user_id, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -457,8 +457,8 @@ async fn create_key_requires_admin_scope_for_admin_key() {
         return;
     }
     let pool = setup_db().await;
-    // non-admin user with human scope only
-    let (_, bearer) = make_user_with_scopes(&pool, &["human"]).await;
+    // non-admin user without admin scope
+    let (_, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 

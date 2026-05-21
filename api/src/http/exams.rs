@@ -30,7 +30,7 @@ use crate::{
 
 pub struct ExamWriteScopes;
 impl ScopeOneOf for ExamWriteScopes {
-    const SCOPES: &'static [Scope] = &[Scope::Human];
+    const SCOPES: &'static [Scope] = &[Scope::QuizWrite];
 }
 
 // ── request / response shapes ────────────────────────────────────────────────
@@ -254,7 +254,7 @@ pub async fn get_exam(
     let mut exam = row_to_exam(row)?;
 
     // Learners never see composition_trace
-    let is_writer = user.token_scopes.contains(&Scope::Human);
+    let is_writer = user.token_scopes.contains(&Scope::QuizWrite);
     if !is_writer {
         exam.composition_trace = None;
     }

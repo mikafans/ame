@@ -18,7 +18,7 @@ use ame_api::{
 
 struct WriteQuestionsScope;
 impl ScopeConstraint for WriteQuestionsScope {
-    const SCOPE: Scope = Scope::AgentWriteQuestions;
+    const SCOPE: Scope = Scope::QuizWrite;
 }
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -106,13 +106,13 @@ async fn test_auth_and_idempotency() {
         .unwrap()
         .to_string();
 
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, 'Test User', 'user')")
+    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, 'Test User', 'learner')")
         .bind(user_id)
         .execute(&pool)
         .await
         .unwrap();
 
-    let scopes = vec!["human".to_string(), "agent:read-only".to_string()];
+    let scopes = vec!["quiz.read".to_string()];
     sqlx::query(
         "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test token', $3, $4)",
     )
@@ -144,9 +144,9 @@ async fn test_auth_and_idempotency() {
         .send()
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "agent:write-questions"
+    assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "quiz.write"
     let body: Value = res.json().await.unwrap();
-    assert_eq!(body["error"]["details"]["scope"], "agent:write-questions");
+    assert_eq!(body["error"]["details"]["scope"], "quiz.write");
 
     // Test 4: Idempotency
     let idem_key = "test-key-1";
@@ -233,15 +233,17 @@ async fn revoked_token_returns_unauthorized() {
         .unwrap()
         .to_string();
 
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, 'Revoked User', 'user')")
-        .bind(user_id)
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO users (id, display_name, role) VALUES ($1, 'Revoked User', 'learner')",
+    )
+    .bind(user_id)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     // revoked_at set at insert time — the secret hash is still valid, so any
     // 200 here would prove the extractor stopped checking revocation.
-    let scopes = vec!["human".to_string()];
+    let scopes = vec!["quiz.read".to_string()];
     sqlx::query(
         "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
          VALUES ($1, $2, 'revoked token', $3, $4, now())",

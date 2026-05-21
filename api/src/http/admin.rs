@@ -58,7 +58,9 @@ pub async fn list_users(
             let role_str: String = r.get("role");
             let role = match role_str.as_str() {
                 "admin" => Role::Admin,
-                _ => Role::User,
+                "instructor" => Role::Instructor,
+                "agent" => Role::Agent,
+                _ => Role::Learner,
             };
             User {
                 id: r.get("id"),
@@ -79,10 +81,11 @@ pub async fn update_user_role(
     Path(user_id): Path<Uuid>,
     Json(body): Json<UpdateUserRoleBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if body.role != "admin" && body.role != "user" {
+    let valid_roles = ["learner", "instructor", "admin"];
+    if !valid_roles.contains(&body.role.as_str()) {
         return Err(ApiError::Validation(vec![FieldError {
             field: "role".into(),
-            message: "must be 'admin' or 'user'".into(),
+            message: "must be 'learner', 'instructor', or 'admin'".into(),
         }]));
     }
 

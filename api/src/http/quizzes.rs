@@ -24,12 +24,12 @@ use crate::{
 
 pub struct QuizReadScopes;
 impl ScopeOneOf for QuizReadScopes {
-    const SCOPES: &'static [Scope] = &[Scope::Human, Scope::QuizRead];
+    const SCOPES: &'static [Scope] = &[Scope::QuizRead, Scope::QuizWrite];
 }
 
 pub struct QuizWriteScopes;
 impl ScopeOneOf for QuizWriteScopes {
-    const SCOPES: &'static [Scope] = &[Scope::Human, Scope::QuizWrite];
+    const SCOPES: &'static [Scope] = &[Scope::QuizWrite];
 }
 
 // ── list ─────────────────────────────────────────────────────────────────────
