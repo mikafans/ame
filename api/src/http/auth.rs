@@ -130,6 +130,7 @@ pub async fn register(
     let secret = generate_secret();
     let token_hash = hash_secret(&secret)?;
 
+    let initial_scopes = scopes_for_role(&role);
     sqlx::query(
         "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes)
          VALUES ($1, $2, $3, $4, $5)",
@@ -138,7 +139,7 @@ pub async fn register(
     .bind(user_id)
     .bind("default")
     .bind(&token_hash)
-    .bind(vec!["human"])
+    .bind(initial_scopes)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -199,6 +200,7 @@ pub async fn login(
         let secret = generate_secret();
         let token_hash = hash_secret(&secret)?;
 
+        let initial_scopes = scopes_for_role(&role);
         sqlx::query(
             "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes)
              VALUES ($1, $2, $3, $4, $5)",
@@ -207,7 +209,7 @@ pub async fn login(
         .bind(user_id)
         .bind("default")
         .bind(&token_hash)
-        .bind(vec!["human"])
+        .bind(initial_scopes)
         .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -238,6 +240,33 @@ pub async fn login(
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+fn scopes_for_role(role: &str) -> Vec<&'static str> {
+    match role {
+        "agent" => vec!["quiz.read"],
+        "admin" => vec![
+            "quiz.read",
+            "quiz.write",
+            "attempt.read",
+            "attempt.write",
+            "stats.read",
+            "feedback.write",
+            "plan.read",
+            "plan.write",
+            "admin",
+        ],
+        _ => vec![
+            "quiz.read",
+            "quiz.write",
+            "attempt.read",
+            "attempt.write",
+            "stats.read",
+            "feedback.write",
+            "plan.read",
+            "plan.write",
+        ],
+    }
+}
 
 pub fn generate_secret() -> String {
     use rand::RngCore;

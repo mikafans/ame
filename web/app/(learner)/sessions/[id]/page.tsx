@@ -88,6 +88,38 @@ export default function ActiveQuizPage({
       .catch(console.error);
   }, [token, id]);
 
+  const handleFinish = useCallback(async () => {
+    if (finishing || !token) return;
+    setFinishing(true);
+    try {
+      // Autosave before finish
+      const answersList = Object.entries(answers).map(([qid, val]) => ({
+        questionId: qid,
+        answer: val,
+      }));
+      if (answersList.length > 0) {
+        await makeClient(token).PATCH(
+          "/v1/sessions/{id}/answers" as never,
+          {
+            params: { path: { id } },
+            body: { answers: answersList } as never,
+          } as never,
+        );
+      }
+      // Submit session
+      await makeClient(token).POST(
+        "/v1/sessions/{id}/submit" as never,
+        {
+          params: { path: { id } },
+        } as never,
+      );
+      router.push(`/sessions/${id}/results`);
+    } catch (err) {
+      console.error(err);
+      setFinishing(false);
+    }
+  }, [token, id, router, finishing, answers]);
+
   // Timer countdown
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
@@ -147,38 +179,6 @@ export default function ActiveQuizPage({
       console.error(err);
     }
   }, [token, id, router]);
-
-  const handleFinish = useCallback(async () => {
-    if (finishing || !token) return;
-    setFinishing(true);
-    try {
-      // Autosave before finish
-      const answersList = Object.entries(answers).map(([qid, val]) => ({
-        questionId: qid,
-        answer: val,
-      }));
-      if (answersList.length > 0) {
-        await makeClient(token).PATCH(
-          "/v1/sessions/{id}/answers" as never,
-          {
-            params: { path: { id } },
-            body: { answers: answersList } as never,
-          } as never,
-        );
-      }
-      // Submit session
-      await makeClient(token).POST(
-        "/v1/sessions/{id}/submit" as never,
-        {
-          params: { path: { id } },
-        } as never,
-      );
-      router.push(`/sessions/${id}/results`);
-    } catch (err) {
-      console.error(err);
-      setFinishing(false);
-    }
-  }, [token, id, router, finishing, answers]);
 
   if (!session) {
     return (

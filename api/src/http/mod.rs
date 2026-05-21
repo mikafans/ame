@@ -1,6 +1,7 @@
 use axum::{Json, Router, middleware, routing::get};
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use tower_http::cors::{Any, CorsLayer};
 
 /// Shared HTTP state. Cloned per request by Axum, so anything added here must
 /// be cheap to clone (PgPool is internally an `Arc`).
@@ -56,11 +57,17 @@ pub fn router(pool: PgPool) -> Router {
             activity::activity_log_middleware,
         ));
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/healthz", get(healthz))
         .merge(openapi::router(state.clone()))
         .merge(auth::router(state.clone()))
         .merge(logged)
+        .layer(cors)
         .with_state(state)
 }
 

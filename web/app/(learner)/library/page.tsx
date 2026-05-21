@@ -48,55 +48,33 @@ export default function LibraryPage() {
     setLoading(true);
     const client = makeClient(token);
 
-    const fetchTab = async (tabId: TabId) => {
-      try {
-        const params: Record<string, string | boolean> = {};
-        if (tabId === "assigned") {
-          params.assigned = true;
-        } else if (tabId === "completed") {
-          params.completed = true;
-        } else if (tabId === "drafts") {
-          params.status = "draft";
-        } else {
-          params.status = "active";
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data } = await (client as any).GET("/v1/quizzes", {
-          params: { query: params },
-        });
-
-        if (data) {
-          const quizzes = Array.isArray(data.quizzes) ? data.quizzes : [];
-          const total =
-            typeof data.total === "number" ? data.total : quizzes.length;
-          setAllQuizzes((prev) => ({
-            ...prev,
-            [tabId]: { quizzes, total },
-          }));
-        }
-      } catch (err) {
-        console.error(`Failed to fetch ${tabId}:`, err);
-        if (tabId === "assigned" || tabId === "completed") {
-          // Fall back gracefully to All quizzes if specific endpoints fail
-          const fallbackData = allQuizzes.all;
-          setAllQuizzes((prev) => ({
-            ...prev,
-            [tabId]: fallbackData,
-          }));
-        }
-      }
+    const fetchStatus = async (
+      status: string,
+    ): Promise<{ quizzes: Quiz[]; total: number }> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (client as any).GET("/v1/quizzes", {
+        params: { query: { status } },
+      });
+      const quizzes = Array.isArray(data?.quizzes) ? data.quizzes : [];
+      return { quizzes, total: data?.total ?? quizzes.length };
     };
 
+    const isInst = user?.role === "instructor" || user?.role === "admin";
     Promise.all([
-      fetchTab("all"),
-      fetchTab("assigned"),
-      fetchTab("completed"),
-      ...(user?.role === "instructor" || user?.role === "admin"
-        ? [fetchTab("drafts")]
-        : []),
-    ]).finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      fetchStatus("active"),
+      isInst
+        ? fetchStatus("draft")
+        : Promise.resolve({ quizzes: [], total: 0 }),
+    ])
+      .then(([active, drafts]) => {
+        setAllQuizzes({
+          all: active,
+          assigned: active,
+          completed: { quizzes: [], total: 0 },
+          drafts,
+        });
+      })
+      .finally(() => setLoading(false));
   }, [token, user?.role]);
 
   async function startQuiz(quizId: string) {

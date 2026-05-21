@@ -380,7 +380,7 @@ pub fn hash_secret(secret: &str) -> Result<String, ApiError> {
 pub struct MeResponse {
     pub id: Uuid,
     pub display_name: String,
-    pub email: Option<String>,
+    pub email: String,
     pub role: Role,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,

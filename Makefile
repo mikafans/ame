@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down db-migrate dev-env hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -79,6 +79,19 @@ db-up: ## Start Postgres in docker
 
 db-down: ## Stop Postgres
 	docker compose -f db/docker-compose.yml down
+
+db-migrate: ## Run pending sqlx migrations
+	DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame mise exec -- sqlx migrate run --source db/migrations
+
+dev-env: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
+	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
+	@sleep 1
+	$(MAKE) db-migrate
+	@echo "Starting API on :8080 ..."
+	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame DEMO_MODE=1 \
+		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api &
+	@echo "Starting frontend on :3000 ..."
+	@cd web && mise exec -- bun run dev
 
 hooks-install: ## Point git at .githooks/
 	git config core.hooksPath .githooks

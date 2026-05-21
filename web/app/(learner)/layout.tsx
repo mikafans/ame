@@ -12,7 +12,7 @@ export default function LearnerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -22,12 +22,6 @@ export default function LearnerLayout({
     "standard",
   );
   const [showTweaks, setShowTweaks] = useState(false);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login");
-    }
-  }, [user, loading, router]);
 
   // Apply theme
   useEffect(() => {
@@ -49,27 +43,7 @@ export default function LearnerLayout({
     }
   }, []);
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--muted)",
-          fontFamily: "var(--mono)",
-          fontSize: 13,
-        }}
-      >
-        Loading…
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
-  const role = user.role;
+  const role = user?.role ?? "learner";
 
   // Map pathname to route ID for Sidebar
   const getRouteId = () => {

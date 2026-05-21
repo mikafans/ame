@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useMemo, use } from "react";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ShareModal } from "@/components/ShareModal";
@@ -507,6 +507,7 @@ function DonutChart({
 
 function CohortHistogram({ userBin }: { userBin: number }) {
   const bins = Array.from({ length: 10 }, (_, i) => i);
+  const heights = useMemo(() => bins.map(() => Math.random() * 0.8 + 0.2), []);
 
   return (
     <svg
@@ -514,9 +515,9 @@ function CohortHistogram({ userBin }: { userBin: number }) {
       height={170}
       style={{ display: "block", marginBottom: 8 }}
     >
-      {bins.map((bin) => {
+      {bins.map((bin, i) => {
         const x = (bin / 10) * 100;
-        const height = Math.random() * 0.8 + 0.2;
+        const height = heights[i];
         const barWidth = 100 / 10 / 1.5;
         const isUserBin = bin === userBin;
 
