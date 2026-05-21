@@ -27,7 +27,7 @@ interface Exam {
   durationMin?: number;
   passingPoints?: number;
   objectives: string[];
-  sections: ExamSection[];
+  sections: ExamSection[] | null;
   totalPoints: number;
   course?: string;
   tags?: string[];
@@ -469,7 +469,7 @@ function ExamListItem({
         }}
       >
         <span>◆ {exam.durationMin ?? "—"}m</span>
-        <span>▪ {exam.sections.length} sec</span>
+        <span>▪ {(exam.sections ?? []).length} sec</span>
         <span
           style={{
             marginLeft: "auto",
@@ -496,7 +496,8 @@ function ExamDetail({
   onStart: () => void;
   onShare: () => void;
 }) {
-  const totalWeight = exam.sections.reduce((s, x) => s + x.weight, 0);
+  const sections = exam.sections ?? [];
+  const totalWeight = sections.reduce((s, x) => s + x.weight, 0);
 
   return (
     <div
@@ -666,7 +667,7 @@ function ExamDetail({
       >
         {[
           { l: "Duration", v: exam.durationMin ? `${exam.durationMin}m` : "—" },
-          { l: "Sections", v: exam.sections.length },
+          { l: "Sections", v: (exam.sections ?? []).length },
           { l: "Total pts", v: exam.totalPoints },
           {
             l: "Pass mark",
@@ -749,7 +750,7 @@ function ExamDetail({
               color: "var(--muted)",
             }}
           >
-            {exam.sections.length} sections · {totalWeight} pts total
+            {sections.length} sections · {totalWeight} pts total
           </div>
         </div>
 
@@ -764,7 +765,7 @@ function ExamDetail({
             marginBottom: 14,
           }}
         >
-          {exam.sections.map((s, i) => {
+          {sections.map((s, i) => {
             const colors = ["var(--accent)", "#4f8ef7", "#f59e0b", "#ef4444"];
             return (
               <div
@@ -773,7 +774,7 @@ function ExamDetail({
                   flex: s.weight,
                   background: colors[i % colors.length],
                   borderRight:
-                    i < exam.sections.length - 1
+                    i < sections.length - 1
                       ? "1px solid var(--bg, #000)"
                       : "none",
                 }}
@@ -809,7 +810,7 @@ function ExamDetail({
             <span style={{ textAlign: "right" }}>Items</span>
             <span style={{ textAlign: "right" }}>Weight</span>
           </div>
-          {exam.sections.map((s, i) => {
+          {sections.map((s, i) => {
             const colors = ["var(--accent)", "#4f8ef7", "#f59e0b", "#ef4444"];
             return (
               <div
@@ -819,7 +820,7 @@ function ExamDetail({
                   gridTemplateColumns: "32px 1fr 80px 80px",
                   padding: "12px 14px",
                   borderBottom:
-                    i < exam.sections.length - 1
+                    i < sections.length - 1
                       ? "1px solid var(--border)"
                       : "none",
                   alignItems: "center",

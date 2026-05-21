@@ -10,15 +10,16 @@ interface Tag {
 }
 
 const QUESTION_TYPES = [
-  { value: "mcq", label: "Multiple choice" },
-  { value: "free_text", label: "Free text" },
-  { value: "cloze", label: "Fill-in-the-blank" },
+  { value: "mc", label: "Multiple choice" },
+  { value: "tf", label: "True or false" },
+  { value: "short", label: "Short answer" },
+  { value: "essay", label: "Essay" },
 ];
 
 export default function PracticePage() {
   const { token } = useAuth();
   const router = useRouter();
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<Tag[] | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [count, setCount] = useState(10);
@@ -29,11 +30,11 @@ export default function PracticePage() {
   useEffect(() => {
     if (!token) return;
     makeClient(token)
-      .GET("/tags" as never)
-      .then(({ data }: { data?: { tags: Tag[] } }) => {
-        if (data?.tags) setTags(data.tags);
+      .GET("/v1/tags" as never)
+      .then(({ data }: { data?: Tag[] }) => {
+        setTags(Array.isArray(data) ? data : []);
       })
-      .catch(console.error);
+      .catch(() => setTags([]));
   }, [token]);
 
   function toggleTag(name: string) {
@@ -109,9 +110,13 @@ export default function PracticePage() {
       <form onSubmit={handleStart}>
         {/* Tags */}
         <SetupBlock label="Topics" kicker="Filter by tag">
-          {tags.length === 0 ? (
+          {tags === null ? (
             <span style={{ color: "var(--muted)", fontSize: 13 }}>
               Loading tags…
+            </span>
+          ) : tags.length === 0 ? (
+            <span style={{ color: "var(--muted)", fontSize: 13 }}>
+              No tags yet — all questions will be included.
             </span>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

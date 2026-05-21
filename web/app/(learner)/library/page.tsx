@@ -165,7 +165,17 @@ export default function LibraryPage() {
           <Button
             variant="outline"
             icon={<Icon name="plus" size={14} />}
-            onClick={() => router.push("/author/new")}
+            onClick={async () => {
+              if (!token) return;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { data } = await (makeClient(token) as any).POST(
+                "/v1/quizzes",
+                {
+                  body: { title: "Untitled quiz" },
+                },
+              );
+              if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
+            }}
           >
             New quiz
           </Button>

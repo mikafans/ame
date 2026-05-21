@@ -12,9 +12,16 @@ export default function LearnerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Redirect to login if unauthenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, user, router]);
 
   // Tweaks panel state (demo-only)
   const [theme, setTheme] = useState("slate");

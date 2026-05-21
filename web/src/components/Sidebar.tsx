@@ -13,14 +13,25 @@ interface SidebarProps {
 export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
   const { user } = useAuth();
 
+  const isInstructor = user?.role === "instructor" || user?.role === "admin";
+
   const items = [
     { id: "library", label: "Library", icon: "library", section: "Learn" },
     { id: "exams", label: "Exams", icon: "stack", section: "Learn" },
     { id: "quiz", label: "Take quiz", icon: "take", section: "Learn" },
     { id: "results", label: "Last results", icon: "results", section: "Learn" },
     { id: "dashboard", label: "Progress", icon: "dashboard", section: "Learn" },
-    { id: "author", label: "Author studio", icon: "author", section: "Teach" },
-    ...(showAgent
+    ...(isInstructor
+      ? [
+          {
+            id: "author",
+            label: "Author studio",
+            icon: "author",
+            section: "Teach",
+          },
+        ]
+      : []),
+    ...(showAgent && isInstructor
       ? [
           {
             id: "agent",

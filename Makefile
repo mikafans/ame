@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down db-migrate dev-env hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down db-migrate db-shell db-seed dev-env hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -81,7 +81,13 @@ db-down: ## Stop Postgres
 	docker compose -f db/docker-compose.yml down
 
 db-migrate: ## Run pending sqlx migrations
-	DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame mise exec -- sqlx migrate run --source db/migrations
+	DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate run --source db/migrations
+
+db-shell: ## Open interactive pgcli session to local Postgres
+	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
+
+db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API running)
+	uv run scripts/seed.py
 
 dev-env: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true

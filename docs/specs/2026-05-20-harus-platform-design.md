@@ -38,7 +38,7 @@
 | Code editor (Code question type) | Monaco                                                              |                                                                                                  |
 | Server state                     | TanStack Query                                                      | Reads. Server Actions for mutations where the route is colocated.                                |
 | Theme switching                  | `data-theme` attribute on `<html>`                                  | Three themes: slate (default), paper, cobalt.                                                    |
-| Toolchain                        | `mise` for runtimes (rust, bun); `nix develop` for psql/gh/sqlfluff | `make check` before commits, `make validate` before PRs.                                         |
+| Toolchain                        | `mise` for runtimes (rust, bun, uv); `uvx pgcli` for SQL; `uvx sqlfluff` for SQL linting | `make check` before commits, `make validate` before PRs.                                         |
 
 ---
 

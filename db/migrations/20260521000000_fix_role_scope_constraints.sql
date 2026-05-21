@@ -2,7 +2,8 @@
 -- Old values: 'admin' | 'user' (no CHECK constraint, comment-only)
 -- New values: 'learner' | 'instructor' | 'admin' | 'agent'
 -- Migrate existing 'user' rows → 'learner' (closest semantic match)
-UPDATE users SET role = 'learner' WHERE role = 'user';
+UPDATE users SET role = 'learner'
+WHERE role = 'user';
 
 ALTER TABLE users
     ADD CONSTRAINT users_role_check
