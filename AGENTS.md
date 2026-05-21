@@ -6,7 +6,7 @@ This file is the canonical, machine-readable rundown of how to work in this repo
 - Backend: Rust (edition 2021), Axum 0.8, Tokio, sqlx (added in Plan 2), Postgres 18.
 - Frontend: Next.js 15 App Router, React 19, TypeScript, Tailwind 3. Runtime + package manager is **bun** (no node, no npm). One deployment; `/admin/*` is role-gated.
 - Infra: Postgres in Docker (`db/docker-compose.yml`). Local dev only — production runs in Kubernetes.
-- Toolchain: `mise` for language runtimes (rust, bun); `nix develop` for everything else (psql, gh, sqlfluff, …).
+- Toolchain: `mise` for language runtimes (rust, bun, uv). SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`; migrations: `sqlx migrate run` (sqlx-cli via cargo); sqlfluff via `uvx sqlfluff`.
 
 ## Commands
 - `make check` — fmt-check + lint + test. Required before every commit (pre-commit hook enforces).

@@ -1,12 +1,27 @@
 function App() {
-  const [route, setRoute] = React.useState("library");
-  const [showSignup, setShowSignup] = React.useState(true);
+  // Read initial state from URL hash for screenshot/dev links: #/library, #/agent?signup=skip
+  const initHash = () => {
+    const m = (typeof location !== "undefined" ? location.hash : "").match(/^#\/(\w+)(?:\?(.*))?/);
+    return { route: m?.[1], query: new URLSearchParams(m?.[2] || "") };
+  };
+  const init = initHash();
+
+  const [route, setRoute] = React.useState(init.route || "library");
+  const [showSignup, setShowSignup] = React.useState(!(init.route || init.query.get("signup") === "skip"));
   const [t, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
 
   // Apply theme to root
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", t.theme || "slate");
   }, [t.theme]);
+
+  // Dev hook for capturing screenshots — go({route, signup?}) navigates the app
+  React.useEffect(() => {
+    window.__harus = {
+      go: (r) => { setShowSignup(false); setRoute(r); },
+      gotoSignup: () => setShowSignup(true),
+    };
+  }, []);
 
   // Route helpers
   const go = (r) => setRoute(r);

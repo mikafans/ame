@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Button, Tag, Card } from "@/components/ui";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -68,104 +69,98 @@ export default function AgentPage() {
 
   return (
     <div style={{ padding: "28px 36px 56px" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 22 }}>
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            color: "var(--muted)",
-            marginBottom: 6,
-          }}
-        >
-          Programmatic surface · OpenAPI 3.1 · MCP-compatible
-        </div>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: 26,
-            fontWeight: 600,
-            color: "var(--text)",
-          }}
-        >
-          Agent integration
-        </h1>
-      </div>
-
-      {/* Explainer card */}
+      {/* Header with actions */}
       <div
         style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          padding: "22px 28px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
           marginBottom: 22,
-          display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
-          gap: 24,
         }}
       >
         <div>
           <div
             style={{
-              fontSize: 15,
-              fontWeight: 600,
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              letterSpacing: 1.3,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              marginBottom: 6,
+            }}
+          >
+            Programmatic surface · OpenAPI 3.1 · MCP-compatible
+          </div>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: "var(--serif)",
+              fontSize: 32,
+              fontWeight: 500,
               color: "var(--text)",
-              marginBottom: 8,
+            }}
+          >
+            Agent integration
+          </h1>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="ghost">OpenAPI</Button>
+          <Button variant="ghost">MCP manifest</Button>
+          <Button variant="primary">+ New API key</Button>
+        </div>
+      </div>
+
+      {/* Landing intro card */}
+      <Card
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.2fr 1fr",
+          gap: 28,
+          padding: 28,
+          marginBottom: 28,
+          overflow: "hidden",
+        }}
+      >
+        <div>
+          <Tag color="accent">Two interfaces, one model</Tag>
+          <h3
+            style={{
+              margin: "12px 0 8px",
+              fontFamily: "var(--serif)",
+              fontSize: 24,
+              fontWeight: 500,
+              letterSpacing: -0.3,
             }}
           >
             Quizzes, attempts, and rubrics are first-class API objects.
-          </div>
+          </h3>
           <p
             style={{
               color: "var(--text-2)",
-              fontSize: 13.5,
+              fontSize: 14,
               lineHeight: 1.55,
               margin: 0,
+              maxWidth: 540,
             }}
           >
             Every screen a learner or instructor sees is backed by the same REST
-            surface that agents use. No scraping, no duplicate state.
+            surface that agents use. A grading agent reads a learner&apos;s
+            attempt with one call; an authoring agent imports a new quiz with
+            another. No scraping, no duplicate state.
           </p>
-          <div style={{ marginTop: 16, display: "flex", gap: 24 }}>
-            {[
-              { k: "Auth", v: "Bearer + scopes" },
-              { k: "Rate limit", v: "120 / min" },
-            ].map(({ k, v }) => (
-              <div key={k}>
-                <div
-                  style={{
-                    fontFamily: "var(--mono)",
-                    fontSize: 10,
-                    color: "var(--muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: 1.2,
-                    marginBottom: 2,
-                  }}
-                >
-                  {k}
-                </div>
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: "var(--text)",
-                  }}
-                >
-                  {v}
-                </div>
-              </div>
-            ))}
+          <div style={{ marginTop: 22, display: "flex", gap: 22 }}>
+            <KV2 k="Endpoints" v="34" />
+            <KV2 k="Auth" v="Bearer + scopes" />
+            <KV2 k="Rate limit" v="120 / min" />
+            <KV2 k="SDKs" v="ts · py · go" />
           </div>
         </div>
+
         <div
           style={{
             background: "var(--surface-2)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            padding: 16,
+            borderLeft: "1px solid var(--border)",
+            padding: "22px 26px",
           }}
         >
           <div
@@ -175,25 +170,24 @@ export default function AgentPage() {
               letterSpacing: 1.3,
               textTransform: "uppercase",
               color: "var(--muted)",
-              marginBottom: 8,
+              marginBottom: 10,
             }}
           >
             Hello, world
           </div>
-          <pre
-            style={{
-              margin: 0,
-              fontFamily: "var(--mono)",
-              fontSize: 12,
-              color: "var(--text-2)",
-              lineHeight: 1.6,
-            }}
-          >{`curl https://api.harus.app/v1/quizzes \\
-  -H "Authorization: Bearer hk_live_…"
-
-→ 200 OK · quizzes[]`}</pre>
+          <CodeBlock
+            label="curl"
+            lines={[
+              `curl https://api.harus.app/v1/quizzes \\`,
+              `  -H "Authorization: Bearer hk_live_3fY9…ax2P" \\`,
+              `  -H "Content-Type: application/json"`,
+              ``,
+              `→ 200 OK · 24 quizzes`,
+            ]}
+            dim={[4]}
+          />
         </div>
-      </div>
+      </Card>
 
       {/* Tabs */}
       <div
@@ -243,17 +237,136 @@ export default function AgentPage() {
   );
 }
 
+function KV2({ k, v }: { k: string; v: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: 1.2,
+          color: "var(--muted)",
+          textTransform: "uppercase",
+          marginBottom: 2,
+        }}
+      >
+        {k}
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: 18,
+          fontWeight: 500,
+        }}
+      >
+        {v}
+      </div>
+    </div>
+  );
+}
+
+function CodeBlock({
+  label,
+  lines,
+  dim = [],
+  style,
+}: {
+  label?: string;
+  lines: string[];
+  dim?: number[];
+  style?: React.CSSProperties;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      style={{
+        background: "var(--surface-2)",
+        border: "1px solid var(--border)",
+        borderRadius: 6,
+        overflow: "hidden",
+        ...style,
+      }}
+    >
+      {label ? (
+        <div
+          style={{
+            padding: "6px 12px",
+            borderBottom: "1px solid var(--border)",
+            background: "var(--surface)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              color: "var(--muted)",
+              letterSpacing: 1,
+            }}
+          >
+            {label}
+          </span>
+          <button
+            onClick={handleCopy}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--muted)",
+              cursor: "pointer",
+              padding: 2,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {copied ? "✓" : "⎘"}
+          </button>
+        </div>
+      ) : null}
+      <pre
+        style={{
+          margin: 0,
+          padding: "12px 14px",
+          fontFamily: "var(--mono)",
+          fontSize: 12,
+          lineHeight: 1.65,
+          color: "var(--text-2)",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {lines.map((l, i) => (
+          <div
+            key={i}
+            style={{ color: dim.includes(i) ? "var(--accent)" : undefined }}
+          >
+            {l || " "}
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
 // ── API Keys tab ──────────────────────────────────────────────────────────────
 
 function KeysTab({ token }: { token: string | undefined }) {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [creating, setCreating] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [newKeyScopes, setNewKeyScopes] = useState("quiz.read");
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
-  const [bootstrapping, setBootstrapping] = useState(false);
-  const [bootstrapResult, setBootstrapResult] = useState<string | null>(null);
 
   function loadKeys() {
     if (!token) return;
@@ -272,6 +385,7 @@ function KeysTab({ token }: { token: string | undefined }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function createKey() {
     if (!token) return;
     setCreating(true);
@@ -298,6 +412,7 @@ function KeysTab({ token }: { token: string | undefined }) {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function revokeKey(id: string) {
     if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -305,6 +420,7 @@ function KeysTab({ token }: { token: string | undefined }) {
     loadKeys();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function rotateKey(id: string) {
     if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -315,82 +431,31 @@ function KeysTab({ token }: { token: string | undefined }) {
     loadKeys();
   }
 
-  async function bootstrapAgent() {
-    if (!token) return;
-    setBootstrapping(true);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST(
-        "/v1/agents/register",
-        {
-          body: {
-            displayName: "My agent",
-            scopes: ["quiz.read", "quiz.write", "stats.read"],
-          },
-        },
-      );
-      if (data?.apiKey) {
-        setBootstrapResult(data.apiKey);
-        try {
-          await navigator.clipboard.writeText(data.apiKey);
-        } catch {
-          // ignore clipboard error
-        }
-      }
-    } catch {
-      setBootstrapResult("Error registering agent");
-    } finally {
-      setBootstrapping(false);
-    }
-  }
-
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 18 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18 }}>
       {/* Keys list */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "14px 20px",
-            borderBottom: "1px solid var(--border)",
-            fontSize: 15,
-            fontWeight: 600,
-            color: "var(--text)",
-          }}
-        >
-          API keys
-        </div>
-
-        {/* Create form */}
+      <Card style={{ padding: 0 }}>
         <div
           style={{
             padding: "14px 20px",
             borderBottom: "1px solid var(--border)",
             display: "flex",
-            gap: 8,
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          <input
-            value={newKeyName}
-            onChange={(e) => setNewKeyName(e.target.value)}
-            placeholder="Key name"
-            style={{ ...inputStyle, flex: 1 }}
-          />
-          <input
-            value={newKeyScopes}
-            onChange={(e) => setNewKeyScopes(e.target.value)}
-            placeholder="scopes (comma-sep)"
-            style={{ ...inputStyle, flex: 1 }}
-          />
-          <button onClick={createKey} disabled={creating} style={btnAccent}>
-            {creating ? "…" : "Create"}
-          </button>
+          <div
+            style={{
+              fontFamily: "var(--serif)",
+              fontSize: 16,
+              fontWeight: 500,
+            }}
+          >
+            API keys
+          </div>
+          <Button size="sm" variant="ghost">
+            Create
+          </Button>
         </div>
 
         {loading ? (
@@ -446,71 +511,77 @@ function KeysTab({ token }: { token: string | undefined }) {
                       fontSize: 12,
                       color: "var(--text-2)",
                       marginTop: 4,
+                      letterSpacing: 0.4,
                     }}
                   >
                     {k.prefix}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => rotateKey(k.id)} style={btnGhost}>
+                  <Button size="sm" variant="ghost">
+                    Copy
+                  </Button>
+                  <Button size="sm" variant="ghost">
                     Rotate
-                  </button>
-                  <button
-                    onClick={() => revokeKey(k.id)}
-                    style={{
-                      ...btnGhost,
-                      color: "#ef4444",
-                      borderColor: "#ef4444",
-                    }}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    style={{ color: "#ef4444" }}
                   >
                     Revoke
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div
                 style={{
                   marginTop: 10,
                   display: "flex",
-                  gap: 6,
-                  flexWrap: "wrap",
+                  gap: 16,
+                  alignItems: "center",
                 }}
               >
-                {k.scopes.map((s) => (
-                  <span
-                    key={s}
-                    style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: 10,
-                      padding: "2px 7px",
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 3,
-                      color: s === "*" ? "#f59e0b" : "var(--text-2)",
-                    }}
-                  >
-                    {s}
-                  </span>
-                ))}
+                <div
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Created {k.createdAt} · Last used {k.lastUsedAt || "—"}
+                </div>
+                <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+                  {k.scopes.map((s) => (
+                    <Tag key={s} color={s === "*" ? "amber" : "muted"}>
+                      {s}
+                    </Tag>
+                  ))}
+                </div>
               </div>
             </div>
           ))
         )}
-      </div>
+      </Card>
 
-      {/* Right panel: auth info + bootstrap */}
+      {/* Right panel: auth info */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            padding: 20,
-          }}
-        >
-          <div style={sectionLabel}>Authentication</div>
+        <Card>
           <div
             style={{
-              fontSize: 15,
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              letterSpacing: 1.3,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              marginBottom: 10,
+            }}
+          >
+            Authentication
+          </div>
+          <div
+            style={{
+              fontSize: 16,
               fontWeight: 600,
               color: "var(--text)",
               marginBottom: 8,
@@ -529,37 +600,42 @@ function KeysTab({ token }: { token: string | undefined }) {
             Send the key in an <code style={codeStyle}>Authorization</code>{" "}
             header. Scopes are checked per endpoint.
           </p>
+          <CodeBlock
+            label="request"
+            style={{ marginTop: 14 }}
+            lines={[
+              `GET /v1/quizzes/qz_8sd1/stats`,
+              `Authorization: Bearer hk_live_3fY9…ax2P`,
+              `Accept: application/json`,
+              `X-Cohort: spring-2026`,
+            ]}
+          />
           <div
             style={{
-              marginTop: 14,
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: "10px 14px",
-            }}
-          >
-            <pre
-              style={{
-                margin: 0,
-                fontFamily: "var(--mono)",
-                fontSize: 11.5,
-                color: "var(--text-2)",
-                lineHeight: 1.6,
-              }}
-            >
-              {`GET /v1/quizzes
-Authorization: Bearer hk_live_…`}
-            </pre>
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 14,
+              marginTop: 18,
+              paddingTop: 18,
               borderTop: "1px solid var(--border)",
             }}
           >
-            <div style={sectionLabel}>Scope reference</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                letterSpacing: 1.3,
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                marginBottom: 8,
+              }}
+            >
+              Scope reference
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 6,
+              }}
+            >
               {[
                 "quiz.read",
                 "quiz.write",
@@ -583,67 +659,7 @@ Authorization: Bearer hk_live_…`}
               ))}
             </div>
           </div>
-        </div>
-
-        {/* Bootstrap helper */}
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            padding: 20,
-          }}
-        >
-          <div style={sectionLabel}>Bootstrap agent</div>
-          <p
-            style={{
-              color: "var(--text-2)",
-              fontSize: 13,
-              lineHeight: 1.6,
-              margin: "0 0 14px",
-            }}
-          >
-            Mint an agent user instantly. The API key is shown once — copy it
-            before dismissing.
-          </p>
-          {bootstrapResult ? (
-            <div>
-              <div
-                style={{
-                  padding: "10px 12px",
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  fontFamily: "var(--mono)",
-                  fontSize: 12,
-                  color: "var(--text)",
-                  wordBreak: "break-all",
-                  marginBottom: 8,
-                }}
-              >
-                {bootstrapResult}
-              </div>
-              <button
-                onClick={() => {
-                  navigator.clipboard
-                    .writeText(bootstrapResult)
-                    .catch(() => {});
-                }}
-                style={btnGhost}
-              >
-                Copy key
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={bootstrapAgent}
-              disabled={bootstrapping}
-              style={{ ...btnAccent, opacity: bootstrapping ? 0.7 : 1 }}
-            >
-              {bootstrapping ? "Registering…" : "Register agent"}
-            </button>
-          )}
-        </div>
+        </Card>
       </div>
 
       {/* Secret shown once modal */}
@@ -659,15 +675,7 @@ Authorization: Bearer hk_live_…`}
             zIndex: 100,
           }}
         >
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: 28,
-              width: 480,
-            }}
-          >
+          <Card style={{ width: 480, padding: 28 }}>
             <div
               style={{
                 fontSize: 16,
@@ -687,7 +695,7 @@ Authorization: Bearer hk_live_…`}
               style={{
                 padding: "12px 14px",
                 background: "var(--surface-2)",
-                border: "1px solid var(--accent)",
+                border: "1px solid var(--accent-line)",
                 borderRadius: 4,
                 fontFamily: "var(--mono)",
                 fontSize: 13,
@@ -701,19 +709,24 @@ Authorization: Bearer hk_live_…`}
             <div
               style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
             >
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(createdSecret).catch(() => {});
                 }}
-                style={btnGhost}
               >
                 Copy
-              </button>
-              <button onClick={() => setCreatedSecret(null)} style={btnAccent}>
-                Done — I&apos;ve copied it
-              </button>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setCreatedSecret(null)}
+              >
+                Done
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
@@ -761,14 +774,7 @@ function ToolsTab({ token }: { token: string | undefined }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 18 }}>
       {/* Tool list */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          overflow: "hidden",
-        }}
-      >
+      <Card style={{ padding: 0 }}>
         <div
           style={{
             padding: "14px 18px",
@@ -781,15 +787,7 @@ function ToolsTab({ token }: { token: string | undefined }) {
           <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>
             MCP descriptors
           </div>
-          <span
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
-              color: "var(--accent)",
-            }}
-          >
-            {tools.length}
-          </span>
+          <Tag color="accent">{tools.length}</Tag>
         </div>
         {tools.map((t) => {
           const sel = active === t.name;
@@ -833,18 +831,11 @@ function ToolsTab({ token }: { token: string | undefined }) {
             </button>
           );
         })}
-      </div>
+      </Card>
 
       {/* Tool detail */}
       {tool ? (
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            overflow: "hidden",
-          }}
-        >
+        <Card style={{ padding: 0 }}>
           <div
             style={{
               padding: "18px 22px",
@@ -873,7 +864,18 @@ function ToolsTab({ token }: { token: string | undefined }) {
             </div>
           </div>
           <div style={{ padding: 22 }}>
-            <div style={sectionLabel}>MCP descriptor</div>
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                letterSpacing: 1.3,
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                marginBottom: 10,
+              }}
+            >
+              MCP descriptor
+            </div>
             <pre
               style={{
                 background: "var(--surface-2)",
@@ -891,7 +893,7 @@ function ToolsTab({ token }: { token: string | undefined }) {
               {JSON.stringify(tool, null, 2)}
             </pre>
           </div>
-        </div>
+        </Card>
       ) : (
         <div style={{ color: "var(--muted)", fontSize: 13 }}>
           Select a tool to view its descriptor.
@@ -959,14 +961,7 @@ function ImportTab({ token }: { token: string | undefined }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 18 }}>
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          overflow: "hidden",
-        }}
-      >
+      <Card style={{ padding: 0 }}>
         <div
           style={{
             padding: "14px 20px",
@@ -1037,20 +1032,13 @@ function ImportTab({ token }: { token: string | undefined }) {
           >
             POST /v1/quizzes · Bearer hk_live_…
           </span>
-          <button onClick={send} disabled={running} style={btnAccent}>
+          <Button variant="primary" size="sm" onClick={send} disabled={running}>
             {running ? "Sending…" : "Send request →"}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          overflow: "hidden",
-        }}
-      >
+      <Card style={{ padding: 0 }}>
         <div
           style={{
             padding: "14px 20px",
@@ -1064,30 +1052,11 @@ function ImportTab({ token }: { token: string | undefined }) {
             Response
           </div>
           {response ? (
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: response.ok ? "var(--accent)" : "#ef4444",
-                padding: "2px 8px",
-                background: response.ok
-                  ? "var(--accent-dim, rgba(0,200,100,0.1))"
-                  : "rgba(239,68,68,0.1)",
-                borderRadius: 3,
-              }}
-            >
+            <Tag color={response.ok ? "accent" : "amber"}>
               {response.status} · {response.latencyMs}ms
-            </span>
+            </Tag>
           ) : (
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-              }}
-            >
-              awaiting request
-            </span>
+            <Tag color="muted">awaiting request</Tag>
           )}
         </div>
         {response ? (
@@ -1122,7 +1091,7 @@ function ImportTab({ token }: { token: string | undefined }) {
             Click Send request to see the response
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -1146,14 +1115,7 @@ function ActivityTab({ token }: { token: string | undefined }) {
   }, [token]);
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-        overflow: "hidden",
-      }}
-    >
+    <Card style={{ padding: 0 }}>
       <div
         style={{
           padding: "14px 20px",
@@ -1225,54 +1187,11 @@ function ActivityTab({ token }: { token: string | undefined }) {
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
-// ── shared styles ─────────────────────────────────────────────────────────────
-
-const sectionLabel: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 10,
-  letterSpacing: 1.3,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  marginBottom: 10,
-};
-
-const inputStyle: React.CSSProperties = {
-  background: "var(--surface-2)",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  padding: "7px 10px",
-  color: "var(--text)",
-  fontFamily: "var(--sans, sans-serif)",
-  fontSize: 13,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const btnAccent: React.CSSProperties = {
-  padding: "7px 14px",
-  background: "var(--accent)",
-  border: "none",
-  borderRadius: 4,
-  color: "#000",
-  fontWeight: 600,
-  fontSize: 13,
-  cursor: "pointer",
-  flexShrink: 0,
-};
-
-const btnGhost: React.CSSProperties = {
-  padding: "6px 12px",
-  background: "transparent",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  color: "var(--text-2)",
-  fontSize: 12,
-  cursor: "pointer",
-};
+// ── Shared styles ─────────────────────────────────────────────────────────────
 
 const codeStyle: React.CSSProperties = {
   fontFamily: "var(--mono)",

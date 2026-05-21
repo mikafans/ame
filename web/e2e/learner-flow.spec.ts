@@ -13,18 +13,20 @@ test.describe("learner golden path", () => {
     }, API_TOKEN);
   });
 
-  test("login page renders and rejects bad key", async ({ page }) => {
+  test("login page renders and rejects bad credentials", async ({ page }) => {
     await page.goto("/login");
-    await page.fill('input[type="password"]', "bad_key");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.fill('input[type="email"]', "nobody@example.com");
+    await page.fill('input[type="password"]', "badpass");
     await page.click('button[type="submit"]');
-    await expect(page.getByText("Invalid API key")).toBeVisible({
+    await expect(page.getByText("missing or invalid token")).toBeVisible({
       timeout: 8000,
     });
   });
 
-  test("library screen loads quizzes", async ({ page }) => {
+  test("library screen loads", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Library")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
   });
 
   test("practice setup form renders", async ({ page }) => {
@@ -35,7 +37,9 @@ test.describe("learner golden path", () => {
 
   test("progress page renders", async ({ page }) => {
     await page.goto("/progress");
-    await expect(page.getByText("Progress")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Progress dashboard" }),
+    ).toBeVisible();
   });
 
   test("unauthenticated user redirects to login", async ({ page, context }) => {

@@ -63,6 +63,7 @@ impl std::str::FromStr for ExamStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Exam {
     pub id: Uuid,
     pub name: String,
@@ -87,6 +88,7 @@ pub struct Exam {
 ///
 /// Exactly one of `question_ids` (static) or `mix` (dynamic) is non-null.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExamSection {
     pub id: Uuid,
     pub exam_id: Uuid,

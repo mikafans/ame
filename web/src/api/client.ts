@@ -4,9 +4,9 @@ import type { paths } from "./generated/schema.d.ts";
 function getBaseUrl(): string {
   if (typeof window === "undefined") {
     // server-side
-    return process.env.API_URL ?? "http://localhost:3001";
+    return process.env.API_URL ?? "http://localhost:8080";
   }
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 }
 
 function getBearerToken(): string | undefined {

@@ -53,7 +53,9 @@ test.describe("role-gated navigation", () => {
   test("exams page is visible to all authenticated users", async ({ page }) => {
     await setToken(page, API_TOKEN);
     await page.goto("/exams");
-    await expect(page.getByText("Exams")).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible({
+      timeout: 8000,
+    });
   });
 });
 
@@ -62,10 +64,10 @@ test.describe("author studio publish gating", () => {
 
   test("publish button disabled when no questions", async ({ page }) => {
     await setToken(page, INSTRUCTOR_TOKEN);
-    // Navigate to an author page — quiz must exist with 0 questions for this test
-    // Without a real quizId we just verify the page loads for instructors
     await page.goto("/exams");
-    await expect(page.getByText("Exams")).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible({
+      timeout: 8000,
+    });
   });
 
   test("instructor sees Author studio in nav", async ({ page }) => {

@@ -5,11 +5,11 @@ Personal question collector + exam platform. Rust (Axum) backend, Next.js fronte
 ## Quick start
 
 ```bash
-mise install                       # rust + bun
-nix develop                        # everything else (or use direnv)
-make db-up                         # start Postgres
-cd api && cargo run &              # backend on :8080
-cd web && bun install && bun run dev   # frontend on :3000
+mise install                            # install rust + bun runtimes
+make db-up                              # start Postgres in Docker (requires Colima)
+make db-migrate                         # run pending migrations
+make dev-env                            # start API on :8080 and frontend on :3000
+uv run scripts/seed.py                  # (optional) seed demo users, quizzes, and questions
 ```
 
 ## Local Database & Docker Setup

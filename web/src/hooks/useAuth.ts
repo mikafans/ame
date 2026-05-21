@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { makeClient } from "@/api/client";
 
 export interface AuthUser {
   id: string;
@@ -10,13 +9,18 @@ export interface AuthUser {
   role: string;
 }
 
-function getTokenFromCookie(): string | undefined {
+const API_URL =
+  typeof window !== "undefined"
+    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080")
+    : "http://localhost:8080";
+
+function getCookieToken(): string | undefined {
   if (typeof document === "undefined") return undefined;
   return (document.cookie.match(/(?:^|;\s*)ame_token=([^;]+)/) ?? [])[1];
 }
 
 export function setAuthToken(token: string) {
-  document.cookie = `ame_token=${encodeURIComponent(token)}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+  document.cookie = `ame_token=${token}; path=/; max-age=86400; SameSite=Lax`;
 }
 
 export function clearAuthToken() {
@@ -26,22 +30,34 @@ export function clearAuthToken() {
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const token = getTokenFromCookie();
-    if (!token) {
+    const t = getCookieToken();
+    if (!t) {
       setLoading(false);
       return;
     }
-    const client = makeClient(token);
-    client
-      .GET("/v1/me" as never)
-      .then(({ data }: { data?: AuthUser }) => {
+    setToken(t);
+    fetch(`${API_URL}/v1/me`, {
+      headers: { Authorization: `Bearer ${t}` },
+    })
+      .then((r) => {
+        if (!r.ok) {
+          clearAuthToken();
+          setToken(undefined);
+          return null;
+        }
+        return r.json();
+      })
+      .then((data) => {
         if (data) setUser(data as AuthUser);
       })
-      .catch(() => {})
+      .catch(() => {
+        setToken(undefined);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  return { user, loading, token: getTokenFromCookie() };
+  return { user, loading, token };
 }

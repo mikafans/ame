@@ -548,7 +548,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             displayName: string;
-            email?: string | null;
+            email: string;
             /** Format: uuid */
             id: string;
             role: components["schemas"]["Role"];
@@ -828,7 +828,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             display_name: string;
-            email?: string | null;
+            email: string;
             /** Format: uuid */
             id: string;
             role: components["schemas"]["Role"];

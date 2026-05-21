@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { Button, Card, Icon, KV } from "@/components/ui";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
-import { LearningObjectives } from "@/components/LearningObjectives";
 
 interface QuizQuestion {
   id: string;
@@ -20,19 +20,36 @@ interface Quiz {
   id: string;
   title: string;
   status: string;
-  objectives: string[];
+  course?: string;
+  duration?: number;
+  difficulty?: string;
+  attempts?: number;
   questions: QuizQuestion[];
+  updated_at?: string;
 }
 
 function kindLabel(kind: string): string {
   const map: Record<string, string> = {
-    mc: "Multiple choice",
-    tf: "True/false",
-    short: "Short answer",
+    mc: "MC",
+    tf: "T/F",
+    short: "Short",
     essay: "Essay",
     code: "Code",
   };
   return map[kind] ?? kind;
+}
+
+function getMinutesAgo(iso: string): string {
+  if (!iso) return "unknown";
+  const now = new Date();
+  const then = new Date(iso);
+  const mins = Math.floor((now.getTime() - then.getTime()) / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
 }
 
 export default function AuthorStudioPage({
@@ -45,26 +62,25 @@ export default function AuthorStudioPage({
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [showGenerate, setShowGenerate] = useState(false);
-  const [generateSource, setGenerateSource] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
 
-  // Editable fields for selected question
+  // Metadata state
+  const [editTitle, setEditTitle] = useState("");
+  const [editCourse, setEditCourse] = useState("");
+  const [editDuration, setEditDuration] = useState(30);
+  const [editDifficulty, setEditDifficulty] = useState("intermediate");
+  const [editAttempts, setEditAttempts] = useState(2);
+
+  // Question editor state
   const [editPrompt, setEditPrompt] = useState("");
   const [editExplanation, setEditExplanation] = useState("");
   const [editPoints, setEditPoints] = useState(1);
+  const [editTag, setEditTag] = useState("");
+  const [editQuestionDifficulty, setEditQuestionDifficulty] =
+    useState("intermediate");
 
-  // Editable quiz metadata
-  const [editTitle, setEditTitle] = useState("");
-  const [editObjectives, setEditObjectives] = useState<string[]>([]);
-  const [objectivesWarning, setObjectivesWarning] = useState<string | null>(
-    null,
-  );
+  const [, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   function load() {
     if (!token) return;
@@ -75,8 +91,11 @@ export default function AuthorStudioPage({
       .then(({ data }: { data?: Quiz }) => {
         if (data) {
           setQuiz(data);
-          setEditTitle(data.title);
-          setEditObjectives(data.objectives ?? []);
+          setEditTitle(data.title || "");
+          setEditCourse(data.course || "");
+          setEditDuration(data.duration || 30);
+          setEditDifficulty(data.difficulty || "intermediate");
+          setEditAttempts(data.attempts || 2);
           if (data.questions.length && !selectedId) {
             setSelectedId(data.questions[0].id);
           }
@@ -98,45 +117,64 @@ export default function AuthorStudioPage({
       setEditPrompt(selectedQ.prompt);
       setEditExplanation(selectedQ.explanation ?? "");
       setEditPoints(selectedQ.points);
+      setEditTag("");
+      setEditQuestionDifficulty("intermediate");
     }
   }, [selectedQ]);
+
+  async function saveMetadata() {
+    if (!token) return;
+    setSaving(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (makeClient(token) as any).PATCH(`/v1/quizzes/${quizId}`, {
+        body: {
+          title: editTitle,
+          course: editCourse,
+          duration: editDuration,
+          difficulty: editDifficulty,
+          attempts: editAttempts,
+        },
+      });
+      load();
+    } catch {
+      // noop
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function saveQuestion() {
     if (!token || !selectedId) return;
     setSaving(true);
-    setSaveMsg(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).PATCH(`/questions/${selectedId}`, {
+      await (makeClient(token) as any).PATCH(`/v1/questions/${selectedId}`, {
         body: {
           prompt: editPrompt,
           explanation: editExplanation || undefined,
           points: editPoints,
         },
       });
-      setSaveMsg("Saved");
       load();
     } catch {
-      setSaveMsg("Error saving");
+      // noop
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 2000);
     }
   }
 
-  async function saveMetadata() {
+  async function addQuestion() {
     if (!token) return;
     setSaving(true);
-    setObjectivesWarning(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).PATCH(
-        `/v1/quizzes/${quizId}`,
-        { body: { title: editTitle, objectives: editObjectives } },
-      );
-      if (data?.warnings?.length) {
-        setObjectivesWarning(data.warnings[0]);
-      }
+      await (makeClient(token) as any).POST(`/v1/quizzes/${quizId}/questions`, {
+        body: {
+          kind: "mc",
+          prompt: "",
+        },
+      });
       load();
     } catch {
       // noop
@@ -151,51 +189,28 @@ export default function AuthorStudioPage({
     setPublishError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (makeClient(token) as any).PATCH(
-        `/v1/quizzes/${quizId}`,
-        { body: { status: "active" } },
-      );
-      if (error) {
-        const msg =
-          typeof error === "object" && "message" in error
-            ? String((error as { message: string }).message)
-            : "Failed to publish";
-        setPublishError(msg);
-      } else {
-        load();
-      }
-    } catch {
-      setPublishError("Could not reach API");
+      await (makeClient(token) as any).PATCH(`/v1/quizzes/${quizId}`, {
+        body: { status: "active" },
+      });
+      load();
+    } catch (err) {
+      const msg =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message: string }).message)
+          : "Failed to publish";
+      setPublishError(msg);
     } finally {
       setPublishing(false);
     }
   }
 
-  async function runGenerate() {
-    if (!token) return;
-    setGenerating(true);
-    setGenerateWarnings([]);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST(
-        "/v1/quizzes/generate",
-        { body: { source: generateSource, questionCount: 5 } },
-      );
-      if (data?.warnings?.length) {
-        setGenerateWarnings(data.warnings);
-      }
-    } catch {
-      setGenerateWarnings(["Could not reach generate endpoint"]);
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  const canPublish =
-    quiz &&
-    quiz.questions.length > 0 &&
-    quiz.questions.every((q) => q.status === "live") &&
-    quiz.status !== "active";
+  const outlineComplete =
+    editTitle.trim().length > 0 && (quiz?.questions.length ?? 0) > 0;
+  const questionsNeedingReview =
+    quiz?.questions.filter((q) => !q.points || !q.prompt).length ?? 0;
+  const totalPoints =
+    quiz?.questions.reduce((sum, q) => sum + (q.points || 0), 0) ?? 0;
+  const minutesAgo = getMinutesAgo(quiz?.updated_at ?? "");
 
   if (loading) {
     return (
@@ -244,13 +259,14 @@ export default function AuthorStudioPage({
               marginBottom: 4,
             }}
           >
-            Editing {quiz.status} · autosaved
+            Editing draft · {editCourse} · autosaved
           </div>
           <h1
             style={{
               margin: 0,
-              fontSize: 22,
-              fontWeight: 600,
+              fontSize: 26,
+              fontWeight: 400,
+              fontFamily: "var(--serif)",
               color: "var(--text)",
             }}
           >
@@ -258,40 +274,24 @@ export default function AuthorStudioPage({
           </h1>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {saveMsg && (
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-              }}
-            >
-              {saveMsg}
-            </span>
-          )}
-          <button
-            onClick={saveQuestion}
-            disabled={saving || !selectedId}
-            style={btnSolid}
-          >
+          <Button variant="ghost" size="md">
+            Import
+          </Button>
+          <Button variant="ghost" size="md">
+            Preview
+          </Button>
+          <Button variant="outline" size="md" onClick={saveMetadata}>
             Save draft
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
             onClick={publish}
-            disabled={!canPublish || publishing}
-            title={
-              !canPublish
-                ? "Need ≥1 live question and quiz not already active"
-                : "Publish quiz"
-            }
-            style={{
-              ...btnPrimary,
-              opacity: canPublish ? 1 : 0.4,
-              cursor: canPublish ? "pointer" : "not-allowed",
-            }}
+            disabled={quiz.status === "active" || publishing}
+            icon={<Icon name="arrow" size={14} />}
           >
-            {publishing ? "Publishing…" : "Publish →"}
-          </button>
+            {publishing ? "Publishing…" : "Publish"}
+          </Button>
         </div>
       </div>
 
@@ -311,136 +311,181 @@ export default function AuthorStudioPage({
         </div>
       )}
 
-      {/* Metadata strip */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 6,
-          padding: "16px 22px",
-          marginBottom: 18,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <label style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={monoLabel}>Title</span>
-          <input
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            onBlur={saveMetadata}
-            style={{ ...inlineInput, flex: 1 }}
-          />
-        </label>
-
-        <div>
-          <div style={monoLabel}>Learning objectives</div>
-          {editObjectives.map((obj, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                gap: 8,
-                marginBottom: 6,
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  width: 20,
-                  textAlign: "right",
-                  flexShrink: 0,
-                }}
-              >
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <input
-                value={obj}
-                onChange={(e) => {
-                  const next = [...editObjectives];
-                  next[i] = e.target.value;
-                  setEditObjectives(next);
-                }}
-                onBlur={saveMetadata}
-                style={{ ...inlineInput, flex: 1 }}
-              />
-              <button
-                onClick={() => {
-                  setEditObjectives(editObjectives.filter((_, j) => j !== i));
-                  saveMetadata();
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--muted)",
-                  cursor: "pointer",
-                  fontSize: 14,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={() => setEditObjectives([...editObjectives, ""])}
+      {/* Metadata row */}
+      <Card style={{ marginBottom: 18, padding: 0, borderRadius: 6 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <label
             style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: 12,
-              fontFamily: "var(--mono)",
-              padding: "2px 0",
+              padding: "14px 22px",
+              borderRight: "1px solid var(--border)",
             }}
           >
-            + Add objective
-          </button>
-          {objectivesWarning && (
-            <div style={{ color: "#f59e0b", fontSize: 12, marginTop: 4 }}>
-              ⚠ {objectivesWarning}
-            </div>
-          )}
+            <div style={monoLabel}>Title</div>
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={saveMetadata}
+              style={inlineInput}
+            />
+          </label>
+          <label
+            style={{
+              padding: "14px 22px",
+              borderRight: "1px solid var(--border)",
+            }}
+          >
+            <div style={monoLabel}>Course</div>
+            <input
+              value={editCourse}
+              onChange={(e) => setEditCourse(e.target.value)}
+              onBlur={saveMetadata}
+              style={inlineInput}
+            />
+          </label>
+          <label
+            style={{
+              padding: "14px 22px",
+              borderRight: "1px solid var(--border)",
+            }}
+          >
+            <div style={monoLabel}>Duration</div>
+            <input
+              type="number"
+              value={editDuration}
+              onChange={(e) => setEditDuration(parseInt(e.target.value) || 30)}
+              onBlur={saveMetadata}
+              style={inlineInput}
+            />
+          </label>
+          <label
+            style={{
+              padding: "14px 22px",
+              borderRight: "1px solid var(--border)",
+            }}
+          >
+            <div style={monoLabel}>Difficulty</div>
+            <select
+              value={editDifficulty}
+              onChange={(e) => setEditDifficulty(e.target.value)}
+              onBlur={saveMetadata}
+              style={inlineInput}
+            >
+              <option value="intro">Intro</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </label>
+          <label style={{ padding: "14px 22px" }}>
+            <div style={monoLabel}>Attempts</div>
+            <input
+              type="number"
+              value={editAttempts}
+              onChange={(e) => setEditAttempts(parseInt(e.target.value) || 1)}
+              onBlur={saveMetadata}
+              style={inlineInput}
+            />
+          </label>
         </div>
 
-        {quiz.objectives.length > 0 && (
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-            <LearningObjectives items={quiz.objectives} compact />
+        {/* Validation status bar */}
+        <div
+          style={{
+            padding: "14px 22px",
+            display: "flex",
+            gap: 28,
+            alignItems: "center",
+            fontSize: 12.5,
+            color: "var(--text-2)",
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              color: outlineComplete ? "var(--accent)" : "var(--muted)",
+            }}
+          >
+            <span>{outlineComplete ? "✓" : "✗"}</span>
+            <span>Outline complete</span>
           </div>
-        )}
-      </div>
+
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              color:
+                questionsNeedingReview === 0 ? "var(--accent)" : "var(--muted)",
+            }}
+          >
+            {questionsNeedingReview === 0 ? (
+              <>
+                <span>✓</span>
+                <span>All questions ready</span>
+              </>
+            ) : (
+              <>
+                <span>✗</span>
+                <span>{questionsNeedingReview} questions need review</span>
+              </>
+            )}
+          </div>
+
+          <div style={{ color: "var(--text-2)" }}>
+            <span>
+              ≈ {quiz.questions.length} questions · {totalPoints} pts
+            </span>
+          </div>
+
+          <span
+            style={{
+              marginLeft: "auto",
+              color: "var(--muted)",
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              letterSpacing: 0.5,
+            }}
+          >
+            Last edit · {minutesAgo} ago · by you
+          </span>
+        </div>
+      </Card>
 
       {/* Three-pane layout */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "300px 1fr 260px",
+          gridTemplateColumns: "320px 1fr 280px",
           gap: 18,
+          minHeight: 600,
         }}
       >
-        {/* Questions list */}
-        <div
+        {/* LEFT - Questions list */}
+        <Card
           style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
+            padding: 0,
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <div
             style={{
-              padding: "12px 16px",
+              padding: "14px 16px",
               borderBottom: "1px solid var(--border)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
             }}
           >
-            <span
+            <div
               style={{
                 fontFamily: "var(--mono)",
                 fontSize: 10,
@@ -450,107 +495,106 @@ export default function AuthorStudioPage({
               }}
             >
               Questions
-            </span>
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-              }}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Icon name="plus" size={12} />}
+              onClick={addQuestion}
             >
-              {quiz.questions.length} total
-            </span>
+              Add
+            </Button>
           </div>
 
-          {quiz.questions.length === 0 ? (
-            <div
-              style={{
-                padding: "24px 16px",
-                color: "var(--muted)",
-                fontSize: 13,
-                textAlign: "center",
-              }}
-            >
-              No questions yet.
-            </div>
-          ) : (
-            quiz.questions.map((q, idx) => {
-              const sel = selectedId === q.id;
-              return (
-                <button
-                  key={q.id}
-                  onClick={() => setSelectedId(q.id)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    background: sel
-                      ? "var(--accent-dim, rgba(0,200,100,0.08))"
-                      : "transparent",
-                    border: "none",
-                    borderLeft: `2px solid ${sel ? "var(--accent)" : "transparent"}`,
-                    borderBottom: "1px solid var(--border)",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    display: "grid",
-                    gridTemplateColumns: "28px 1fr 40px",
-                    gap: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <span
+          <div style={{ flex: 1, overflow: "auto" }}>
+            {quiz.questions.length === 0 ? (
+              <div
+                style={{
+                  padding: "24px 16px",
+                  color: "var(--muted)",
+                  fontSize: 13,
+                  textAlign: "center",
+                }}
+              >
+                No questions yet.
+              </div>
+            ) : (
+              quiz.questions.map((q, idx) => {
+                const sel = selectedId === q.id;
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => setSelectedId(q.id)}
                     style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: 11,
-                      color: "var(--muted)",
+                      width: "100%",
+                      padding: "12px 16px",
+                      background: sel ? "var(--accent-dim)" : "transparent",
+                      border: "none",
+                      borderLeft: `2px solid ${
+                        sel ? "var(--accent)" : "transparent"
+                      }`,
+                      borderBottom: "1px solid var(--border)",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      display: "grid",
+                      gridTemplateColumns: "28px 1fr 40px",
+                      gap: 8,
+                      alignItems: "start",
                     }}
                   >
-                    Q{idx + 1}
-                  </span>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: sel ? "var(--text)" : "var(--text-2)",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        fontWeight: sel ? 500 : 400,
-                      }}
-                    >
-                      {q.prompt}
-                    </div>
-                    <div
+                    <span
                       style={{
                         fontFamily: "var(--mono)",
-                        fontSize: 10,
+                        fontSize: 11,
                         color: "var(--muted)",
                         marginTop: 2,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
                       }}
                     >
-                      {kindLabel(q.kind)} ·{" "}
-                      {q.status !== "live" ? (
-                        <span style={{ color: "#f59e0b" }}>{q.status}</span>
-                      ) : (
-                        q.status
-                      )}
+                      Q{idx + 1}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: sel ? "var(--text)" : "var(--text-2)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontWeight: sel ? 500 : 400,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {q.prompt.slice(0, 40)}
+                        {q.prompt.length > 40 ? "…" : ""}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "var(--mono)",
+                          fontSize: 10,
+                          color: "var(--muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {kindLabel(q.kind)}
+                      </div>
                     </div>
-                  </div>
-                  <span
-                    style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: 11,
-                      color: "var(--text-2)",
-                      textAlign: "right",
-                    }}
-                  >
-                    {q.points}pt
-                  </span>
-                </button>
-              );
-            })
-          )}
+                    <span
+                      style={{
+                        fontFamily: "var(--mono)",
+                        fontSize: 11,
+                        color: "var(--text-2)",
+                        textAlign: "right",
+                        marginTop: 2,
+                      }}
+                    >
+                      {q.points}pt
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
 
           {/* Generate footer */}
           <div
@@ -570,19 +614,23 @@ export default function AuthorStudioPage({
             >
               Generate from source — paste notes or a reading.
             </div>
-            <button onClick={() => setShowGenerate(true)} style={btnSolid}>
-              ✦ Generate questions
-            </button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Icon name="sparkle" size={12} />}
+            >
+              Generate questions
+            </Button>
           </div>
-        </div>
+        </Card>
 
-        {/* Editor */}
-        <div
+        {/* MIDDLE - Question editor */}
+        <Card
           style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
+            padding: 0,
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           {selectedQ ? (
@@ -604,6 +652,7 @@ export default function AuthorStudioPage({
                       letterSpacing: 1.3,
                       color: "var(--muted)",
                       textTransform: "uppercase",
+                      marginBottom: 4,
                     }}
                   >
                     Editing Q
@@ -611,9 +660,9 @@ export default function AuthorStudioPage({
                   </div>
                   <div
                     style={{
-                      fontSize: 17,
-                      fontWeight: 600,
-                      marginTop: 2,
+                      fontSize: 18,
+                      fontWeight: 500,
+                      fontFamily: "var(--serif)",
                       color: "var(--text)",
                     }}
                   >
@@ -622,23 +671,25 @@ export default function AuthorStudioPage({
                 </div>
               </div>
 
-              <div style={{ padding: 22 }}>
+              <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
                 <label style={{ display: "block", marginBottom: 18 }}>
                   <div style={monoLabel}>Question prompt</div>
                   <textarea
                     value={editPrompt}
                     onChange={(e) => setEditPrompt(e.target.value)}
+                    onBlur={saveQuestion}
                     rows={3}
                     style={{
                       ...inlineInput,
                       width: "100%",
                       padding: 12,
+                      fontFamily: "var(--serif)",
+                      fontSize: 16,
                       resize: "vertical",
                     }}
                   />
                 </label>
 
-                {/* MC options preview (read-only payload) */}
                 {selectedQ.kind === "mc" && (
                   <McOptionsEditor payload={selectedQ.payload} />
                 )}
@@ -649,7 +700,7 @@ export default function AuthorStudioPage({
                     paddingTop: 18,
                     borderTop: "1px solid var(--border)",
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: "1fr 1fr 1fr",
                     gap: 18,
                   }}
                 >
@@ -662,16 +713,42 @@ export default function AuthorStudioPage({
                       onChange={(e) =>
                         setEditPoints(parseInt(e.target.value) || 0)
                       }
-                      style={{ ...inlineInput, width: 80 }}
+                      onBlur={saveQuestion}
+                      style={inlineInput}
                     />
+                  </label>
+                  <label style={{ display: "block" }}>
+                    <div style={monoLabel}>Tag</div>
+                    <input
+                      value={editTag}
+                      onChange={(e) => setEditTag(e.target.value)}
+                      onBlur={saveQuestion}
+                      style={inlineInput}
+                    />
+                  </label>
+                  <label style={{ display: "block" }}>
+                    <div style={monoLabel}>Difficulty</div>
+                    <select
+                      value={editQuestionDifficulty}
+                      onChange={(e) =>
+                        setEditQuestionDifficulty(e.target.value)
+                      }
+                      onBlur={saveQuestion}
+                      style={inlineInput}
+                    >
+                      <option value="intro">Intro</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
                   </label>
                 </div>
 
-                <label style={{ display: "block", marginTop: 18 }}>
+                <label style={{ display: "block", marginTop: 22 }}>
                   <div style={monoLabel}>Explanation shown after answering</div>
                   <textarea
                     value={editExplanation}
                     onChange={(e) => setEditExplanation(e.target.value)}
+                    onBlur={saveQuestion}
                     rows={2}
                     style={{
                       ...inlineInput,
@@ -686,6 +763,9 @@ export default function AuthorStudioPage({
           ) : (
             <div
               style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 padding: "48px 22px",
                 textAlign: "center",
                 color: "var(--muted)",
@@ -695,182 +775,63 @@ export default function AuthorStudioPage({
               Select a question to edit.
             </div>
           )}
-        </div>
+        </Card>
 
-        {/* Right rail */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: 18,
-            }}
-          >
-            <div style={sectionLabel}>Summary</div>
-            <KV k="Questions" v={String(quiz.questions.length)} />
-            <KV
-              k="Ready to publish"
-              v={
-                canPublish
-                  ? "Yes"
-                  : quiz.status === "active"
-                    ? "Published"
-                    : "No"
-              }
-            />
-            <KV k="Status" v={quiz.status} />
-          </div>
+        {/* RIGHT - Rail */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <Card>
+            <div style={sectionLabel}>Distribution</div>
+            <KV label="Most correct" value="#1" />
+            <KV label="Hardest item" value="#2" />
+          </Card>
 
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: 18,
-            }}
-          >
-            <div style={sectionLabel}>Rubric · auto-grading</div>
+          <Card>
+            <div style={sectionLabel}>Rubric</div>
             <div
-              style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}
+              style={{
+                fontSize: 12,
+                color: "var(--text-2)",
+                fontFamily: "var(--mono)",
+                lineHeight: 1.5,
+                padding: "10px 12px",
+                background: "var(--surface-2)",
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+              }}
             >
-              MC and TF are graded instantly. Short answers compare against
-              accepted strings. Essays use a 4-criterion rubric.
+              criteria:
+              <br />
+              &nbsp;&nbsp;clarity: 0–2
+              <br />
+              &nbsp;&nbsp;evidence: 0–2
+              <br />
+              &nbsp;&nbsp;mechanism: 0–1
+              <br />
+              &nbsp;&nbsp;link: 0–1
             </div>
-          </div>
+          </Card>
 
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: 18,
-            }}
-          >
-            <div style={sectionLabel}>Publish gating</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <GateRow
-                ok={quiz.questions.length > 0}
-                label="At least 1 question"
-              />
-              <GateRow
-                ok={quiz.questions.every((q) => q.status === "live")}
-                label="All questions live"
-              />
-              <GateRow
-                ok={quiz.status !== "active"}
-                label="Not yet published"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Generate dialog */}
-      {showGenerate && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              width: 500,
-              padding: 28,
-            }}
-          >
+          <Card>
+            <div style={sectionLabel}>Recent activity</div>
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 18,
+                flexDirection: "column",
+                gap: 10,
+                fontSize: 12,
               }}
             >
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: "var(--text)",
-                }}
-              >
-                Generate questions
-              </h2>
-              <button
-                onClick={() => setShowGenerate(false)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--muted)",
-                  fontSize: 18,
-                  cursor: "pointer",
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <label style={{ display: "block", marginBottom: 14 }}>
-              <div style={monoLabel}>Source material</div>
-              <textarea
-                value={generateSource}
-                onChange={(e) => setGenerateSource(e.target.value)}
-                rows={6}
-                style={{
-                  ...inlineInput,
-                  width: "100%",
-                  padding: 12,
-                  resize: "vertical",
-                }}
-                placeholder="Paste lecture notes, PDF text, or a reading…"
+              <ActivityEntry name="You" action="edited Q1" time="4m" />
+              <ActivityEntry name="You" action="added 2 questions" time="2h" />
+              <ActivityEntry
+                name="System"
+                action="auto-saved draft"
+                time="5m"
               />
-            </label>
-            {generateWarnings.length > 0 && (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  background: "rgba(245,158,11,0.1)",
-                  border: "1px solid #f59e0b",
-                  borderRadius: 4,
-                  marginBottom: 14,
-                }}
-              >
-                {generateWarnings.map((w) => (
-                  <div key={w} style={{ fontSize: 12, color: "#f59e0b" }}>
-                    ⚠ {w}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div
-              style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
-            >
-              <button onClick={() => setShowGenerate(false)} style={btnGhost}>
-                Cancel
-              </button>
-              <button
-                onClick={runGenerate}
-                disabled={generating || !generateSource.trim()}
-                style={{
-                  ...btnPrimary,
-                  opacity: generating || !generateSource.trim() ? 0.5 : 1,
-                }}
-              >
-                {generating ? "Generating…" : "Generate"}
-              </button>
             </div>
-          </div>
+          </Card>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -882,32 +843,47 @@ function McOptionsEditor({ payload }: { payload: unknown }) {
   } | null;
   if (!p?.options) return null;
   return (
-    <div>
-      <div style={monoLabel}>Options</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ marginBottom: 18 }}>
+      <div style={monoLabel}>Options · mark the correct answer</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {p.options.map((o, i) => (
           <div
             key={i}
             style={{
-              display: "flex",
+              display: "grid",
+              gridTemplateColumns: "30px 1fr",
               gap: 10,
               alignItems: "center",
-              padding: "8px 12px",
+              padding: "10px 12px",
               background: "var(--surface-2)",
-              border: `1px solid ${i === p.correct_index ? "var(--accent)" : "var(--border)"}`,
+              border: `1px solid ${
+                i === p.correct_index ? "var(--accent)" : "var(--border)"
+              }`,
               borderRadius: 4,
             }}
           >
-            <span
+            <button
               style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: i === p.correct_index ? "var(--accent)" : "var(--muted)",
-                width: 16,
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                background:
+                  i === p.correct_index ? "var(--accent)" : "transparent",
+                border: `1px solid ${
+                  i === p.correct_index
+                    ? "var(--accent)"
+                    : "var(--border-strong)"
+                }`,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {i === p.correct_index ? "✓" : String.fromCharCode(65 + i)}
-            </span>
+              {i === p.correct_index ? (
+                <Icon name="check" size={12} color="#0b1410" />
+              ) : null}
+            </button>
             <span style={{ fontSize: 13, color: "var(--text-2)" }}>
               {o.text}
             </span>
@@ -918,35 +894,45 @@ function McOptionsEditor({ payload }: { payload: unknown }) {
   );
 }
 
-function GateRow({ ok, label }: { ok: boolean; label: string }) {
+function ActivityEntry({
+  name,
+  action,
+  time,
+}: {
+  name: string;
+  action: string;
+  time: string;
+}) {
+  const isYou = name === "You";
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        fontSize: 12,
-        color: ok ? "var(--accent)" : "var(--muted)",
-      }}
-    >
-      <span>{ok ? "✓" : "○"}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function KV({ k, v }: { k: string; v: string }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        fontSize: 12,
-        marginBottom: 6,
-      }}
-    >
-      <span style={{ color: "var(--muted)" }}>{k}</span>
-      <span style={{ color: "var(--text)", fontWeight: 500 }}>{v}</span>
+    <div style={{ display: "flex", gap: 8 }}>
+      <span
+        style={{
+          width: 4,
+          alignSelf: "stretch",
+          background: isYou ? "var(--accent)" : "var(--border-strong)",
+          borderRadius: 2,
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ color: "var(--text)" }}>
+          <span style={{ color: isYou ? "var(--accent)" : "var(--text-2)" }}>
+            {name}
+          </span>{" "}
+          {action}
+        </div>
+        <div
+          style={{
+            color: "var(--muted)",
+            fontFamily: "var(--mono)",
+            fontSize: 10.5,
+            marginTop: 2,
+            letterSpacing: 0.5,
+          }}
+        >
+          {time} ago
+        </div>
+      </div>
     </div>
   );
 }
@@ -980,35 +966,5 @@ const inlineInput: React.CSSProperties = {
   fontSize: 13.5,
   outline: "none",
   boxSizing: "border-box",
-};
-
-const btnPrimary: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "var(--accent)",
-  border: "none",
-  borderRadius: 4,
-  color: "#000",
-  fontWeight: 700,
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const btnSolid: React.CSSProperties = {
-  padding: "7px 14px",
-  background: "var(--surface-2)",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  color: "var(--text)",
-  fontSize: 12,
-  cursor: "pointer",
-};
-
-const btnGhost: React.CSSProperties = {
-  padding: "8px 14px",
-  background: "transparent",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  color: "var(--text-2)",
-  fontSize: 13,
-  cursor: "pointer",
+  width: "100%",
 };

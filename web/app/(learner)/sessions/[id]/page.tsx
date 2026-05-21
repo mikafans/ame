@@ -4,26 +4,50 @@ import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { McqRenderer } from "@/components/question/McqRenderer";
 import { ShortRenderer } from "@/components/question/ShortRenderer";
 import { EssayRenderer } from "@/components/question/EssayRenderer";
 import { ClozeRenderer } from "@/components/question/ClozeRenderer";
+import { TfRenderer } from "@/components/question/TfRenderer";
+import { CodeRenderer } from "@/components/question/CodeRenderer";
 
 interface SessionQuestion {
   questionId: string;
   kind: string;
   prompt: string;
+  points: number;
   codeSnippet?: { language: string; body: string };
   options?: Array<{ text: string }>;
   optionOrder?: number[];
 }
 
 interface SessionData {
-  session: { id: string; status: string; deadline_at?: string };
+  session: {
+    id: string;
+    status: string;
+    deadline_at?: string;
+    duration?: number;
+    allowed_materials?: string[];
+    course_title?: string;
+    quiz_title?: string;
+  };
   questions: SessionQuestion[];
 }
 
-type Answer = string | number | null;
+type Answer = string | number | boolean | null;
+
+const QUESTION_TYPES: Record<string, string> = {
+  mc: "Multiple choice",
+  tf: "True / false",
+  short: "Short answer",
+  essay: "Essay",
+  code: "Code",
+  mcq: "Multiple choice",
+  free_text: "Free text",
+  cloze: "Fill in the blank",
+};
 
 export default function ActiveQuizPage({
   params,
@@ -36,9 +60,10 @@ export default function ActiveQuizPage({
   const [session, setSession] = useState<SessionData | null>(null);
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [autosaveScheduled, setAutosaveScheduled] = useState(false);
 
   // Load session
   useEffect(() => {
@@ -63,6 +88,38 @@ export default function ActiveQuizPage({
       .catch(console.error);
   }, [token, id]);
 
+  const handleFinish = useCallback(async () => {
+    if (finishing || !token) return;
+    setFinishing(true);
+    try {
+      // Autosave before finish
+      const answersList = Object.entries(answers).map(([qid, val]) => ({
+        questionId: qid,
+        answer: val,
+      }));
+      if (answersList.length > 0) {
+        await makeClient(token).PATCH(
+          "/v1/sessions/{id}/answers" as never,
+          {
+            params: { path: { id } },
+            body: { answers: answersList } as never,
+          } as never,
+        );
+      }
+      // Submit session
+      await makeClient(token).POST(
+        "/v1/sessions/{id}/submit" as never,
+        {
+          params: { path: { id } },
+        } as never,
+      );
+      router.push(`/sessions/${id}/results`);
+    } catch (err) {
+      console.error(err);
+      setFinishing(false);
+    }
+  }, [token, id, router, finishing, answers]);
+
   // Timer countdown
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
@@ -80,45 +137,48 @@ export default function ActiveQuizPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft !== null && timeLeft > 0]);
 
-  const handleFinish = useCallback(async () => {
-    if (finishing || !token) return;
-    setFinishing(true);
-    try {
-      await makeClient(token).POST(
-        "/v1/sessions/{id}/finish" as never,
-        {
-          params: { path: { id } },
-        } as never,
-      );
-      router.push(`/sessions/${id}/results`);
-    } catch (err) {
-      console.error(err);
-      setFinishing(false);
-    }
-  }, [token, id, router, finishing]);
+  // Autosave every 8 seconds
+  useEffect(() => {
+    if (!token || Object.keys(answers).length === 0 || autosaveScheduled)
+      return;
+    setAutosaveScheduled(true);
+    const timer = setTimeout(() => {
+      const answersList = Object.entries(answers).map(([qid, val]) => ({
+        questionId: qid,
+        answer: val,
+      }));
+      makeClient(token)
+        .PATCH(
+          "/v1/sessions/{id}/answers" as never,
+          {
+            params: { path: { id } },
+            body: { answers: answersList } as never,
+          } as never,
+        )
+        .catch(console.error)
+        .finally(() => setAutosaveScheduled(false));
+    }, 8000);
+    return () => {
+      clearTimeout(timer);
+      setAutosaveScheduled(false);
+    };
+  }, [answers, token, id, autosaveScheduled]);
 
-  async function submitAnswer(questionId: string, answer: Answer) {
-    if (!token || submitting || answer === null) return;
-    setSubmitting(true);
+  const handleSaveExit = useCallback(async () => {
+    if (!token) return;
     try {
-      const body = buildAnswerBody(cur, answer);
-      await makeClient(token).POST(
-        "/v1/sessions/{id}/answer" as never,
+      await makeClient(token).PATCH(
+        "/v1/sessions/{id}" as never,
         {
           params: { path: { id } },
-          body: { questionId, ...body } as never,
+          body: { status: "abandoned" } as never,
         } as never,
       );
-      setAnswers((prev) => ({ ...prev, [questionId]: answer }));
-      if (idx < (session?.questions.length ?? 0) - 1) {
-        setIdx((i) => i + 1);
-      }
+      router.push("/sessions");
     } catch (err) {
       console.error(err);
-    } finally {
-      setSubmitting(false);
     }
-  }
+  }, [token, id, router]);
 
   if (!session) {
     return (
@@ -141,26 +201,30 @@ export default function ActiveQuizPage({
   const questions = session.questions;
   const cur = questions[idx];
   const answered = Object.keys(answers).length;
+  const flaggedCount = Object.values(flagged).filter(Boolean).length;
   const curAnswer = cur ? (answers[cur.questionId] ?? null) : null;
 
   const mm = timeLeft !== null ? Math.floor(timeLeft / 60) : null;
   const ss = timeLeft !== null ? String(timeLeft % 60).padStart(2, "0") : null;
-  const timeWarning = timeLeft !== null && timeLeft < 180;
+  const timeWarning = timeLeft !== null && timeLeft < 300;
+
+  const attemptNum = 1; // TODO: get from session data
+  const totalAttempts = 2; // TODO: get from session data
 
   return (
     <div
       style={{
         minHeight: "100vh",
         display: "grid",
-        gridTemplateColumns: "1fr 260px",
+        gridTemplateColumns: "1fr 240px",
       }}
     >
-      {/* Main */}
+      {/* Main quiz area */}
       <div
         style={{
-          borderRight: "1px solid var(--border)",
           display: "flex",
           flexDirection: "column",
+          borderRight: "1px solid var(--border)",
         }}
       >
         {/* Sticky header */}
@@ -188,235 +252,441 @@ export default function ActiveQuizPage({
                 marginBottom: 4,
               }}
             >
-              Question {idx + 1} of {questions.length}
+              Attempt {attemptNum} of {totalAttempts} ·{" "}
+              {session.session.course_title || "COURSE"}
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--serif)",
+                fontSize: 18,
+                fontWeight: 500,
+                letterSpacing: -0.2,
+                color: "var(--text)",
+              }}
+            >
+              {session.session.quiz_title || "Quiz"}
             </div>
           </div>
+
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             {timeLeft !== null && mm !== null && ss !== null && (
               <div
                 style={{
-                  padding: "6px 14px",
-                  background: timeWarning
-                    ? "var(--red-dim)"
-                    : "var(--surface-2)",
+                  padding: "8px 14px",
                   border: `1px solid ${timeWarning ? "var(--red)" : "var(--border)"}`,
-                  borderRadius: 4,
+                  borderRadius: 6,
+                  background: timeWarning ? "var(--red-dim)" : "var(--surface)",
                   fontFamily: "var(--mono)",
-                  fontSize: 15,
+                  fontSize: 14,
+                  fontWeight: 600,
                   color: timeWarning ? "var(--red)" : "var(--text)",
-                  letterSpacing: 1,
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  letterSpacing: 0.5,
                 }}
               >
+                <Icon
+                  name="bell"
+                  size={14}
+                  color={timeWarning ? "var(--red)" : "var(--text)"}
+                />
                 {mm}:{ss}
               </div>
             )}
-            <button
-              onClick={handleFinish}
-              disabled={finishing}
-              style={{
-                padding: "8px 18px",
-                background: "var(--accent)",
-                border: "none",
-                borderRadius: 4,
-                color: "#000",
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: finishing ? "not-allowed" : "pointer",
-                opacity: finishing ? 0.7 : 1,
-              }}
-            >
-              {finishing ? "Finishing…" : "Finish"}
-            </button>
+            <Button variant="ghost" onClick={handleSaveExit}>
+              Save & exit
+            </Button>
           </div>
         </div>
 
-        {/* Question body */}
-        <div style={{ flex: 1, padding: "40px 40px 56px", overflowY: "auto" }}>
+        {/* Question content */}
+        <div
+          style={{
+            flex: 1,
+            padding: "44px 56px",
+            overflowY: "auto",
+            paddingBottom: 56,
+          }}
+        >
           {cur && (
             <>
-              {/* Kind label */}
+              {/* Question sub-header */}
               <div
                 style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.3,
-                  textTransform: "uppercase",
-                  color: "var(--muted)",
-                  marginBottom: 16,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  marginBottom: 10,
                 }}
               >
-                {kindLabel(cur.kind)}
-              </div>
-
-              {/* Code snippet */}
-              {cur.codeSnippet && (
-                <pre
+                <div
                   style={{
-                    background: "var(--surface-3)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: "16px 18px",
-                    fontSize: 13,
                     fontFamily: "var(--mono)",
-                    color: "var(--text)",
-                    overflowX: "auto",
-                    marginBottom: 24,
+                    fontSize: 11,
+                    letterSpacing: 1.3,
+                    color: "var(--muted)",
+                    textTransform: "uppercase",
                   }}
                 >
-                  <code>{cur.codeSnippet.body}</code>
-                </pre>
-              )}
+                  Question {idx + 1} of {questions.length} ·{" "}
+                  {QUESTION_TYPES[cur.kind] || cur.kind} · {cur.points}{" "}
+                  {cur.points === 1 ? "pt" : "pts"}
+                </div>
+                <button
+                  onClick={() =>
+                    setFlagged((f) => ({
+                      ...f,
+                      [cur.questionId]: !f[cur.questionId],
+                    }))
+                  }
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontFamily: "var(--mono)",
+                    fontSize: 11,
+                    letterSpacing: 1,
+                    color: flagged[cur.questionId]
+                      ? "var(--amber)"
+                      : "var(--muted)",
+                    padding: 0,
+                  }}
+                >
+                  <Icon
+                    name="flag"
+                    size={12}
+                    color={
+                      flagged[cur.questionId] ? "var(--amber)" : "var(--muted)"
+                    }
+                  />
+                  {flagged[cur.questionId] ? "Flagged" : "Flag for review"}
+                </button>
+              </div>
 
               {/* Prompt */}
-              <div
+              <h2
                 style={{
-                  fontSize: 16,
+                  fontFamily: "var(--serif)",
+                  fontSize: 26,
+                  lineHeight: 1.35,
                   fontWeight: 500,
+                  letterSpacing: -0.2,
+                  margin: 0,
                   color: "var(--text)",
-                  lineHeight: 1.6,
-                  marginBottom: 28,
+                  marginTop: 20,
                 }}
               >
                 {cur.prompt}
+              </h2>
+
+              {/* Question input */}
+              <div style={{ marginTop: 32 }}>
+                <QuestionInput
+                  question={cur}
+                  value={curAnswer}
+                  onChange={(v) =>
+                    setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
+                  }
+                  disabled={false}
+                />
               </div>
 
-              {/* Answer input */}
-              <QuestionInput
-                question={cur}
-                value={curAnswer}
-                onChange={(v) =>
-                  setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
-                }
-                disabled={submitting || cur.questionId in answers}
-              />
-
-              {/* Submit / Next */}
-              {!(cur.questionId in answers) && (
-                <button
-                  onClick={() => submitAnswer(cur.questionId, curAnswer)}
-                  disabled={submitting || curAnswer === null}
-                  style={{
-                    marginTop: 28,
-                    padding: "10px 24px",
-                    background: "var(--accent)",
-                    border: "none",
-                    borderRadius: 4,
-                    color: "#000",
-                    fontWeight: 700,
-                    fontSize: 14,
-                    cursor:
-                      submitting || curAnswer === null
-                        ? "not-allowed"
-                        : "pointer",
-                    opacity: submitting || curAnswer === null ? 0.6 : 1,
-                  }}
+              {/* Navigation */}
+              <div
+                style={{
+                  marginTop: 48,
+                  paddingTop: 24,
+                  borderTop: "1px solid var(--border)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => setIdx((i) => Math.max(0, i - 1))}
+                  disabled={idx === 0}
                 >
-                  {submitting ? "Submitting…" : "Submit"}
-                </button>
-              )}
-
-              {cur.questionId in answers && idx < questions.length - 1 && (
-                <button
-                  onClick={() => setIdx((i) => i + 1)}
-                  style={{
-                    marginTop: 28,
-                    padding: "10px 24px",
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    color: "var(--text)",
-                    fontWeight: 600,
-                    fontSize: 14,
-                    cursor: "pointer",
-                  }}
-                >
-                  Next →
-                </button>
-              )}
+                  Previous
+                </Button>
+                {idx < questions.length - 1 ? (
+                  <Button
+                    variant="primary"
+                    onClick={() =>
+                      setIdx((i) => Math.min(questions.length - 1, i + 1))
+                    }
+                  >
+                    Next question
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={handleFinish}
+                    disabled={finishing}
+                  >
+                    {finishing ? "Submitting…" : "Submit attempt"}
+                  </Button>
+                )}
+              </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Sidebar — question map */}
-      <div style={{ padding: "24px 20px", overflowY: "auto" }}>
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            color: "var(--muted)",
-            marginBottom: 14,
-          }}
-        >
-          Progress · {answered}/{questions.length}
+      {/* Right rail */}
+      <aside
+        style={{
+          padding: "20px 22px",
+          background: "var(--surface)",
+          overflowY: "auto",
+        }}
+      >
+        {/* Question palette */}
+        <div>
+          <div
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              letterSpacing: 1.3,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              marginBottom: 10,
+            }}
+          >
+            Question palette
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: 6,
+              marginBottom: 18,
+            }}
+          >
+            {questions.map((q, i) => {
+              const status =
+                q.questionId in answers ? "answered" : "unanswered";
+              const isCurrent = i === idx;
+              const isFlagged = flagged[q.questionId];
+              return (
+                <button
+                  key={q.questionId}
+                  onClick={() => setIdx(i)}
+                  style={{
+                    height: 36,
+                    position: "relative",
+                    background:
+                      status === "answered"
+                        ? "var(--accent-dim)"
+                        : "var(--surface-2)",
+                    color:
+                      status === "answered" ? "var(--accent)" : "var(--text-2)",
+                    border: `1px solid ${
+                      isCurrent
+                        ? "var(--accent)"
+                        : status === "answered"
+                          ? "var(--accent-line)"
+                          : "var(--border)"
+                    }`,
+                    fontFamily: "var(--mono)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 4,
+                    cursor: "pointer",
+                  }}
+                >
+                  {i + 1}
+                  {isFlagged ? (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        right: 3,
+                        width: 5,
+                        height: 5,
+                        borderRadius: "50%",
+                        background: "var(--amber)",
+                      }}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Divider */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 6,
+            height: "1px",
+            background: "var(--border)",
+            margin: "12px 0",
+          }}
+        />
+
+        {/* Legend */}
+        <div
+          style={{
+            marginTop: 18,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
           }}
         >
-          {questions.map((q, i) => {
-            const done = q.questionId in answers;
-            const current = i === idx;
-            return (
-              <button
-                key={q.questionId}
-                onClick={() => setIdx(i)}
+          <LegendItem
+            swatch="var(--accent-dim)"
+            border="var(--accent-line)"
+            label={`Answered · ${answered}`}
+          />
+          <LegendItem
+            swatch="var(--surface-2)"
+            border="var(--border)"
+            label={`Unanswered · ${questions.length - answered}`}
+          />
+          <LegendItem dot="var(--amber)" label={`Flagged · ${flaggedCount}`} />
+        </div>
+
+        {/* Divider */}
+        <div
+          style={{
+            height: "1px",
+            background: "var(--border)",
+            margin: "18px 0",
+          }}
+        />
+
+        {/* Integrity */}
+        <div style={{ marginTop: 18 }}>
+          <div
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              letterSpacing: 1.3,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              marginBottom: 10,
+            }}
+          >
+            Integrity
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              fontSize: 12,
+              color: "var(--text-2)",
+            }}
+          >
+            <IntegrityRow icon="check" text="Browser locked" />
+            <IntegrityRow icon="check" text="Single tab session" />
+            <IntegrityRow icon="check" text="Autosave every 8 s" />
+          </div>
+        </div>
+
+        {/* Allowed materials */}
+        {session.session.allowed_materials &&
+          session.session.allowed_materials.length > 0 && (
+            <div
+              style={{
+                marginTop: 26,
+                padding: 14,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+              }}
+            >
+              <div
                 style={{
-                  aspectRatio: "1",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 4,
-                  border: `1px solid ${current ? "var(--accent)" : done ? "var(--border)" : "var(--border)"}`,
-                  background: current
-                    ? "var(--accent-dim)"
-                    : done
-                      ? "var(--surface-3)"
-                      : "var(--surface-2)",
-                  color: current
-                    ? "var(--accent)"
-                    : done
-                      ? "var(--muted)"
-                      : "var(--text-2)",
-                  cursor: "pointer",
                   fontFamily: "var(--mono)",
-                  fontSize: 12,
-                  fontWeight: current ? 700 : 400,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  textTransform: "uppercase",
+                  color: "var(--muted)",
+                  marginBottom: 6,
                 }}
               >
-                {i + 1}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                Allowed
+              </div>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 16,
+                  color: "var(--text-2)",
+                  fontSize: 12,
+                  lineHeight: 1.7,
+                }}
+              >
+                {session.session.allowed_materials.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+      </aside>
     </div>
   );
 }
 
-function kindLabel(kind: string) {
-  const map: Record<string, string> = {
-    mcq: "Multiple choice",
-    free_text: "Free text",
-    cloze: "Fill in the blank",
-  };
-  return map[kind] ?? kind;
+function LegendItem({
+  swatch,
+  border,
+  dot,
+  label,
+}: {
+  swatch?: string;
+  border?: string;
+  dot?: string;
+  label: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        color: "var(--text-2)",
+        fontSize: 12,
+      }}
+    >
+      {swatch ? (
+        <div
+          style={{
+            width: 14,
+            height: 14,
+            background: swatch,
+            border: `1px solid ${border}`,
+            borderRadius: 3,
+          }}
+        />
+      ) : (
+        <div style={{ width: 14, display: "flex", justifyContent: "center" }}>
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: dot,
+            }}
+          />
+        </div>
+      )}
+      <span>{label}</span>
+    </div>
+  );
 }
 
-function buildAnswerBody(q: SessionQuestion, value: Answer) {
-  if (q.kind === "mcq") return { selectedPosition: value };
-  if (q.kind === "free_text") {
-    const text = String(value ?? "");
-    const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-    if (wordCount > 30) return { body: text, wordCount };
-    return { answer: text };
-  }
-  return { answer: String(value ?? "") };
+function IntegrityRow({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <Icon name={icon} size={13} color="var(--accent)" />
+      <span>{text}</span>
+    </div>
+  );
 }
 
 function QuestionInput({
@@ -430,7 +700,8 @@ function QuestionInput({
   onChange: (v: Answer) => void;
   disabled: boolean;
 }) {
-  if (question.kind === "mcq" && question.options) {
+  // Multiple choice
+  if ((question.kind === "mc" || question.kind === "mcq") && question.options) {
     const order = question.optionOrder ?? question.options.map((_, i) => i);
     const opts = order.map((pos) => ({
       text: question.options![pos].text,
@@ -445,6 +716,19 @@ function QuestionInput({
       />
     );
   }
+
+  // True/False
+  if (question.kind === "tf") {
+    return (
+      <TfRenderer
+        value={typeof value === "boolean" ? value : null}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    );
+  }
+
+  // Cloze
   if (question.kind === "cloze") {
     return (
       <ClozeRenderer
@@ -455,12 +739,25 @@ function QuestionInput({
       />
     );
   }
+
+  // Code
+  if (question.kind === "code") {
+    return (
+      <CodeRenderer
+        value={String(value ?? "")}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    );
+  }
+
+  // Essay (free text with >30 words)
   const isEssay =
     question.kind === "free_text" &&
     String(value ?? "")
       .trim()
       .split(/\s+/).length > 30;
-  if (isEssay || question.kind === "free_text") {
+  if (isEssay || question.kind === "essay") {
     return (
       <EssayRenderer
         value={String(value ?? "")}
@@ -469,6 +766,8 @@ function QuestionInput({
       />
     );
   }
+
+  // Short answer / free text
   return (
     <ShortRenderer
       value={String(value ?? "")}
