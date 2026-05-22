@@ -8,11 +8,13 @@ Seed the ame database with demo users, tags, questions, quizzes, and exams.
 Usage:
     uv run scripts/seed.py
     uv run scripts/seed.py --api http://localhost:8080
+    uv run scripts/seed.py --wipe   # drop existing seed data first (re-seeds)
 """
 
 import argparse
 import sys
 from dataclasses import dataclass, field
+from typing import Any
 
 import httpx
 from rich.console import Console
@@ -20,21 +22,17 @@ from rich.table import Table
 
 console = Console()
 
-DEFAULT_API = "http://localhost:8080"
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Users
-# ---------------------------------------------------------------------------
+DEFAULT_API = "http://localhost:8080"
 
 USERS = [
     {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "learner"},
     {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "instructor"},
     {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "admin"},
 ]
-
-# ---------------------------------------------------------------------------
-# Tags
-# ---------------------------------------------------------------------------
 
 TAGS = [
     {"name": "algorithms", "description": "Algorithm design and analysis"},
@@ -44,372 +42,143 @@ TAGS = [
     {"name": "dynamic-programming", "description": "Optimal substructure, memoization"},
     {"name": "math", "description": "Mathematics and discrete math"},
     {"name": "python", "description": "Python language and stdlib"},
-    {"name": "rust", "description": "Rust language and ecosystem"},
-    {"name": "ownership", "description": "Rust ownership, borrowing, lifetimes"},
-    {"name": "concurrency", "description": "Concurrent and parallel programming"},
-    {"name": "zig", "description": "Zig language and ecosystem"},
-    {"name": "systems", "description": "Systems programming concepts"},
-    {"name": "memory", "description": "Memory management and layout"},
-    {"name": "os", "description": "Operating systems concepts"},
-    {"name": "networking", "description": "Networking and protocols"},
-    {"name": "complexity", "description": "Time and space complexity"},
 ]
 
-# ---------------------------------------------------------------------------
-# Questions — grouped by quiz
-# ---------------------------------------------------------------------------
-
-QUESTIONS_ALGO = [
+QUESTIONS = [
+    # Multiple choice
     {
         "kind": "mc",
         "prompt": "What is the time complexity of binary search on a sorted array?",
-        "payload": {"options": ["O(n)", "O(log n)", "O(n log n)", "O(1)"], "correct_index": 1},
-        "explanation": "Binary search halves the search space each step: O(log n).",
-        "tags": ["algorithms", "complexity"],
+        "payload": {
+            "options": ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
+            "correct_index": 1,
+        },
+        "explanation": "Binary search halves the search space each step, giving O(log n).",
+        "tags": ["algorithms", "sorting"],
         "points": 1,
     },
     {
         "kind": "mc",
-        "prompt": "Which data structure is used to implement breadth-first search?",
-        "payload": {"options": ["Stack", "Queue", "Heap", "Hash map"], "correct_index": 1},
-        "explanation": "BFS uses a FIFO queue to visit nodes level by level.",
+        "prompt": "Which data structure is used to implement a breadth-first search?",
+        "payload": {
+            "options": ["Stack", "Queue", "Heap", "Hash map"],
+            "correct_index": 1,
+        },
+        "explanation": "BFS uses a queue (FIFO) to visit nodes level by level.",
         "tags": ["graphs", "data-structures"],
         "points": 1,
     },
     {
         "kind": "mc",
         "prompt": "What is the worst-case time complexity of quicksort?",
-        "payload": {"options": ["O(n log n)", "O(n)", "O(n²)", "O(log n)"], "correct_index": 2},
-        "explanation": "Quicksort degrades to O(n²) when the pivot is always the min or max.",
-        "tags": ["sorting", "complexity"],
+        "payload": {
+            "options": ["O(n log n)", "O(n)", "O(n²)", "O(log n)"],
+            "correct_index": 2,
+        },
+        "explanation": "Quicksort degrades to O(n²) when the pivot is always the smallest or largest element.",
+        "tags": ["sorting", "algorithms"],
         "points": 1,
     },
+    {
+        "kind": "mc",
+        "prompt": "In dynamic programming, what property ensures a problem can be solved optimally by combining solutions to subproblems?",
+        "payload": {
+            "options": ["Greedy choice", "Optimal substructure", "Divide and conquer", "Memoization"],
+            "correct_index": 1,
+        },
+        "explanation": "Optimal substructure means the optimal solution to the whole problem contains optimal solutions to subproblems.",
+        "tags": ["dynamic-programming", "algorithms"],
+        "points": 2,
+    },
+    # True / False
     {
         "kind": "tf",
         "prompt": "A binary search tree guarantees O(log n) search time in all cases.",
         "payload": {"correct": False},
-        "explanation": "An unbalanced BST degrades to O(n) — e.g., inserting a sorted sequence.",
-        "tags": ["data-structures", "complexity"],
+        "explanation": "An unbalanced BST can degrade to O(n) in the worst case (e.g., inserting a sorted sequence).",
+        "tags": ["data-structures", "algorithms"],
         "points": 1,
     },
     {
         "kind": "tf",
         "prompt": "Merge sort is a stable sorting algorithm.",
         "payload": {"correct": True},
-        "explanation": "Merge sort preserves relative order of equal elements.",
+        "explanation": "Merge sort preserves the relative order of equal elements, making it stable.",
         "tags": ["sorting"],
         "points": 1,
     },
     {
-        "kind": "mc",
-        "prompt": "Which property ensures a problem can be solved optimally by combining solutions to subproblems?",
-        "payload": {"options": ["Greedy choice", "Optimal substructure", "Divide and conquer", "Memoization"], "correct_index": 1},
-        "explanation": "Optimal substructure is the key property enabling dynamic programming.",
-        "tags": ["dynamic-programming", "algorithms"],
-        "points": 2,
+        "kind": "tf",
+        "prompt": "Dijkstra's algorithm can handle graphs with negative edge weights.",
+        "payload": {"correct": False},
+        "explanation": "Dijkstra's requires non-negative weights. Use Bellman-Ford for negative edges.",
+        "tags": ["graphs"],
+        "points": 1,
     },
+    # Short answer
     {
         "kind": "short",
         "prompt": "Name the data structure that follows Last-In, First-Out (LIFO) ordering.",
-        "payload": {"accepted": ["stack", "Stack", "STACK"], "normalize": "case_insensitive_strip_accents", "judge": "exact"},
+        "payload": {
+            "accepted": ["stack", "Stack", "STACK"],
+            "normalize": "case_insensitive_strip_accents",
+            "judge": "exact",
+        },
         "explanation": "A stack processes the most recently added item first.",
         "tags": ["data-structures"],
         "points": 1,
     },
     {
+        "kind": "short",
+        "prompt": "What Python built-in function returns the length of a sequence?",
+        "payload": {
+            "accepted": ["len", "len()", "len()"],
+            "normalize": "exact",
+            "judge": "exact",
+        },
+        "explanation": "len() returns the number of items in an object.",
+        "tags": ["python"],
+        "points": 1,
+    },
+    # Essay
+    {
         "kind": "essay",
         "prompt": "Compare depth-first search and breadth-first search. When would you choose each?",
-        "payload": {"min_words": 60, "rubric": "Traversal description (2), complexity comparison (2), use-case examples (2).", "judge": "manual"},
-        "explanation": "DFS uses O(depth) space; BFS uses O(width) space and finds shortest paths in unweighted graphs.",
+        "payload": {
+            "min_words": 60,
+            "rubric": "Award marks for: correct traversal description (2), time/space complexity comparison (2), appropriate use-case examples (2).",
+            "judge": "manual",
+        },
+        "explanation": "DFS uses O(depth) space and is good for cycle detection/topological sort. BFS uses O(width) space and finds shortest paths in unweighted graphs.",
         "tags": ["graphs", "algorithms"],
         "points": 6,
     },
-]
-
-QUESTIONS_RUST = [
-    {
-        "kind": "mc",
-        "prompt": "What does Rust's ownership system eliminate at compile time?",
-        "payload": {"options": ["Stack overflows", "Data races and use-after-free", "Integer overflow", "Deadlocks"], "correct_index": 1},
-        "explanation": "Rust's ownership system statically prevents data races and use-after-free without a GC.",
-        "tags": ["rust", "ownership", "memory"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "How many immutable references to a value can coexist at the same time in Rust?",
-        "payload": {"options": ["Only one", "Exactly two", "Any number", "Zero — you must use a mutex"], "correct_index": 2},
-        "explanation": "Rust allows any number of simultaneous immutable (&T) references, but only one mutable (&mut T).",
-        "tags": ["rust", "ownership"],
-        "points": 1,
-    },
-    {
-        "kind": "tf",
-        "prompt": "In Rust, a value can have multiple mutable references at the same time.",
-        "payload": {"correct": False},
-        "explanation": "Rust enforces exclusive access: at most one &mut T reference at a time.",
-        "tags": ["rust", "ownership"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "Which Rust type represents an owned, heap-allocated string?",
-        "payload": {"options": ["&str", "str", "String", "Box<str>"], "correct_index": 2},
-        "explanation": "String is the growable, heap-allocated string type. &str is a borrowed string slice.",
-        "tags": ["rust"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "What does the ? operator do in a function returning Result?",
-        "payload": {"options": ["Panics on error", "Returns None", "Propagates the error to the caller", "Logs the error"], "correct_index": 2},
-        "explanation": "? unwraps Ok values and returns Err early, propagating the error up the call stack.",
-        "tags": ["rust"],
-        "points": 1,
-    },
-    {
-        "kind": "tf",
-        "prompt": "Rust's async functions return a Future that runs on a background thread immediately.",
-        "payload": {"correct": False},
-        "explanation": "Rust Futures are lazy — they do nothing until polled by an executor.",
-        "tags": ["rust", "concurrency"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "Which trait must a type implement to be sent across thread boundaries in Rust?",
-        "payload": {"options": ["Copy", "Clone", "Send", "Sync"], "correct_index": 2},
-        "explanation": "Send marks types safe to transfer ownership across threads. Sync marks types safe to share references.",
-        "tags": ["rust", "concurrency", "ownership"],
-        "points": 2,
-    },
-    {
-        "kind": "short",
-        "prompt": "What keyword is used to define a Rust trait?",
-        "payload": {"accepted": ["trait"], "normalize": "exact", "judge": "exact"},
-        "explanation": "The trait keyword defines a shared interface, similar to interfaces in other languages.",
-        "tags": ["rust"],
-        "points": 1,
-    },
     {
         "kind": "essay",
-        "prompt": "Explain Rust's ownership model and how it differs from garbage collection. Give an example of a bug it prevents.",
-        "payload": {"min_words": 80, "rubric": "Ownership explanation (2), GC comparison (2), concrete bug example (2).", "judge": "manual"},
-        "tags": ["rust", "ownership", "memory"],
-        "points": 6,
+        "prompt": "Explain how memoization differs from tabulation in dynamic programming, with an example for each.",
+        "payload": {
+            "min_words": 80,
+            "rubric": "Award marks for: correct definition of memoization (2), correct definition of tabulation (2), valid example for each (2), space/time trade-off discussion (2).",
+            "judge": "manual",
+        },
+        "tags": ["dynamic-programming"],
+        "points": 8,
     },
 ]
 
-QUESTIONS_ZIG = [
-    {
-        "kind": "mc",
-        "prompt": "How does Zig handle memory allocation differently from C?",
-        "payload": {"options": [
-            "Zig uses a garbage collector",
-            "Zig requires an explicit allocator to be passed to functions that allocate",
-            "Zig allocates all memory on the stack",
-            "Zig forbids heap allocation entirely",
-        ], "correct_index": 1},
-        "explanation": "Zig requires explicit allocator arguments, making allocation visible and testable.",
-        "tags": ["zig", "memory", "systems"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "What is comptime in Zig?",
-        "payload": {"options": [
-            "A runtime optimization hint",
-            "A way to mark functions as async",
-            "Compile-time code execution for generics and meta-programming",
-            "A debugging mode",
-        ], "correct_index": 2},
-        "explanation": "comptime allows arbitrary code to run at compile time, enabling generics without templates.",
-        "tags": ["zig"],
-        "points": 1,
-    },
-    {
-        "kind": "tf",
-        "prompt": "Zig has hidden control flow such as exceptions or operator overloading.",
-        "payload": {"correct": False},
-        "explanation": "Zig explicitly avoids hidden control flow — no exceptions, no operator overloading, no implicit allocations.",
-        "tags": ["zig", "systems"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "Which Zig type is used to represent a value that may or may not be present?",
-        "payload": {"options": ["Result", "Option", "?T (optional)", "Maybe"], "correct_index": 2},
-        "explanation": "Zig uses ?T for optionals — null is only allowed for optional types.",
-        "tags": ["zig"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "What does defer do in Zig?",
-        "payload": {"options": [
-            "Delays a function until the next event loop tick",
-            "Runs a statement when the current scope exits",
-            "Marks a function as asynchronous",
-            "Allocates memory that is freed at program exit",
-        ], "correct_index": 1},
-        "explanation": "defer schedules a statement to run at the end of the enclosing scope — useful for cleanup.",
-        "tags": ["zig", "systems"],
-        "points": 1,
-    },
-    {
-        "kind": "tf",
-        "prompt": "Zig can call C functions directly without any FFI layer or wrapper.",
-        "payload": {"correct": True},
-        "explanation": "Zig has first-class C interop — you can @cImport and call C functions directly.",
-        "tags": ["zig", "systems"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "Which Zig error handling mechanism propagates errors without exceptions?",
-        "payload": {"options": ["try/catch blocks", "error unions with try and catch", "error unions with try (propagates) and catch (handles)", "panic()"], "correct_index": 2},
-        "explanation": "Zig error unions (T!E) combined with try propagate errors up the call stack explicitly.",
-        "tags": ["zig"],
-        "points": 2,
-    },
-    {
-        "kind": "essay",
-        "prompt": "Compare Zig's approach to error handling with Rust's Result type. What are the trade-offs?",
-        "payload": {"min_words": 70, "rubric": "Zig error unions (2), Rust Result (2), trade-off analysis (2).", "judge": "manual"},
-        "tags": ["zig", "rust", "systems"],
-        "points": 6,
-    },
-]
+QUIZ = {
+    "title": "Algorithms and Data Structures — Fundamentals",
+    "objectives": [
+        "Understand time complexity of common algorithms",
+        "Distinguish between core data structures",
+        "Apply sorting and graph algorithms",
+    ],
+}
 
-QUESTIONS_CS = [
-    {
-        "kind": "mc",
-        "prompt": "What does a process context switch involve?",
-        "payload": {"options": [
-            "Only saving the program counter",
-            "Saving CPU registers, stack pointer, and page table reference for the current process",
-            "Flushing the disk cache",
-            "Deallocating all heap memory",
-        ], "correct_index": 1},
-        "explanation": "A context switch saves the full CPU state of the current process and restores the next one.",
-        "tags": ["os", "systems"],
-        "points": 2,
-    },
-    {
-        "kind": "tf",
-        "prompt": "TCP guarantees that data arrives in the same order it was sent.",
-        "payload": {"correct": True},
-        "explanation": "TCP is a reliable, ordered byte stream — it reorders segments and retransmits as needed.",
-        "tags": ["networking"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "What is a TLB in the context of virtual memory?",
-        "payload": {"options": [
-            "A type of disk cache",
-            "A hardware cache that speeds up virtual-to-physical address translation",
-            "A network routing table",
-            "A thread-local buffer",
-        ], "correct_index": 1},
-        "explanation": "The Translation Lookaside Buffer caches recent page table entries to avoid expensive memory lookups.",
-        "tags": ["os", "memory"],
-        "points": 2,
-    },
-    {
-        "kind": "mc",
-        "prompt": "Which HTTP status code indicates that a resource has permanently moved to a new URL?",
-        "payload": {"options": ["200", "301", "404", "500"], "correct_index": 1},
-        "explanation": "301 Moved Permanently tells clients and search engines the resource has a new permanent URL.",
-        "tags": ["networking"],
-        "points": 1,
-    },
-    {
-        "kind": "tf",
-        "prompt": "A mutex and a semaphore are functionally identical.",
-        "payload": {"correct": False},
-        "explanation": "A mutex is a binary lock owned by a thread. A semaphore is a counter that need not be owned.",
-        "tags": ["concurrency", "os"],
-        "points": 1,
-    },
-    {
-        "kind": "mc",
-        "prompt": "What does the CAP theorem state?",
-        "payload": {"options": [
-            "A distributed system can guarantee all of consistency, availability, and partition tolerance",
-            "A distributed system can guarantee at most two of consistency, availability, and partition tolerance",
-            "Partition tolerance can always be sacrificed for consistency",
-            "Availability is always more important than consistency",
-        ], "correct_index": 1},
-        "explanation": "CAP: in the presence of a network partition, you must choose between consistency and availability.",
-        "tags": ["systems", "networking"],
-        "points": 2,
-    },
-    {
-        "kind": "short",
-        "prompt": "What does POSIX stand for?",
-        "payload": {"accepted": ["Portable Operating System Interface", "portable operating system interface"], "normalize": "case_insensitive_strip_accents", "judge": "exact"},
-        "explanation": "POSIX defines a standard API for Unix-compatible operating systems.",
-        "tags": ["os", "systems"],
-        "points": 1,
-    },
-    {
-        "kind": "essay",
-        "prompt": "Explain the difference between a process and a thread. When would you use one over the other?",
-        "payload": {"min_words": 70, "rubric": "Process definition (2), thread definition (2), comparison with examples (2).", "judge": "manual"},
-        "tags": ["os", "concurrency"],
-        "points": 6,
-    },
-]
-
-# Quiz definitions: title, objectives, question list key
-QUIZZES = [
-    {
-        "title": "Algorithms & Data Structures — Fundamentals",
-        "course": "Computer Science",
-        "objectives": [
-            "Understand time complexity of common algorithms",
-            "Distinguish between core data structures",
-            "Apply sorting and graph algorithms",
-        ],
-        "questions": QUESTIONS_ALGO,
-    },
-    {
-        "title": "Rust Essentials",
-        "course": "Systems Programming",
-        "objectives": [
-            "Understand Rust's ownership and borrowing model",
-            "Use Result and Option for error handling",
-            "Reason about Rust concurrency primitives",
-        ],
-        "questions": QUESTIONS_RUST,
-    },
-    {
-        "title": "Zig Fundamentals",
-        "course": "Systems Programming",
-        "objectives": [
-            "Understand Zig's comptime and allocator model",
-            "Use Zig error unions and defer",
-            "Compare Zig with C and Rust",
-        ],
-        "questions": QUESTIONS_ZIG,
-    },
-    {
-        "title": "General CS — Systems & Networking",
-        "course": "Computer Science",
-        "objectives": [
-            "Understand OS concepts: processes, threads, virtual memory",
-            "Reason about networking protocols",
-            "Apply concurrency primitives correctly",
-        ],
-        "questions": QUESTIONS_CS,
-    },
-]
-
-EXAM = {
-    "name": "Systems & Languages Midterm",
-    "description": "Covers Rust, Zig, algorithms, OS, and networking fundamentals.",
-    "duration": 90,
+EXAM_BLUEPRINT = {
+    "name": "CS Fundamentals Midterm",
+    "description": "Covers algorithms, data structures, and complexity analysis.",
+    "duration": 60,
 }
 
 
@@ -421,15 +190,19 @@ EXAM = {
 class SeedResult:
     users: list[dict] = field(default_factory=list)
     tags: list[dict] = field(default_factory=list)
-    quizzes: list[dict] = field(default_factory=list)
+    questions: list[dict] = field(default_factory=list)
+    quiz_id: str | None = None
     exam_id: str | None = None
-    session_count: int = 0
+    cohort_id: str | None = None
 
 
-def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None) -> dict:
-    resp = client.post(path, json=body, headers=auth or {})
+def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None, label: str = "") -> dict:
+    headers = auth or {}
+    resp = client.post(path, json=body, headers=headers)
     if not resp.is_success:
-        console.print(f"[red]FAIL[/red] POST {path} → {resp.status_code}: {resp.text[:300]}")
+        console.print(f"[red]FAIL[/red] POST {path} → {resp.status_code}: {resp.text[:200]}")
+        if label:
+            console.print(f"  ({label})")
     return resp.json() if resp.is_success else {}
 
 
@@ -438,6 +211,7 @@ def register_or_login(client: httpx.Client, user: dict) -> dict | None:
     if resp.status_code == 201:
         return resp.json()
     if resp.status_code in (400, 422):
+        # Email already registered — log in instead
         resp2 = client.post("/v1/auth/login", json={"email": user["email"], "password": user["password"]})
         if resp2.is_success:
             return resp2.json()
@@ -458,173 +232,120 @@ def seed_users(client: httpx.Client, result: SeedResult) -> None:
             console.print(f"  [green]✓[/green] {u['role']:12} {u['email']}")
 
 
-def seed_tags(client: httpx.Client, auth: dict) -> None:
+def seed_tags(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     console.rule("[bold]Tags")
     for tag in TAGS:
         resp = client.post("/v1/tags", json=tag, headers=auth)
-        status = "[green]✓[/green]" if resp.status_code in (200, 201) else "[yellow]skip[/yellow]"
-        console.print(f"  {status} #{tag['name']}")
+        if resp.status_code in (200, 201):
+            result.tags.append(resp.json())
+            console.print(f"  [green]✓[/green] #{tag['name']}")
+        else:
+            console.print(f"  [yellow]skip[/yellow] #{tag['name']} ({resp.status_code})")
 
 
-def seed_quiz(client: httpx.Client, auth: dict, quiz_def: dict, result: SeedResult) -> None:
-    # Create questions
-    resp = client.post("/v1/questions", json={"questions": quiz_def["questions"]}, headers=auth)
+def seed_questions(client: httpx.Client, auth: dict, result: SeedResult) -> None:
+    console.rule("[bold]Questions")
+    resp = client.post("/v1/questions", json={"questions": QUESTIONS}, headers=auth)
     if resp.status_code != 201:
-        console.print(f"  [red]Failed to create questions:[/red] {resp.text[:300]}")
+        console.print(f"[red]Failed to create questions:[/red] {resp.text[:400]}")
         return
-    created_qs = resp.json()["questions"]
 
-    # Promote to live
-    for q in created_qs:
-        client.post(f"/v1/questions/{q['id']}/promote", headers=auth)
+    created = resp.json()["questions"]
+    result.questions = created
+    console.print(f"  Created {len(created)} questions (draft)")
 
-    # Create quiz
-    resp2 = client.post("/v1/quizzes", json={
-        "title": quiz_def["title"],
-        "objectives": quiz_def["objectives"],
-        "course": quiz_def.get("course"),
-    }, headers=auth)
-    if not resp2.is_success:
-        console.print(f"  [red]Failed to create quiz:[/red] {resp2.text[:200]}")
+    # Promote all to live
+    promoted = 0
+    for q in created:
+        r = client.post(f"/v1/questions/{q['id']}/promote", headers=auth)
+        if r.is_success:
+            promoted += 1
+    console.print(f"  Promoted {promoted}/{len(created)} questions to live")
+
+
+def seed_quiz(client: httpx.Client, auth: dict, result: SeedResult) -> None:
+    console.rule("[bold]Quiz")
+    resp = client.post("/v1/quizzes", json=QUIZ, headers=auth)
+    if not resp.is_success:
+        console.print(f"[red]Failed to create quiz:[/red] {resp.text[:200]}")
         return
-    quiz_id = resp2.json()["quiz"]["id"]
 
-    # Link questions
+    quiz_id = resp.json()["quiz"]["id"]
+    result.quiz_id = quiz_id
+    console.print(f"  Created quiz {quiz_id}")
+
+    # Add live bank questions to the quiz
     added = 0
-    for q in created_qs:
-        r = client.post(f"/v1/quizzes/{quiz_id}/questions", json={"questionId": q["id"]}, headers=auth)
+    for q in result.questions:
+        r = client.post(
+            f"/v1/quizzes/{quiz_id}/questions",
+            json={"questionId": q["id"]},
+            headers=auth,
+        )
         if r.is_success:
             added += 1
+    console.print(f"  Linked {added}/{len(result.questions)} questions to quiz")
 
     # Publish
-    client.patch(f"/v1/quizzes/{quiz_id}", json={"status": "active"}, headers=auth)
-
-    result.quizzes.append({"id": quiz_id, "title": quiz_def["title"], "questions": created_qs})
-    console.print(f"  [green]✓[/green] {quiz_def['title']} — {len(created_qs)} questions, {added} linked")
+    resp2 = client.patch(f"/v1/quizzes/{quiz_id}", json={"status": "active"}, headers=auth)
+    if resp2.is_success:
+        console.print("  Published quiz → active")
+    else:
+        console.print(f"  [yellow]Could not publish:[/yellow] {resp2.text[:200]}")
 
 
 def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     console.rule("[bold]Exam")
-    if len(result.quizzes) < 2:
-        console.print("  [yellow]Need at least 2 quizzes — skipping exam[/yellow]")
+    if not result.questions:
+        console.print("  [yellow]No questions available — skipping exam[/yellow]")
         return
 
-    # Build one section per quiz, picking up to 10 MC/TF questions per section
-    sections = []
-    total = 0
-    for quiz in result.quizzes:
-        mc_tf_ids = [
-            q["id"] for q in quiz["questions"]
-            if q["kind"] in ("mc", "tf") and total < 30
-        ][:3]  # up to 3 per quiz section → ~10-12 total across 4 quizzes
-        if not mc_tf_ids:
-            continue
-        sections.append({
-            "title": quiz["title"],
-            "questionIds": mc_tf_ids,
-            "weight": 1.0,
-        })
-        total += len(mc_tf_ids)
+    mc_ids = [q["id"] for q in result.questions if q["kind"] == "mc"]
+    essay_ids = [q["id"] for q in result.questions if q["kind"] == "essay"]
 
-    if not sections:
-        console.print("  [yellow]No MC/TF questions found — skipping exam[/yellow]")
+    if not mc_ids:
+        console.print("  [yellow]No multiple-choice questions — skipping exam[/yellow]")
         return
 
-    resp = client.post("/v1/exams", json={**EXAM, "sections": sections}, headers=auth)
+    sections = [{"title": "Multiple Choice", "questionIds": mc_ids, "weight": 0.6}]
+    if essay_ids:
+        sections.append({"title": "Essay Questions", "questionIds": essay_ids, "weight": 0.4})
+
+    resp = client.post("/v1/exams", json={**EXAM_BLUEPRINT, "sections": sections}, headers=auth)
     if resp.is_success:
-        body = resp.json()
-        exam_id = body.get("examId") or body.get("exam_id") or body.get("id")
+        exam_id = resp.json().get("id") or resp.json().get("exam_id")
         result.exam_id = exam_id
-        console.print(f"  [green]✓[/green] {EXAM['name']} — {len(sections)} sections, {total} questions")
-        if exam_id:
-            pub = client.patch(f"/v1/exams/{exam_id}", json={"status": "published"}, headers=auth)
-            if pub.is_success:
-                console.print("  [green]✓[/green] Published exam")
-            else:
-                console.print(f"  [yellow]Could not publish exam:[/yellow] {pub.status_code} {pub.text[:200]}")
+        console.print(f"  Created exam {exam_id} with {len(sections)} sections")
     else:
-        console.print(f"  [yellow]Could not create exam:[/yellow] {resp.status_code} {resp.text[:200]}")
+        console.print(f"  [yellow]Could not create exam (non-fatal):[/yellow] {resp.status_code} {resp.text[:200]}")
 
 
-def _answer_for(question: dict, attempt_index: int) -> dict:
-    """Build a plausible AttemptResponse for a question based on attempt_index parity."""
-    kind = question.get("kind", "mc")
-    if kind == "mc":
-        # alternate between position 0 and 1 to get some correct, some wrong
-        return {"selected_position": attempt_index % 4}
-    if kind == "tf":
-        return {"answer": attempt_index % 2 == 0}
-    if kind == "essay":
-        body = (
-            "This is a thorough answer explaining the concept in detail. "
-            "The implementation relies on several key principles that work together "
-            "to produce correct and efficient results. "
-            "Further analysis would consider edge cases and performance trade-offs."
-        )
-        return {"body": body, "word_count": len(body.split())}
-    # short / code
-    return {"answer": "example answer for seed purposes"}
-
-
-def seed_sessions(client: httpx.Client, result: SeedResult) -> None:
-    """Create 2 finished sessions per quiz for the learner user."""
-    console.rule("[bold]Sessions (learner history)")
-
-    learner = next((u for u in result.users if u["role"] == "learner"), None)
-    if not learner or not result.quizzes:
-        console.print("  [yellow]Skipping — no learner or no quizzes[/yellow]")
+def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
+    console.rule("[bold]Cohort")
+    resp = client.post(
+        "/v1/cohorts",
+        json={"name": "CS '27", "description": "Computer Science 2027 cohort"},
+        headers=auth,
+    )
+    if not resp.is_success:
+        console.print(f"  [yellow]Could not create cohort (non-fatal):[/yellow] {resp.status_code} {resp.text[:200]}")
         return
 
-    learner_auth = {"Authorization": f"Bearer {learner['token']}"}
+    cohort_id = resp.json().get("id")
+    result.cohort_id = cohort_id
+    console.print(f"  Created cohort {cohort_id}")
 
-    for quiz in result.quizzes:
-        quiz_id = quiz["id"]
-        questions = quiz["questions"]
-        for attempt_idx in range(2):
-            # Start session
-            resp = client.post("/v1/sessions", json={"quizId": quiz_id}, headers=learner_auth)
-            if not resp.is_success:
-                console.print(f"  [yellow]Could not start session for {quiz['title']}:[/yellow] {resp.text[:100]}")
-                continue
-            session_id = resp.json().get("sessionId")
-            if not session_id:
-                continue
-
-            # Fetch session questions (hydrated order)
-            sr = client.get(f"/v1/sessions/{session_id}", headers=learner_auth)
-            if not sr.is_success:
-                continue
-            session_questions = sr.json().get("questions", [])
-
-            # Submit one answer per question
-            for q in session_questions:
-                qid = q.get("questionId") or q.get("id")
-                kind = q.get("kind", "mc")
-                options = q.get("options") or []
-                option_order = q.get("optionOrder") or list(range(len(options)))
-
-                raw = _answer_for({"kind": kind}, attempt_idx)
-                # For MC: clamp position to valid range
-                if kind == "mc" and option_order:
-                    raw["selected_position"] = attempt_idx % len(option_order)
-
-                client.post(
-                    f"/v1/sessions/{session_id}/answer",
-                    json={"questionId": qid, "response": raw},
-                    headers=learner_auth,
-                )
-
-            # Finish session
-            fr = client.post(f"/v1/sessions/{session_id}/finish", headers=learner_auth)
-            status = "[green]✓[/green]" if fr.is_success else "[yellow]warn[/yellow]"
-            score_info = ""
-            if fr.is_success:
-                result.session_count += 1
-                res = fr.json().get("result", {})
-                pts = res.get("pointsAwarded", res.get("points_awarded", "?"))
-                max_pts = res.get("maxPoints", res.get("max_points", "?"))
-                score_info = f" {pts}/{max_pts} pts"
-            console.print(f"  {status} {quiz['title'][:40]} attempt {attempt_idx + 1}{score_info}")
+    learners = [u for u in result.users if u["role"] == "learner"]
+    enrolled = 0
+    for u in learners:
+        r = client.post(
+            f"/v1/cohorts/{cohort_id}/members",
+            json={"userId": u["id"]},
+            headers=auth,
+        )
+        if r.is_success:
+            enrolled += 1
+    console.print(f"  Enrolled {enrolled}/{len(learners)} learners")
 
 
 def print_summary(result: SeedResult) -> None:
@@ -633,10 +354,11 @@ def print_summary(result: SeedResult) -> None:
     table.add_column("Resource")
     table.add_column("Count / ID")
     table.add_row("Users", str(len(result.users)))
-    table.add_row("Tags", str(len(TAGS)))
-    table.add_row("Quizzes", str(len(result.quizzes)))
+    table.add_row("Tags", str(len(result.tags)))
+    table.add_row("Questions (live)", str(len(result.questions)))
+    table.add_row("Quiz", result.quiz_id or "—")
     table.add_row("Exam", result.exam_id or "—")
-    table.add_row("Sessions (learner)", str(result.session_count))
+    table.add_row("Cohort", result.cohort_id or "—")
     console.print(table)
 
     console.rule("[bold]Credentials")
@@ -650,19 +372,23 @@ def print_summary(result: SeedResult) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed demo data into a running ame API.")
-    parser.add_argument("--api", default=DEFAULT_API)
+    parser.add_argument("--api", default=DEFAULT_API, help="Base URL of the API (default: %(default)s)")
     args = parser.parse_args()
 
     console.print(f"\n[bold]ame seed[/bold] → {args.api}\n")
+
     result = SeedResult()
 
     with httpx.Client(base_url=args.api, timeout=15.0) as client:
-        if not client.get("/healthz").is_success:
+        # Health check
+        health = client.get("/healthz")
+        if not health.is_success:
             console.print(f"[red]API not reachable at {args.api}[/red]")
             sys.exit(1)
 
         seed_users(client, result)
 
+        # Use instructor token for all write operations
         instructor = next((u for u in result.users if u["role"] == "instructor"), None)
         if not instructor:
             console.print("[red]No instructor user — cannot seed content[/red]")
@@ -670,14 +396,11 @@ def main() -> None:
 
         auth = {"Authorization": f"Bearer {instructor['token']}"}
 
-        seed_tags(client, auth)
-
-        console.rule("[bold]Quizzes")
-        for quiz_def in QUIZZES:
-            seed_quiz(client, auth, quiz_def, result)
-
+        seed_tags(client, auth, result)
+        seed_questions(client, auth, result)
+        seed_quiz(client, auth, result)
         seed_exam(client, auth, result)
-        seed_sessions(client, result)
+        seed_cohort(client, auth, result)
 
     print_summary(result)
 

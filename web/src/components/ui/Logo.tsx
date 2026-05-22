@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 
 interface LogoProps {
   size?: number;
@@ -8,7 +9,15 @@ interface LogoProps {
 
 export function Logo({ size = 24 }: LogoProps) {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+    <Link
+      href="/"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 9,
+        textDecoration: "none",
+      }}
+    >
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
         <rect x="2" y="2" width="28" height="28" rx="6" fill="var(--accent)" />
         <path
@@ -29,6 +38,6 @@ export function Logo({ size = 24 }: LogoProps) {
       >
         Harus
       </span>
-    </div>
+    </Link>
   );
 }

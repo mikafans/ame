@@ -32,7 +32,7 @@ lint: ## Clippy + tsc + api drift check + sqlfluff lint
 test: ## Backend + frontend unit / integration tests
 	cd api && mise exec -- cargo test
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun test --if-present || true; \
+		cd web && mise exec -- bun test src/ || true; \
 	else \
 		echo "[web] skipping bun test (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
@@ -70,7 +70,7 @@ openapi: ## Regenerate api/openapi.yaml and web TypeScript schema
 
 e2e: ## Playwright (requires `make db-up`)
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run e2e --if-present || true; \
+		cd web && mise exec -- bun run e2e || true; \
 	else \
 		echo "[web] skipping e2e (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi

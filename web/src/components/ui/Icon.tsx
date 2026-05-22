@@ -97,6 +97,12 @@ const icons: Record<
       <path d="M5 3l-3 5 3 5M11 3l3 5-3 5" />
     </svg>
   ),
+  grade: (p) => (
+    <svg {...p} viewBox="0 0 16 16">
+      <path d="M3 8l3 3 7-7" />
+      <circle cx="8" cy="8" r="6.5" />
+    </svg>
+  ),
 };
 
 export function Icon({ name, size = 16, color = "currentColor" }: IconProps) {

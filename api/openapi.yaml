@@ -655,6 +655,7 @@ components:
       - presentation
       - is_correct
       - score
+      - grade_status
       - rating_before_user_avg
       - rating_before_question
       - user_tag_deltas
@@ -664,6 +665,12 @@ components:
         created_at:
           type: string
           format: date-time
+        grade_status:
+          type: string
+        grader_notes:
+          type:
+          - string
+          - 'null'
         id:
           type: string
           format: uuid

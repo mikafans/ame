@@ -314,6 +314,8 @@ export interface components {
         Attempt: {
             /** Format: date-time */
             created_at: string;
+            grade_status: string;
+            grader_notes?: string | null;
             /** Format: uuid */
             id: string;
             is_correct: boolean;

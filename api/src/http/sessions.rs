@@ -26,7 +26,7 @@ use crate::{
         error::{ApiError, FieldError},
         question::{McPayload, QuestionKind},
         session::{QuestionPlan, Session, SessionKind, SessionStatus},
-        user::Scope,
+        user::{Role, Scope},
     },
     engine::{
         elo::{EloUpdate, QuestionRating, UserTagRating},
@@ -787,8 +787,9 @@ async fn existing_attempts_by_question(
 async fn list_session_attempts(pool: &PgPool, session_id: Uuid) -> Result<Vec<Attempt>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, user_id, question_id, question_version, session_id, response, presentation, \
-                is_correct, score, time_to_answer_ms, rating_before_user_avg, \
-                rating_before_question, user_tag_deltas, question_delta, created_at \
+                is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
+                rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
+                created_at \
          FROM attempts WHERE session_id = $1 ORDER BY created_at ASC",
     )
     .bind(session_id)
@@ -813,6 +814,8 @@ fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
         presentation: serde_json::from_value(presentation).map_err(anyhow::Error::from)?,
         is_correct: row.get("is_correct"),
         score: row.get("score"),
+        grade_status: row.get("grade_status"),
+        grader_notes: row.get("grader_notes"),
         time_to_answer_ms: row.get("time_to_answer_ms"),
         rating_before_user_avg: row.get("rating_before_user_avg"),
         rating_before_question: row.get("rating_before_question"),
@@ -827,9 +830,9 @@ async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), Ap
     sqlx::query(
         "INSERT INTO attempts \
          (id, user_id, question_id, question_version, session_id, response, presentation, \
-          is_correct, score, time_to_answer_ms, rating_before_user_avg, rating_before_question, \
-          user_tag_deltas, question_delta, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+          is_correct, score, grade_status, time_to_answer_ms, rating_before_user_avg, \
+          rating_before_question, user_tag_deltas, question_delta, created_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
     )
     .bind(attempt.id)
     .bind(attempt.user_id)
@@ -840,6 +843,7 @@ async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), Ap
     .bind(serde_json::to_value(&attempt.presentation).map_err(anyhow::Error::from)?)
     .bind(attempt.is_correct)
     .bind(attempt.score)
+    .bind(&attempt.grade_status)
     .bind(attempt.time_to_answer_ms)
     .bind(attempt.rating_before_user_avg)
     .bind(attempt.rating_before_question)
@@ -951,6 +955,152 @@ pub async fn autosave_answers(
     StatusCode::NO_CONTENT
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PendingAttemptRow {
+    pub attempt_id: Uuid,
+    pub session_id: Uuid,
+    pub user_id: Uuid,
+    pub user_email: String,
+    pub user_display_name: String,
+    pub question_id: Uuid,
+    pub question_prompt: String,
+    pub response_body: String,
+    pub response_word_count: i32,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/attempts/pending",
+    responses(
+        (status = 200, description = "Pending manual attempts", body = Vec<PendingAttemptRow>),
+        (status = 403, description = "Not instructor or admin"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_pending_attempts(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<Vec<PendingAttemptRow>>, ApiError> {
+    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
+        return Err(ApiError::ScopeRequired("instructor"));
+    }
+
+    let rows = sqlx::query(
+        "SELECT a.id AS attempt_id, a.session_id, a.user_id, \
+                u.email AS user_email, u.display_name AS user_display_name, \
+                a.question_id, q.prompt AS question_prompt, \
+                (a.response->>'body') AS response_body, \
+                (a.response->>'word_count')::int AS response_word_count, \
+                a.created_at \
+         FROM attempts a \
+         JOIN users u ON u.id = a.user_id \
+         JOIN questions q ON q.id = a.question_id \
+         WHERE a.grade_status = 'pending_manual' \
+         ORDER BY a.created_at ASC",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    let result = rows
+        .into_iter()
+        .map(|row| PendingAttemptRow {
+            attempt_id: row.get("attempt_id"),
+            session_id: row.get("session_id"),
+            user_id: row.get("user_id"),
+            user_email: row.get("user_email"),
+            user_display_name: row.get("user_display_name"),
+            question_id: row.get("question_id"),
+            question_prompt: row.get("question_prompt"),
+            response_body: row
+                .get::<Option<String>, _>("response_body")
+                .unwrap_or_default(),
+            response_word_count: row
+                .get::<Option<i32>, _>("response_word_count")
+                .unwrap_or(0),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct GradeAttemptBody {
+    pub score: f64,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v1/attempts/{id}/grade",
+    params(("id" = Uuid, Path, description = "Attempt id")),
+    request_body = GradeAttemptBody,
+    responses(
+        (status = 200, description = "Graded attempt", body = Attempt),
+        (status = 403, description = "Not instructor or admin"),
+        (status = 404, description = "No such attempt"),
+        (status = 409, description = "Attempt is not pending manual grading"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn grade_attempt(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<GradeAttemptBody>,
+) -> Result<Json<Attempt>, ApiError> {
+    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
+        return Err(ApiError::ScopeRequired("instructor"));
+    }
+
+    if body.score < 0.0 || body.score > 1.0 {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "score".into(),
+            message: "must be between 0.0 and 1.0".into(),
+        }]));
+    }
+
+    let row = sqlx::query("SELECT grade_status FROM attempts WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(internal)?
+        .ok_or(ApiError::NotFound {
+            resource: "attempt",
+        })?;
+
+    let grade_status: String = row.get("grade_status");
+    if grade_status != "pending_manual" {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "grade_status".into(),
+            message: "attempt is not pending manual grading".into(),
+        }]));
+    }
+
+    let updated = sqlx::query(
+        "UPDATE attempts \
+         SET score = $2, is_correct = ($2 > 0), grade_status = 'graded', grader_notes = $3 \
+         WHERE id = $1 \
+         RETURNING id, user_id, question_id, question_version, session_id, response, presentation, \
+                   is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
+                   rating_before_user_avg, rating_before_question, user_tag_deltas, \
+                   question_delta, created_at",
+    )
+    .bind(id)
+    .bind(body.score)
+    .bind(&body.notes)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    Ok(Json(row_to_attempt(updated)?))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/sessions", post(create_session))
@@ -958,5 +1108,7 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/sessions/{id}/answer", post(answer))
         .route("/v1/sessions/{id}/answers", patch(autosave_answers))
         .route("/v1/sessions/{id}/finish", post(finish))
+        .route("/v1/attempts/pending", get(list_pending_attempts))
+        .route("/v1/attempts/{id}/grade", patch(grade_attempt))
         .with_state(state)
 }

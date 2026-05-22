@@ -172,6 +172,12 @@ pub fn answer_session(
         presentation,
         is_correct: grade.correct,
         score: score_fraction,
+        grade_status: if grade.status == GradeStatus::PendingManual {
+            "pending_manual".to_string()
+        } else {
+            "graded".to_string()
+        },
+        grader_notes: None,
         time_to_answer_ms: input.time_to_answer_ms,
         rating_before_user_avg,
         rating_before_question,
@@ -342,7 +348,7 @@ fn summarize_attempts(
         max_points += max;
         let awarded = (attempt.score * max as f64).round() as i32;
         points_awarded += awarded;
-        if attempt.score == 0.0 && !attempt.is_correct {
+        if attempt.grade_status == "pending_manual" {
             pending_manual_count += 1;
         } else {
             graded_count += 1;
