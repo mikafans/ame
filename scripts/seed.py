@@ -388,19 +388,20 @@ def main() -> None:
 
         seed_users(client, result)
 
-        # Use instructor token for all write operations
         instructor = next((u for u in result.users if u["role"] == "instructor"), None)
         if not instructor:
             console.print("[red]No instructor user — cannot seed content[/red]")
             sys.exit(1)
-
         auth = {"Authorization": f"Bearer {instructor['token']}"}
+
+        admin = next((u for u in result.users if u["role"] == "admin"), None)
+        admin_auth = {"Authorization": f"Bearer {admin['token']}"} if admin else auth
 
         seed_tags(client, auth, result)
         seed_questions(client, auth, result)
         seed_quiz(client, auth, result)
         seed_exam(client, auth, result)
-        seed_cohort(client, auth, result)
+        seed_cohort(client, admin_auth, result)
 
     print_summary(result)
 
