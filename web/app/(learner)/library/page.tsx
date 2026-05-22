@@ -418,7 +418,7 @@ export default function LibraryPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => router.push(`/sessions?preview=${upNext.id}`)}
+                  onClick={() => router.push(`/quizzes/${upNext.id}/preview`)}
                 >
                   Preview questions
                 </Button>
