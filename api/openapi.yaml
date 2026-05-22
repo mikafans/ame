@@ -1101,6 +1101,10 @@ components:
       - points
       properties:
         codeSnippet: {}
+        explanation:
+          type:
+          - string
+          - 'null'
         kind:
           $ref: '#/components/schemas/QuestionKind'
         optionOrder:
@@ -1672,10 +1676,15 @@ components:
       - title
       - status
       - objectives
+      - questionCount
       - createdBy
       - createdAt
       - updatedAt
       properties:
+        course:
+          type:
+          - string
+          - 'null'
         createdAt:
           type: string
           format: date-time
@@ -1689,6 +1698,9 @@ components:
           type: array
           items:
             type: string
+        questionCount:
+          type: integer
+          format: int64
         status:
           type: string
         title:
@@ -1769,6 +1781,10 @@ components:
       properties:
         affects_rating:
           type: boolean
+        course_title:
+          type:
+          - string
+          - 'null'
         deadline_at:
           type:
           - string
@@ -1798,6 +1814,10 @@ components:
           - string
           - 'null'
           format: uuid
+        quiz_title:
+          type:
+          - string
+          - 'null'
         rating_snapshot:
           type: object
         result:

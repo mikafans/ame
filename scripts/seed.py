@@ -366,6 +366,7 @@ QUESTIONS_CS = [
 QUIZZES = [
     {
         "title": "Algorithms & Data Structures — Fundamentals",
+        "course": "Computer Science",
         "objectives": [
             "Understand time complexity of common algorithms",
             "Distinguish between core data structures",
@@ -375,6 +376,7 @@ QUIZZES = [
     },
     {
         "title": "Rust Essentials",
+        "course": "Systems Programming",
         "objectives": [
             "Understand Rust's ownership and borrowing model",
             "Use Result and Option for error handling",
@@ -384,6 +386,7 @@ QUIZZES = [
     },
     {
         "title": "Zig Fundamentals",
+        "course": "Systems Programming",
         "objectives": [
             "Understand Zig's comptime and allocator model",
             "Use Zig error unions and defer",
@@ -393,6 +396,7 @@ QUIZZES = [
     },
     {
         "title": "General CS — Systems & Networking",
+        "course": "Computer Science",
         "objectives": [
             "Understand OS concepts: processes, threads, virtual memory",
             "Reason about networking protocols",
@@ -419,6 +423,7 @@ class SeedResult:
     tags: list[dict] = field(default_factory=list)
     quizzes: list[dict] = field(default_factory=list)
     exam_id: str | None = None
+    session_count: int = 0
 
 
 def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None) -> dict:
@@ -477,6 +482,7 @@ def seed_quiz(client: httpx.Client, auth: dict, quiz_def: dict, result: SeedResu
     resp2 = client.post("/v1/quizzes", json={
         "title": quiz_def["title"],
         "objectives": quiz_def["objectives"],
+        "course": quiz_def.get("course"),
     }, headers=auth)
     if not resp2.is_success:
         console.print(f"  [red]Failed to create quiz:[/red] {resp2.text[:200]}")
@@ -527,11 +533,98 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     resp = client.post("/v1/exams", json={**EXAM, "sections": sections}, headers=auth)
     if resp.is_success:
         body = resp.json()
-        exam_id = body.get("id") or (body.get("exam") or {}).get("id")
+        exam_id = body.get("examId") or body.get("exam_id") or body.get("id")
         result.exam_id = exam_id
         console.print(f"  [green]✓[/green] {EXAM['name']} — {len(sections)} sections, {total} questions")
+        if exam_id:
+            pub = client.patch(f"/v1/exams/{exam_id}", json={"status": "published"}, headers=auth)
+            if pub.is_success:
+                console.print("  [green]✓[/green] Published exam")
+            else:
+                console.print(f"  [yellow]Could not publish exam:[/yellow] {pub.status_code} {pub.text[:200]}")
     else:
         console.print(f"  [yellow]Could not create exam:[/yellow] {resp.status_code} {resp.text[:200]}")
+
+
+def _answer_for(question: dict, attempt_index: int) -> dict:
+    """Build a plausible AttemptResponse for a question based on attempt_index parity."""
+    kind = question.get("kind", "mc")
+    if kind == "mc":
+        # alternate between position 0 and 1 to get some correct, some wrong
+        return {"selected_position": attempt_index % 4}
+    if kind == "tf":
+        return {"answer": attempt_index % 2 == 0}
+    if kind == "essay":
+        body = (
+            "This is a thorough answer explaining the concept in detail. "
+            "The implementation relies on several key principles that work together "
+            "to produce correct and efficient results. "
+            "Further analysis would consider edge cases and performance trade-offs."
+        )
+        return {"body": body, "word_count": len(body.split())}
+    # short / code
+    return {"answer": "example answer for seed purposes"}
+
+
+def seed_sessions(client: httpx.Client, result: SeedResult) -> None:
+    """Create 2 finished sessions per quiz for the learner user."""
+    console.rule("[bold]Sessions (learner history)")
+
+    learner = next((u for u in result.users if u["role"] == "learner"), None)
+    if not learner or not result.quizzes:
+        console.print("  [yellow]Skipping — no learner or no quizzes[/yellow]")
+        return
+
+    learner_auth = {"Authorization": f"Bearer {learner['token']}"}
+
+    for quiz in result.quizzes:
+        quiz_id = quiz["id"]
+        questions = quiz["questions"]
+        for attempt_idx in range(2):
+            # Start session
+            resp = client.post("/v1/sessions", json={"quizId": quiz_id}, headers=learner_auth)
+            if not resp.is_success:
+                console.print(f"  [yellow]Could not start session for {quiz['title']}:[/yellow] {resp.text[:100]}")
+                continue
+            session_id = resp.json().get("sessionId")
+            if not session_id:
+                continue
+
+            # Fetch session questions (hydrated order)
+            sr = client.get(f"/v1/sessions/{session_id}", headers=learner_auth)
+            if not sr.is_success:
+                continue
+            session_questions = sr.json().get("questions", [])
+
+            # Submit one answer per question
+            for q in session_questions:
+                qid = q.get("questionId") or q.get("id")
+                kind = q.get("kind", "mc")
+                options = q.get("options") or []
+                option_order = q.get("optionOrder") or list(range(len(options)))
+
+                raw = _answer_for({"kind": kind}, attempt_idx)
+                # For MC: clamp position to valid range
+                if kind == "mc" and option_order:
+                    raw["selected_position"] = attempt_idx % len(option_order)
+
+                client.post(
+                    f"/v1/sessions/{session_id}/answer",
+                    json={"questionId": qid, "response": raw},
+                    headers=learner_auth,
+                )
+
+            # Finish session
+            fr = client.post(f"/v1/sessions/{session_id}/finish", headers=learner_auth)
+            status = "[green]✓[/green]" if fr.is_success else "[yellow]warn[/yellow]"
+            score_info = ""
+            if fr.is_success:
+                result.session_count += 1
+                res = fr.json().get("result", {})
+                pts = res.get("pointsAwarded", res.get("points_awarded", "?"))
+                max_pts = res.get("maxPoints", res.get("max_points", "?"))
+                score_info = f" {pts}/{max_pts} pts"
+            console.print(f"  {status} {quiz['title'][:40]} attempt {attempt_idx + 1}{score_info}")
 
 
 def print_summary(result: SeedResult) -> None:
@@ -543,6 +636,7 @@ def print_summary(result: SeedResult) -> None:
     table.add_row("Tags", str(len(TAGS)))
     table.add_row("Quizzes", str(len(result.quizzes)))
     table.add_row("Exam", result.exam_id or "—")
+    table.add_row("Sessions (learner)", str(result.session_count))
     console.print(table)
 
     console.rule("[bold]Credentials")
@@ -583,6 +677,7 @@ def main() -> None:
             seed_quiz(client, auth, quiz_def, result)
 
         seed_exam(client, auth, result)
+        seed_sessions(client, result)
 
     print_summary(result)
 

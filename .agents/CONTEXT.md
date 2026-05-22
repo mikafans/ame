@@ -1,7 +1,7 @@
 # CONTEXT.md — Project context for AI sessions
 
 ## Current stage
-Harus redesign — docs-first branch (`feat/harus-redesign-docs`). Master spec written; design ↔ spec gap analysis captured. Code refactor will follow on a separate branch once docs are committed.
+`feat/quiz-sessions-squash` — all 12 visual/functional gaps fixed and verified. Seed creates rich demo data (4 quizzes with course labels, 8 finished learner sessions). Ready for PR or next feature work.
 
 ## Reference docs (read these before making decisions)
 - **`docs/specs/2026-05-20-harus-platform-design.md`** — canonical spec (473 lines). Replaces the May-19 spec.

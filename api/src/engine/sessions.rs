@@ -97,6 +97,8 @@ pub fn start_session(input: StartSessionInput) -> Result<Session, ApiError> {
         deadline_at,
         started_at: input.now,
         finished_at: None,
+        quiz_title: None,
+        course_title: None,
     })
 }
 

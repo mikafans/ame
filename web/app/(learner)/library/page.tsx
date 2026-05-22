@@ -22,7 +22,14 @@ interface Quiz {
   color?: string;
   objectives?: string[];
   due_date?: string;
+  questionCount?: number;
   createdAt: string;
+}
+
+interface QuizStats {
+  avg: number;
+  median: number;
+  distribution: { bucket: number; count: number }[];
 }
 
 type TabId = "all" | "assigned" | "completed" | "drafts";
@@ -43,6 +50,7 @@ export default function LibraryPage() {
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
+  const [featuredStats, setFeaturedStats] = useState<QuizStats | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -77,6 +85,25 @@ export default function LibraryPage() {
       })
       .finally(() => setLoading(false));
   }, [token, user?.role]);
+
+  const upNextId =
+    tab === "all" || tab === "assigned"
+      ? (allQuizzes[tab].quizzes[0]?.id ?? null)
+      : null;
+
+  useEffect(() => {
+    if (!token || !upNextId) return;
+    setFeaturedStats(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (makeClient(token) as any)
+      .GET(`/v1/quizzes/${upNextId}/stats`)
+      .then(({ data }: { data?: QuizStats }) => {
+        if (data) setFeaturedStats(data);
+      })
+      .catch(() => {
+        /* stats are best-effort */
+      });
+  }, [token, upNextId]);
 
   async function startQuiz(quizId: string) {
     if (!token) return;
@@ -116,12 +143,9 @@ export default function LibraryPage() {
 
   const currentData = allQuizzes[tab];
   const { quizzes } = currentData;
-  const upNext =
-    tab === "assigned" && quizzes.length > 0
-      ? quizzes[0]
-      : tab === "all" && quizzes.length > 0
-        ? quizzes[0]
-        : null;
+  const upNext = upNextId
+    ? (quizzes.find((q) => q.id === upNextId) ?? null)
+    : null;
   const remaining = upNext ? quizzes.slice(1) : quizzes;
 
   const daysUntilDue = (dueDate: string | undefined) => {
@@ -364,6 +388,25 @@ export default function LibraryPage() {
                   <LearningObjectives items={upNext.objectives} />
                 </div>
               )}
+              {/* Stat strip */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 20,
+                  marginBottom: 18,
+                  fontSize: 12,
+                  fontFamily: "var(--mono)",
+                  color: "var(--muted)",
+                  letterSpacing: 0.3,
+                }}
+              >
+                {upNext.questionCount != null && (
+                  <span>{upNext.questionCount} questions</span>
+                )}
+                {upNext.questionCount != null && (
+                  <span>~{upNext.questionCount * 2} min</span>
+                )}
+              </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <Button
                   variant="primary"
@@ -372,6 +415,12 @@ export default function LibraryPage() {
                   disabled={starting === upNext.id}
                 >
                   {starting === upNext.id ? "Starting…" : "Start"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/sessions?preview=${upNext.id}`)}
+                >
+                  Preview questions
                 </Button>
                 <Button variant="ghost" onClick={() => setShareOpen(upNext.id)}>
                   Share
@@ -393,8 +442,22 @@ export default function LibraryPage() {
               >
                 Cohort context
               </div>
-              <KV label="Class average" value="—" />
-              <KV label="Class completion" value="—" />
+              <KV
+                label="Class average"
+                value={
+                  featuredStats
+                    ? `${Math.round(featuredStats.avg * 100)}%`
+                    : "—"
+                }
+              />
+              <KV
+                label="Class median"
+                value={
+                  featuredStats
+                    ? `${Math.round(featuredStats.median * 100)}%`
+                    : "—"
+                }
+              />
               <KV label="Topic mastery" value="—" />
               <KV label="Your last related score" value="—" />
             </div>

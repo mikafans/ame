@@ -7,7 +7,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
@@ -530,6 +530,44 @@ fn validate_compose_body(body: &ComposeExamBody) -> Result<(), ApiError> {
     }
 }
 
+async fn patch_exam_status(
+    State(state): State<AppState>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, ApiError> {
+    let status = body.get("status").and_then(|v| v.as_str()).ok_or_else(|| {
+        ApiError::Validation(vec![crate::domain::error::FieldError {
+            field: "status".into(),
+            message: "required".into(),
+        }])
+    })?;
+
+    match status {
+        "published" | "draft" | "archived" => {}
+        other => {
+            return Err(ApiError::Validation(vec![
+                crate::domain::error::FieldError {
+                    field: "status".into(),
+                    message: format!("unknown status: {other}"),
+                },
+            ]));
+        }
+    }
+
+    sqlx::query("UPDATE exams SET status = $2, updated_at = now() WHERE id = $1")
+        .bind(id)
+        .bind(status)
+        .execute(&state.pool)
+        .await
+        .map_err(internal)?;
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({ "id": id, "status": status })),
+    ))
+}
+
 fn internal<E: Into<anyhow::Error>>(e: E) -> ApiError {
     ApiError::Internal(e.into())
 }
@@ -545,5 +583,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .merge(write_router)
         .route("/v1/exams", get(list_exams))
         .route("/v1/exams/{id}", get(get_exam))
+        .route("/v1/exams/{id}", patch(patch_exam_status))
         .with_state(state)
 }

@@ -1,0 +1,3 @@
+[test]
+# only match unit/integration tests; keeps e2e/*.spec.ts out of bun test
+testMatch = ["src/**/*.test.ts", "src/**/*.test.tsx", "app/**/*.test.ts", "app/**/*.test.tsx"]

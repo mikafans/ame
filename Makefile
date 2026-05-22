@@ -60,8 +60,13 @@ test-stats: ## Stats, messages, keys integration tests (requires `make db-up`)
 test-api: ## Black-box HTTP tests against a running API (requires `make db-up` + API running)
 	uv run pytest api_tests -v
 
-openapi: ## Regenerate api/openapi.yaml snapshot
+openapi: ## Regenerate api/openapi.yaml and web TypeScript schema
 	cd api && mise exec -- cargo run --quiet --bin gen-openapi
+	@if [ -x web/node_modules/.bin/openapi-typescript ]; then \
+		cd web && mise exec -- bun run api:gen; \
+	else \
+		echo "[web] skipping schema regen (web deps missing - run 'cd web && bun install' to enable)"; \
+	fi
 
 e2e: ## Playwright (requires `make db-up`)
 	@if [ -x web/node_modules/.bin/next ]; then \

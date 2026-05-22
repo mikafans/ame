@@ -32,6 +32,53 @@ See `docs/plans/` for implementation plans, including `docs/plans/2026-05-20-des
 ## Module boundaries (api/src/)
 `engine/` and `assess/` may depend on `bank/` and `domain/`. Reverse is forbidden. `bank/` does not know that attempts exist.
 
+## E2E / Visual audit tooling
+
+### Running the test suite
+```bash
+# Full Playwright suite (non-interactive)
+E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:3000 \
+  bunx @playwright/test test --project=chromium
+```
+
+### Interactive browser audit (@playwright/cli)
+```bash
+# Package is @playwright/cli — NOT playwright-cli (that 404s on npm)
+# Run from .tmp/ so snapshots land there, not in web/
+cd .tmp
+bunx @playwright/cli open http://localhost:3000
+
+# Auth pattern — cookies don't survive goto; must re-set on each new page:
+bunx @playwright/cli cookie-set ame_token "<token>" --domain=localhost
+bunx @playwright/cli reload
+sleep 3   # useAuth is async; screenshot too early catches Loading state
+bunx @playwright/cli screenshot --filename=page.png
+
+# Common commands
+bunx @playwright/cli goto http://localhost:3000/exams
+bunx @playwright/cli snapshot          # accessibility tree with refs
+bunx @playwright/cli click e42
+bunx @playwright/cli eval "document.cookie"
+bunx @playwright/cli console
+bunx @playwright/cli close
+```
+
+### Getting a learner token
+```bash
+curl -s -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"learner@example.com","password":"password123"}' | jq -r .token
+```
+
+### jq tip (fish shell)
+Multi-line variable + pipe breaks jq. Use a temp file:
+```bash
+curl -s <url> -H "..." -o /tmp/out.json && jq '.field' /tmp/out.json
+```
+
+### Temp files
+Use `.tmp/` at repo root (gitignored). Clean with `rm -rf .tmp/*.png .tmp/.playwright-cli` after a session.
+
 ## Agent operations
 `agents/` at the project root contains skill markdowns for agent-driven workflows:
 - `agents/generate-questions/SKILL.md` — fetch weakest tags, generate targeted questions.

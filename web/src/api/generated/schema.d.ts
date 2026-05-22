@@ -481,6 +481,7 @@ export interface components {
         };
         GetSessionQuestion: {
             codeSnippet?: unknown;
+            explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
             optionOrder?: number[] | null;
             options?: unknown[] | null;
@@ -708,6 +709,7 @@ export interface components {
             median: number;
         };
         QuizSummary: {
+            course?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -715,6 +717,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             objectives: string[];
+            /** Format: int64 */
+            questionCount: number;
             status: string;
             title: string;
             /** Format: date-time */
@@ -747,6 +751,7 @@ export interface components {
         };
         Session: {
             affects_rating: boolean;
+            course_title?: string | null;
             /** Format: date-time */
             deadline_at?: string | null;
             /** Format: uuid */
@@ -760,6 +765,7 @@ export interface components {
             question_plan: components["schemas"]["QuestionPlan"];
             /** Format: uuid */
             quiz_id?: string | null;
+            quiz_title?: string | null;
             rating_snapshot: Record<string, never>;
             result?: Record<string, never>;
             /** Format: date-time */

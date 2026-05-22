@@ -41,6 +41,9 @@ pub struct QuizSummary {
     pub title: String,
     pub status: String,
     pub objectives: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub course: Option<String>,
+    pub question_count: i64,
     pub created_by: Uuid,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
@@ -96,11 +99,15 @@ async fn list_quizzes(
     Query(q): Query<ListQuizzesQuery>,
 ) -> Result<Json<ListQuizzesResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, title, status, objectives, created_by, created_at, updated_at,
-                COUNT(*) OVER() AS total
-         FROM quizzes
-         WHERE status = $1
-         ORDER BY created_at DESC
+        "SELECT q.id, q.title, q.status, q.objectives, q.course, q.created_by,
+                q.created_at, q.updated_at,
+                COUNT(*) OVER() AS total,
+                COUNT(qq.question_id) AS question_count
+         FROM quizzes q
+         LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
+         WHERE q.status = $1
+         GROUP BY q.id
+         ORDER BY q.created_at DESC
          LIMIT $2 OFFSET $3",
     )
     .bind(&q.status)
@@ -118,6 +125,8 @@ async fn list_quizzes(
             title: r.get("title"),
             status: r.get("status"),
             objectives: r.get::<Vec<String>, _>("objectives"),
+            course: r.get("course"),
+            question_count: r.get("question_count"),
             created_by: r.get("created_by"),
             created_at: r.get("created_at"),
             updated_at: r.get("updated_at"),
@@ -397,12 +406,13 @@ async fn create_quiz(
     let objectives = body.objectives.unwrap_or_default();
 
     let result = sqlx::query(
-        "INSERT INTO quizzes (title, objectives, status, created_by)
-         VALUES ($1, $2, $3, $4)
+        "INSERT INTO quizzes (title, objectives, course, status, created_by)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id, title, status, objectives, created_by, created_at",
     )
     .bind(&body.title)
     .bind(&objectives)
+    .bind(&body.course)
     .bind("draft")
     .bind(auth.0.user.id)
     .fetch_one(&state.pool)

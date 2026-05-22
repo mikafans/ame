@@ -9,9 +9,11 @@ import { Button, Tag, Card } from "@/components/ui";
 interface Answer {
   qid: string;
   correct: boolean;
+  pendingReview: boolean;
   points: number;
   max: number;
   type: "mc" | "tf" | "short" | "essay" | "code";
+  prompt: string;
   given: string;
   note: string;
 }
@@ -24,8 +26,32 @@ interface ResultData {
   total_attempts: number;
   score: number;
   total: number;
+  duration_min: number | null;
   feedback?: string;
   answers: Answer[];
+}
+
+function resolveAnswer(response: any, kind: string, q: any): string {
+  if (!response) return "—";
+  if (kind === "mc") {
+    const pos: number = response.selected_position ?? response.answer ?? 0;
+    const options: { text: string }[] = q.options ?? [];
+    const order: number[] =
+      q.option_order ?? q.optionOrder ?? options.map((_: any, i: number) => i);
+    const origIdx = order[pos];
+    return options[origIdx]?.text ?? `Option ${pos + 1}`;
+  }
+  if (kind === "tf")
+    return response.answer === true
+      ? "True"
+      : response.answer === false
+        ? "False"
+        : "—";
+  if (kind === "essay") return response.body ?? "—";
+  if (kind === "short") return response.answer ?? "—";
+  if (kind === "code") return response.code ?? response.body ?? "—";
+  if (typeof response === "object") return JSON.stringify(response);
+  return String(response);
 }
 
 export default function ResultsPage({
@@ -44,6 +70,14 @@ export default function ResultsPage({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    try {
+      localStorage.setItem("ame.lastSessionId", id);
+    } catch {
+      /* ignore */
+    }
+  }, [id]);
+
+  useEffect(() => {
     if (!token) return;
     makeClient(token)
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
@@ -54,35 +88,44 @@ export default function ResultsPage({
         const attempts: any[] = d.attempts ?? [];
         const questions: any[] = d.questions ?? [];
 
-        // Build a points lookup from the question plan
-        const pointsById: Record<string, number> = {};
+        // Build a lookup from the hydrated question plan
+        const questionById: Record<string, any> = {};
         for (const q of questions) {
-          pointsById[q.questionId ?? q.id] = q.points ?? 1;
+          questionById[q.questionId ?? q.id] = q;
         }
 
-        const answers: Answer[] = attempts.map((a: any) => ({
-          qid: a.question_id ?? a.questionId ?? "",
-          correct: a.is_correct ?? false,
-          points:
-            a.score != null
-              ? Math.round(
-                  a.score * (pointsById[a.question_id ?? a.questionId] ?? 1),
-                )
-              : 0,
-          max: pointsById[a.question_id ?? a.questionId] ?? 1,
-          type: a.kind ?? "mc",
-          given:
-            typeof a.response === "object"
-              ? JSON.stringify(a.response)
-              : String(a.response ?? ""),
-          note: a.explanation ?? "",
-        }));
+        const answers: Answer[] = attempts.map((a: any) => {
+          const qid = a.question_id ?? a.questionId ?? "";
+          const q = questionById[qid] ?? {};
+          const max = q.points ?? 1;
+          const kind: string = q.kind ?? a.kind ?? "mc";
+          const pendingReview = kind === "essay" || kind === "code";
+          return {
+            qid,
+            correct: a.is_correct ?? false,
+            pendingReview,
+            points: a.score != null ? Math.round(a.score * max) : 0,
+            max,
+            type: kind as Answer["type"],
+            prompt: q.prompt ?? "",
+            given: resolveAnswer(a.response, kind, q),
+            note: q.explanation ?? "",
+          };
+        });
 
         const score = answers.reduce((s, a) => s + a.points, 0);
         const total = answers.reduce((s, a) => s + a.max, 0) || 1;
 
         // Use stored result if available (set by /finish)
         const stored = session.result;
+        const durationMin =
+          session.started_at && session.finished_at
+            ? Math.round(
+                (new Date(session.finished_at).getTime() -
+                  new Date(session.started_at).getTime()) /
+                  60000,
+              )
+            : null;
         setData({
           id: session.id ?? id,
           quiz_title: session.quiz_title ?? "Quiz Results",
@@ -91,6 +134,7 @@ export default function ResultsPage({
           total_attempts: 1,
           score: stored?.points_awarded ?? score,
           total: stored?.max_points ?? total,
+          duration_min: durationMin,
           feedback: stored?.feedback,
           answers,
         });
@@ -261,7 +305,7 @@ export default function ResultsPage({
           >
             Cohort distribution
           </div>
-          <CohortHistogram userBin={Math.floor(pct / 10)} />
+          <CohortHistogram userBin={Math.min(Math.floor(pct / 10), 9)} />
           <div
             style={{
               marginTop: 12,
@@ -299,6 +343,56 @@ export default function ResultsPage({
             </span>
           </div>
         </Card>
+      </div>
+
+      {/* Stats row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        {[
+          {
+            label: "Duration",
+            value:
+              data.duration_min != null
+                ? data.duration_min >= 60
+                  ? `${Math.floor(data.duration_min / 60)}h ${data.duration_min % 60}m`
+                  : `${data.duration_min}m`
+                : "—",
+          },
+          { label: "Cohort avg", value: "—" },
+          { label: "Percentile", value: "—" },
+          { label: "Topics mastered", value: "—" },
+        ].map(({ label, value }) => (
+          <Card key={label} style={{ padding: "16px 20px" }}>
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                letterSpacing: 1.3,
+                textTransform: "uppercase",
+                color: "var(--muted)",
+                marginBottom: 6,
+              }}
+            >
+              {label}
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--serif)",
+                fontSize: 22,
+                fontWeight: 500,
+                letterSpacing: -0.3,
+              }}
+            >
+              {value}
+            </div>
+          </Card>
+        ))}
       </div>
 
       {/* Per-item review */}
@@ -340,133 +434,243 @@ export default function ResultsPage({
               {data.answers.filter((a) => a.correct).length} correct
             </Tag>
             <Tag color="red">
-              {data.answers.filter((a) => !a.correct).length} needs work
+              {
+                data.answers.filter((a) => !a.correct && !a.pendingReview)
+                  .length
+              }{" "}
+              needs work
             </Tag>
+            {data.answers.some((a) => a.pendingReview) && (
+              <Tag color="muted">
+                {data.answers.filter((a) => a.pendingReview).length} pending
+                review
+              </Tag>
+            )}
           </div>
         </div>
         <div>
-          {data.answers.map((answer, i) => (
-            <div
-              key={answer.qid}
-              style={{
-                padding: "18px 22px",
-                borderBottom:
-                  i < data.answers.length - 1
-                    ? "1px solid var(--border)"
-                    : "none",
-                display: "grid",
-                gridTemplateColumns: "1fr auto",
-                gap: 18,
-                alignItems: "start",
-              }}
-            >
-              {/* Left: question info */}
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                    marginBottom: 6,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: 11,
-                      color: "var(--muted)",
-                      letterSpacing: 1.1,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Q{i + 1} · {answer.type.toUpperCase()}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    fontFamily: "var(--serif)",
-                    fontSize: 15,
-                    lineHeight: 1.5,
-                    color: "var(--text)",
-                    marginBottom: 10,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {answer.given.substring(0, 80)}
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-2)",
-                    fontStyle: "italic",
-                  }}
-                >
-                  {answer.note}
-                </div>
+          {data.answers.map((answer, i) => {
+            const borderColor = answer.pendingReview
+              ? "var(--surface-3)"
+              : answer.correct
+                ? "var(--accent)"
+                : "var(--red, #ef4444)";
+            const scoreColor = answer.pendingReview
+              ? "var(--muted)"
+              : answer.correct
+                ? "var(--accent)"
+                : "var(--red, #ef4444)";
+            const iconSymbol = answer.pendingReview
+              ? "○"
+              : answer.correct
+                ? "✓"
+                : "✗";
+            const iconColor = answer.pendingReview
+              ? "var(--muted)"
+              : answer.correct
+                ? "var(--accent)"
+                : "var(--red, #ef4444)";
 
-                {/* Expanded explanation */}
-                {expandedItems.has(answer.qid) && (
+            return (
+              <div
+                key={answer.qid}
+                style={{
+                  padding: "18px 22px",
+                  borderBottom:
+                    i < data.answers.length - 1
+                      ? "1px solid var(--border)"
+                      : "none",
+                  borderLeft: `3px solid ${borderColor}`,
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: 18,
+                  alignItems: "start",
+                }}
+              >
+                {/* Left: question info */}
+                <div style={{ minWidth: 0 }}>
                   <div
                     style={{
-                      marginTop: 12,
-                      paddingTop: 12,
-                      borderTop: "1px solid var(--border)",
-                      fontSize: 13,
-                      color: "var(--text-2)",
-                      lineHeight: 1.6,
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      marginBottom: 6,
                     }}
                   >
-                    Explanation would appear here.
+                    <span
+                      style={{
+                        fontFamily: "var(--mono)",
+                        fontSize: 11,
+                        color: "var(--muted)",
+                        letterSpacing: 1.1,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      <span style={{ color: iconColor, marginRight: 6 }}>
+                        {iconSymbol}
+                      </span>
+                      Q{i + 1} · {answer.type.toUpperCase()}
+                    </span>
                   </div>
-                )}
-              </div>
+                  <div
+                    style={{
+                      fontFamily: "var(--serif)",
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                      color: "var(--text)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {answer.prompt}
+                  </div>
+                  <div
+                    style={{
+                      display:
+                        answer.type === "essay" ? "block" : "inline-block",
+                      fontSize: 13,
+                      color:
+                        answer.type === "essay"
+                          ? "var(--muted)"
+                          : "var(--text-2)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {answer.type === "essay" ? `"${answer.given}"` : null}
+                    {answer.type !== "essay" && (
+                      <span
+                        style={{
+                          fontFamily: "var(--mono)",
+                          fontSize: 12,
+                          background: "var(--surface-2)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          padding: "4px 8px",
+                          marginLeft: 4,
+                          color: "var(--text)",
+                        }}
+                      >
+                        {answer.given}
+                      </span>
+                    )}
+                  </div>
 
-              {/* Right: score + actions */}
-              <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                <div
-                  style={{
-                    fontFamily: "var(--serif)",
-                    fontSize: 22,
-                    fontWeight: 500,
-                    color: answer.correct ? "var(--text)" : "var(--text-2)",
-                    marginBottom: 8,
-                  }}
-                >
-                  {answer.points}
-                  <span style={{ color: "var(--muted)", fontSize: 14 }}>
-                    {" "}
-                    / {answer.max}
-                  </span>
+                  {/* Expanded explanation */}
+                  {expandedItems.has(answer.qid) && (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        paddingTop: 12,
+                        borderTop: "1px solid var(--border)",
+                        fontSize: 13,
+                        color: "var(--text-2)",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {answer.note ||
+                        "No explanation available for this question."}
+                    </div>
+                  )}
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleShareItem(answer.qid)}
+
+                {/* Right: score + actions */}
+                <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  {answer.pendingReview ? (
+                    <div
+                      style={{
+                        fontFamily: "var(--mono)",
+                        fontSize: 11,
+                        letterSpacing: 1.1,
+                        textTransform: "uppercase",
+                        color: "var(--muted)",
+                        marginBottom: 8,
+                        paddingTop: 4,
+                      }}
+                    >
+                      Pending review
+                      <div
+                        style={{
+                          color: "var(--muted)",
+                          fontSize: 13,
+                          fontFamily: "var(--serif)",
+                          fontWeight: 400,
+                          letterSpacing: 0,
+                          textTransform: "none",
+                          marginTop: 2,
+                        }}
+                      >
+                        — / {answer.max}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontFamily: "var(--serif)",
+                        fontSize: 22,
+                        fontWeight: 500,
+                        color: scoreColor,
+                        marginBottom: 8,
+                      }}
+                    >
+                      {answer.points}
+                      <span style={{ color: "var(--muted)", fontSize: 14 }}>
+                        {" "}
+                        / {answer.max}
+                      </span>
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      justifyContent: "flex-end",
+                    }}
                   >
-                    Share
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => toggleExpanded(answer.qid)}
-                  >
-                    {expandedItems.has(answer.qid) ? "Hide" : "See"} solution
-                  </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleShareItem(answer.qid)}
+                    >
+                      Share
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleExpanded(answer.qid)}
+                    >
+                      {expandedItems.has(answer.qid) ? "Hide" : "See"} solution
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 12,
+          marginTop: 32,
+          paddingTop: 24,
+          borderTop: "1px solid var(--border)",
+        }}
+      >
+        <Button
+          variant="outline"
+          onClick={() => (window.location.href = "/library")}
+        >
+          Back to library
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => (window.location.href = "/progress")}
+        >
+          View 6-week plan
+        </Button>
+      </div>
 
       {/* Share modal */}
       {shareModal?.open && token && (

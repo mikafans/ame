@@ -130,6 +130,11 @@ export default function ActiveQuizPage({
       await (
         client as never as { POST: (p: string, o: unknown) => Promise<unknown> }
       ).POST("/v1/sessions/{id}/finish", { params: { path: { id } } });
+      try {
+        localStorage.setItem("ame.lastSessionId", id);
+      } catch {
+        /* ignore */
+      }
       router.push(`/sessions/${id}/results`);
     } catch (err) {
       console.error(err);
@@ -321,6 +326,20 @@ export default function ActiveQuizPage({
               Save & exit
             </Button>
           </div>
+        </div>
+
+        {/* Progress bar */}
+        <div
+          style={{ height: 3, background: "var(--surface-2)", flexShrink: 0 }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${questions.length > 0 ? (answered / questions.length) * 100 : 0}%`,
+              background: "var(--accent)",
+              transition: "width 200ms",
+            }}
+          />
         </div>
 
         {/* Question content */}

@@ -7,7 +7,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -80,6 +80,8 @@ pub struct GetSessionQuestion {
     pub kind: QuestionKind,
     pub prompt: String,
     pub points: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_snippet: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -212,9 +214,21 @@ pub async fn get_session(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetSessionResponse>, ApiError> {
-    let session = get_owned_session(&state.pool, id, user.user.id).await?;
+    let mut session = get_owned_session(&state.pool, id, user.user.id).await?;
     let attempts = list_session_attempts(&state.pool, session.id).await?;
     let questions = hydrate_session_questions(&state.pool, &session).await?;
+
+    if let Some(qid) = session.quiz_id {
+        let row = sqlx::query("SELECT title FROM quizzes WHERE id = $1")
+            .bind(qid)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(internal)?;
+        if let Some(r) = row {
+            session.quiz_title = r.try_get("title").ok();
+        }
+    }
+
     Ok(Json(GetSessionResponse {
         session,
         questions,
@@ -238,7 +252,7 @@ async fn hydrate_session_questions(
     }
 
     let rows = sqlx::query(
-        "SELECT id, kind, prompt, points, code_snippet, payload \
+        "SELECT id, kind, prompt, points, explanation, code_snippet, payload \
          FROM questions WHERE id = ANY($1)",
     )
     .bind(&plan_ids)
@@ -275,6 +289,7 @@ async fn hydrate_session_questions(
                 kind,
                 prompt: row.get("prompt"),
                 points: row.get("points"),
+                explanation: row.get("explanation"),
                 code_snippet: row.get("code_snippet"),
                 options,
                 option_order: item.option_order.clone(),
@@ -691,6 +706,8 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
         deadline_at: row.get("deadline_at"),
         started_at: row.get("started_at"),
         finished_at: row.get("finished_at"),
+        quiz_title: None,
+        course_title: None,
     })
 }
 
@@ -917,11 +934,29 @@ fn internal<E: Into<anyhow::Error>>(e: E) -> ApiError {
     ApiError::Internal(e.into())
 }
 
+#[utoipa::path(
+    patch,
+    path = "/v1/sessions/{id}/answers",
+    params(("id" = Uuid, Path, description = "Session id")),
+    responses(
+        (status = 204, description = "Draft saved"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn autosave_answers(
+    _user: AuthenticatedUser,
+    Path(_id): Path<Uuid>,
+    Json(_body): Json<serde_json::Value>,
+) -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/sessions", post(create_session))
         .route("/v1/sessions/{id}", get(get_session))
         .route("/v1/sessions/{id}/answer", post(answer))
+        .route("/v1/sessions/{id}/answers", patch(autosave_answers))
         .route("/v1/sessions/{id}/finish", post(finish))
         .with_state(state)
 }

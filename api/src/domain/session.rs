@@ -138,6 +138,10 @@ pub struct Session {
     #[serde(with = "time::serde::rfc3339::option")]
     #[schema(value_type = Option<String>, format = DateTime)]
     pub finished_at: Option<OffsetDateTime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quiz_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub course_title: Option<String>,
 }
 
 #[cfg(test)]
