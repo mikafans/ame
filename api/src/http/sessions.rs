@@ -219,13 +219,14 @@ pub async fn get_session(
     let questions = hydrate_session_questions(&state.pool, &session).await?;
 
     if let Some(qid) = session.quiz_id {
-        let row = sqlx::query("SELECT title FROM quizzes WHERE id = $1")
+        let row = sqlx::query("SELECT title, course FROM quizzes WHERE id = $1")
             .bind(qid)
             .fetch_optional(&state.pool)
             .await
             .map_err(internal)?;
         if let Some(r) = row {
             session.quiz_title = r.try_get("title").ok();
+            session.course_title = r.try_get("course").ok();
         }
     }
 

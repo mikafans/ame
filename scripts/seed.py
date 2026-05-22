@@ -313,7 +313,7 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
 
     resp = client.post("/v1/exams", json={**EXAM_BLUEPRINT, "sections": sections}, headers=auth)
     if resp.is_success:
-        exam_id = resp.json().get("id") or resp.json().get("exam_id")
+        exam_id = resp.json().get("examId") or resp.json().get("id")
         result.exam_id = exam_id
         console.print(f"  Created exam {exam_id} with {len(sections)} sections")
     else:

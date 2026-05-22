@@ -19,10 +19,10 @@ interface Answer {
 interface ResultData {
   id: string;
   quiz_id?: string;
-  quiz_title: string;
-  course: string;
-  attempt_number: number;
-  total_attempts: number;
+  quiz_title: string | null;
+  course: string | null;
+  attempt_number: number | null;
+  total_attempts: number | null;
   score: number;
   total: number;
   feedback?: string;
@@ -62,20 +62,53 @@ export default function ResultsPage({
     if (!token) return;
     makeClient(token)
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
-      .then(({ data: d }: { data?: ResultData }) => {
-        if (d) {
-          setData(d);
-          if (d.quiz_id) {
-            fetch(
-              `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${d.quiz_id}`,
-              { headers: { Authorization: `Bearer ${token}` } },
-            )
-              .then((r) => (r.ok ? r.json() : null))
-              .then((cs: CohortStats | null) => {
-                if (cs) setCohortStats(cs);
-              })
-              .catch(() => {});
-          }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then(({ data: d }: { data?: any }) => {
+        if (!d?.session) return;
+        const session = d.session;
+        const questions: any[] = d.questions ?? [];
+        const attempts: any[] = d.attempts ?? [];
+        const byQuestion = new Map(
+          attempts.map((a: any) => [a.question_id, a]),
+        );
+        const result = session.result ?? {};
+        setData({
+          id: session.id,
+          quiz_id: session.quiz_id,
+          quiz_title: session.quiz_title ?? null,
+          course: session.course_title ?? null,
+          attempt_number: null,
+          total_attempts: null,
+          score: result.points_awarded ?? 0,
+          total: result.max_points ?? 0,
+          answers: questions.map((q: any) => {
+            const attempt = byQuestion.get(q.questionId);
+            const body = attempt?.response?.body;
+            return {
+              qid: q.questionId,
+              correct: attempt?.is_correct ?? false,
+              points: attempt ? Math.round(attempt.score) : 0,
+              max: q.points,
+              type: q.kind,
+              given:
+                typeof body === "string" ? body : JSON.stringify(body ?? ""),
+              note:
+                attempt?.grade_status === "pending"
+                  ? "Pending manual review"
+                  : "",
+            };
+          }),
+        });
+        if (session.quiz_id) {
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${session.quiz_id}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+            .then((r) => (r.ok ? r.json() : null))
+            .then((cs: CohortStats | null) => {
+              if (cs) setCohortStats(cs);
+            })
+            .catch(() => {});
         }
       })
       .catch(console.error);
@@ -99,9 +132,16 @@ export default function ResultsPage({
     );
   }
 
-  const pct = Math.round((data.score / data.total) * 100);
+  const pct = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
   const passed = pct >= 70;
-  const kicker = `${data.course.toUpperCase()} · ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`;
+  const kickerParts = [
+    data.course ? data.course.toUpperCase() : null,
+    data.attempt_number != null
+      ? `ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`
+      : null,
+  ].filter(Boolean);
+  const kicker =
+    kickerParts.length > 0 ? kickerParts.join(" · ") : "PRACTICE SESSION";
 
   const toggleExpanded = (qid: string) => {
     const next = new Set(expandedItems);
@@ -156,7 +196,7 @@ export default function ResultsPage({
               margin: 0,
             }}
           >
-            {data.quiz_title} — Results
+            {data.quiz_title ?? "Practice Session"} — Results
           </h1>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -393,7 +433,7 @@ export default function ResultsPage({
         <div>
           {data.answers.map((answer, i) => (
             <div
-              key={answer.qid}
+              key={answer.qid ?? i}
               style={{
                 padding: "18px 22px",
                 borderBottom:
@@ -514,13 +554,41 @@ export default function ResultsPage({
         </div>
       </Card>
 
+      {/* Footer actions */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 32,
+          paddingTop: 24,
+          borderTop: "1px solid var(--border)",
+        }}
+      >
+        <Button
+          variant="outline"
+          onClick={() => (window.location.href = "/library")}
+        >
+          Back to library
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => (window.location.href = "/progress")}
+        >
+          View 6-week plan
+        </Button>
+      </div>
+
       {/* Share modal */}
       {shareModal?.open && token && (
         <ShareModal
           payload={{
             kind: shareModal.kind as "quiz" | "item",
             id: shareModal.itemId || id,
-            title: shareModal.kind === "item" ? "Question" : data.quiz_title,
+            title:
+              shareModal.kind === "item"
+                ? "Question"
+                : (data.quiz_title ?? "Quiz"),
           }}
           onClose={() => setShareModal(null)}
           bearerToken={token}
