@@ -267,6 +267,7 @@ export default function ActiveQuizPage({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            paddingBottom: "19px",
           }}
         >
           <div>
@@ -326,20 +327,27 @@ export default function ActiveQuizPage({
               Save & exit
             </Button>
           </div>
-        </div>
 
-        {/* Progress bar */}
-        <div
-          style={{ height: 3, background: "var(--surface-2)", flexShrink: 0 }}
-        >
+          {/* Progress bar — inside sticky header so it stays pinned while scrolling */}
           <div
             style={{
-              height: "100%",
-              width: `${questions.length > 0 ? (answered / questions.length) * 100 : 0}%`,
-              background: "var(--accent)",
-              transition: "width 200ms",
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              background: "var(--surface-2)",
             }}
-          />
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${questions.length > 0 ? (answered / questions.length) * 100 : 0}%`,
+                background: "var(--accent)",
+                transition: "width 200ms",
+              }}
+            />
+          </div>
         </div>
 
         {/* Question content */}

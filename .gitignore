@@ -42,7 +42,9 @@ __pycache__/
 # Local agent CLI scratch (not part of repo)
 .antigravitycli/api/.env
 .tmp/
+.claude/worktrees
+.playwright-cli
 
 # Web tooling artifacts
-web/.fastembed_cache/
-web/test-results/
+.fastembed_cache
+test-results

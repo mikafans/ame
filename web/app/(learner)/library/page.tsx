@@ -26,10 +26,10 @@ interface Quiz {
   createdAt: string;
 }
 
-interface QuizStats {
-  avg: number;
-  median: number;
-  distribution: { bucket: number; count: number }[];
+interface CohortStats {
+  cohortAvg: number | null;
+  percentile: number | null;
+  completionRate: number | null;
 }
 
 type TabId = "all" | "assigned" | "completed" | "drafts";
@@ -50,7 +50,7 @@ export default function LibraryPage() {
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
-  const [featuredStats, setFeaturedStats] = useState<QuizStats | null>(null);
+  const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -93,16 +93,16 @@ export default function LibraryPage() {
 
   useEffect(() => {
     if (!token || !upNextId) return;
-    setFeaturedStats(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
-      .GET(`/v1/quizzes/${upNextId}/stats`)
-      .then(({ data }: { data?: QuizStats }) => {
-        if (data) setFeaturedStats(data);
+    setCohortStats(null);
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${upNextId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cs: CohortStats | null) => {
+        if (cs) setCohortStats(cs);
       })
-      .catch(() => {
-        /* stats are best-effort */
-      });
+      .catch(() => {});
   }, [token, upNextId]);
 
   async function startQuiz(quizId: string) {
@@ -445,21 +445,28 @@ export default function LibraryPage() {
               <KV
                 label="Class average"
                 value={
-                  featuredStats
-                    ? `${Math.round(featuredStats.avg * 100)}%`
+                  cohortStats?.cohortAvg != null
+                    ? `${Math.round(cohortStats.cohortAvg * 100)}%`
                     : "—"
                 }
               />
               <KV
-                label="Class median"
+                label="Completion rate"
                 value={
-                  featuredStats
-                    ? `${Math.round(featuredStats.median * 100)}%`
+                  cohortStats?.completionRate != null
+                    ? `${Math.round(cohortStats.completionRate * 100)}%`
                     : "—"
                 }
               />
-              <KV label="Topic mastery" value="—" />
-              <KV label="Your last related score" value="—" />
+              <KV
+                label="Your percentile"
+                value={
+                  cohortStats?.percentile != null
+                    ? `${cohortStats.percentile}th`
+                    : "—"
+                }
+              />
+              <KV label="Your last score" value="—" />
             </div>
           </div>
         </Card>

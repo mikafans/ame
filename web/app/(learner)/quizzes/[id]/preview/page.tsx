@@ -139,6 +139,7 @@ export default function QuizPreviewPage({
             lineHeight: 1.1,
             color: "var(--text)",
             margin: "0 0 16px",
+            textWrap: "balance",
           }}
         >
           {quiz.title}

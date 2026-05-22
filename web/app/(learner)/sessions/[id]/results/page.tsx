@@ -36,9 +36,9 @@ interface CohortHistogramBucket {
 }
 
 interface CohortStats {
-  cohort_avg: number | null;
+  cohortAvg: number | null;
   percentile: number | null;
-  completion_rate: number | null;
+  completionRate: number | null;
   histogram: CohortHistogramBucket[];
 }
 
@@ -90,8 +90,7 @@ export default function ResultsPage({
               points: attempt ? Math.round(attempt.score) : 0,
               max: q.points,
               type: q.kind,
-              given:
-                typeof body === "string" ? body : JSON.stringify(body ?? ""),
+              given: typeof body === "string" ? body : "",
               note:
                 attempt?.grade_status === "pending"
                   ? "Pending manual review"
@@ -285,7 +284,7 @@ export default function ResultsPage({
             Cohort distribution
           </div>
           <CohortHistogram
-            userBin={Math.floor(pct / 10)}
+            userBin={Math.min(Math.floor(pct / 10), 9)}
             histogram={cohortStats?.histogram ?? null}
           />
           <div
@@ -339,8 +338,8 @@ export default function ResultsPage({
               {
                 label: "Cohort avg",
                 value:
-                  cohortStats?.cohort_avg != null
-                    ? `${Math.round(cohortStats.cohort_avg * 100)}%`
+                  cohortStats?.cohortAvg != null
+                    ? `${Math.round(cohortStats.cohortAvg * 100)}%`
                     : "—",
               },
               {
@@ -353,8 +352,8 @@ export default function ResultsPage({
               {
                 label: "Completion",
                 value:
-                  cohortStats?.completion_rate != null
-                    ? `${Math.round(cohortStats.completion_rate * 100)}%`
+                  cohortStats?.completionRate != null
+                    ? `${Math.round(cohortStats.completionRate * 100)}%`
                     : "—",
               },
             ].map(({ label, value }) => (
@@ -607,7 +606,7 @@ function DonutChart({
   total: number;
   size: number;
 }) {
-  const pct = (correct / total) * 100;
+  const pct = total > 0 ? (correct / total) * 100 : 0;
   const circumference = 2 * Math.PI * (size / 2 - 12);
   const strokeDashoffset = circumference * (1 - pct / 100);
 

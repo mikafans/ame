@@ -168,6 +168,7 @@ QUESTIONS = [
 
 QUIZ = {
     "title": "Algorithms and Data Structures — Fundamentals",
+    "course": "Computer Science",
     "objectives": [
         "Understand time complexity of common algorithms",
         "Distinguish between core data structures",
