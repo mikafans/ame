@@ -49,8 +49,7 @@ def main() -> None:
         headers=inst_headers,
     )
     step("register agent", r.status_code in (200, 201), str(r.status_code))
-    body = r.json()
-    agent_key = body.get("key") or body.get("apiKey")
+    agent_key = r.json()["apiKey"]  # API returns "apiKey"
     step("received API key", bool(agent_key))
     agent_headers = {"Authorization": f"Bearer {agent_key}"}
 
@@ -117,7 +116,7 @@ def main() -> None:
     r = c.post(
         "/v1/quizzes/generate",
         json={
-            "source": "Rust is a systems programming language that runs blazingly fast, prevents segfaults, and guarantees thread safety through its ownership system.",
+            "source": "Rust is a systems programming language that prevents segfaults and guarantees thread safety through its ownership system.",
             "questionCount": 3,
             "types": ["mc", "tf"],
             "difficulty": "inter",
@@ -128,7 +127,7 @@ def main() -> None:
     gen_quiz_id = r.json().get("id") or r.json().get("quizId")
     step("quiz id returned", bool(gen_quiz_id))
 
-    # 6. Fetch user stats (instructor has attempt history from seeding)
+    # 6. Fetch user stats (instructor has attempt history)
     r = c.get("/v1/me/stats", headers=inst_headers)
     step("fetch user stats", r.status_code == 200)
     step("stats has avg_score field", "avg_score" in r.json())
@@ -149,8 +148,7 @@ def main() -> None:
     # 8. Fetch study plan
     r = c.get(f"/v1/plans/{plan_id}", headers=inst_headers)
     step("fetch study plan", r.status_code == 200)
-    plan = r.json()
-    weeks = plan.get("weeks", [])
+    weeks = r.json().get("weeks", [])
     step("plan has weeks", len(weeks) > 0, f"{len(weeks)} weeks")
 
     # 9. Agent activity log

@@ -40,9 +40,9 @@ def main() -> None:
         headers=headers,
     )
     step("create quiz", r.status_code in (200, 201), str(r.status_code))
-    quiz_id = r.json()["id"]
+    quiz_id = r.json()["quizId"]
 
-    # 3. Create questions
+    # 3. Create questions in the bank
     r = c.post(
         "/v1/questions",
         json={
@@ -76,11 +76,11 @@ def main() -> None:
     step("create questions", r.status_code in (200, 201), str(r.status_code))
     q_ids = [q["id"] for q in r.json()["questions"]]
 
-    # 4. Add questions to quiz
+    # 4. Add questions to quiz (snake_case body — no rename_all on this endpoint)
     for qid in q_ids:
         r = c.post(
             f"/v1/quizzes/{quiz_id}/questions",
-            json={"questionId": qid},
+            json={"question_id": qid},
             headers=headers,
         )
         step("add question to quiz", r.status_code in (200, 201, 204), str(r.status_code))
