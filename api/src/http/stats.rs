@@ -1,4 +1,4 @@
-//! Stats routes: GET /v1/quizzes/{id}/stats and GET /v1/exams/{id}/stats.
+//! Stats routes: GET /v1/quizzes/{id}/stats, GET /v1/exams/{id}/stats, GET /v1/me/stats.
 
 use axum::{
     Json, Router,
@@ -11,7 +11,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::scope::{RequireScope, ScopeConstraint},
+    auth::{
+        extractor::AuthenticatedUser,
+        scope::{RequireScope, ScopeConstraint},
+    },
     domain::{error::ApiError, user::Scope},
     http::AppState,
 };
@@ -76,7 +79,7 @@ pub async fn quiz_stats(
     Query(params): Query<QuizStatsParams>,
 ) -> Result<Json<QuizStatsResponse>, ApiError> {
     // Verify quiz exists
-    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM quizzes WHERE id = $1)")
+    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_quizzes WHERE id = $1)")
         .bind(id)
         .fetch_one(&state.pool)
         .await
@@ -92,7 +95,7 @@ pub async fn quiz_stats(
         "SELECT
             coalesce(avg((result->>'percent')::double precision), 0) as avg,
             coalesce(percentile_cont(0.5) within group (order by (result->>'percent')::double precision), 0) as median
-         FROM sessions
+         FROM tb_sessions
          WHERE quiz_id = $1
            AND status = 'finished'
            AND result is not null
@@ -111,7 +114,7 @@ pub async fn quiz_stats(
         "SELECT
             floor((result->>'percent')::double precision * 10)::int as bucket,
             count(*) as count
-         FROM sessions
+         FROM tb_sessions
          WHERE quiz_id = $1
            AND status = 'finished'
            AND result is not null
@@ -138,7 +141,7 @@ pub async fn quiz_stats(
         "WITH session_scores AS (
             SELECT s.id as session_id,
                    (s.result->>'percent')::double precision as pct
-            FROM sessions s
+            FROM tb_sessions s
             WHERE s.quiz_id = $1
               AND s.status = 'finished'
               AND s.result is not null
@@ -148,7 +151,7 @@ pub async fn quiz_stats(
             SELECT
                 a.question_id,
                 avg(a.is_correct::int::double precision)          as correct_rate,
-                avg(a.time_to_answer_ms)                          as avg_time_ms,
+                avg(a.time_to_answer_ms::double precision)        as avg_time_ms,
                 -- point-biserial: (M_p - M_t) / S_t * sqrt(p * (1-p))
                 -- only defined when there is variance in session scores
                 CASE
@@ -163,7 +166,7 @@ pub async fn quiz_stats(
                           )
                     ELSE NULL
                 END as discrimination_idx
-            FROM attempts a
+            FROM tb_attempts a
             JOIN session_scores ss ON a.session_id = ss.session_id
             GROUP BY a.question_id
          )
@@ -230,7 +233,7 @@ pub async fn exam_stats(
     Path(id): Path<Uuid>,
 ) -> Result<Json<ExamStatsResponse>, ApiError> {
     // Verify exam exists and get passing_points
-    let exam_row = sqlx::query("SELECT passing_points, total_points FROM exams WHERE id = $1")
+    let exam_row = sqlx::query("SELECT passing_points, total_points FROM tb_exams WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.pool)
         .await
@@ -247,7 +250,7 @@ pub async fn exam_stats(
                 avg(((result->>'points_awarded')::int >= $2)::int::double precision),
                 0
              )
-             FROM sessions
+             FROM tb_sessions
              WHERE exam_id = $1 AND status = 'finished' AND result is not null",
         )
         .bind(id)
@@ -263,7 +266,7 @@ pub async fn exam_stats(
                      / $2::double precision >= 0.6)::int::double precision),
                 0
              )
-             FROM sessions
+             FROM tb_sessions
              WHERE exam_id = $1 AND status = 'finished' AND result is not null",
         )
         .bind(id)
@@ -282,9 +285,9 @@ pub async fn exam_stats(
                 avg(a.score),
                 0
             ) as avg_score
-         FROM exam_sections es
-         LEFT JOIN sessions s ON s.exam_id = $1 AND s.status = 'finished'
-         LEFT JOIN attempts a
+         FROM tb_exam_sections es
+         LEFT JOIN tb_sessions s ON s.exam_id = $1 AND s.status = 'finished'
+         LEFT JOIN tb_attempts a
             ON a.session_id = s.id
             AND a.question_id = ANY(es.question_ids)
          WHERE es.exam_id = $1
@@ -312,7 +315,7 @@ pub async fn exam_stats(
                 (order by extract(epoch from (finished_at - started_at)) * 1000) as p50,
             percentile_cont(0.95) within group
                 (order by extract(epoch from (finished_at - started_at)) * 1000) as p95
-         FROM sessions
+         FROM tb_sessions
          WHERE exam_id = $1 AND status = 'finished' AND finished_at is not null",
     )
     .bind(id)
@@ -340,9 +343,150 @@ fn window_sql_filter(window: Option<&str>) -> String {
     }
 }
 
+// ── me stats ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MeStatsResponse {
+    pub avg_score: f64,
+    pub avg_score_delta: f64,
+    pub attempts_total: i64,
+    pub attempts_this_week: i64,
+    pub hours_spent: f64,
+    pub hours_spent_delta: f64,
+    pub current_streak: i64,
+    pub best_streak: i64,
+    pub mastered_topics: i64,
+    pub mastered_topics_total: i64,
+    pub mastered_topics_delta_since: String,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/me/stats",
+    responses(
+        (status = 200, description = "User stats summary", body = MeStatsResponse),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn me_stats(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<MeStatsResponse>, ApiError> {
+    let uid = user.user.id;
+
+    // attempts total and this week
+    let attempts_row = sqlx::query(
+        "SELECT COUNT(*) AS total, \
+                COUNT(*) FILTER (WHERE created_at > now() - interval '7 days') AS this_week \
+         FROM tb_attempts WHERE user_id = $1",
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+    let attempts_total: i64 = attempts_row.get("total");
+    let attempts_this_week: i64 = attempts_row.get("this_week");
+
+    // avg score from finished sessions (result->points_awarded / result->max_points)
+    let score_row = sqlx::query(
+        "SELECT \
+            AVG(CASE WHEN (result->>'max_points')::float > 0 \
+                THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
+                ELSE NULL END) FILTER (WHERE finished_at > now() - interval '28 days') AS avg_recent, \
+            AVG(CASE WHEN (result->>'max_points')::float > 0 \
+                THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
+                ELSE NULL END) FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days') AS avg_prior \
+         FROM tb_sessions WHERE user_id = $1 AND status = 'finished' AND result IS NOT NULL",
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+    let avg_score: f64 = score_row.try_get::<f64, _>("avg_recent").unwrap_or(0.0);
+    let avg_prior: f64 = score_row.try_get::<f64, _>("avg_prior").unwrap_or(0.0);
+    let avg_score_delta = avg_score - avg_prior;
+
+    // hours spent
+    let hours_row = sqlx::query(
+        "SELECT \
+            COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
+                FILTER (WHERE finished_at > now() - interval '28 days'), 0)::float8 AS hours_recent, \
+            COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
+                FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days'), 0)::float8 AS hours_prior \
+         FROM tb_sessions WHERE user_id = $1 AND status = 'finished'",
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+    let hours_spent: f64 = hours_row.get("hours_recent");
+    let hours_prior: f64 = hours_row.get("hours_prior");
+    let hours_spent_delta = hours_spent - hours_prior;
+
+    // streak: consecutive days with at least one attempt, counting back from today
+    let streak_row = sqlx::query(
+        "WITH daily AS ( \
+            SELECT DISTINCT date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day \
+            FROM tb_attempts WHERE user_id = $1 \
+        ), \
+        gaps AS ( \
+            SELECT day, ROW_NUMBER() OVER (ORDER BY day) - \
+                   (day - '2000-01-01'::date) AS grp \
+            FROM daily \
+        ), \
+        runs AS ( \
+            SELECT grp, COUNT(*) AS run_len, MAX(day) AS last_day \
+            FROM gaps GROUP BY grp \
+        ) \
+        SELECT \
+            COALESCE((SELECT run_len FROM runs WHERE last_day >= now()::date - 1 ORDER BY last_day DESC LIMIT 1), 0)::bigint AS current_streak, \
+            COALESCE(MAX(run_len), 0)::bigint AS best_streak \
+        FROM runs",
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+    let current_streak: i64 = streak_row.get("current_streak");
+    let best_streak: i64 = streak_row.get("best_streak");
+
+    // mastered topics (rating >= 1400 means above starting 1200 by meaningful margin)
+    let mastery_row = sqlx::query(
+        "SELECT \
+            COUNT(*) FILTER (WHERE rating >= 1400) AS mastered, \
+            COUNT(*) AS total \
+         FROM tb_user_tag_ratings WHERE user_id = $1",
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+    let mastered_topics: i64 = mastery_row.get("mastered");
+    let mastered_topics_total: i64 = mastery_row.get("total");
+
+    Ok(Json(MeStatsResponse {
+        avg_score,
+        avg_score_delta,
+        attempts_total,
+        attempts_this_week,
+        hours_spent,
+        hours_spent_delta,
+        current_streak,
+        best_streak,
+        mastered_topics,
+        mastered_topics_total,
+        mastered_topics_delta_since: "last 4 weeks".to_string(),
+    }))
+}
+
+fn internal<E: Into<anyhow::Error>>(e: E) -> ApiError {
+    ApiError::Internal(e.into())
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/quizzes/{id}/stats", get(quiz_stats))
         .route("/v1/exams/{id}/stats", get(exam_stats))
+        .route("/v1/me/stats", get(me_stats))
         .with_state(state)
 }

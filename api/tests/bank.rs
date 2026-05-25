@@ -58,12 +58,15 @@ fn skip_if_no_db() -> bool {
 async fn make_user(pool: &PgPool) -> Uuid {
     let id = Uuid::now_v7();
     let display_name = format!("bank-test-{}", id);
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
-        .bind(id)
-        .bind(display_name)
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(id)
+    .bind(display_name)
+    .bind(format!("bank-{id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
     id
 }
 
@@ -129,7 +132,7 @@ async fn create_questions_batch_inserts_and_links_tags() {
     }
 
     let q1_tag_count: i64 =
-        sqlx::query("SELECT COUNT(*)::bigint AS n FROM question_tags WHERE question_id = $1")
+        sqlx::query("SELECT COUNT(*)::bigint AS n FROM tb_question_tags WHERE question_id = $1")
             .bind(created[0].id)
             .fetch_one(&pool)
             .await

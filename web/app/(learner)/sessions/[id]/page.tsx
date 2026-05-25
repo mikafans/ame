@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,6 +49,12 @@ const QUESTION_TYPES: Record<string, string> = {
   cloze: "Fill in the blank",
 };
 
+const DEFAULT_ALLOWED_MATERIALS = [
+  "One sheet of notes (any)",
+  "Class textbook (printed)",
+  "Standard calculator",
+];
+
 export default function ActiveQuizPage({
   params,
 }: {
@@ -63,7 +69,7 @@ export default function ActiveQuizPage({
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const [autosaveScheduled, setAutosaveScheduled] = useState(false);
+  const autosaveScheduled = useRef(false);
 
   // Load session
   useEffect(() => {
@@ -82,6 +88,8 @@ export default function ActiveQuizPage({
               ),
             );
             setTimeLeft(remaining);
+          } else if (data.questions.length > 0) {
+            setTimeLeft(Math.max(20, data.questions.length * 2) * 60);
           }
         }
       })
@@ -92,33 +100,55 @@ export default function ActiveQuizPage({
     if (finishing || !token) return;
     setFinishing(true);
     try {
-      // Autosave before finish
-      const answersList = Object.entries(answers).map(([qid, val]) => ({
-        questionId: qid,
-        answer: val,
-      }));
-      if (answersList.length > 0) {
-        await makeClient(token).PATCH(
-          "/v1/sessions/{id}/answers" as never,
-          {
-            params: { path: { id } },
-            body: { answers: answersList } as never,
-          } as never,
-        );
-      }
-      // Submit session
-      await makeClient(token).POST(
-        "/v1/sessions/{id}/submit" as never,
-        {
+      const client = makeClient(token);
+      // Submit each answered question in the correct AttemptResponse shape
+      for (const [qid, val] of Object.entries(answers)) {
+        const q = session?.questions.find((x) => x.questionId === qid);
+        if (!q) continue;
+        let response: Record<string, unknown>;
+        if (q.kind === "mc") {
+          // answers store the original index; API expects display position
+          const displayPos = q.optionOrder
+            ? q.optionOrder.indexOf(val as number)
+            : (val as number);
+          response = {
+            selected_position: displayPos >= 0 ? displayPos : (val as number),
+          };
+        } else if (q.kind === "tf") {
+          response = { answer: val as boolean };
+        } else if (q.kind === "essay") {
+          const body = String(val ?? "");
+          response = {
+            body,
+            word_count: body.trim().split(/\s+/).filter(Boolean).length,
+          };
+        } else {
+          response = { answer: String(val ?? "") };
+        }
+        await (
+          client as never as {
+            POST: (p: string, o: unknown) => Promise<unknown>;
+          }
+        ).POST("/v1/sessions/{id}/answer", {
           params: { path: { id } },
-        } as never,
-      );
+          body: { questionId: qid, response },
+        });
+      }
+      // Finish the session — sets session.result
+      await (
+        client as never as { POST: (p: string, o: unknown) => Promise<unknown> }
+      ).POST("/v1/sessions/{id}/finish", { params: { path: { id } } });
+      try {
+        localStorage.setItem("ame.lastSessionId", id);
+      } catch {
+        /* ignore */
+      }
       router.push(`/sessions/${id}/results`);
     } catch (err) {
       console.error(err);
       setFinishing(false);
     }
-  }, [token, id, router, finishing, answers]);
+  }, [token, id, router, finishing, answers, session]);
 
   // Timer countdown
   useEffect(() => {
@@ -139,9 +169,13 @@ export default function ActiveQuizPage({
 
   // Autosave every 8 seconds
   useEffect(() => {
-    if (!token || Object.keys(answers).length === 0 || autosaveScheduled)
+    if (
+      !token ||
+      Object.keys(answers).length === 0 ||
+      autosaveScheduled.current
+    )
       return;
-    setAutosaveScheduled(true);
+    autosaveScheduled.current = true;
     const timer = setTimeout(() => {
       const answersList = Object.entries(answers).map(([qid, val]) => ({
         questionId: qid,
@@ -156,13 +190,15 @@ export default function ActiveQuizPage({
           } as never,
         )
         .catch(console.error)
-        .finally(() => setAutosaveScheduled(false));
+        .finally(() => {
+          autosaveScheduled.current = false;
+        });
     }, 8000);
     return () => {
       clearTimeout(timer);
-      setAutosaveScheduled(false);
+      autosaveScheduled.current = false;
     };
-  }, [answers, token, id, autosaveScheduled]);
+  }, [answers, token, id]);
 
   const handleSaveExit = useCallback(async () => {
     if (!token) return;
@@ -171,7 +207,7 @@ export default function ActiveQuizPage({
         "/v1/sessions/{id}" as never,
         {
           params: { path: { id } },
-          body: { status: "abandoned" } as never,
+          body: { status: "abandoned" },
         } as never,
       );
       router.push("/sessions");
@@ -210,6 +246,11 @@ export default function ActiveQuizPage({
 
   const attemptNum = 1; // TODO: get from session data
   const totalAttempts = 2; // TODO: get from session data
+  const allowedMaterials =
+    session.session.allowed_materials &&
+    session.session.allowed_materials.length > 0
+      ? session.session.allowed_materials
+      : DEFAULT_ALLOWED_MATERIALS;
 
   return (
     <div
@@ -239,6 +280,7 @@ export default function ActiveQuizPage({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            paddingBottom: "19px",
           }}
         >
           <div>
@@ -297,6 +339,27 @@ export default function ActiveQuizPage({
             <Button variant="ghost" onClick={handleSaveExit}>
               Save & exit
             </Button>
+          </div>
+
+          {/* Progress bar — inside sticky header so it stays pinned while scrolling */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              background: "var(--surface-2)",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${questions.length > 0 ? (answered / questions.length) * 100 : 0}%`,
+                background: "var(--accent)",
+                transition: "width 200ms",
+              }}
+            />
           </div>
         </div>
 
@@ -589,44 +652,41 @@ export default function ActiveQuizPage({
         </div>
 
         {/* Allowed materials */}
-        {session.session.allowed_materials &&
-          session.session.allowed_materials.length > 0 && (
-            <div
-              style={{
-                marginTop: 26,
-                padding: 14,
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: "var(--muted)",
-                  marginBottom: 6,
-                }}
-              >
-                Allowed
-              </div>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 16,
-                  color: "var(--text-2)",
-                  fontSize: 12,
-                  lineHeight: 1.7,
-                }}
-              >
-                {session.session.allowed_materials.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+        <div
+          style={{
+            marginTop: 26,
+            padding: 14,
+            background: "var(--surface-2)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              letterSpacing: 1.2,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              marginBottom: 6,
+            }}
+          >
+            Allowed
+          </div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 16,
+              color: "var(--text-2)",
+              fontSize: 12,
+              lineHeight: 1.7,
+            }}
+          >
+            {allowedMaterials.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
       </aside>
     </div>
   );

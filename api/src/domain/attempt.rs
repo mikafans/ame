@@ -38,6 +38,9 @@ pub struct Attempt {
     pub presentation: AttemptPresentation,
     pub is_correct: bool,
     pub score: f64,
+    pub grade_status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grader_notes: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_to_answer_ms: Option<i32>,
     pub rating_before_user_avg: f64,

@@ -68,7 +68,7 @@ pub async fn send_message(
 
     // Verify recipient exists
     let recipient_exists: bool =
-        sqlx::query_scalar("SELECT exists(SELECT 1 FROM users WHERE id = $1)")
+        sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_users WHERE id = $1)")
             .bind(body.user_id)
             .fetch_one(&state.pool)
             .await
@@ -78,7 +78,7 @@ pub async fn send_message(
     }
 
     let row = sqlx::query(
-        "INSERT INTO messages (from_user_id, to_user_id, channel, body, link_quiz_id, status)
+        "INSERT INTO tb_messages (from_user_id, to_user_id, channel, body, link_quiz_id, status)
          VALUES ($1, $2, $3, $4, $5, 'queued')
          RETURNING id, status",
     )

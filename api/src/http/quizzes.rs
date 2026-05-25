@@ -41,6 +41,9 @@ pub struct QuizSummary {
     pub title: String,
     pub status: String,
     pub objectives: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub course: Option<String>,
+    pub question_count: i64,
     pub created_by: Uuid,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
@@ -96,11 +99,15 @@ async fn list_quizzes(
     Query(q): Query<ListQuizzesQuery>,
 ) -> Result<Json<ListQuizzesResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, title, status, objectives, created_by, created_at, updated_at,
-                COUNT(*) OVER() AS total
-         FROM quizzes
-         WHERE status = $1
-         ORDER BY created_at DESC
+        "SELECT q.id, q.title, q.status, q.objectives, q.course, q.created_by,
+                q.created_at, q.updated_at,
+                COUNT(*) OVER() AS total,
+                COUNT(qq.question_id) AS question_count
+         FROM tb_quizzes q
+         LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
+         WHERE q.status = $1
+         GROUP BY q.id
+         ORDER BY q.created_at DESC
          LIMIT $2 OFFSET $3",
     )
     .bind(&q.status)
@@ -118,6 +125,8 @@ async fn list_quizzes(
             title: r.get("title"),
             status: r.get("status"),
             objectives: r.get::<Vec<String>, _>("objectives"),
+            course: r.get("course"),
+            question_count: r.get("question_count"),
             created_by: r.get("created_by"),
             created_at: r.get("created_at"),
             updated_at: r.get("updated_at"),
@@ -160,6 +169,18 @@ pub struct GetQuizResponse {
     pub questions: Vec<QuizQuestion>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/quizzes/{id}",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    responses(
+        (status = 200, description = "Quiz detail", body = GetQuizResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such quiz"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn get_quiz(
     State(state): State<AppState>,
     _auth: RequireAnyScope<QuizReadScopes>,
@@ -167,7 +188,7 @@ async fn get_quiz(
 ) -> Result<Json<GetQuizResponse>, ApiError> {
     let quiz_row = sqlx::query(
         "SELECT id, title, status, objectives, created_by, created_at, updated_at
-         FROM quizzes WHERE id = $1",
+         FROM tb_quizzes WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(&state.pool)
@@ -178,8 +199,8 @@ async fn get_quiz(
     let question_rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
                 COALESCE(qq.points_override, q.points) AS points, q.status, qq.order_index
-         FROM quiz_questions qq
-         JOIN questions q ON q.id = qq.question_id
+         FROM tb_quiz_questions qq
+         JOIN tb_questions q ON q.id = qq.question_id
          WHERE qq.quiz_id = $1
          ORDER BY qq.order_index",
     )
@@ -238,6 +259,21 @@ pub struct PatchQuizResponse {
     pub warnings: Vec<String>,
 }
 
+#[utoipa::path(
+    patch,
+    path = "/v1/quizzes/{id}",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    request_body = QuizPatch,
+    responses(
+        (status = 200, description = "Quiz updated", body = PatchQuizResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "No such quiz"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn patch_quiz(
     State(state): State<AppState>,
     _auth: RequireAnyScope<QuizWriteScopes>,
@@ -245,13 +281,14 @@ async fn patch_quiz(
     Json(body): Json<QuizPatch>,
 ) -> Result<Json<PatchQuizResponse>, ApiError> {
     // Verify quiz exists and is owned by caller (instructors can edit any, agents only their own)
-    let quiz_row =
-        sqlx::query("SELECT id, title, status, objectives, created_by FROM quizzes WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?
-            .ok_or(ApiError::NotFound { resource: "quiz" })?;
+    let quiz_row = sqlx::query(
+        "SELECT id, title, status, objectives, created_by FROM tb_quizzes WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?
+    .ok_or(ApiError::NotFound { resource: "quiz" })?;
 
     let mut warnings: Vec<String> = Vec::new();
 
@@ -267,7 +304,7 @@ async fn patch_quiz(
 
         // Must have at least one question, all live
         let q_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = $1")
+            sqlx::query_scalar("SELECT COUNT(*) FROM tb_quiz_questions WHERE quiz_id = $1")
                 .bind(id)
                 .fetch_one(&state.pool)
                 .await
@@ -281,8 +318,8 @@ async fn patch_quiz(
         }
 
         let draft_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM quiz_questions qq
-             JOIN questions q ON q.id = qq.question_id
+            "SELECT COUNT(*) FROM tb_quiz_questions qq
+             JOIN tb_questions q ON q.id = qq.question_id
              WHERE qq.quiz_id = $1 AND q.status != 'live'",
         )
         .bind(id)
@@ -309,7 +346,7 @@ async fn patch_quiz(
     }
 
     let updated = sqlx::query(
-        "UPDATE quizzes SET
+        "UPDATE tb_quizzes SET
            title      = COALESCE($2, title),
            objectives = COALESCE($3, objectives),
            status     = COALESCE($4, status),
@@ -375,6 +412,7 @@ pub struct CreatedQuiz {
 #[utoipa::path(
     post,
     path = "/v1/quizzes",
+    request_body = CreateQuizBody,
     responses(
         (status = 201, description = "Quiz created", body = CreateQuizResponse),
         (status = 401, description = "Unauthorized"),
@@ -397,12 +435,13 @@ async fn create_quiz(
     let objectives = body.objectives.unwrap_or_default();
 
     let result = sqlx::query(
-        "INSERT INTO quizzes (title, objectives, status, created_by)
-         VALUES ($1, $2, $3, $4)
+        "INSERT INTO tb_quizzes (title, objectives, course, status, created_by)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id, title, status, objectives, created_by, created_at",
     )
     .bind(&body.title)
     .bind(&objectives)
+    .bind(&body.course)
     .bind("draft")
     .bind(auth.0.user.id)
     .fetch_one(&state.pool)
@@ -451,6 +490,21 @@ pub struct AddQuizQuestionResponse {
     pub order_index: i32,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/quizzes/{id}/questions",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    request_body = AddQuizQuestionBody,
+    responses(
+        (status = 201, description = "Question linked", body = AddQuizQuestionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "No such quiz or question"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn add_quiz_question(
     State(state): State<AppState>,
     auth: RequireAnyScope<QuizWriteScopes>,
@@ -463,7 +517,7 @@ async fn add_quiz_question(
     }
 
     // Verify quiz exists
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM quizzes WHERE id = $1)")
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tb_quizzes WHERE id = $1)")
         .bind(quiz_id)
         .fetch_one(&state.pool)
         .await
@@ -476,7 +530,7 @@ async fn add_quiz_question(
     let question_id = if let Some(qid) = body.question_id {
         // Verify it exists in the bank
         let qexists: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM questions WHERE id = $1)")
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tb_questions WHERE id = $1)")
                 .bind(qid)
                 .fetch_one(&state.pool)
                 .await
@@ -499,7 +553,7 @@ async fn add_quiz_question(
         let default_payload = default_payload_for_kind(kind);
 
         let row = sqlx::query(
-            "INSERT INTO questions (kind, prompt, payload, status, points, created_by)
+            "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by)
              VALUES ($1, $2, $3, 'draft', 1, $4)
              RETURNING id",
         )
@@ -516,7 +570,7 @@ async fn add_quiz_question(
 
     // Compute next order_index
     let next_order: i32 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(order_index) + 1, 0) FROM quiz_questions WHERE quiz_id = $1",
+        "SELECT COALESCE(MAX(order_index) + 1, 0) FROM tb_quiz_questions WHERE quiz_id = $1",
     )
     .bind(quiz_id)
     .fetch_one(&state.pool)
@@ -524,7 +578,7 @@ async fn add_quiz_question(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     sqlx::query(
-        "INSERT INTO quiz_questions (quiz_id, question_id, order_index, points_override)
+        "INSERT INTO tb_quiz_questions (quiz_id, question_id, order_index, points_override)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (quiz_id, question_id) DO NOTHING",
     )
@@ -613,7 +667,7 @@ async fn count_quizzes(
     _auth: RequireAnyScope<QuizReadScopes>,
     Query(_q): Query<CountQuizzesQuery>,
 ) -> Result<Json<CountQuizzesResponse>, ApiError> {
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM quizzes WHERE status = $1")
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_quizzes WHERE status = $1")
         .bind("active")
         .fetch_one(&state.pool)
         .await
@@ -646,6 +700,18 @@ pub struct GenerateResponse {
     pub warnings: Vec<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/quizzes/generate",
+    request_body = GenerateBody,
+    responses(
+        (status = 200, description = "Generated quiz candidates", body = GenerateResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn generate_quiz(
     _auth: RequireAnyScope<QuizWriteScopes>,
     Json(_body): Json<GenerateBody>,

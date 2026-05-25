@@ -23,7 +23,7 @@ fn sign_payload(signing_key: &str, ts: u64, body: &str) -> String {
 /// Each dispatch runs in a background task — this function returns immediately.
 pub async fn fire_webhooks(pool: &PgPool, event: &str, payload: serde_json::Value) {
     let rows = sqlx::query(
-        "SELECT id, url, signing_key FROM webhooks
+        "SELECT id, url, signing_key FROM tb_webhooks
          WHERE $1 = ANY(events) AND revoked_at IS NULL AND signing_key IS NOT NULL",
     )
     .bind(event)
@@ -64,7 +64,7 @@ async fn dispatch_with_retries(
     let delivery_id = Uuid::now_v7();
 
     let _ = sqlx::query(
-        "INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status, next_attempt_at)
+        "INSERT INTO tb_webhook_deliveries (id, webhook_id, event, payload, status, next_attempt_at)
          VALUES ($1, $2, $3, $4, 'pending', now())",
     )
     .bind(delivery_id)
@@ -101,7 +101,7 @@ async fn dispatch_with_retries(
         match result {
             Ok(resp) if resp.status().is_success() => {
                 let _ = sqlx::query(
-                    "UPDATE webhook_deliveries
+                    "UPDATE tb_webhook_deliveries
                      SET status = 'delivered', attempt_num = $1, completed_at = now()
                      WHERE id = $2",
                 )
@@ -114,7 +114,7 @@ async fn dispatch_with_retries(
             Ok(resp) => {
                 let err = format!("HTTP {}", resp.status().as_u16());
                 let _ = sqlx::query(
-                    "UPDATE webhook_deliveries SET attempt_num = $1, last_error = $2 WHERE id = $3",
+                    "UPDATE tb_webhook_deliveries SET attempt_num = $1, last_error = $2 WHERE id = $3",
                 )
                 .bind(attempt_num)
                 .bind(&err)
@@ -124,7 +124,7 @@ async fn dispatch_with_retries(
             }
             Err(e) => {
                 let _ = sqlx::query(
-                    "UPDATE webhook_deliveries SET attempt_num = $1, last_error = $2 WHERE id = $3",
+                    "UPDATE tb_webhook_deliveries SET attempt_num = $1, last_error = $2 WHERE id = $3",
                 )
                 .bind(attempt_num)
                 .bind(e.to_string())
@@ -136,7 +136,7 @@ async fn dispatch_with_retries(
     }
 
     let _ = sqlx::query(
-        "UPDATE webhook_deliveries SET status = 'failed', completed_at = now() WHERE id = $1",
+        "UPDATE tb_webhook_deliveries SET status = 'failed', completed_at = now() WHERE id = $1",
     )
     .bind(delivery_id)
     .execute(pool)

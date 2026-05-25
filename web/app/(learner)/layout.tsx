@@ -60,6 +60,7 @@ export default function LearnerLayout({
     if (pathname.startsWith("/results")) return "results";
     if (pathname.startsWith("/progress")) return "dashboard";
     if (pathname.startsWith("/author")) return "author";
+    if (pathname.startsWith("/grading")) return "grading";
     if (pathname.startsWith("/agent")) return "agent";
     return "library";
   };
@@ -74,6 +75,7 @@ export default function LearnerLayout({
       results: "/results",
       dashboard: "/progress",
       author: "/author",
+      grading: "/grading",
       agent: "/agent",
     };
     router.push(routeMap[route] || "/library");

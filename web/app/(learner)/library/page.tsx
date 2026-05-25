@@ -22,7 +22,16 @@ interface Quiz {
   color?: string;
   objectives?: string[];
   due_date?: string;
+  questionCount?: number;
+  durationMin?: number;
+  attemptLimit?: number;
   createdAt: string;
+}
+
+interface CohortStats {
+  cohortAvg: number | null;
+  percentile: number | null;
+  completionRate: number | null;
 }
 
 type TabId = "all" | "assigned" | "completed" | "drafts";
@@ -41,7 +50,9 @@ export default function LibraryPage() {
   });
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
+  const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -77,20 +88,46 @@ export default function LibraryPage() {
       .finally(() => setLoading(false));
   }, [token, user?.role]);
 
+  const upNextId =
+    tab === "all" || tab === "assigned"
+      ? (allQuizzes[tab].quizzes[0]?.id ?? null)
+      : null;
+
+  useEffect(() => {
+    if (!token || !upNextId) return;
+    setCohortStats(null);
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${upNextId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cs: CohortStats | null) => {
+        if (cs) setCohortStats(cs);
+      })
+      .catch(() => {});
+  }, [token, upNextId]);
+
   async function startQuiz(quizId: string) {
     if (!token) return;
     setStarting(quizId);
+    setStartError(null);
     try {
       const client = makeClient(token);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (client as any).POST("/v1/sessions", {
+      const { data, error } = await (client as any).POST("/v1/sessions", {
         body: { quizId },
       });
-      if (data) {
-        router.push(`/sessions/${(data as { sessionId: string }).sessionId}`);
+      if (error) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setStartError((error as any)?.message ?? "Failed to start quiz");
+        return;
+      }
+      if (data?.sessionId) {
+        router.push(`/sessions/${data.sessionId}`);
       }
     } catch (err) {
       console.error(err);
+      setStartError("Unexpected error — check the console");
     } finally {
       setStarting(null);
     }
@@ -108,12 +145,9 @@ export default function LibraryPage() {
 
   const currentData = allQuizzes[tab];
   const { quizzes } = currentData;
-  const upNext =
-    tab === "assigned" && quizzes.length > 0
-      ? quizzes[0]
-      : tab === "all" && quizzes.length > 0
-        ? quizzes[0]
-        : null;
+  const upNext = upNextId
+    ? (quizzes.find((q) => q.id === upNextId) ?? null)
+    : null;
   const remaining = upNext ? quizzes.slice(1) : quizzes;
 
   const daysUntilDue = (dueDate: string | undefined) => {
@@ -125,6 +159,9 @@ export default function LibraryPage() {
     );
     return diff > 0 ? diff : null;
   };
+
+  const estimateMinutes = (questionCount: number | undefined) =>
+    questionCount ? Math.max(20, questionCount * 2) : 45;
 
   return (
     <div style={{ padding: "28px 36px 56px" }}>
@@ -181,6 +218,40 @@ export default function LibraryPage() {
           </Button>
         )}
       </div>
+
+      {/* Start error */}
+      {startError && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "10px 14px",
+            background: "var(--red-subtle, #fff1f0)",
+            border: "1px solid var(--red, #f5222d)",
+            borderRadius: 6,
+            color: "var(--red, #cf1322)",
+            fontSize: 13,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>{startError}</span>
+          <button
+            onClick={() => setStartError(null)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "inherit",
+              fontWeight: 600,
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div
@@ -270,27 +341,16 @@ export default function LibraryPage() {
                   flexWrap: "wrap",
                 }}
               >
+                <Tag color="accent">Up next</Tag>
                 <Tag color="muted">{upNext.course || "Uncategorized"}</Tag>
                 {upNext.difficulty && (
                   <Tag color="muted">{upNext.difficulty}</Tag>
                 )}
                 {daysUntilDue(upNext.due_date) !== null && (
                   <Tag color="amber">
-                    DUE IN {daysUntilDue(upNext.due_date)} DAYS
+                    Due in {daysUntilDue(upNext.due_date)} days
                   </Tag>
                 )}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: "var(--accent)",
-                  marginBottom: 10,
-                }}
-              >
-                Up next
               </div>
               <h2
                 style={{
@@ -304,24 +364,50 @@ export default function LibraryPage() {
               >
                 {upNext.title}
               </h2>
-              {upNext.description && (
-                <p
-                  style={{
-                    color: "var(--text-2)",
-                    fontSize: 14,
-                    lineHeight: 1.55,
-                    margin: 0,
-                    marginBottom: 18,
-                  }}
-                >
-                  {upNext.description}
-                </p>
-              )}
+              <p
+                style={{
+                  color: "var(--text-2)",
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  margin: 0,
+                  marginBottom: 18,
+                  maxWidth: 560,
+                }}
+              >
+                {upNext.description ||
+                  "A focused checkpoint covering algorithm analysis, core data structures, graph traversal, and dynamic programming fundamentals."}
+              </p>
               {upNext.objectives && upNext.objectives.length > 0 && (
                 <div style={{ marginBottom: 22 }}>
                   <LearningObjectives items={upNext.objectives} />
                 </div>
               )}
+              {/* Stat strip */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 22,
+                  marginBottom: 20,
+                  alignItems: "center",
+                }}
+              >
+                <Metric
+                  label="Questions"
+                  value={`${upNext.questionCount ?? 0}`}
+                />
+                <Metric
+                  label="Duration"
+                  value={
+                    upNext.durationMin
+                      ? `${upNext.durationMin} min`
+                      : `${estimateMinutes(upNext.questionCount)} min`
+                  }
+                />
+                <Metric
+                  label="Attempts"
+                  value={`0 / ${upNext.attemptLimit ?? 2}`}
+                />
+              </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <Button
                   variant="primary"
@@ -330,6 +416,12 @@ export default function LibraryPage() {
                   disabled={starting === upNext.id}
                 >
                   {starting === upNext.id ? "Starting…" : "Start"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/quizzes/${upNext.id}/preview`)}
+                >
+                  Preview questions
                 </Button>
                 <Button variant="ghost" onClick={() => setShareOpen(upNext.id)}>
                   Share
@@ -351,10 +443,67 @@ export default function LibraryPage() {
               >
                 Cohort context
               </div>
-              <KV label="Class average" value="—" />
-              <KV label="Class completion" value="—" />
-              <KV label="Topic mastery" value="—" />
-              <KV label="Your last related score" value="—" />
+              <KV
+                label="Class average"
+                value={
+                  cohortStats?.cohortAvg != null
+                    ? `${Math.round(cohortStats.cohortAvg * 100)}%`
+                    : "—"
+                }
+              />
+              <KV
+                label="Completion rate"
+                value={
+                  cohortStats?.completionRate != null
+                    ? `${Math.round(cohortStats.completionRate * 100)}%`
+                    : "—"
+                }
+              />
+              <KV
+                label="Your percentile"
+                value={
+                  cohortStats?.percentile != null
+                    ? `${cohortStats.percentile}th`
+                    : "—"
+                }
+              />
+              <KV label="Your last score" value="—" />
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 10,
+                  letterSpacing: 1.3,
+                  textTransform: "uppercase",
+                  color: "var(--muted)",
+                  marginTop: 22,
+                  marginBottom: 10,
+                }}
+              >
+                Recommended prep
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--text-2)",
+                }}
+              >
+                {[
+                  "Lecture 8 - Graph representations",
+                  "Worksheet - BFS trace",
+                  "Reading - Dynamic programming basics",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
+                    <Icon name="book" size={13} color="var(--accent)" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </Card>
@@ -494,6 +643,27 @@ function QuizCardGrid({
       </div>
       <div
         style={{
+          padding: "14px 18px 2px",
+          display: "flex",
+          gap: 14,
+          alignItems: "center",
+          color: "var(--muted)",
+          fontSize: 12,
+          fontFamily: "var(--mono)",
+          letterSpacing: 0.4,
+        }}
+      >
+        <span>
+          <Icon name="results" size={12} /> {quiz.questionCount ?? 0} Qs
+        </span>
+        <span>
+          <Icon name="clock" size={12} />{" "}
+          {quiz.questionCount ? Math.max(20, quiz.questionCount * 2) : 45}m
+        </span>
+        <span style={{ marginLeft: "auto", color: "var(--text-2)" }}>0/2</span>
+      </div>
+      <div
+        style={{
           padding: "12px 18px",
           borderTop: "1px solid var(--border)",
           background: "var(--surface-2)",
@@ -547,5 +717,33 @@ function QuizCardGrid({
         </div>
       </div>
     </Card>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          color: "var(--muted)",
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: 20,
+          fontWeight: 500,
+          color: "var(--text)",
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }

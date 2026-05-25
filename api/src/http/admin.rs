@@ -44,7 +44,7 @@ pub async fn list_users(
 ) -> Result<Json<ListUsersResponse>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, email, display_name, role, created_at
-         FROM users
+         FROM tb_users
          ORDER BY created_at DESC
          LIMIT 500",
     )
@@ -89,7 +89,7 @@ pub async fn update_user_role(
         }]));
     }
 
-    let affected = sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+    let affected = sqlx::query("UPDATE tb_users SET role = $1 WHERE id = $2")
         .bind(&body.role)
         .bind(user_id)
         .execute(&state.pool)
@@ -110,7 +110,7 @@ pub async fn deactivate_user(
 ) -> Result<impl IntoResponse, ApiError> {
     // Deactivate by revoking all tokens
     sqlx::query(
-        "UPDATE api_tokens SET revoked_at = now()
+        "UPDATE tb_api_tokens SET revoked_at = now()
          WHERE user_id = $1 AND revoked_at IS NULL",
     )
     .bind(user_id)

@@ -168,6 +168,7 @@ QUESTIONS = [
 
 QUIZ = {
     "title": "Algorithms and Data Structures — Fundamentals",
+    "course": "Computer Science",
     "objectives": [
         "Understand time complexity of common algorithms",
         "Distinguish between core data structures",
@@ -193,6 +194,7 @@ class SeedResult:
     questions: list[dict] = field(default_factory=list)
     quiz_id: str | None = None
     exam_id: str | None = None
+    cohort_id: str | None = None
 
 
 def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None, label: str = "") -> dict:
@@ -312,11 +314,39 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
 
     resp = client.post("/v1/exams", json={**EXAM_BLUEPRINT, "sections": sections}, headers=auth)
     if resp.is_success:
-        exam_id = resp.json().get("id") or resp.json().get("exam_id")
+        exam_id = resp.json().get("examId") or resp.json().get("id")
         result.exam_id = exam_id
         console.print(f"  Created exam {exam_id} with {len(sections)} sections")
     else:
         console.print(f"  [yellow]Could not create exam (non-fatal):[/yellow] {resp.status_code} {resp.text[:200]}")
+
+
+def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
+    console.rule("[bold]Cohort")
+    resp = client.post(
+        "/v1/cohorts",
+        json={"name": "CS '27", "description": "Computer Science 2027 cohort"},
+        headers=auth,
+    )
+    if not resp.is_success:
+        console.print(f"  [yellow]Could not create cohort (non-fatal):[/yellow] {resp.status_code} {resp.text[:200]}")
+        return
+
+    cohort_id = resp.json().get("id")
+    result.cohort_id = cohort_id
+    console.print(f"  Created cohort {cohort_id}")
+
+    learners = [u for u in result.users if u["role"] == "learner"]
+    enrolled = 0
+    for u in learners:
+        r = client.post(
+            f"/v1/cohorts/{cohort_id}/members",
+            json={"userId": u["id"]},
+            headers=auth,
+        )
+        if r.is_success:
+            enrolled += 1
+    console.print(f"  Enrolled {enrolled}/{len(learners)} learners")
 
 
 def print_summary(result: SeedResult) -> None:
@@ -329,6 +359,7 @@ def print_summary(result: SeedResult) -> None:
     table.add_row("Questions (live)", str(len(result.questions)))
     table.add_row("Quiz", result.quiz_id or "—")
     table.add_row("Exam", result.exam_id or "—")
+    table.add_row("Cohort", result.cohort_id or "—")
     console.print(table)
 
     console.rule("[bold]Credentials")
@@ -358,18 +389,20 @@ def main() -> None:
 
         seed_users(client, result)
 
-        # Use instructor token for all write operations
         instructor = next((u for u in result.users if u["role"] == "instructor"), None)
         if not instructor:
             console.print("[red]No instructor user — cannot seed content[/red]")
             sys.exit(1)
-
         auth = {"Authorization": f"Bearer {instructor['token']}"}
+
+        admin = next((u for u in result.users if u["role"] == "admin"), None)
+        admin_auth = {"Authorization": f"Bearer {admin['token']}"} if admin else auth
 
         seed_tags(client, auth, result)
         seed_questions(client, auth, result)
         seed_quiz(client, auth, result)
         seed_exam(client, auth, result)
+        seed_cohort(client, admin_auth, result)
 
     print_summary(result)
 

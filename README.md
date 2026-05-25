@@ -1,47 +1,63 @@
 # ame
 
-Personal question collector + exam platform. Rust (Axum) backend, Next.js frontend, Postgres in Kubernetes for production.
+Quiz and exam platform. Rust (Axum) backend, Next.js 16 / React 19 frontend, Postgres.
+
+**Stack**: Rust · Axum 0.8 · sqlx · Next.js 16 · Bun · TypeScript · Tailwind 3 · Postgres 18
 
 ## Quick start
 
 ```bash
-mise install                            # install rust + bun runtimes
+mise install                            # rust + bun + uv runtimes
 make db-up                              # start Postgres in Docker (requires Colima)
 make db-migrate                         # run pending migrations
-make dev-env                            # start API on :8080 and frontend on :3000
-uv run scripts/seed.py                  # (optional) seed demo users, quizzes, and questions
+make dev-env                            # API on :8080, frontend on :3000
+uv run --script scripts/seed.py         # seed demo users, quizzes, questions
 ```
 
-## Local Database & Docker Setup
+Credentials after seeding: `learner@example.com / password123`, `instructor@example.com / password123`
 
-Postgres requires a Docker daemon. On macOS, this project recommends [Colima](https://github.com/abiosoft/colima).
+## Common tasks
 
 ```bash
-# Start colima (docker daemon)
+make check          # fmt-check + lint + tests (pre-commit gate)
+make validate       # check + e2e (pre-PR gate)
+make db-reset       # wipe DB data, recreate, migrate (use when migration checksums conflict)
+make openapi        # regenerate api/openapi.yaml + web/src/api/generated/schema.d.ts
+```
+
+## E2E tests
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"learner@example.com","password":"password123"}' | jq -r .token)
+
+E2E_API_TOKEN=$TOKEN E2E_BASE_URL=http://localhost:3000 \
+  bunx @playwright/test test --project=chromium
+```
+
+For interactive visual audits use `bunx @playwright/cli` — see `AGENTS.md` for the auth cookie pattern.
+
+## Local database
+
+Postgres runs in Docker. On macOS, [Colima](https://github.com/abiosoft/colima) is recommended.
+
+```bash
 colima start
-
-# Start the local database
 make db-up
-
-# Check database status
-docker compose -f db/docker-compose.yml ps
-
-# When finished working, bring down the database and daemon to save resources
+# ... work ...
 make db-down
 colima stop
 ```
 
-To clean up persistent database data and start entirely fresh:
-```bash
-make db-down
-rm -rf db/data/
-make db-up
-```
+## Layout
 
-- `docs/specs/` — design specs.
-- `docs/plans/` — implementation plans (executed sequentially).
-- `api/` — Rust backend.
-- `web/` — Next.js frontend.
-- `db/` — docker-compose + sqlx migrations.
+- `api/` — Rust backend
+- `web/` — Next.js frontend
+- `db/` — docker-compose + sqlx migrations
+- `design/source/src/*.jsx` — pixel-faithful UI design source of truth
+- `docs/specs/` — design specs (`2026-05-20-harus-platform-design.md` is canonical)
+- `docs/plans/` — implementation plans
+- `.tmp/` — gitignored scratch space for screenshots and playwright artifacts
 
-See `AGENTS.md` for the working conventions.
+See `AGENTS.md` for full working conventions and `AGENTS.md` → toolchain details.

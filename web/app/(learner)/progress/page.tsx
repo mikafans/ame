@@ -45,6 +45,7 @@ export default function ProgressPage() {
   const [window, setWindow] = useState<WindowType>("12w");
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [tagNames, setTagNames] = useState<Record<string, string>>({});
   const [statsLoading, setStatsLoading] = useState(true);
   const [attemptsLoading, setAttemptsLoading] = useState(true);
 
@@ -70,22 +71,34 @@ export default function ProgressPage() {
     if (!token) return;
 
     setAttemptsLoading(true);
-    makeClient(token)
-      .GET(
-        "/v1/me/attempts" as never,
-        {
-          params: { query: { limit: 200 } },
-        } as never,
-      )
-      .then(({ data }: { data?: { attempts: Attempt[]; total: number } }) => {
-        if (data?.attempts) setAttempts(data.attempts);
+    Promise.all([
+      makeClient(token)
+        .GET(
+          "/v1/me/attempts" as never,
+          { params: { query: { limit: 200 } } } as never,
+        )
+        .then(
+          ({ data }: { data?: { attempts: Attempt[]; total: number } }) =>
+            data?.attempts ?? [],
+        ),
+      makeClient(token)
+        .GET("/v1/tags" as never, {} as never)
+        .then(({ data }: { data?: { id: string; name: string }[] }) =>
+          Array.isArray(data) ? data : [],
+        ),
+    ])
+      .then(([fetchedAttempts, tags]) => {
+        setAttempts(fetchedAttempts);
+        const lookup: Record<string, string> = {};
+        for (const t of tags) lookup[t.id] = t.name;
+        setTagNames(lookup);
       })
       .catch(console.error)
       .finally(() => setAttemptsLoading(false));
   }, [token]);
 
   const weeklyAvgs = computeWeeklyAverages(attempts);
-  const tagAvgs = computeTagAverages(attempts);
+  const tagAvgs = computeTagAverages(attempts, tagNames);
   const topTags = tagAvgs.sort((a, b) => b.count - a.count).slice(0, 6);
 
   return (
@@ -509,11 +522,15 @@ function computeWeeklyAverages(attempts: Attempt[]): WeeklyAvg[] {
   }));
 }
 
-function computeTagAverages(attempts: Attempt[]): TagAvg[] {
+function computeTagAverages(
+  attempts: Attempt[],
+  tagNames: Record<string, string> = {},
+): TagAvg[] {
   const tagMap = new Map<string, { sum: number; count: number }>();
 
   for (const a of attempts) {
-    for (const tag of Object.keys(a.user_tag_deltas)) {
+    for (const tagId of Object.keys(a.user_tag_deltas)) {
+      const tag = tagNames[tagId] ?? tagId;
       if (!tagMap.has(tag)) {
         tagMap.set(tag, { sum: 0, count: 0 });
       }

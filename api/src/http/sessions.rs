@@ -7,7 +7,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ use crate::{
         error::{ApiError, FieldError},
         question::{McPayload, QuestionKind},
         session::{QuestionPlan, Session, SessionKind, SessionStatus},
-        user::Scope,
+        user::{Role, Scope},
     },
     engine::{
         elo::{EloUpdate, QuestionRating, UserTagRating},
@@ -74,8 +74,26 @@ pub struct CreateSessionResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GetSessionQuestion {
+    pub question_id: Uuid,
+    pub kind: QuestionKind,
+    pub prompt: String,
+    pub points: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_snippet: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<Vec<serde_json::Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub option_order: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct GetSessionResponse {
     pub session: Session,
+    pub questions: Vec<GetSessionQuestion>,
     pub attempts: Vec<Attempt>,
 }
 
@@ -196,9 +214,149 @@ pub async fn get_session(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetSessionResponse>, ApiError> {
-    let session = get_owned_session(&state.pool, id, user.user.id).await?;
+    let mut session = get_owned_session(&state.pool, id, user.user.id).await?;
     let attempts = list_session_attempts(&state.pool, session.id).await?;
-    Ok(Json(GetSessionResponse { session, attempts }))
+    let questions = hydrate_session_questions(&state.pool, &session).await?;
+
+    if let Some(qid) = session.quiz_id {
+        let row = sqlx::query("SELECT title, course FROM tb_quizzes WHERE id = $1")
+            .bind(qid)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(internal)?;
+        if let Some(r) = row {
+            session.quiz_title = r.try_get("title").ok();
+            session.course_title = r.try_get("course").ok();
+        }
+    }
+
+    Ok(Json(GetSessionResponse {
+        session,
+        questions,
+        attempts,
+    }))
+}
+
+async fn hydrate_session_questions(
+    pool: &PgPool,
+    session: &Session,
+) -> Result<Vec<GetSessionQuestion>, ApiError> {
+    let plan_ids: Vec<Uuid> = session
+        .question_plan
+        .items
+        .iter()
+        .map(|i| i.question_id)
+        .collect();
+
+    if plan_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let rows = sqlx::query(
+        "SELECT id, kind, prompt, points, explanation, code_snippet, payload \
+         FROM tb_questions WHERE id = ANY($1)",
+    )
+    .bind(&plan_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    // preserve plan order
+    let mut by_id: std::collections::HashMap<Uuid, _> = rows
+        .into_iter()
+        .map(|r| (r.get::<Uuid, _>("id"), r))
+        .collect();
+
+    session
+        .question_plan
+        .items
+        .iter()
+        .map(|item| {
+            let row = by_id.remove(&item.question_id).ok_or_else(|| {
+                ApiError::Internal(anyhow::anyhow!(
+                    "question {} missing from DB",
+                    item.question_id
+                ))
+            })?;
+            let kind_str: String = row.get("kind");
+            let kind = QuestionKind::from_str(&kind_str)
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid kind in DB: {e}")))?;
+            let payload: serde_json::Value = row.get("payload");
+            let options = payload
+                .get("options")
+                .cloned()
+                .and_then(|v| v.as_array().cloned())
+                .map(|arr| {
+                    arr.into_iter()
+                        .map(|opt| serde_json::json!({"text": opt}))
+                        .collect()
+                });
+            Ok(GetSessionQuestion {
+                question_id: item.question_id,
+                kind,
+                prompt: row.get("prompt"),
+                points: row.get("points"),
+                explanation: row.get("explanation"),
+                code_snippet: row.get("code_snippet"),
+                options,
+                option_order: item.option_order.clone(),
+            })
+        })
+        .collect()
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchSessionBody {
+    pub status: SessionStatus,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v1/sessions/{id}",
+    params(("id" = Uuid, Path, description = "Session id")),
+    request_body = PatchSessionBody,
+    responses(
+        (status = 200, description = "Session updated", body = Session),
+        (status = 404, description = "No such session"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn patch_session(
+    State(state): State<AppState>,
+    user: RequireAnyScope<SessionWriteScopes>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<PatchSessionBody>,
+) -> Result<Json<Session>, ApiError> {
+    let mut session = get_owned_session(&state.pool, id, user.0.user.id).await?;
+
+    match (session.status, body.status) {
+        (SessionStatus::InProgress, SessionStatus::Abandoned)
+        | (SessionStatus::Abandoned, SessionStatus::Abandoned) => {}
+        (SessionStatus::Finished, _) => {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "status".into(),
+                message: "cannot modify finished session".into(),
+            }]));
+        }
+        _ => {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "status".into(),
+                message: "only abandoning an in-progress session is supported".into(),
+            }]));
+        }
+    }
+
+    session.status = body.status;
+
+    sqlx::query("UPDATE tb_sessions SET status = $1 WHERE id = $2")
+        .bind(session.status.as_str())
+        .bind(session.id)
+        .execute(&state.pool)
+        .await
+        .map_err(internal)?;
+
+    Ok(Json(session))
 }
 
 #[utoipa::path(
@@ -295,11 +453,8 @@ async fn build_plan(
     user_id: Uuid,
     body: &CreateSessionBody,
 ) -> Result<CreatePlan, ApiError> {
-    if body.quiz_id.is_some() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "quizId".to_string(),
-            message: "quiz session hydration waits for Plan 4 quiz tables".to_string(),
-        }]));
+    if let Some(quiz_id) = body.quiz_id {
+        return build_quiz_plan(pool, quiz_id).await;
     }
     if let Some(exam_id) = body.exam_id {
         return build_exam_plan(pool, exam_id).await;
@@ -314,16 +469,16 @@ async fn build_plan(
     let tags = normalize_strings(&body.tags);
     let rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM questions q \
+         FROM tb_questions q \
          WHERE q.status = 'live' \
            AND (cardinality($1::text[]) = 0 OR q.kind = ANY($1::text[])) \
            AND (cardinality($2::text[]) = 0 OR EXISTS ( \
-                SELECT 1 FROM question_tags qt \
-                JOIN tags t ON t.id = qt.tag_id \
+                SELECT 1 FROM tb_question_tags qt \
+                JOIN tb_tags t ON t.id = qt.tag_id \
                 WHERE qt.question_id = q.id AND t.name = ANY($2::text[]) \
            )) \
            AND NOT EXISTS ( \
-                SELECT 1 FROM attempts a \
+                SELECT 1 FROM tb_attempts a \
                 WHERE a.user_id = $3 AND a.question_id = q.id \
                   AND a.created_at >= now() - interval '24 hours' \
            ) \
@@ -383,19 +538,76 @@ async fn build_plan(
     })
 }
 
+async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, ApiError> {
+    sqlx::query("SELECT id FROM tb_quizzes WHERE id = $1 AND status = 'active'")
+        .bind(quiz_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(internal)?
+        .ok_or(ApiError::NotFound { resource: "quiz" })?;
+
+    let rows = sqlx::query(
+        "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
+         FROM tb_quiz_questions qq \
+         JOIN tb_questions q ON q.id = qq.question_id \
+         WHERE qq.quiz_id = $1 AND q.status = 'live' \
+         ORDER BY qq.order_index ASC",
+    )
+    .bind(quiz_id)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    if rows.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "quizId".to_string(),
+            message: "quiz has no live questions".to_string(),
+        }]));
+    }
+
+    let mut questions = Vec::with_capacity(rows.len());
+    for row in rows {
+        let id = row.get("id");
+        let kind_str: String = row.get("kind");
+        let kind = QuestionKind::from_str(&kind_str)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid kind in DB: {e}")))?;
+        let payload: serde_json::Value = row.get("payload");
+        let option_order = option_order(kind, &payload)?;
+        questions.push(PlannedQuestion {
+            question: SessionQuestion {
+                id,
+                kind,
+                prompt: row.get("prompt"),
+                version: row.get("version"),
+                points: row.get("points"),
+                payload,
+                option_order,
+            },
+        });
+    }
+
+    Ok(CreatePlan {
+        kind: SessionKind::Quiz,
+        filter: None,
+        questions,
+        affects_rating: None,
+    })
+}
+
 async fn build_exam_plan(pool: &PgPool, exam_id: Uuid) -> Result<CreatePlan, ApiError> {
-    let exam_row =
-        sqlx::query("SELECT id, affects_rating FROM exams WHERE id = $1 AND status = 'published'")
-            .bind(exam_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(internal)?
-            .ok_or(ApiError::NotFound { resource: "exam" })?;
+    let exam_row = sqlx::query(
+        "SELECT id, affects_rating FROM tb_exams WHERE id = $1 AND status = 'published'",
+    )
+    .bind(exam_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(internal)?
+    .ok_or(ApiError::NotFound { resource: "exam" })?;
 
     let affects_rating: bool = exam_row.get("affects_rating");
 
     let section_rows = sqlx::query(
-        "SELECT question_ids, order_index FROM exam_sections \
+        "SELECT question_ids, order_index FROM tb_exam_sections \
          WHERE exam_id = $1 ORDER BY order_index ASC",
     )
     .bind(exam_id)
@@ -428,7 +640,7 @@ async fn build_exam_plan(pool: &PgPool, exam_id: Uuid) -> Result<CreatePlan, Api
 
     let q_rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM questions q WHERE q.id = ANY($1::uuid[]) AND q.status = 'live'",
+         FROM tb_questions q WHERE q.id = ANY($1::uuid[]) AND q.status = 'live'",
     )
     .bind(&all_ids)
     .fetch_all(pool)
@@ -491,7 +703,7 @@ fn option_order(
 
 async fn insert_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
     sqlx::query(
-        "INSERT INTO sessions \
+        "INSERT INTO tb_sessions \
          (id, user_id, kind, quiz_id, exam_id, filter, question_plan, status, affects_rating, \
           rating_snapshot, result, deadline_at, started_at, finished_at) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
@@ -520,7 +732,7 @@ async fn get_owned_session(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<Ses
     let row = sqlx::query(
         "SELECT id, user_id, kind, quiz_id, exam_id, filter, question_plan, status, affects_rating, \
                 rating_snapshot, result, deadline_at, started_at, finished_at \
-         FROM sessions WHERE id = $1 AND user_id = $2",
+         FROM tb_sessions WHERE id = $1 AND user_id = $2",
     )
     .bind(id)
     .bind(user_id)
@@ -556,6 +768,8 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
         deadline_at: row.get("deadline_at"),
         started_at: row.get("started_at"),
         finished_at: row.get("finished_at"),
+        quiz_title: None,
+        course_title: None,
     })
 }
 
@@ -566,7 +780,7 @@ async fn load_runtime_question(
 ) -> Result<RuntimeQuestion, ApiError> {
     let row = sqlx::query(
         "SELECT id, kind, payload, version, points, rating, attempts_count \
-         FROM questions WHERE id = $1",
+         FROM tb_questions WHERE id = $1",
     )
     .bind(question_id)
     .fetch_optional(pool)
@@ -600,9 +814,9 @@ async fn load_user_tag_ratings(
     let rows = sqlx::query(
         "SELECT t.id, COALESCE(utr.rating, 1200::double precision) AS rating, \
                 COALESCE(utr.attempts_count, 0) AS attempts_count \
-         FROM question_tags qt \
-         JOIN tags t ON t.id = qt.tag_id \
-         LEFT JOIN user_tag_ratings utr ON utr.tag_id = t.id AND utr.user_id = $1 \
+         FROM tb_question_tags qt \
+         JOIN tb_tags t ON t.id = qt.tag_id \
+         LEFT JOIN tb_user_tag_ratings utr ON utr.tag_id = t.id AND utr.user_id = $1 \
          WHERE qt.question_id = $2",
     )
     .bind(user_id)
@@ -635,9 +849,10 @@ async fn existing_attempts_by_question(
 async fn list_session_attempts(pool: &PgPool, session_id: Uuid) -> Result<Vec<Attempt>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, user_id, question_id, question_version, session_id, response, presentation, \
-                is_correct, score, time_to_answer_ms, rating_before_user_avg, \
-                rating_before_question, user_tag_deltas, question_delta, created_at \
-         FROM attempts WHERE session_id = $1 ORDER BY created_at ASC",
+                is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
+                rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
+                created_at \
+         FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
     )
     .bind(session_id)
     .fetch_all(pool)
@@ -661,6 +876,8 @@ fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
         presentation: serde_json::from_value(presentation).map_err(anyhow::Error::from)?,
         is_correct: row.get("is_correct"),
         score: row.get("score"),
+        grade_status: row.get("grade_status"),
+        grader_notes: row.get("grader_notes"),
         time_to_answer_ms: row.get("time_to_answer_ms"),
         rating_before_user_avg: row.get("rating_before_user_avg"),
         rating_before_question: row.get("rating_before_question"),
@@ -673,11 +890,11 @@ fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
 async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), ApiError> {
     let attempt = &outcome.attempt;
     sqlx::query(
-        "INSERT INTO attempts \
+        "INSERT INTO tb_attempts \
          (id, user_id, question_id, question_version, session_id, response, presentation, \
-          is_correct, score, time_to_answer_ms, rating_before_user_avg, rating_before_question, \
-          user_tag_deltas, question_delta, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+          is_correct, score, grade_status, time_to_answer_ms, rating_before_user_avg, \
+          rating_before_question, user_tag_deltas, question_delta, created_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
     )
     .bind(attempt.id)
     .bind(attempt.user_id)
@@ -688,6 +905,7 @@ async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), Ap
     .bind(serde_json::to_value(&attempt.presentation).map_err(anyhow::Error::from)?)
     .bind(attempt.is_correct)
     .bind(attempt.score)
+    .bind(&attempt.grade_status)
     .bind(attempt.time_to_answer_ms)
     .bind(attempt.rating_before_user_avg)
     .bind(attempt.rating_before_question)
@@ -708,7 +926,7 @@ async fn max_points_by_question(
         return Ok(HashMap::new());
     }
     let ids: Vec<Uuid> = attempts.iter().map(|attempt| attempt.question_id).collect();
-    let rows = sqlx::query("SELECT id, points FROM questions WHERE id = ANY($1::uuid[])")
+    let rows = sqlx::query("SELECT id, points FROM tb_questions WHERE id = ANY($1::uuid[])")
         .bind(&ids)
         .fetch_all(pool)
         .await
@@ -721,7 +939,7 @@ async fn max_points_by_question(
 }
 
 async fn update_finished_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
-    sqlx::query("UPDATE sessions SET status = $2, result = $3, finished_at = $4 WHERE id = $1")
+    sqlx::query("UPDATE tb_sessions SET status = $2, result = $3, finished_at = $4 WHERE id = $1")
         .bind(session.id)
         .bind(session.status.as_str())
         .bind(&session.result)
@@ -738,7 +956,7 @@ async fn persist_elo(
     question_id: Uuid,
     elo: &EloUpdate,
 ) -> Result<(), ApiError> {
-    sqlx::query("UPDATE questions SET rating = $2, attempts_count = $3 WHERE id = $1")
+    sqlx::query("UPDATE tb_questions SET rating = $2, attempts_count = $3 WHERE id = $1")
         .bind(question_id)
         .bind(elo.question.rating_after)
         .bind(elo.question.attempts_after)
@@ -748,7 +966,7 @@ async fn persist_elo(
 
     for tag in &elo.user_tags {
         sqlx::query(
-            "INSERT INTO user_tag_ratings (user_id, tag_id, rating, attempts_count, last_updated) \
+            "INSERT INTO tb_user_tag_ratings (user_id, tag_id, rating, attempts_count, last_updated) \
              VALUES ($1, $2, $3, $4, now()) \
              ON CONFLICT (user_id, tag_id) DO UPDATE \
              SET rating = EXCLUDED.rating, \
@@ -782,11 +1000,177 @@ fn internal<E: Into<anyhow::Error>>(e: E) -> ApiError {
     ApiError::Internal(e.into())
 }
 
+#[utoipa::path(
+    patch,
+    path = "/v1/sessions/{id}/answers",
+    params(("id" = Uuid, Path, description = "Session id")),
+    responses(
+        (status = 204, description = "Draft saved"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn autosave_answers(
+    _user: AuthenticatedUser,
+    Path(_id): Path<Uuid>,
+    Json(_body): Json<serde_json::Value>,
+) -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PendingAttemptRow {
+    pub attempt_id: Uuid,
+    pub session_id: Uuid,
+    pub user_id: Uuid,
+    pub user_email: String,
+    pub user_display_name: String,
+    pub question_id: Uuid,
+    pub question_prompt: String,
+    pub response_body: String,
+    pub response_word_count: i32,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/attempts/pending",
+    responses(
+        (status = 200, description = "Pending manual attempts", body = Vec<PendingAttemptRow>),
+        (status = 403, description = "Not instructor or admin"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_pending_attempts(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<Vec<PendingAttemptRow>>, ApiError> {
+    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
+        return Err(ApiError::ScopeRequired("instructor"));
+    }
+
+    let rows = sqlx::query(
+        "SELECT a.id AS attempt_id, a.session_id, a.user_id, \
+                u.email AS user_email, u.display_name AS user_display_name, \
+                a.question_id, q.prompt AS question_prompt, \
+                (a.response->>'body') AS response_body, \
+                (a.response->>'word_count')::int AS response_word_count, \
+                a.created_at \
+         FROM tb_attempts a \
+         JOIN tb_users u ON u.id = a.user_id \
+         JOIN tb_questions q ON q.id = a.question_id \
+         WHERE a.grade_status = 'pending_manual' \
+         ORDER BY a.created_at ASC",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    let result = rows
+        .into_iter()
+        .map(|row| PendingAttemptRow {
+            attempt_id: row.get("attempt_id"),
+            session_id: row.get("session_id"),
+            user_id: row.get("user_id"),
+            user_email: row.get("user_email"),
+            user_display_name: row.get("user_display_name"),
+            question_id: row.get("question_id"),
+            question_prompt: row.get("question_prompt"),
+            response_body: row
+                .get::<Option<String>, _>("response_body")
+                .unwrap_or_default(),
+            response_word_count: row
+                .get::<Option<i32>, _>("response_word_count")
+                .unwrap_or(0),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct GradeAttemptBody {
+    pub score: f64,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v1/attempts/{id}/grade",
+    params(("id" = Uuid, Path, description = "Attempt id")),
+    request_body = GradeAttemptBody,
+    responses(
+        (status = 200, description = "Graded attempt", body = Attempt),
+        (status = 403, description = "Not instructor or admin"),
+        (status = 404, description = "No such attempt"),
+        (status = 409, description = "Attempt is not pending manual grading"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn grade_attempt(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<GradeAttemptBody>,
+) -> Result<Json<Attempt>, ApiError> {
+    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
+        return Err(ApiError::ScopeRequired("instructor"));
+    }
+
+    if body.score < 0.0 || body.score > 1.0 {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "score".into(),
+            message: "must be between 0.0 and 1.0".into(),
+        }]));
+    }
+
+    let row = sqlx::query("SELECT grade_status FROM tb_attempts WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(internal)?
+        .ok_or(ApiError::NotFound {
+            resource: "attempt",
+        })?;
+
+    let grade_status: String = row.get("grade_status");
+    if grade_status != "pending_manual" {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "grade_status".into(),
+            message: "attempt is not pending manual grading".into(),
+        }]));
+    }
+
+    let updated = sqlx::query(
+        "UPDATE tb_attempts \
+         SET score = $2, is_correct = ($2 > 0), grade_status = 'graded', grader_notes = $3 \
+         WHERE id = $1 \
+         RETURNING id, user_id, question_id, question_version, session_id, response, presentation, \
+                   is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
+                   rating_before_user_avg, rating_before_question, user_tag_deltas, \
+                   question_delta, created_at",
+    )
+    .bind(id)
+    .bind(body.score)
+    .bind(&body.notes)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    Ok(Json(row_to_attempt(updated)?))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/sessions", post(create_session))
-        .route("/v1/sessions/{id}", get(get_session))
+        .route("/v1/sessions/{id}", get(get_session).patch(patch_session))
         .route("/v1/sessions/{id}/answer", post(answer))
+        .route("/v1/sessions/{id}/answers", patch(autosave_answers))
         .route("/v1/sessions/{id}/finish", post(finish))
+        .route("/v1/attempts/pending", get(list_pending_attempts))
+        .route("/v1/attempts/{id}/grade", patch(grade_attempt))
         .with_state(state)
 }

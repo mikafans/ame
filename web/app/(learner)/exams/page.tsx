@@ -33,7 +33,7 @@ interface Exam {
   tags?: string[];
 }
 
-type TabId = "all" | "active" | "scheduled" | "draft";
+type TabId = "all" | "published" | "scheduled" | "draft";
 type ComposeStep = "form" | "sections";
 
 interface SectionDraft {
@@ -87,7 +87,7 @@ export default function ExamsPage() {
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "all", label: "All" },
-    { id: "active", label: "Active" },
+    { id: "published", label: "Active" },
     { id: "scheduled", label: "Scheduled" },
     { id: "draft", label: "Drafts" },
   ];
@@ -393,7 +393,7 @@ function ExamListItem({
   onClick: () => void;
 }) {
   const statusColor =
-    exam.status === "active"
+    exam.status === "published"
       ? "var(--accent)"
       : exam.status === "scheduled"
         ? "var(--blue, #4f8ef7)"
@@ -619,7 +619,7 @@ function ExamDetail({
               flexShrink: 0,
             }}
           >
-            {exam.status === "active" && (
+            {exam.status === "published" && (
               <button
                 onClick={onStart}
                 disabled={starting}

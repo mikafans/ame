@@ -49,15 +49,18 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
-        .bind(user_id)
-        .bind(format!("test-user-{user_id}"))
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(user_id)
+    .bind(format!("test-user-{user_id}"))
+    .bind(format!("stats-{user_id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
     let scopes_vec: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)
@@ -77,7 +80,7 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
         _ => json!({ "accepted": ["42"], "normalize": "exact", "judge": "exact" }),
     };
     sqlx::query(
-        "INSERT INTO questions (kind, prompt, payload, status, points, created_by) \
+        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
          VALUES ($1, $2, $3, 'live', 1, $4) RETURNING id",
     )
     .bind(kind)
@@ -92,7 +95,7 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
 
 async fn make_quiz(pool: &PgPool, owner_id: Uuid) -> Uuid {
     sqlx::query(
-        "INSERT INTO quizzes (title, status, created_by) VALUES ($1, 'active', $2) RETURNING id",
+        "INSERT INTO tb_quizzes (title, status, created_by) VALUES ($1, 'active', $2) RETURNING id",
     )
     .bind("Test Quiz")
     .bind(owner_id)
@@ -121,7 +124,7 @@ async fn make_finished_session_for_quiz(
         "pending_manual_count": 0
     });
     sqlx::query(
-        "INSERT INTO sessions (id, user_id, kind, quiz_id, question_plan, status, affects_rating, \
+        "INSERT INTO tb_sessions (id, user_id, kind, quiz_id, question_plan, status, affects_rating, \
          rating_snapshot, result, finished_at) \
          VALUES ($1, $2, 'quiz', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
     )
@@ -136,7 +139,7 @@ async fn make_finished_session_for_quiz(
 
     // insert attempt
     sqlx::query(
-        "INSERT INTO attempts (user_id, question_id, question_version, session_id, response, \
+        "INSERT INTO tb_attempts (user_id, question_id, question_version, session_id, response, \
          is_correct, score, rating_before_user_avg, rating_before_question, user_tag_deltas, \
          question_delta, time_to_answer_ms) \
          VALUES ($1, $2, 1, $3, $4::jsonb, $5, $6, 1200, 1400, '{}'::jsonb, 0, 5000)",
@@ -264,8 +267,9 @@ async fn stats_endpoints_require_stats_read_scope() {
         return;
     }
     let pool = setup_db().await;
-    // token with quiz.read only (no stats.read)
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    // token can create/read source objects, but intentionally lacks stats.read.
+    let (user_id, bearer) =
+        make_user_with_scopes(&pool, &["quiz.read", "quiz.write", "attempt.write"]).await;
     let quiz_id = make_quiz(&pool, user_id).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
@@ -341,7 +345,7 @@ async fn post_message_in_app_creates_record() {
 
     // verify stored
     let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM messages WHERE from_user_id = $1 AND to_user_id = $2",
+        "SELECT count(*) FROM tb_messages WHERE from_user_id = $1 AND to_user_id = $2",
     )
     .bind(from_id)
     .bind(to_id)
@@ -380,13 +384,14 @@ async fn post_message_email_channel_queues_without_sending() {
     assert_eq!(body["status"], "queued", "email channel stays queued");
 
     // stored in DB
-    let row: (String,) =
-        sqlx::query_as("SELECT status FROM messages WHERE from_user_id = $1 AND to_user_id = $2")
-            .bind(from_id)
-            .bind(to_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let row: (String,) = sqlx::query_as(
+        "SELECT status FROM tb_messages WHERE from_user_id = $1 AND to_user_id = $2",
+    )
+    .bind(from_id)
+    .bind(to_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(row.0, "queued");
 }
 

@@ -47,12 +47,15 @@ fn skip_if_no_db() -> bool {
 
 async fn make_user(pool: &PgPool) -> Uuid {
     let id = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
-        .bind(id)
-        .bind(format!("planner-test-{id}"))
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(id)
+    .bind(format!("planner-test-{id}"))
+    .bind(format!("planner-{id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
     id
 }
 
@@ -172,7 +175,7 @@ async fn quiz_planner_excludes_recent_attempts_for_user() {
     }
 
     sqlx::query(
-        "INSERT INTO attempts \
+        "INSERT INTO tb_attempts \
          (user_id, question_id, question_version, response, presentation, is_correct, score, \
           rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta) \
          VALUES ($1, $2, $3, $4, $5, true, 1.0, 1200, 1400, '{}'::jsonb, 0)",

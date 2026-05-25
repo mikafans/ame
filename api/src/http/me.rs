@@ -106,7 +106,7 @@ pub async fn list_keys(
 ) -> Result<Json<ListKeysResponse>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, name, scopes, last_used_at, created_at
-         FROM api_tokens
+         FROM tb_api_tokens
          WHERE user_id = $1 AND revoked_at IS NULL
          ORDER BY created_at DESC",
     )
@@ -170,7 +170,7 @@ pub async fn create_key(
     let prefix = format!("hk_{}", &secret[..8]);
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user.user.id)
@@ -198,7 +198,7 @@ pub async fn rotate_key(
 ) -> Result<Json<RotateKeyResponse>, ApiError> {
     // Verify key belongs to caller and is active
     let row = sqlx::query(
-        "SELECT id, name, scopes FROM api_tokens
+        "SELECT id, name, scopes FROM tb_api_tokens
          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(key_id)
@@ -212,7 +212,7 @@ pub async fn rotate_key(
     let scopes: Vec<String> = row.get("scopes");
 
     // Revoke old key
-    sqlx::query("UPDATE api_tokens SET revoked_at = now() WHERE id = $1")
+    sqlx::query("UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1")
         .bind(key_id)
         .execute(&state.pool)
         .await
@@ -224,7 +224,7 @@ pub async fn rotate_key(
     let new_hash = hash_secret(&new_secret)?;
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(new_token_id)
     .bind(user.user.id)
@@ -246,7 +246,7 @@ pub async fn revoke_key(
     Path(key_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let affected = sqlx::query(
-        "UPDATE api_tokens SET revoked_at = now()
+        "UPDATE tb_api_tokens SET revoked_at = now()
          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(key_id)
@@ -270,7 +270,7 @@ pub async fn list_webhooks(
 ) -> Result<Json<ListWebhooksResponse>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, url, events, created_at
-         FROM webhooks
+         FROM tb_webhooks
          WHERE user_id = $1 AND revoked_at IS NULL
          ORDER BY created_at DESC",
     )
@@ -309,7 +309,7 @@ pub async fn create_webhook(
     let hash = hash_secret(&secret)?;
 
     sqlx::query(
-        "INSERT INTO webhooks (id, user_id, url, events, secret_hash, signing_key)
+        "INSERT INTO tb_webhooks (id, user_id, url, events, secret_hash, signing_key)
          VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(webhook_id)
@@ -338,7 +338,7 @@ pub async fn delete_webhook(
     Path(webhook_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let affected = sqlx::query(
-        "UPDATE webhooks SET revoked_at = now()
+        "UPDATE tb_webhooks SET revoked_at = now()
          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(webhook_id)
@@ -460,11 +460,11 @@ async fn list_attempts(
     let rows = if let Some(sid) = q.session_id {
         sqlx::query(
             "SELECT id, user_id, question_id, question_version, session_id, response,
-                    presentation, is_correct, score, time_to_answer_ms,
+                    presentation, is_correct, score, grade_status, grader_notes, time_to_answer_ms,
                     rating_before_user_avg, rating_before_question,
                     user_tag_deltas, question_delta, created_at,
                     COUNT(*) OVER() AS total
-             FROM attempts
+             FROM tb_attempts
              WHERE user_id = $1 AND session_id = $2
              ORDER BY created_at DESC
              LIMIT $3 OFFSET $4",
@@ -479,11 +479,11 @@ async fn list_attempts(
     } else {
         sqlx::query(
             "SELECT id, user_id, question_id, question_version, session_id, response,
-                    presentation, is_correct, score, time_to_answer_ms,
+                    presentation, is_correct, score, grade_status, grader_notes, time_to_answer_ms,
                     rating_before_user_avg, rating_before_question,
                     user_tag_deltas, question_delta, created_at,
                     COUNT(*) OVER() AS total
-             FROM attempts
+             FROM tb_attempts
              WHERE user_id = $1
              ORDER BY created_at DESC
              LIMIT $2 OFFSET $3",
@@ -513,6 +513,8 @@ async fn list_attempts(
             presentation: serde_json::from_value(r.get("presentation")).unwrap_or_default(),
             is_correct: r.get("is_correct"),
             score: r.get("score"),
+            grade_status: r.get("grade_status"),
+            grader_notes: r.get("grader_notes"),
             time_to_answer_ms: r.get("time_to_answer_ms"),
             rating_before_user_avg: r.get("rating_before_user_avg"),
             rating_before_question: r.get("rating_before_question"),
@@ -523,6 +525,281 @@ async fn list_attempts(
         .collect();
 
     Ok(Json(ListAttemptsResponse { attempts, total }))
+}
+
+// ── cohort stats ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CohortStatsQuery {
+    pub quiz_id: Uuid,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CohortStatsBucket {
+    pub bucket_start: f64,
+    pub bucket_end: f64,
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CohortStatsResponse {
+    pub cohort_avg: Option<f64>,
+    pub percentile: Option<i32>,
+    pub completion_rate: Option<f64>,
+    pub histogram: Vec<CohortStatsBucket>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/me/cohort-stats",
+    params(
+        ("quizId" = Uuid, Query, description = "Quiz to compare against"),
+    ),
+    responses(
+        (status = 200, description = "Cohort stats", body = CohortStatsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+async fn get_cohort_stats(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Query(q): Query<CohortStatsQuery>,
+) -> Result<Json<CohortStatsResponse>, ApiError> {
+    let quiz_id = q.quiz_id;
+    let user_id = auth.user.id;
+
+    let cohort_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT cm.cohort_id FROM tb_cohort_memberships cm WHERE cm.user_id = $1 LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let Some(cohort_id) = cohort_id else {
+        return Ok(Json(CohortStatsResponse {
+            cohort_avg: None,
+            percentile: None,
+            completion_rate: None,
+            histogram: empty_histogram(),
+        }));
+    };
+
+    let total_members: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM tb_cohort_memberships WHERE cohort_id = $1")
+            .bind(cohort_id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if total_members == 0 {
+        return Ok(Json(CohortStatsResponse {
+            cohort_avg: None,
+            percentile: None,
+            completion_rate: None,
+            histogram: empty_histogram(),
+        }));
+    }
+
+    let agg_row = sqlx::query(
+        "SELECT
+            avg((s.result->>'percent')::double precision) as cohort_avg,
+            count(distinct s.user_id) as finishers
+         FROM tb_sessions s
+         WHERE s.quiz_id = $1
+           AND s.status = 'finished'
+           AND s.result IS NOT NULL
+           AND s.user_id IN (
+               SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
+           )",
+    )
+    .bind(quiz_id)
+    .bind(cohort_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let cohort_avg: Option<f64> = agg_row.get("cohort_avg");
+    let finishers: i64 = agg_row.get("finishers");
+    let completion_rate = Some(finishers as f64 / total_members as f64);
+
+    let user_score: Option<f64> = sqlx::query_scalar(
+        "SELECT (result->>'percent')::double precision
+         FROM tb_sessions
+         WHERE quiz_id = $1
+           AND user_id = $2
+           AND status = 'finished'
+           AND result IS NOT NULL
+         ORDER BY (result->>'percent')::double precision DESC
+         LIMIT 1",
+    )
+    .bind(quiz_id)
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?
+    .flatten();
+
+    let percentile: Option<i32> = if let Some(score) = user_score {
+        let count_at_or_below: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM (
+                SELECT DISTINCT ON (s.user_id) s.user_id,
+                    (s.result->>'percent')::double precision as best_score
+                FROM tb_sessions s
+                WHERE s.quiz_id = $1
+                  AND s.status = 'finished'
+                  AND s.result IS NOT NULL
+                  AND s.user_id IN (
+                      SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
+                  )
+                ORDER BY s.user_id, (s.result->>'percent')::double precision DESC
+             ) ranked
+             WHERE ranked.best_score <= $3",
+        )
+        .bind(quiz_id)
+        .bind(cohort_id)
+        .bind(score)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+        Some(((count_at_or_below as f64 / total_members as f64) * 100.0).round() as i32)
+    } else {
+        None
+    };
+
+    let hist_rows = sqlx::query(
+        "SELECT
+            floor((s.result->>'percent')::double precision * 10)::int as bucket,
+            count(*) as count
+         FROM tb_sessions s
+         WHERE s.quiz_id = $1
+           AND s.status = 'finished'
+           AND s.result IS NOT NULL
+           AND s.user_id IN (
+               SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
+           )
+         GROUP BY 1
+         ORDER BY 1",
+    )
+    .bind(quiz_id)
+    .bind(cohort_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let mut histogram = empty_histogram();
+    for row in &hist_rows {
+        let bucket: i32 = row.get::<i32, _>("bucket").clamp(0, 9);
+        let count: i64 = row.get("count");
+        histogram[bucket as usize].count += count;
+    }
+
+    Ok(Json(CohortStatsResponse {
+        cohort_avg,
+        percentile,
+        completion_rate,
+        histogram,
+    }))
+}
+
+fn empty_histogram() -> Vec<CohortStatsBucket> {
+    (0..10)
+        .map(|i| CohortStatsBucket {
+            bucket_start: i as f64 * 0.1,
+            bucket_end: (i + 1) as f64 * 0.1,
+            count: 0,
+        })
+        .collect()
+}
+
+// ── cohort management ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCohortBody {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCohortResponse {
+    pub id: Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AddCohortMemberBody {
+    pub user_id: Uuid,
+}
+
+pub struct CohortWriteScopes;
+impl ScopeOneOf for CohortWriteScopes {
+    const SCOPES: &'static [Scope] = &[Scope::Admin];
+}
+
+async fn create_cohort(
+    State(state): State<AppState>,
+    _auth: RequireAnyScope<CohortWriteScopes>,
+    Json(body): Json<CreateCohortBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    if body.name.trim().is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "name".into(),
+            message: "must not be empty".into(),
+        }]));
+    }
+    let id = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_cohorts (id, name, description) VALUES ($1, $2, $3)")
+        .bind(id)
+        .bind(&body.name)
+        .bind(&body.description)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateCohortResponse {
+            id,
+            name: body.name,
+        }),
+    ))
+}
+
+async fn add_cohort_member(
+    State(state): State<AppState>,
+    _auth: RequireAnyScope<CohortWriteScopes>,
+    Path(cohort_id): Path<Uuid>,
+    Json(body): Json<AddCohortMemberBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_cohorts WHERE id = $1)")
+        .bind(cohort_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    if !exists {
+        return Err(ApiError::NotFound { resource: "cohort" });
+    }
+
+    sqlx::query(
+        "INSERT INTO tb_cohort_memberships (id, cohort_id, user_id) VALUES ($1, $2, $3)
+         ON CONFLICT (cohort_id, user_id) DO NOTHING",
+    )
+    .bind(Uuid::now_v7())
+    .bind(cohort_id)
+    .bind(body.user_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
@@ -536,5 +813,8 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/me/webhooks", post(create_webhook))
         .route("/v1/me/webhooks/{id}", delete(delete_webhook))
         .route("/v1/me/attempts", get(list_attempts))
+        .route("/v1/me/cohort-stats", get(get_cohort_stats))
+        .route("/v1/cohorts", post(create_cohort))
+        .route("/v1/cohorts/{id}/members", post(add_cohort_member))
         .with_state(state)
 }

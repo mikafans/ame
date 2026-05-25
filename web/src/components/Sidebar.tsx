@@ -29,6 +29,12 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
             icon: "author",
             section: "Teach",
           },
+          {
+            id: "grading",
+            label: "Grading",
+            icon: "grade",
+            section: "Teach",
+          },
         ]
       : []),
     ...(showAgent && isInstructor

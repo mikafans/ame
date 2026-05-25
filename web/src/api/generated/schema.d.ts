@@ -4,6 +4,70 @@
  */
 
 export interface paths {
+    "/v1/attempts/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_pending_attempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/attempts/{id}/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["grade_attempt"];
+        trace?: never;
+    };
+    "/v1/exams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_exams"];
+        put?: never;
+        post: operations["compose_exam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/exams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_exam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_exam_status"];
+        trace?: never;
+    };
     "/v1/exams/{id}/stats": {
         parameters: {
             query?: never;
@@ -46,6 +110,38 @@ export interface paths {
         };
         /** List the current user's attempts. */
         get: operations["list_attempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/cohort-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_cohort_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_stats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -192,7 +288,76 @@ export interface paths {
         /** List quizzes. */
         get: operations["list_quizzes"];
         put?: never;
+        /**
+         * Create a new quiz.
+         * @description Only instructors and admins may create quizzes. Learners receive 403.
+         */
+        post: operations["create_quiz"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/quizzes/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get quiz count with optional filters. */
+        get: operations["count_quizzes"];
+        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/quizzes/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate_quiz"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/quizzes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_quiz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_quiz"];
+        trace?: never;
+    };
+    "/v1/quizzes/{id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["add_quiz_question"];
         delete?: never;
         options?: never;
         head?: never;
@@ -244,7 +409,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["patch_session"];
         trace?: never;
     };
     "/v1/sessions/{id}/answer": {
@@ -261,6 +426,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions/{id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["autosave_answers"];
         trace?: never;
     };
     "/v1/sessions/{id}/finish": {
@@ -299,6 +480,23 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddQuizQuestionBody: {
+            kind?: null | components["schemas"]["QuestionKind"];
+            /** Format: int32 */
+            pointsOverride?: number | null;
+            prompt?: string | null;
+            /**
+             * Format: uuid
+             * @description Link an existing bank question by ID.
+             */
+            questionId?: string | null;
+        };
+        AddQuizQuestionResponse: {
+            /** Format: int32 */
+            orderIndex: number;
+            /** Format: uuid */
+            questionId: string;
+        };
         AnswerSessionBody: {
             /** Format: uuid */
             questionId: string;
@@ -314,6 +512,8 @@ export interface components {
         Attempt: {
             /** Format: date-time */
             created_at: string;
+            grade_status: string;
+            grader_notes?: string | null;
             /** Format: uuid */
             id: string;
             is_correct: boolean;
@@ -375,6 +575,57 @@ export interface components {
             body: string;
             name: string;
         };
+        CohortStatsBucket: {
+            /** Format: double */
+            bucketEnd: number;
+            /** Format: double */
+            bucketStart: number;
+            /** Format: int64 */
+            count: number;
+        };
+        CohortStatsQuery: {
+            /** Format: uuid */
+            quizId: string;
+        };
+        CohortStatsResponse: {
+            /** Format: double */
+            cohortAvg?: number | null;
+            /** Format: double */
+            completionRate?: number | null;
+            histogram: components["schemas"]["CohortStatsBucket"][];
+            /** Format: int32 */
+            percentile?: number | null;
+        };
+        ComposeExamBody: {
+            affectsRating?: boolean | null;
+            description?: string | null;
+            /** Format: int32 */
+            duration?: number | null;
+            method?: string | null;
+            name: string;
+            objectives?: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            sections: components["schemas"]["SectionSpec"][];
+        };
+        ComposeExamResponse: {
+            /** Format: uuid */
+            examId: string;
+            sections: components["schemas"]["ExamSection"][];
+            /** Format: int32 */
+            totalPoints: number;
+            warnings?: string[];
+        };
+        CountQuizzesQuery: {
+            cats?: string | null;
+            diff?: string | null;
+            tags?: string | null;
+            types?: string | null;
+        };
+        CountQuizzesResponse: {
+            /** Format: int64 */
+            count: number;
+        };
         CreateKeyBody: {
             label: string;
             scopes: string[];
@@ -395,6 +646,18 @@ export interface components {
         };
         CreateQuestionsResponse: {
             questions: components["schemas"]["Question"][];
+        };
+        CreateQuizBody: {
+            course?: string | null;
+            difficulty?: string | null;
+            /** Format: int32 */
+            duration?: number | null;
+            objectives?: string[] | null;
+            title: string;
+        };
+        CreateQuizResponse: {
+            quiz: components["schemas"]["CreatedQuiz"];
+            quizId: string;
         };
         CreateSessionBody: {
             cats?: string[];
@@ -428,6 +691,17 @@ export interface components {
             id: string;
             secret: string;
         };
+        CreatedQuiz: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            /** Format: uuid */
+            id: string;
+            objectives: string[];
+            status: string;
+            title: string;
+        };
         DistributionBucket: {
             /** Format: int32 */
             bucket: number;
@@ -440,6 +714,53 @@ export interface components {
             min_words?: number | null;
             rubric?: string | null;
         };
+        Exam: {
+            affectsRating: boolean;
+            blueprint: unknown;
+            compositionTrace?: unknown;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            /** Format: uuid */
+            id: string;
+            method: components["schemas"]["ExamMethod"];
+            name: string;
+            objectives: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            showResultsDuring: boolean;
+            status: components["schemas"]["ExamStatus"];
+            /** Format: int32 */
+            totalPoints: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {string} */
+        ExamMethod: "manual" | "agent";
+        /**
+         * @description A resolved section of an exam.
+         *
+         *     Exactly one of `question_ids` (static) or `mix` (dynamic) is non-null.
+         */
+        ExamSection: {
+            /** Format: uuid */
+            examId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            itemsCount: number;
+            mix?: unknown;
+            /** Format: int32 */
+            orderIndex: number;
+            questionIds?: string[] | null;
+            title: string;
+            /** Format: double */
+            weight: number;
+        };
         ExamStatsResponse: {
             /** Format: double */
             passRate: number;
@@ -449,6 +770,8 @@ export interface components {
             /** Format: double */
             timeP95?: number | null;
         };
+        /** @enum {string} */
+        ExamStatus: "draft" | "published" | "archived";
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
             session: components["schemas"]["Session"];
@@ -465,6 +788,10 @@ export interface components {
             objectives: string[];
             warnings: string[];
         };
+        GetExamResponse: {
+            exam: components["schemas"]["Exam"];
+            sections: components["schemas"]["ExamSection"][];
+        };
         GetQuizResponse: {
             /** Format: date-time */
             createdAt: string;
@@ -479,9 +806,27 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        GetSessionQuestion: {
+            codeSnippet?: unknown;
+            explanation?: string | null;
+            kind: components["schemas"]["QuestionKind"];
+            optionOrder?: number[] | null;
+            options?: unknown[] | null;
+            /** Format: int32 */
+            points: number;
+            prompt: string;
+            /** Format: uuid */
+            questionId: string;
+        };
         GetSessionResponse: {
             attempts: components["schemas"]["Attempt"][];
+            questions: components["schemas"]["GetSessionQuestion"][];
             session: components["schemas"]["Session"];
+        };
+        GradeAttemptBody: {
+            notes?: string | null;
+            /** Format: double */
+            score: number;
         };
         GradeOutcome: {
             correct: boolean;
@@ -526,6 +871,9 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListExamsResponse: {
+            exams: components["schemas"]["Exam"][];
+        };
         ListKeysResponse: {
             keys: components["schemas"]["KeySummary"][];
         };
@@ -553,12 +901,43 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        MeStatsResponse: {
+            /** Format: int64 */
+            attempts_this_week: number;
+            /** Format: int64 */
+            attempts_total: number;
+            /** Format: double */
+            avg_score: number;
+            /** Format: double */
+            avg_score_delta: number;
+            /** Format: int64 */
+            best_streak: number;
+            /** Format: int64 */
+            current_streak: number;
+            /** Format: double */
+            hours_spent: number;
+            /** Format: double */
+            hours_spent_delta: number;
+            /** Format: int64 */
+            mastered_topics: number;
+            mastered_topics_delta_since: string;
+            /** Format: int64 */
+            mastered_topics_total: number;
+        };
         /**
          * @description Normalization rule applied to *both* the stored accepted answers and the
          *     user's response at grade time. See spec §"Normalize semantics".
          * @enum {string}
          */
         Normalize: "exact" | "case_insensitive_strip_accents";
+        PatchExamStatusBody: {
+            status: components["schemas"]["ExamStatus"];
+        };
+        PatchExamStatusResponse: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+        };
         PatchQuizResponse: {
             /** Format: uuid */
             id: string;
@@ -566,6 +945,27 @@ export interface components {
             status: string;
             title: string;
             warnings: string[];
+        };
+        PatchSessionBody: {
+            status: components["schemas"]["SessionStatus"];
+        };
+        PendingAttemptRow: {
+            /** Format: uuid */
+            attempt_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            question_id: string;
+            question_prompt: string;
+            response_body: string;
+            /** Format: int32 */
+            response_word_count: number;
+            /** Format: uuid */
+            session_id: string;
+            user_display_name: string;
+            user_email: string;
+            /** Format: uuid */
+            user_id: string;
         };
         PlanItem: {
             option_order?: number[] | null;
@@ -696,6 +1096,7 @@ export interface components {
             median: number;
         };
         QuizSummary: {
+            course?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -703,6 +1104,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             objectives: string[];
+            /** Format: int64 */
+            questionCount: number;
             status: string;
             title: string;
             /** Format: date-time */
@@ -720,6 +1123,24 @@ export interface components {
             sectionId: string;
             title: string;
         };
+        SectionSpec: {
+            /** Format: double */
+            difficultyMax?: number | null;
+            /** Format: double */
+            difficultyMin?: number | null;
+            /**
+             * Format: int32
+             * @description Dynamic: draw `items` questions matching these filters.
+             */
+            items?: number | null;
+            /** @description Static: explicit question ids from the bank. */
+            questionIds?: string[];
+            tags?: string[];
+            title: string;
+            types?: string[];
+            /** Format: double */
+            weight: number;
+        };
         SendMessageBody: {
             body: string;
             channel: string;
@@ -735,6 +1156,7 @@ export interface components {
         };
         Session: {
             affects_rating: boolean;
+            course_title?: string | null;
             /** Format: date-time */
             deadline_at?: string | null;
             /** Format: uuid */
@@ -748,6 +1170,7 @@ export interface components {
             question_plan: components["schemas"]["QuestionPlan"];
             /** Format: uuid */
             quiz_id?: string | null;
+            quiz_title?: string | null;
             rating_snapshot: Record<string, never>;
             result?: Record<string, never>;
             /** Format: date-time */
@@ -850,6 +1273,238 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_pending_attempts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending manual attempts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingAttemptRow"][];
+                };
+            };
+            /** @description Not instructor or admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    grade_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Attempt id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradeAttemptBody"];
+            };
+        };
+        responses: {
+            /** @description Graded attempt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attempt"];
+                };
+            };
+            /** @description Not instructor or admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such attempt */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Attempt is not pending manual grading */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_exams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of exams */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListExamsResponse"];
+                };
+            };
+        };
+    };
+    compose_exam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeExamBody"];
+            };
+        };
+        responses: {
+            /** @description Exam composed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComposeExamResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks required scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed or pool insufficient */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_exam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Exam id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exam with sections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetExamResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_exam_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Exam id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchExamStatusBody"];
+            };
+        };
+        responses: {
+            /** @description Exam status updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchExamStatusResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks required scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Exam not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid status value */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     exam_stats: {
         parameters: {
             query?: never;
@@ -945,6 +1600,56 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_cohort_stats: {
+        parameters: {
+            query: {
+                /** @description Quiz to compare against */
+                quizId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cohort stats */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortStatsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User stats summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeStatsResponse"];
+                };
             };
         };
     };
@@ -1377,6 +2082,265 @@ export interface operations {
             };
         };
     };
+    create_quiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuizBody"];
+            };
+        };
+        responses: {
+            /** @description Quiz created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateQuizResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (learner cannot create) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    count_quizzes: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated categories */
+                cats?: string;
+                /** @description Comma-separated tags */
+                tags?: string;
+                /** @description Difficulty filter */
+                diff?: string;
+                /** @description Comma-separated types */
+                types?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quiz count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountQuizzesResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generate_quiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateBody"];
+            };
+        };
+        responses: {
+            /** @description Generated quiz candidates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_quiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Quiz id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quiz detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetQuizResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such quiz */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_quiz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Quiz id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizPatch"];
+            };
+        };
+        responses: {
+            /** @description Quiz updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchQuizResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such quiz */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_quiz_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Quiz id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddQuizQuestionBody"];
+            };
+        };
+        responses: {
+            /** @description Question linked */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddQuizQuestionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such quiz or question */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     quiz_stats: {
         parameters: {
             query?: {
@@ -1494,6 +2458,40 @@ export interface operations {
             };
         };
     };
+    patch_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Session id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchSessionBody"];
+            };
+        };
+        responses: {
+            /** @description Session updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description No such session */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     answer: {
         parameters: {
             query?: never;
@@ -1528,6 +2526,27 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    autosave_answers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Session id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft saved */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

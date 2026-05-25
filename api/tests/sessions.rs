@@ -61,14 +61,17 @@ async fn make_bearer(pool: &PgPool) -> String {
         .unwrap()
         .to_string();
 
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
-        .bind(user_id)
-        .bind(format!("session-user-{user_id}"))
-        .execute(pool)
-        .await
-        .unwrap();
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) \
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(user_id)
+    .bind(format!("session-user-{user_id}"))
+    .bind(format!("session-{user_id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
          VALUES ($1, $2, 'session token', $3, $4)",
     )
     .bind(token_id)
@@ -84,15 +87,18 @@ async fn make_bearer(pool: &PgPool) -> String {
 
 async fn make_live_mc_question(pool: &PgPool) -> Uuid {
     let author_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
-        .bind(author_id)
-        .bind(format!("author-{author_id}"))
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(author_id)
+    .bind(format!("author-{author_id}"))
+    .bind(format!("author-{author_id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
 
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO questions (kind, prompt, payload, status, points, created_by) \
+        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
          VALUES ('mc', 'What color?', $1, 'live', 2, $2) \
          RETURNING id",
     )
@@ -103,7 +109,7 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
     .unwrap()
     .get("id");
     let tag_id: Uuid = sqlx::query(
-        "INSERT INTO tags (name) VALUES ('rust') \
+        "INSERT INTO tb_tags (name) VALUES ('rust') \
          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name \
          RETURNING id",
     )
@@ -112,7 +118,7 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
     .unwrap()
     .get("id");
     sqlx::query(
-        "INSERT INTO question_tags (question_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        "INSERT INTO tb_question_tags (question_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
     )
     .bind(question_id)
     .bind(tag_id)
@@ -221,4 +227,94 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
         .await
         .unwrap();
     assert_eq!(late.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn abandon_session_roundtrip() {
+    if skip_if_no_db() {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let bearer = make_bearer(&pool).await;
+    let base_url = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    let created: Value = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .json(&json!({
+            "count": 1,
+            "mode": "practice"
+        }))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let session_id = created["sessionId"].as_str().unwrap();
+
+    let patched: Value = client
+        .patch(format!("{base_url}/v1/sessions/{session_id}"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .json(&json!({ "status": "abandoned" }))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(patched["status"], "abandoned");
+
+    let revive = client
+        .patch(format!("{base_url}/v1/sessions/{session_id}"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .json(&json!({ "status": "in_progress" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(revive.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn patch_session_rejects_finished_target() {
+    if skip_if_no_db() {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let bearer = make_bearer(&pool).await;
+    let base_url = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    let created: Value = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .json(&json!({
+            "count": 1,
+            "mode": "practice"
+        }))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let session_id = created["sessionId"].as_str().unwrap();
+
+    let finished = client
+        .patch(format!("{base_url}/v1/sessions/{session_id}"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .json(&json!({ "status": "finished" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(finished.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }

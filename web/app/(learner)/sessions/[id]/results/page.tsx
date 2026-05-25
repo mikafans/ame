@@ -12,20 +12,36 @@ interface Answer {
   points: number;
   max: number;
   type: "mc" | "tf" | "short" | "essay" | "code";
+  prompt: string;
   given: string;
   note: string;
+  gradeStatus: string;
 }
 
 interface ResultData {
   id: string;
-  quiz_title: string;
-  course: string;
-  attempt_number: number;
-  total_attempts: number;
+  quiz_id?: string;
+  quiz_title: string | null;
+  course: string | null;
+  attempt_number: number | null;
+  total_attempts: number | null;
   score: number;
   total: number;
   feedback?: string;
   answers: Answer[];
+}
+
+interface CohortHistogramBucket {
+  bucket_start: number;
+  bucket_end: number;
+  count: number;
+}
+
+interface CohortStats {
+  cohortAvg: number | null;
+  percentile: number | null;
+  completionRate: number | null;
+  histogram: CohortHistogramBucket[];
 }
 
 export default function ResultsPage({
@@ -36,6 +52,7 @@ export default function ResultsPage({
   const { id } = use(params);
   const { token } = useAuth();
   const [data, setData] = useState<ResultData | null>(null);
+  const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
   const [shareModal, setShareModal] = useState<{
     open: boolean;
     kind: string;
@@ -47,8 +64,60 @@ export default function ResultsPage({
     if (!token) return;
     makeClient(token)
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
-      .then(({ data: d }: { data?: ResultData }) => {
-        if (d) setData(d);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then(({ data: d }: { data?: any }) => {
+        if (!d?.session) return;
+        const session = d.session;
+        const questions: any[] = d.questions ?? [];
+        const attempts: any[] = d.attempts ?? [];
+        const byQuestion = new Map(
+          attempts.map((a: any) => [a.question_id, a]),
+        );
+        const result = session.result ?? {};
+        setData({
+          id: session.id,
+          quiz_id: session.quiz_id,
+          quiz_title: session.quiz_title ?? null,
+          course: session.course_title ?? null,
+          attempt_number: null,
+          total_attempts: null,
+          score: result.points_awarded ?? 0,
+          total: result.max_points ?? 0,
+          answers: questions.map((q: any) => {
+            const attempt = byQuestion.get(q.questionId);
+            const body = attempt?.response?.body || attempt?.response?.answer;
+            const score = attempt?.score ?? 0;
+            const points = Math.round(score * q.points);
+            const status = attempt?.grade_status ?? "ungraded";
+            return {
+              qid: q.questionId,
+              correct: attempt?.is_correct ?? false,
+              points: points,
+              max: q.points,
+              type: q.kind,
+              prompt: q.prompt,
+              given: typeof body === "string" ? body : "",
+              gradeStatus: status,
+              note:
+                status === "pending_manual"
+                  ? "Pending manual review"
+                  : status === "graded"
+                    ? ""
+                    : "Not graded yet",
+            };
+          }),
+        });
+        if (session.quiz_id) {
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${session.quiz_id}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+            .then((r) => (r.ok ? r.json() : null))
+            .then((cs: CohortStats | null) => {
+              if (cs) setCohortStats(cs);
+            })
+            .catch(() => {});
+        }
       })
       .catch(console.error);
   }, [token, id]);
@@ -71,9 +140,16 @@ export default function ResultsPage({
     );
   }
 
-  const pct = Math.round((data.score / data.total) * 100);
+  const pct = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
   const passed = pct >= 70;
-  const kicker = `${data.course.toUpperCase()} · ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`;
+  const kickerParts = [
+    data.course ? data.course.toUpperCase() : null,
+    data.attempt_number != null
+      ? `ATTEMPT ${data.attempt_number} OF ${data.total_attempts}`
+      : null,
+  ].filter(Boolean);
+  const kicker =
+    kickerParts.length > 0 ? kickerParts.join(" · ") : "PRACTICE SESSION";
 
   const toggleExpanded = (qid: string) => {
     const next = new Set(expandedItems);
@@ -128,7 +204,7 @@ export default function ResultsPage({
               margin: 0,
             }}
           >
-            {data.quiz_title} — Results
+            {data.quiz_title ?? "Practice Session"} — Results
           </h1>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -216,7 +292,10 @@ export default function ResultsPage({
           >
             Cohort distribution
           </div>
-          <CohortHistogram userBin={Math.floor(pct / 10)} />
+          <CohortHistogram
+            userBin={Math.min(Math.floor(pct / 10), 9)}
+            histogram={cohortStats?.histogram ?? null}
+          />
           <div
             style={{
               marginTop: 12,
@@ -252,6 +331,66 @@ export default function ResultsPage({
               />{" "}
               Cohort
             </span>
+          </div>
+          {/* Stats row */}
+          <div
+            style={{
+              marginTop: 16,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 8,
+              borderTop: "1px solid var(--border)",
+              paddingTop: 14,
+            }}
+          >
+            {[
+              {
+                label: "Cohort avg",
+                value:
+                  cohortStats?.cohortAvg != null
+                    ? `${Math.round(cohortStats.cohortAvg * 100)}%`
+                    : "—",
+              },
+              {
+                label: "Percentile",
+                value:
+                  cohortStats?.percentile != null
+                    ? `${cohortStats.percentile}th`
+                    : "—",
+              },
+              {
+                label: "Completion",
+                value:
+                  cohortStats?.completionRate != null
+                    ? `${Math.round(cohortStats.completionRate * 100)}%`
+                    : "—",
+              },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 9,
+                    letterSpacing: 1.1,
+                    textTransform: "uppercase",
+                    color: "var(--muted)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "var(--serif)",
+                    fontSize: 18,
+                    fontWeight: 500,
+                    color: "var(--text)",
+                  }}
+                >
+                  {value}
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       </div>
@@ -302,7 +441,7 @@ export default function ResultsPage({
         <div>
           {data.answers.map((answer, i) => (
             <div
-              key={answer.qid}
+              key={answer.qid ?? i}
               style={{
                 padding: "18px 22px",
                 borderBottom:
@@ -349,7 +488,7 @@ export default function ResultsPage({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {answer.given.substring(0, 80)}
+                  {answer.prompt}
                 </div>
                 <div
                   style={{
@@ -423,13 +562,41 @@ export default function ResultsPage({
         </div>
       </Card>
 
+      {/* Footer actions */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 32,
+          paddingTop: 24,
+          borderTop: "1px solid var(--border)",
+        }}
+      >
+        <Button
+          variant="outline"
+          onClick={() => (window.location.href = "/library")}
+        >
+          Back to library
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => (window.location.href = "/progress")}
+        >
+          View 6-week plan
+        </Button>
+      </div>
+
       {/* Share modal */}
       {shareModal?.open && token && (
         <ShareModal
           payload={{
             kind: shareModal.kind as "quiz" | "item",
             id: shareModal.itemId || id,
-            title: shareModal.kind === "item" ? "Question" : data.quiz_title,
+            title:
+              shareModal.kind === "item"
+                ? "Question"
+                : (data.quiz_title ?? "Quiz"),
           }}
           onClose={() => setShareModal(null)}
           bearerToken={token}
@@ -448,7 +615,7 @@ function DonutChart({
   total: number;
   size: number;
 }) {
-  const pct = (correct / total) * 100;
+  const pct = total > 0 ? (correct / total) * 100 : 0;
   const circumference = 2 * Math.PI * (size / 2 - 12);
   const strokeDashoffset = circumference * (1 - pct / 100);
 
@@ -505,9 +672,26 @@ function DonutChart({
   );
 }
 
-function CohortHistogram({ userBin }: { userBin: number }) {
+function CohortHistogram({
+  userBin,
+  histogram,
+}: {
+  userBin: number;
+  histogram: CohortHistogramBucket[] | null;
+}) {
   const bins = Array.from({ length: 10 }, (_, i) => i);
-  const heights = useMemo(() => bins.map(() => Math.random() * 0.8 + 0.2), []);
+
+  const counts = useMemo(() => {
+    if (histogram && histogram.length === 10) {
+      return histogram.map((b) => b.count);
+    }
+    return null;
+  }, [histogram]);
+
+  const maxCount = useMemo(
+    () => (counts ? Math.max(...counts, 1) : 1),
+    [counts],
+  );
 
   return (
     <svg
@@ -515,15 +699,14 @@ function CohortHistogram({ userBin }: { userBin: number }) {
       height={170}
       style={{ display: "block", marginBottom: 8 }}
     >
-      {bins.map((bin, i) => {
+      {bins.map((bin) => {
         const x = (bin / 10) * 100;
-        const height = heights[i];
+        const height = counts ? counts[bin] / maxCount : 0.15;
         const barWidth = 100 / 10 / 1.5;
         const isUserBin = bin === userBin;
 
         return (
           <g key={bin}>
-            {/* Bar */}
             <rect
               x={`${x + (10 - barWidth) / 2}%`}
               y={`${100 - height * 100}%`}

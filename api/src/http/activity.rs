@@ -80,16 +80,17 @@ pub async fn activity_log_middleware(
         let token_id = parsed.id;
 
         tokio::spawn(async move {
-            let result =
-                sqlx::query("SELECT user_id FROM api_tokens WHERE id = $1 AND revoked_at IS NULL")
-                    .bind(token_id)
-                    .fetch_optional(&pool)
-                    .await;
+            let result = sqlx::query(
+                "SELECT user_id FROM tb_api_tokens WHERE id = $1 AND revoked_at IS NULL",
+            )
+            .bind(token_id)
+            .fetch_optional(&pool)
+            .await;
 
             if let Ok(Some(row)) = result {
                 let agent_id: uuid::Uuid = row.get("user_id");
                 let _ = sqlx::query(
-                    "INSERT INTO activity_log (agent_id, tool_name, method, path, status)
+                    "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
                          VALUES ($1, $2, $3, $4, $5)",
                 )
                 .bind(agent_id)

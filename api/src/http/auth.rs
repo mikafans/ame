@@ -94,7 +94,7 @@ pub async fn register(
     // Insert user
     let user_id = Uuid::now_v7();
     let result = sqlx::query(
-        "INSERT INTO users (id, email, display_name, role, password_hash)
+        "INSERT INTO tb_users (id, email, display_name, role, password_hash)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, email, display_name, role",
     )
@@ -132,7 +132,7 @@ pub async fn register(
 
     let initial_scopes = scopes_for_role(&role);
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes)
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
          VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
@@ -165,7 +165,7 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>, ApiError> {
     // Fetch user by email
     let user_row = sqlx::query(
-        "SELECT id, email, display_name, role, password_hash FROM users WHERE email = $1",
+        "SELECT id, email, display_name, role, password_hash FROM tb_users WHERE email = $1",
     )
     .bind(&body.email)
     .fetch_optional(&state.pool)
@@ -186,7 +186,7 @@ pub async fn login(
     }
 
     // Fetch or create API key
-    let token_row = sqlx::query("SELECT id FROM api_tokens WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1")
+    let token_row = sqlx::query("SELECT id FROM tb_api_tokens WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1")
         .bind(user_id)
         .fetch_optional(&state.pool)
         .await
@@ -202,7 +202,7 @@ pub async fn login(
 
         let initial_scopes = scopes_for_role(&role);
         sqlx::query(
-            "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes)
+            "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
              VALUES ($1, $2, $3, $4, $5)",
         )
         .bind(new_token_id)
@@ -221,7 +221,7 @@ pub async fn login(
     let secret = generate_secret();
     let token_hash = hash_secret(&secret)?;
 
-    sqlx::query("UPDATE api_tokens SET token_hash = $1 WHERE id = $2")
+    sqlx::query("UPDATE tb_api_tokens SET token_hash = $1 WHERE id = $2")
         .bind(&token_hash)
         .bind(token_id)
         .execute(&state.pool)
