@@ -60,6 +60,104 @@ paths:
           description: Validation failed
       security:
       - bearer_auth: []
+  /v1/exams:
+    get:
+      tags:
+      - crate::http::exams
+      operationId: list_exams
+      responses:
+        '200':
+          description: List of exams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListExamsResponse'
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - crate::http::exams
+      operationId: compose_exam
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComposeExamBody'
+        required: true
+      responses:
+        '201':
+          description: Exam composed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComposeExamResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '422':
+          description: Validation failed or pool insufficient
+      security:
+      - bearer_auth: []
+  /v1/exams/{id}:
+    get:
+      tags:
+      - crate::http::exams
+      operationId: get_exam
+      parameters:
+      - name: id
+        in: path
+        description: Exam id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Exam with sections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExamResponse'
+        '404':
+          description: Not found
+      security:
+      - bearer_auth: []
+    patch:
+      tags:
+      - crate::http::exams
+      operationId: patch_exam_status
+      parameters:
+      - name: id
+        in: path
+        description: Exam id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchExamStatusBody'
+        required: true
+      responses:
+        '200':
+          description: Exam status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchExamStatusResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '404':
+          description: Exam not found
+        '422':
+          description: Invalid status value
+      security:
+      - bearer_auth: []
   /v1/exams/{id}/stats:
     get:
       tags:
@@ -1225,6 +1323,65 @@ components:
           - integer
           - 'null'
           format: int32
+    ComposeExamBody:
+      type: object
+      required:
+      - name
+      - sections
+      properties:
+        affectsRating:
+          type:
+          - boolean
+          - 'null'
+        description:
+          type:
+          - string
+          - 'null'
+        duration:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        method:
+          type:
+          - string
+          - 'null'
+        name:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+        passingPoints:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionSpec'
+    ComposeExamResponse:
+      type: object
+      required:
+      - examId
+      - totalPoints
+      - sections
+      properties:
+        examId:
+          type: string
+          format: uuid
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamSection'
+        totalPoints:
+          type: integer
+          format: int32
+        warnings:
+          type: array
+          items:
+            type: string
     CountQuizzesQuery:
       type: object
       properties:
@@ -1489,6 +1646,111 @@ components:
           type:
           - string
           - 'null'
+    Exam:
+      type: object
+      required:
+      - id
+      - name
+      - method
+      - status
+      - blueprint
+      - totalPoints
+      - objectives
+      - affectsRating
+      - showResultsDuring
+      - createdBy
+      - createdAt
+      - updatedAt
+      properties:
+        affectsRating:
+          type: boolean
+        blueprint: {}
+        compositionTrace: {}
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        description:
+          type:
+          - string
+          - 'null'
+        durationMin:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        id:
+          type: string
+          format: uuid
+        method:
+          $ref: '#/components/schemas/ExamMethod'
+        name:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+        passingPoints:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        showResultsDuring:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/ExamStatus'
+        totalPoints:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+    ExamMethod:
+      type: string
+      enum:
+      - manual
+      - agent
+    ExamSection:
+      type: object
+      description: |-
+        A resolved section of an exam.
+
+        Exactly one of `question_ids` (static) or `mix` (dynamic) is non-null.
+      required:
+      - id
+      - examId
+      - title
+      - orderIndex
+      - weight
+      - itemsCount
+      properties:
+        examId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        itemsCount:
+          type: integer
+          format: int32
+        mix: {}
+        orderIndex:
+          type: integer
+          format: int32
+        questionIds:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+            format: uuid
+        title:
+          type: string
+        weight:
+          type: number
+          format: double
     ExamStatsResponse:
       type: object
       required:
@@ -1512,6 +1774,12 @@ components:
           - number
           - 'null'
           format: double
+    ExamStatus:
+      type: string
+      enum:
+      - draft
+      - published
+      - archived
     FinishSessionResponse:
       type: object
       required:
@@ -1563,6 +1831,18 @@ components:
           type: array
           items:
             type: string
+    GetExamResponse:
+      type: object
+      required:
+      - exam
+      - sections
+      properties:
+        exam:
+          $ref: '#/components/schemas/Exam'
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamSection'
     GetQuizResponse:
       type: object
       required:
@@ -1761,6 +2041,15 @@ components:
         total:
           type: integer
           format: int64
+    ListExamsResponse:
+      type: object
+      required:
+      - exams
+      properties:
+        exams:
+          type: array
+          items:
+            $ref: '#/components/schemas/Exam'
     ListKeysResponse:
       type: object
       required:
@@ -1890,6 +2179,24 @@ components:
       enum:
       - exact
       - case_insensitive_strip_accents
+    PatchExamStatusBody:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          $ref: '#/components/schemas/ExamStatus'
+    PatchExamStatusResponse:
+      type: object
+      required:
+      - id
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
     PatchQuizResponse:
       type: object
       required:
@@ -2350,6 +2657,47 @@ components:
           format: uuid
         title:
           type: string
+    SectionSpec:
+      type: object
+      required:
+      - title
+      - weight
+      properties:
+        difficultyMax:
+          type:
+          - number
+          - 'null'
+          format: double
+        difficultyMin:
+          type:
+          - number
+          - 'null'
+          format: double
+        items:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: 'Dynamic: draw `items` questions matching these filters.'
+        questionIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 'Static: explicit question ids from the bank.'
+        tags:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        types:
+          type: array
+          items:
+            type: string
+        weight:
+          type: number
+          format: double
     SendMessageBody:
       type: object
       required:

@@ -26,6 +26,7 @@ use utoipa::{
 
 use crate::{
     bank::questions::{QuestionFilter, QuestionInsert, QuestionPatch},
+    domain::exam::{Exam, ExamMethod, ExamSection, ExamStatus},
     domain::question::{
         CodePayload, CodeSnippet, CodeTest, EssayPayload, Judge, McPayload, Normalize, Question,
         QuestionKind, QuestionStatus, QuestionVersion, ShortPayload, Tag, TfPayload,
@@ -119,6 +120,10 @@ impl Modify for SecurityAddon {
         crate::http::me::get_me,
         crate::http::me::list_attempts,
         crate::http::me::get_cohort_stats,
+        crate::http::exams::compose_exam,
+        crate::http::exams::list_exams,
+        crate::http::exams::get_exam,
+        crate::http::exams::patch_exam_status,
     ),
     components(schemas(
         Tag,
@@ -199,6 +204,17 @@ impl Modify for SecurityAddon {
         crate::http::quizzes::CountQuizzesResponse,
         crate::http::me::MeResponse,
         crate::http::me::ListAttemptsResponse,
+        Exam,
+        ExamMethod,
+        ExamStatus,
+        ExamSection,
+        crate::http::exams::ComposeExamBody,
+        crate::http::exams::ComposeExamResponse,
+        crate::http::exams::GetExamResponse,
+        crate::http::exams::ListExamsResponse,
+        crate::http::exams::SectionSpec,
+        crate::http::exams::PatchExamStatusBody,
+        crate::http::exams::PatchExamStatusResponse,
     )),
     modifiers(&SecurityAddon),
 )]

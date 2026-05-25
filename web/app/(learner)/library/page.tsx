@@ -346,11 +346,11 @@ export default function LibraryPage() {
                 {upNext.difficulty && (
                   <Tag color="muted">{upNext.difficulty}</Tag>
                 )}
-                <Tag color="amber">
-                  {daysUntilDue(upNext.due_date) !== null
-                    ? `Due in ${daysUntilDue(upNext.due_date)} days`
-                    : "Due in 2 days"}
-                </Tag>
+                {daysUntilDue(upNext.due_date) !== null && (
+                  <Tag color="amber">
+                    Due in {daysUntilDue(upNext.due_date)} days
+                  </Tag>
+                )}
               </div>
               <h2
                 style={{

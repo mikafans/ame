@@ -36,6 +36,38 @@ export interface paths {
         patch: operations["grade_attempt"];
         trace?: never;
     };
+    "/v1/exams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_exams"];
+        put?: never;
+        post: operations["compose_exam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/exams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_exam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_exam_status"];
+        trace?: never;
+    };
     "/v1/exams/{id}/stats": {
         parameters: {
             query?: never;
@@ -564,6 +596,26 @@ export interface components {
             /** Format: int32 */
             percentile?: number | null;
         };
+        ComposeExamBody: {
+            affectsRating?: boolean | null;
+            description?: string | null;
+            /** Format: int32 */
+            duration?: number | null;
+            method?: string | null;
+            name: string;
+            objectives?: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            sections: components["schemas"]["SectionSpec"][];
+        };
+        ComposeExamResponse: {
+            /** Format: uuid */
+            examId: string;
+            sections: components["schemas"]["ExamSection"][];
+            /** Format: int32 */
+            totalPoints: number;
+            warnings?: string[];
+        };
         CountQuizzesQuery: {
             cats?: string | null;
             diff?: string | null;
@@ -662,6 +714,53 @@ export interface components {
             min_words?: number | null;
             rubric?: string | null;
         };
+        Exam: {
+            affectsRating: boolean;
+            blueprint: unknown;
+            compositionTrace?: unknown;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            /** Format: uuid */
+            id: string;
+            method: components["schemas"]["ExamMethod"];
+            name: string;
+            objectives: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            showResultsDuring: boolean;
+            status: components["schemas"]["ExamStatus"];
+            /** Format: int32 */
+            totalPoints: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {string} */
+        ExamMethod: "manual" | "agent";
+        /**
+         * @description A resolved section of an exam.
+         *
+         *     Exactly one of `question_ids` (static) or `mix` (dynamic) is non-null.
+         */
+        ExamSection: {
+            /** Format: uuid */
+            examId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            itemsCount: number;
+            mix?: unknown;
+            /** Format: int32 */
+            orderIndex: number;
+            questionIds?: string[] | null;
+            title: string;
+            /** Format: double */
+            weight: number;
+        };
         ExamStatsResponse: {
             /** Format: double */
             passRate: number;
@@ -671,6 +770,8 @@ export interface components {
             /** Format: double */
             timeP95?: number | null;
         };
+        /** @enum {string} */
+        ExamStatus: "draft" | "published" | "archived";
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
             session: components["schemas"]["Session"];
@@ -686,6 +787,10 @@ export interface components {
             candidates: unknown[];
             objectives: string[];
             warnings: string[];
+        };
+        GetExamResponse: {
+            exam: components["schemas"]["Exam"];
+            sections: components["schemas"]["ExamSection"][];
         };
         GetQuizResponse: {
             /** Format: date-time */
@@ -766,6 +871,9 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListExamsResponse: {
+            exams: components["schemas"]["Exam"][];
+        };
         ListKeysResponse: {
             keys: components["schemas"]["KeySummary"][];
         };
@@ -822,6 +930,14 @@ export interface components {
          * @enum {string}
          */
         Normalize: "exact" | "case_insensitive_strip_accents";
+        PatchExamStatusBody: {
+            status: components["schemas"]["ExamStatus"];
+        };
+        PatchExamStatusResponse: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+        };
         PatchQuizResponse: {
             /** Format: uuid */
             id: string;
@@ -1006,6 +1122,24 @@ export interface components {
             /** Format: uuid */
             sectionId: string;
             title: string;
+        };
+        SectionSpec: {
+            /** Format: double */
+            difficultyMax?: number | null;
+            /** Format: double */
+            difficultyMin?: number | null;
+            /**
+             * Format: int32
+             * @description Dynamic: draw `items` questions matching these filters.
+             */
+            items?: number | null;
+            /** @description Static: explicit question ids from the bank. */
+            questionIds?: string[];
+            tags?: string[];
+            title: string;
+            types?: string[];
+            /** Format: double */
+            weight: number;
         };
         SendMessageBody: {
             body: string;
@@ -1213,6 +1347,156 @@ export interface operations {
                 content?: never;
             };
             /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_exams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of exams */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListExamsResponse"];
+                };
+            };
+        };
+    };
+    compose_exam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeExamBody"];
+            };
+        };
+        responses: {
+            /** @description Exam composed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComposeExamResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks required scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed or pool insufficient */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_exam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Exam id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exam with sections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetExamResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_exam_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Exam id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchExamStatusBody"];
+            };
+        };
+        responses: {
+            /** @description Exam status updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchExamStatusResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks required scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Exam not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid status value */
             422: {
                 headers: {
                     [name: string]: unknown;

@@ -530,41 +530,56 @@ fn validate_compose_body(body: &ComposeExamBody) -> Result<(), ApiError> {
     }
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct PatchExamStatusBody {
+    pub status: ExamStatus,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PatchExamStatusResponse {
+    pub id: Uuid,
+    pub status: String,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v1/exams/{id}",
+    params(("id" = Uuid, Path, description = "Exam id")),
+    request_body = PatchExamStatusBody,
+    responses(
+        (status = 200, description = "Exam status updated", body = PatchExamStatusResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 403, description = "Token lacks required scope"),
+        (status = 404, description = "Exam not found"),
+        (status = 422, description = "Invalid status value"),
+    ),
+    security(("bearer_auth" = []))
+)]
 async fn patch_exam_status(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    _user: RequireAnyScope<ExamWriteScopes>,
     Path(id): Path<Uuid>,
-    Json(body): Json<serde_json::Value>,
+    Json(body): Json<PatchExamStatusBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let status = body.get("status").and_then(|v| v.as_str()).ok_or_else(|| {
-        ApiError::Validation(vec![crate::domain::error::FieldError {
-            field: "status".into(),
-            message: "required".into(),
-        }])
-    })?;
+    let status = body.status.as_str();
 
-    match status {
-        "published" | "draft" | "archived" => {}
-        other => {
-            return Err(ApiError::Validation(vec![
-                crate::domain::error::FieldError {
-                    field: "status".into(),
-                    message: format!("unknown status: {other}"),
-                },
-            ]));
-        }
-    }
-
-    sqlx::query("UPDATE exams SET status = $2, updated_at = now() WHERE id = $1")
+    let result = sqlx::query("UPDATE exams SET status = $2, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(status)
         .execute(&state.pool)
         .await
         .map_err(internal)?;
 
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound { resource: "exam" });
+    }
+
     Ok((
         StatusCode::OK,
-        Json(serde_json::json!({ "id": id, "status": status })),
+        Json(PatchExamStatusResponse {
+            id,
+            status: status.to_string(),
+        }),
     ))
 }
 

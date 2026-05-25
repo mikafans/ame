@@ -125,12 +125,13 @@ dev-env: db-up ## Kill stale processes, migrate, then start API + frontend (http
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	$(MAKE) db-migrate
-	@echo "Starting API on :8080  (logs → /tmp/ame-api.log)"
+	@mkdir -p .tmp
+	@echo "Starting API on :8080  (logs → .tmp/ame-api.log)"
 	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
 		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
-		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee /tmp/ame-api.log &
-	@echo "Starting frontend on :3000 (logs → /tmp/ame-web.log)"
-	@cd web && mise exec -- bun run dev 2>&1 | tee /tmp/ame-web.log
+		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee .tmp/ame-api.log &
+	@echo "Starting frontend on :3000 (logs → .tmp/ame-web.log)"
+	@cd web && mise exec -- bun run dev 2>&1 | tee .tmp/ame-web.log
 
 hooks-install: ## Point git at .githooks/
 	git config core.hooksPath .githooks

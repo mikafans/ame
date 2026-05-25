@@ -271,10 +271,16 @@ async fn hydrate_session_questions(
         .question_plan
         .items
         .iter()
-        .filter_map(|item| {
-            let row = by_id.remove(&item.question_id)?;
+        .map(|item| {
+            let row = by_id.remove(&item.question_id).ok_or_else(|| {
+                ApiError::Internal(anyhow::anyhow!(
+                    "question {} missing from DB",
+                    item.question_id
+                ))
+            })?;
             let kind_str: String = row.get("kind");
-            let kind = QuestionKind::from_str(&kind_str).ok()?;
+            let kind = QuestionKind::from_str(&kind_str)
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid kind in DB: {e}")))?;
             let payload: serde_json::Value = row.get("payload");
             let options = payload
                 .get("options")
@@ -285,7 +291,7 @@ async fn hydrate_session_questions(
                         .map(|opt| serde_json::json!({"text": opt}))
                         .collect()
                 });
-            Some(Ok(GetSessionQuestion {
+            Ok(GetSessionQuestion {
                 question_id: item.question_id,
                 kind,
                 prompt: row.get("prompt"),
@@ -294,7 +300,7 @@ async fn hydrate_session_questions(
                 code_snippet: row.get("code_snippet"),
                 options,
                 option_order: item.option_order.clone(),
-            }))
+            })
         })
         .collect()
 }
