@@ -49,9 +49,10 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
+    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
         .bind(user_id)
         .bind(format!("test-user-{user_id}"))
+        .bind(format!("stats-{user_id}@example.com"))
         .execute(pool)
         .await
         .unwrap();
@@ -264,8 +265,9 @@ async fn stats_endpoints_require_stats_read_scope() {
         return;
     }
     let pool = setup_db().await;
-    // token with quiz.read only (no stats.read)
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    // token can create/read source objects, but intentionally lacks stats.read.
+    let (user_id, bearer) =
+        make_user_with_scopes(&pool, &["quiz.read", "quiz.write", "attempt.write"]).await;
     let quiz_id = make_quiz(&pool, user_id).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();

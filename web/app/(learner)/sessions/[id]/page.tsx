@@ -207,7 +207,7 @@ export default function ActiveQuizPage({
         "/v1/sessions/{id}" as never,
         {
           params: { path: { id } },
-          body: { status: "abandoned" } as never,
+          body: { status: "abandoned" },
         } as never,
       );
       router.push("/sessions");

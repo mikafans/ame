@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e check validate db-up db-down db-reset db-migrate db-shell db-seed init-env dev-stop dev-env hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check validate pre-remote db-up db-down db-reset db-migrate db-shell db-seed init-env dev-stop dev-env hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -70,14 +70,23 @@ openapi: ## Regenerate api/openapi.yaml and web TypeScript schema
 
 e2e: ## Playwright (requires `make db-up`)
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run e2e || true; \
+		cd web && mise exec -- bun run e2e; \
 	else \
 		echo "[web] skipping e2e (web deps missing - run 'cd web && bun install' to enable)"; \
+	fi
+
+uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
+	@if [ -x web/node_modules/.bin/next ]; then \
+		cd web && mise exec -- bunx playwright test e2e/uiux-spec.spec.ts --project=chromium; \
+	else \
+		echo "[web] skipping uiux (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
 check: fmt-check lint test ## Pre-commit gate (read-only)
 
 validate: check e2e ## Pre-PR gate
+
+pre-remote: check test-db e2e ## Strict pre-remote gate (requires `make db-up`)
 
 db-up: ## Start Postgres in docker
 	docker compose -f db/docker-compose.yml up -d

@@ -151,7 +151,7 @@ pub async fn quiz_stats(
             SELECT
                 a.question_id,
                 avg(a.is_correct::int::double precision)          as correct_rate,
-                avg(a.time_to_answer_ms)                          as avg_time_ms,
+                avg(a.time_to_answer_ms::double precision)        as avg_time_ms,
                 -- point-biserial: (M_p - M_t) / S_t * sqrt(p * (1-p))
                 -- only defined when there is variance in session scores
                 CASE

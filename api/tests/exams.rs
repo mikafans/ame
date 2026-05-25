@@ -48,9 +48,10 @@ async fn make_bearer(pool: &PgPool) -> String {
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
+    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
         .bind(user_id)
         .bind(format!("exam-user-{user_id}"))
+        .bind(format!("exam-{user_id}@example.com"))
         .execute(pool)
         .await
         .unwrap();
@@ -64,9 +65,10 @@ async fn make_bearer(pool: &PgPool) -> String {
 
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
     let author = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
+    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
         .bind(author)
         .bind(format!("author-{author}"))
+        .bind(format!("author-{author}@example.com"))
         .execute(pool)
         .await
         .unwrap();
@@ -171,7 +173,7 @@ async fn dynamic_exam_pool_insufficient_returns_422() {
 
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["code"], "exam_pool_insufficient");
+    assert_eq!(body["error"]["code"], "exam_pool_insufficient");
 }
 
 #[tokio::test]

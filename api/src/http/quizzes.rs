@@ -169,6 +169,18 @@ pub struct GetQuizResponse {
     pub questions: Vec<QuizQuestion>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/quizzes/{id}",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    responses(
+        (status = 200, description = "Quiz detail", body = GetQuizResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such quiz"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn get_quiz(
     State(state): State<AppState>,
     _auth: RequireAnyScope<QuizReadScopes>,
@@ -247,6 +259,21 @@ pub struct PatchQuizResponse {
     pub warnings: Vec<String>,
 }
 
+#[utoipa::path(
+    patch,
+    path = "/v1/quizzes/{id}",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    request_body = QuizPatch,
+    responses(
+        (status = 200, description = "Quiz updated", body = PatchQuizResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "No such quiz"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn patch_quiz(
     State(state): State<AppState>,
     _auth: RequireAnyScope<QuizWriteScopes>,
@@ -384,6 +411,7 @@ pub struct CreatedQuiz {
 #[utoipa::path(
     post,
     path = "/v1/quizzes",
+    request_body = CreateQuizBody,
     responses(
         (status = 201, description = "Quiz created", body = CreateQuizResponse),
         (status = 401, description = "Unauthorized"),
@@ -461,6 +489,21 @@ pub struct AddQuizQuestionResponse {
     pub order_index: i32,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/quizzes/{id}/questions",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    request_body = AddQuizQuestionBody,
+    responses(
+        (status = 201, description = "Question linked", body = AddQuizQuestionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "No such quiz or question"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn add_quiz_question(
     State(state): State<AppState>,
     auth: RequireAnyScope<QuizWriteScopes>,
@@ -656,6 +699,18 @@ pub struct GenerateResponse {
     pub warnings: Vec<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/quizzes/generate",
+    request_body = GenerateBody,
+    responses(
+        (status = 200, description = "Generated quiz candidates", body = GenerateResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
 async fn generate_quiz(
     _auth: RequireAnyScope<QuizWriteScopes>,
     Json(_body): Json<GenerateBody>,

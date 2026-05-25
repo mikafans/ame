@@ -106,11 +106,15 @@ async fn test_auth_and_idempotency() {
         .unwrap()
         .to_string();
 
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, 'Test User', 'learner')")
-        .bind(user_id)
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO users (id, display_name, email, role) \
+         VALUES ($1, 'Test User', $2, 'learner')",
+    )
+    .bind(user_id)
+    .bind(format!("auth-{user_id}@example.com"))
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let scopes = vec!["quiz.read".to_string()];
     sqlx::query(
@@ -234,9 +238,11 @@ async fn revoked_token_returns_unauthorized() {
         .to_string();
 
     sqlx::query(
-        "INSERT INTO users (id, display_name, role) VALUES ($1, 'Revoked User', 'learner')",
+        "INSERT INTO users (id, display_name, email, role) \
+         VALUES ($1, 'Revoked User', $2, 'learner')",
     )
     .bind(user_id)
+    .bind(format!("revoked-{user_id}@example.com"))
     .execute(&pool)
     .await
     .unwrap();

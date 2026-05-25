@@ -23,6 +23,8 @@ interface Quiz {
   objectives?: string[];
   due_date?: string;
   questionCount?: number;
+  durationMin?: number;
+  attemptLimit?: number;
   createdAt: string;
 }
 
@@ -395,9 +397,16 @@ export default function LibraryPage() {
                 />
                 <Metric
                   label="Duration"
-                  value={`${estimateMinutes(upNext.questionCount)} min`}
+                  value={
+                    upNext.durationMin
+                      ? `${upNext.durationMin} min`
+                      : `${estimateMinutes(upNext.questionCount)} min`
+                  }
                 />
-                <Metric label="Attempts" value="0 / 2" />
+                <Metric
+                  label="Attempts"
+                  value={`0 / ${upNext.attemptLimit ?? 2}`}
+                />
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <Button

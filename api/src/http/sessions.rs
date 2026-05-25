@@ -299,6 +299,60 @@ async fn hydrate_session_questions(
         .collect()
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchSessionBody {
+    pub status: SessionStatus,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v1/sessions/{id}",
+    params(("id" = Uuid, Path, description = "Session id")),
+    request_body = PatchSessionBody,
+    responses(
+        (status = 200, description = "Session updated", body = Session),
+        (status = 404, description = "No such session"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn patch_session(
+    State(state): State<AppState>,
+    user: RequireAnyScope<SessionWriteScopes>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<PatchSessionBody>,
+) -> Result<Json<Session>, ApiError> {
+    let mut session = get_owned_session(&state.pool, id, user.0.user.id).await?;
+
+    match (session.status, body.status) {
+        (SessionStatus::InProgress, SessionStatus::Abandoned)
+        | (SessionStatus::Abandoned, SessionStatus::Abandoned) => {}
+        (SessionStatus::Finished, _) => {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "status".into(),
+                message: "cannot modify finished session".into(),
+            }]));
+        }
+        _ => {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "status".into(),
+                message: "only abandoning an in-progress session is supported".into(),
+            }]));
+        }
+    }
+
+    session.status = body.status;
+
+    sqlx::query("UPDATE sessions SET status = $1 WHERE id = $2")
+        .bind(session.status.as_str())
+        .bind(session.id)
+        .execute(&state.pool)
+        .await
+        .map_err(internal)?;
+
+    Ok(Json(session))
+}
+
 #[utoipa::path(
     post,
     path = "/v1/sessions/{id}/answer",
@@ -1105,7 +1159,7 @@ pub async fn grade_attempt(
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/sessions", post(create_session))
-        .route("/v1/sessions/{id}", get(get_session))
+        .route("/v1/sessions/{id}", get(get_session).patch(patch_session))
         .route("/v1/sessions/{id}/answer", post(answer))
         .route("/v1/sessions/{id}/answers", patch(autosave_answers))
         .route("/v1/sessions/{id}/finish", post(finish))

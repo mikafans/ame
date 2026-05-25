@@ -47,9 +47,10 @@ fn skip_if_no_db() -> bool {
 
 async fn make_user(pool: &PgPool) -> Uuid {
     let id = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'learner')")
+    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
         .bind(id)
         .bind(format!("planner-test-{id}"))
+        .bind(format!("planner-{id}@example.com"))
         .execute(pool)
         .await
         .unwrap();

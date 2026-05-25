@@ -6,6 +6,60 @@ info:
     name: ''
   version: 0.1.0
 paths:
+  /v1/attempts/pending:
+    get:
+      tags:
+      - crate::http::sessions
+      operationId: list_pending_attempts
+      responses:
+        '200':
+          description: Pending manual attempts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingAttemptRow'
+        '403':
+          description: Not instructor or admin
+      security:
+      - bearer_auth: []
+  /v1/attempts/{id}/grade:
+    patch:
+      tags:
+      - crate::http::sessions
+      operationId: grade_attempt
+      parameters:
+      - name: id
+        in: path
+        description: Attempt id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GradeAttemptBody'
+        required: true
+      responses:
+        '200':
+          description: Graded attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attempt'
+        '403':
+          description: Not instructor or admin
+        '404':
+          description: No such attempt
+        '409':
+          description: Attempt is not pending manual grading
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
   /v1/exams/{id}/stats:
     get:
       tags:
@@ -88,6 +142,44 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
+  /v1/me/cohort-stats:
+    get:
+      tags:
+      - me
+      operationId: get_cohort_stats
+      parameters:
+      - name: quizId
+        in: query
+        description: Quiz to compare against
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Cohort stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortStatsResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /v1/me/stats:
+    get:
+      tags:
+      - crate::http::stats
+      operationId: me_stats
+      responses:
+        '200':
+          description: User stats summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeStatsResponse'
+      security:
+      - bearer_auth: []
   /v1/messages:
     post:
       tags:
@@ -427,6 +519,194 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
+    post:
+      tags:
+      - quizzes
+      summary: Create a new quiz.
+      description: Only instructors and admins may create quizzes. Learners receive 403.
+      operationId: create_quiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuizBody'
+        required: true
+      responses:
+        '201':
+          description: Quiz created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateQuizResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (learner cannot create)
+      security:
+      - bearer: []
+  /v1/quizzes/count:
+    get:
+      tags:
+      - quizzes
+      summary: Get quiz count with optional filters.
+      operationId: count_quizzes
+      parameters:
+      - name: cats
+        in: query
+        description: Comma-separated categories
+        required: false
+        schema:
+          type: string
+      - name: tags
+        in: query
+        description: Comma-separated tags
+        required: false
+        schema:
+          type: string
+      - name: diff
+        in: query
+        description: Difficulty filter
+        required: false
+        schema:
+          type: string
+      - name: types
+        in: query
+        description: Comma-separated types
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Quiz count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountQuizzesResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /v1/quizzes/generate:
+    post:
+      tags:
+      - quizzes
+      operationId: generate_quiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateBody'
+        required: true
+      responses:
+        '200':
+          description: Generated quiz candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+      security:
+      - bearer: []
+  /v1/quizzes/{id}:
+    get:
+      tags:
+      - quizzes
+      operationId: get_quiz
+      parameters:
+      - name: id
+        in: path
+        description: Quiz id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Quiz detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetQuizResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such quiz
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - quizzes
+      operationId: patch_quiz
+      parameters:
+      - name: id
+        in: path
+        description: Quiz id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizPatch'
+        required: true
+      responses:
+        '200':
+          description: Quiz updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchQuizResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: No such quiz
+        '422':
+          description: Validation failed
+      security:
+      - bearer: []
+  /v1/quizzes/{id}/questions:
+    post:
+      tags:
+      - quizzes
+      operationId: add_quiz_question
+      parameters:
+      - name: id
+        in: path
+        description: Quiz id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddQuizQuestionBody'
+        required: true
+      responses:
+        '201':
+          description: Question linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddQuizQuestionResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: No such quiz or question
+        '422':
+          description: Validation failed
+      security:
+      - bearer: []
   /v1/quizzes/{id}/stats:
     get:
       tags:
@@ -516,6 +796,35 @@ paths:
           description: No such session
       security:
       - bearer_auth: []
+    patch:
+      tags:
+      - crate::http::sessions
+      operationId: patch_session
+      parameters:
+      - name: id
+        in: path
+        description: Session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchSessionBody'
+        required: true
+      responses:
+        '200':
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: No such session
+      security:
+      - bearer_auth: []
   /v1/sessions/{id}/answer:
     post:
       tags:
@@ -546,6 +855,24 @@ paths:
           description: Session expired
         '422':
           description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/sessions/{id}/answers:
+    patch:
+      tags:
+      - crate::http::sessions
+      operationId: autosave_answers
+      parameters:
+      - name: id
+        in: path
+        description: Session id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Draft saved
       security:
       - bearer_auth: []
   /v1/sessions/{id}/finish:
@@ -615,6 +942,41 @@ paths:
       - bearer_auth: []
 components:
   schemas:
+    AddQuizQuestionBody:
+      type: object
+      properties:
+        kind:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/QuestionKind'
+            description: Create a new question inline (kind + prompt required if question_id absent).
+        pointsOverride:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        prompt:
+          type:
+          - string
+          - 'null'
+        questionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Link an existing bank question by ID.
+    AddQuizQuestionResponse:
+      type: object
+      required:
+      - questionId
+      - orderIndex
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        questionId:
+          type: string
+          format: uuid
     AnswerSessionBody:
       type: object
       required:
@@ -815,6 +1177,81 @@ components:
           type: string
         name:
           type: string
+    CohortStatsBucket:
+      type: object
+      required:
+      - bucketStart
+      - bucketEnd
+      - count
+      properties:
+        bucketEnd:
+          type: number
+          format: double
+        bucketStart:
+          type: number
+          format: double
+        count:
+          type: integer
+          format: int64
+    CohortStatsQuery:
+      type: object
+      required:
+      - quizId
+      properties:
+        quizId:
+          type: string
+          format: uuid
+    CohortStatsResponse:
+      type: object
+      required:
+      - histogram
+      properties:
+        cohortAvg:
+          type:
+          - number
+          - 'null'
+          format: double
+        completionRate:
+          type:
+          - number
+          - 'null'
+          format: double
+        histogram:
+          type: array
+          items:
+            $ref: '#/components/schemas/CohortStatsBucket'
+        percentile:
+          type:
+          - integer
+          - 'null'
+          format: int32
+    CountQuizzesQuery:
+      type: object
+      properties:
+        cats:
+          type:
+          - string
+          - 'null'
+        diff:
+          type:
+          - string
+          - 'null'
+        tags:
+          type:
+          - string
+          - 'null'
+        types:
+          type:
+          - string
+          - 'null'
+    CountQuizzesResponse:
+      type: object
+      required:
+      - count
+      properties:
+        count:
+          type: integer
+          format: int64
     CreateKeyBody:
       type: object
       required:
@@ -871,6 +1308,42 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Question'
+    CreateQuizBody:
+      type: object
+      required:
+      - title
+      properties:
+        course:
+          type:
+          - string
+          - 'null'
+        difficulty:
+          type:
+          - string
+          - 'null'
+        duration:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        objectives:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        title:
+          type: string
+    CreateQuizResponse:
+      type: object
+      required:
+      - quizId
+      - quiz
+      properties:
+        quiz:
+          $ref: '#/components/schemas/CreatedQuiz'
+        quizId:
+          type: string
     CreateSessionBody:
       type: object
       properties:
@@ -960,6 +1433,33 @@ components:
           type: string
           format: uuid
         secret:
+          type: string
+    CreatedQuiz:
+      type: object
+      required:
+      - id
+      - title
+      - status
+      - objectives
+      - createdBy
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        objectives:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        title:
           type: string
     DistributionBucket:
       type: object
@@ -1151,6 +1651,18 @@ components:
             $ref: '#/components/schemas/GetSessionQuestion'
         session:
           $ref: '#/components/schemas/Session'
+    GradeAttemptBody:
+      type: object
+      required:
+      - score
+      properties:
+        notes:
+          type:
+          - string
+          - 'null'
+        score:
+          type: number
+          format: double
     GradeOutcome:
       type: object
       required:
@@ -1323,6 +1835,53 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
+    MeStatsResponse:
+      type: object
+      required:
+      - avg_score
+      - avg_score_delta
+      - attempts_total
+      - attempts_this_week
+      - hours_spent
+      - hours_spent_delta
+      - current_streak
+      - best_streak
+      - mastered_topics
+      - mastered_topics_total
+      - mastered_topics_delta_since
+      properties:
+        attempts_this_week:
+          type: integer
+          format: int64
+        attempts_total:
+          type: integer
+          format: int64
+        avg_score:
+          type: number
+          format: double
+        avg_score_delta:
+          type: number
+          format: double
+        best_streak:
+          type: integer
+          format: int64
+        current_streak:
+          type: integer
+          format: int64
+        hours_spent:
+          type: number
+          format: double
+        hours_spent_delta:
+          type: number
+          format: double
+        mastered_topics:
+          type: integer
+          format: int64
+        mastered_topics_delta_since:
+          type: string
+        mastered_topics_total:
+          type: integer
+          format: int64
     Normalize:
       type: string
       description: |-
@@ -1355,6 +1914,53 @@ components:
           type: array
           items:
             type: string
+    PatchSessionBody:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+    PendingAttemptRow:
+      type: object
+      required:
+      - attempt_id
+      - session_id
+      - user_id
+      - user_email
+      - user_display_name
+      - question_id
+      - question_prompt
+      - response_body
+      - response_word_count
+      - created_at
+      properties:
+        attempt_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        question_id:
+          type: string
+          format: uuid
+        question_prompt:
+          type: string
+        response_body:
+          type: string
+        response_word_count:
+          type: integer
+          format: int32
+        session_id:
+          type: string
+          format: uuid
+        user_display_name:
+          type: string
+        user_email:
+          type: string
+        user_id:
+          type: string
+          format: uuid
     PlanItem:
       type: object
       required:

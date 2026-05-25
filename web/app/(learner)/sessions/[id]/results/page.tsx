@@ -12,8 +12,10 @@ interface Answer {
   points: number;
   max: number;
   type: "mc" | "tf" | "short" | "essay" | "code";
+  prompt: string;
   given: string;
   note: string;
+  gradeStatus: string;
 }
 
 interface ResultData {
@@ -83,18 +85,25 @@ export default function ResultsPage({
           total: result.max_points ?? 0,
           answers: questions.map((q: any) => {
             const attempt = byQuestion.get(q.questionId);
-            const body = attempt?.response?.body;
+            const body = attempt?.response?.body || attempt?.response?.answer;
+            const score = attempt?.score ?? 0;
+            const points = Math.round(score * q.points);
+            const status = attempt?.grade_status ?? "ungraded";
             return {
               qid: q.questionId,
               correct: attempt?.is_correct ?? false,
-              points: attempt ? Math.round(attempt.score) : 0,
+              points: points,
               max: q.points,
               type: q.kind,
+              prompt: q.prompt,
               given: typeof body === "string" ? body : "",
+              gradeStatus: status,
               note:
-                attempt?.grade_status === "pending"
+                status === "pending_manual"
                   ? "Pending manual review"
-                  : "",
+                  : status === "graded"
+                    ? ""
+                    : "Not graded yet",
             };
           }),
         });
@@ -479,7 +488,7 @@ export default function ResultsPage({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {answer.given.substring(0, 80)}
+                  {answer.prompt}
                 </div>
                 <div
                   style={{
