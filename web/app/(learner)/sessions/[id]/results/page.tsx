@@ -16,6 +16,7 @@ interface Answer {
   given: string;
   note: string;
   gradeStatus: string;
+  explanation?: string;
 }
 
 interface ResultData {
@@ -104,6 +105,7 @@ export default function ResultsPage({
                   : status === "graded"
                     ? ""
                     : "Not graded yet",
+              explanation: q.explanation ?? undefined,
             };
           }),
         });
@@ -501,18 +503,20 @@ export default function ResultsPage({
                 </div>
 
                 {/* Expanded explanation */}
-                {expandedItems.has(answer.qid) && (
+                {expandedItems.has(answer.qid) && answer.explanation && (
                   <div
                     style={{
                       marginTop: 12,
-                      paddingTop: 12,
-                      borderTop: "1px solid var(--border)",
+                      padding: "10px 14px",
+                      background: "var(--surface-2)",
+                      borderRadius: 4,
                       fontSize: 13,
-                      color: "var(--text-2)",
                       lineHeight: 1.6,
+                      color: "var(--text-2)",
+                      fontFamily: "var(--serif)",
                     }}
                   >
-                    Explanation would appear here.
+                    {answer.explanation}
                   </div>
                 )}
               </div>
