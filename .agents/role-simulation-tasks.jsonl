@@ -1,6 +1,6 @@
-{"id":1,"title":"Add question tools to MCP manifest","stage":1,"status":"pending","file":"api/src/http/agents.rs"}
-{"id":2,"title":"Surface explanation in session results","stage":1,"status":"pending","file":"web/app/(learner)/sessions/[id]/results/page.tsx"}
-{"id":3,"title":"Add study plan detail page","stage":1,"status":"pending","file":"web/app/(learner)/plans/[id]/page.tsx"}
+{"id":1,"title":"Add question tools to MCP manifest","stage":1,"status":"done","file":"api/src/http/agents.rs"}
+{"id":2,"title":"Surface explanation in session results","stage":1,"status":"done","file":"web/app/(learner)/sessions/[id]/results/page.tsx"}
+{"id":3,"title":"Add study plan detail page","stage":1,"status":"done","file":"web/app/(learner)/plans/[id]/page.tsx"}
 {"id":4,"title":"Write learner simulation script","stage":2,"status":"pending","file":"scripts/simulate/learner.py"}
 {"id":5,"title":"Write instructor simulation script","stage":2,"status":"pending","file":"scripts/simulate/instructor.py"}
 {"id":6,"title":"Write agent simulation script","stage":2,"status":"pending","file":"scripts/simulate/agent.py"}
