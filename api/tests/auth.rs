@@ -107,7 +107,7 @@ async fn test_auth_and_idempotency() {
         .to_string();
 
     sqlx::query(
-        "INSERT INTO users (id, display_name, email, role) \
+        "INSERT INTO tb_users (id, display_name, email, role) \
          VALUES ($1, 'Test User', $2, 'learner')",
     )
     .bind(user_id)
@@ -118,7 +118,7 @@ async fn test_auth_and_idempotency() {
 
     let scopes = vec!["quiz.read".to_string()];
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test token', $3, $4)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test token', $3, $4)",
     )
     .bind(token_id)
     .bind(user_id)
@@ -238,7 +238,7 @@ async fn revoked_token_returns_unauthorized() {
         .to_string();
 
     sqlx::query(
-        "INSERT INTO users (id, display_name, email, role) \
+        "INSERT INTO tb_users (id, display_name, email, role) \
          VALUES ($1, 'Revoked User', $2, 'learner')",
     )
     .bind(user_id)
@@ -251,7 +251,7 @@ async fn revoked_token_returns_unauthorized() {
     // 200 here would prove the extractor stopped checking revocation.
     let scopes = vec!["quiz.read".to_string()];
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
          VALUES ($1, $2, 'revoked token', $3, $4, now())",
     )
     .bind(token_id)

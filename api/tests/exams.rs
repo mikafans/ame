@@ -48,15 +48,17 @@ async fn make_bearer(pool: &PgPool) -> String {
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
-        .bind(user_id)
-        .bind(format!("exam-user-{user_id}"))
-        .bind(format!("exam-{user_id}@example.com"))
-        .execute(pool)
-        .await
-        .unwrap();
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(user_id)
+    .bind(format!("exam-user-{user_id}"))
+    .bind(format!("exam-{user_id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
     )
     .bind(token_id).bind(user_id).bind(hash).bind(vec!["quiz.write".to_string(), "attempt.write".to_string()])
     .execute(pool).await.unwrap();
@@ -65,20 +67,22 @@ async fn make_bearer(pool: &PgPool) -> String {
 
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
     let author = Uuid::now_v7();
-    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
-        .bind(author)
-        .bind(format!("author-{author}"))
-        .bind(format!("author-{author}@example.com"))
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(author)
+    .bind(format!("author-{author}"))
+    .bind(format!("author-{author}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
     let payload = match kind {
         "mc" => json!({ "options": ["a", "b", "c"], "correct_index": 0 }),
         "tf" => json!({ "correct": true }),
         _ => json!({ "accepted": ["42"], "normalize": "exact", "judge": "exact" }),
     };
     sqlx::query(
-        "INSERT INTO questions (kind, prompt, payload, status, points, created_by) \
+        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
          VALUES ($1, $2, $3, 'live', 1, $4) RETURNING id",
     )
     .bind(kind)

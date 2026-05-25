@@ -48,16 +48,18 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
         .hash_password(secret.as_bytes(), &salt)
         .unwrap()
         .to_string();
-    sqlx::query("INSERT INTO users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')")
-        .bind(user_id)
-        .bind(format!("test-user-{user_id}"))
-        .bind(format!("share-{user_id}@example.com"))
-        .execute(pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+    )
+    .bind(user_id)
+    .bind(format!("test-user-{user_id}"))
+    .bind(format!("share-{user_id}@example.com"))
+    .execute(pool)
+    .await
+    .unwrap();
     let scopes_vec: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)

@@ -156,7 +156,7 @@ pub async fn compose_exam(
     let exam_id = Uuid::now_v7();
     let now = OffsetDateTime::now_utc();
     sqlx::query(
-        "INSERT INTO exams \
+        "INSERT INTO tb_exams \
          (id, name, description, blueprint, method, duration_min, total_points, passing_points, \
           objectives, affects_rating, show_results_during, status, composition_trace, \
           created_by, created_at, updated_at) \
@@ -211,7 +211,7 @@ pub async fn list_exams(
         "SELECT id, name, description, method, status, blueprint, duration_min, total_points, \
                 passing_points, objectives, affects_rating, show_results_during, \
                 composition_trace, created_by, created_at, updated_at \
-         FROM exams WHERE status != 'archived' ORDER BY created_at DESC LIMIT 100",
+         FROM tb_exams WHERE status != 'archived' ORDER BY created_at DESC LIMIT 100",
     )
     .fetch_all(&state.pool)
     .await
@@ -243,7 +243,7 @@ pub async fn get_exam(
         "SELECT id, name, description, method, status, blueprint, duration_min, total_points, \
                 passing_points, objectives, affects_rating, show_results_during, \
                 composition_trace, created_by, created_at, updated_at \
-         FROM exams WHERE id = $1",
+         FROM tb_exams WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(&state.pool)
@@ -288,7 +288,7 @@ async fn resolve_static_section(
 
     // Verify all question ids exist and are live
     let rows = sqlx::query(
-        "SELECT id, points FROM questions WHERE id = ANY($1::uuid[]) AND status = 'live'",
+        "SELECT id, points FROM tb_questions WHERE id = ANY($1::uuid[]) AND status = 'live'",
     )
     .bind(ids)
     .fetch_all(pool)
@@ -348,13 +348,13 @@ async fn resolve_dynamic_section(
     let types = &spec.types;
 
     let rows = sqlx::query(
-        "SELECT q.id, q.points FROM questions q \
+        "SELECT q.id, q.points FROM tb_questions q \
          WHERE q.status = 'live' \
            AND (cardinality($1::text[]) = 0 OR q.kind = ANY($1::text[])) \
            AND ($2::double precision IS NULL OR q.rating >= $2) \
            AND ($3::double precision IS NULL OR q.rating <= $3) \
            AND (cardinality($4::text[]) = 0 OR EXISTS ( \
-                SELECT 1 FROM question_tags qt JOIN tags t ON t.id = qt.tag_id \
+                SELECT 1 FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id \
                 WHERE qt.question_id = q.id AND t.name = ANY($4::text[]) \
            )) \
          ORDER BY random() LIMIT $5",
@@ -412,7 +412,7 @@ async fn insert_section(
     section: &ExamSection,
 ) -> Result<(), ApiError> {
     sqlx::query(
-        "INSERT INTO exam_sections \
+        "INSERT INTO tb_exam_sections \
          (id, exam_id, title, order_index, weight, question_ids, mix, items_count) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
     )
@@ -433,7 +433,7 @@ async fn insert_section(
 async fn load_sections(pool: &PgPool, exam_id: Uuid) -> Result<Vec<ExamSection>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, exam_id, title, order_index, weight, question_ids, mix, items_count \
-         FROM exam_sections WHERE exam_id = $1 ORDER BY order_index ASC",
+         FROM tb_exam_sections WHERE exam_id = $1 ORDER BY order_index ASC",
     )
     .bind(exam_id)
     .fetch_all(pool)
@@ -563,7 +563,7 @@ async fn patch_exam_status(
 ) -> Result<impl IntoResponse, ApiError> {
     let status = body.status.as_str();
 
-    let result = sqlx::query("UPDATE exams SET status = $2, updated_at = now() WHERE id = $1")
+    let result = sqlx::query("UPDATE tb_exams SET status = $2, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(status)
         .execute(&state.pool)

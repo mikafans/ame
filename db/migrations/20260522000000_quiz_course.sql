@@ -1,1 +1,0 @@
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS course text;

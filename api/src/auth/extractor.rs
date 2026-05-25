@@ -66,8 +66,8 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             SELECT 
                 t.token_hash, t.scopes, t.revoked_at,
                 u.id as user_id, u.email, u.display_name, u.role, u.created_at
-            FROM api_tokens t
-            JOIN users u ON t.user_id = u.id
+            FROM tb_api_tokens t
+            JOIN tb_users u ON t.user_id = u.id
             WHERE t.id = $1
             "#,
         )
@@ -91,7 +91,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let pool = state.pool.clone();
         let token_id = parsed.id;
         tokio::spawn(async move {
-            let _ = sqlx::query("UPDATE api_tokens SET last_used_at = now() WHERE id = $1")
+            let _ = sqlx::query("UPDATE tb_api_tokens SET last_used_at = now() WHERE id = $1")
                 .bind(token_id)
                 .execute(&pool)
                 .await;

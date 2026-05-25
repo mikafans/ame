@@ -219,7 +219,7 @@ pub async fn get_session(
     let questions = hydrate_session_questions(&state.pool, &session).await?;
 
     if let Some(qid) = session.quiz_id {
-        let row = sqlx::query("SELECT title, course FROM quizzes WHERE id = $1")
+        let row = sqlx::query("SELECT title, course FROM tb_quizzes WHERE id = $1")
             .bind(qid)
             .fetch_optional(&state.pool)
             .await
@@ -254,7 +254,7 @@ async fn hydrate_session_questions(
 
     let rows = sqlx::query(
         "SELECT id, kind, prompt, points, explanation, code_snippet, payload \
-         FROM questions WHERE id = ANY($1)",
+         FROM tb_questions WHERE id = ANY($1)",
     )
     .bind(&plan_ids)
     .fetch_all(pool)
@@ -349,7 +349,7 @@ pub async fn patch_session(
 
     session.status = body.status;
 
-    sqlx::query("UPDATE sessions SET status = $1 WHERE id = $2")
+    sqlx::query("UPDATE tb_sessions SET status = $1 WHERE id = $2")
         .bind(session.status.as_str())
         .bind(session.id)
         .execute(&state.pool)
@@ -469,16 +469,16 @@ async fn build_plan(
     let tags = normalize_strings(&body.tags);
     let rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM questions q \
+         FROM tb_questions q \
          WHERE q.status = 'live' \
            AND (cardinality($1::text[]) = 0 OR q.kind = ANY($1::text[])) \
            AND (cardinality($2::text[]) = 0 OR EXISTS ( \
-                SELECT 1 FROM question_tags qt \
-                JOIN tags t ON t.id = qt.tag_id \
+                SELECT 1 FROM tb_question_tags qt \
+                JOIN tb_tags t ON t.id = qt.tag_id \
                 WHERE qt.question_id = q.id AND t.name = ANY($2::text[]) \
            )) \
            AND NOT EXISTS ( \
-                SELECT 1 FROM attempts a \
+                SELECT 1 FROM tb_attempts a \
                 WHERE a.user_id = $3 AND a.question_id = q.id \
                   AND a.created_at >= now() - interval '24 hours' \
            ) \
@@ -539,7 +539,7 @@ async fn build_plan(
 }
 
 async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, ApiError> {
-    sqlx::query("SELECT id FROM quizzes WHERE id = $1 AND status = 'active'")
+    sqlx::query("SELECT id FROM tb_quizzes WHERE id = $1 AND status = 'active'")
         .bind(quiz_id)
         .fetch_optional(pool)
         .await
@@ -548,8 +548,8 @@ async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, Api
 
     let rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM quiz_questions qq \
-         JOIN questions q ON q.id = qq.question_id \
+         FROM tb_quiz_questions qq \
+         JOIN tb_questions q ON q.id = qq.question_id \
          WHERE qq.quiz_id = $1 AND q.status = 'live' \
          ORDER BY qq.order_index ASC",
     )
@@ -595,18 +595,19 @@ async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, Api
 }
 
 async fn build_exam_plan(pool: &PgPool, exam_id: Uuid) -> Result<CreatePlan, ApiError> {
-    let exam_row =
-        sqlx::query("SELECT id, affects_rating FROM exams WHERE id = $1 AND status = 'published'")
-            .bind(exam_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(internal)?
-            .ok_or(ApiError::NotFound { resource: "exam" })?;
+    let exam_row = sqlx::query(
+        "SELECT id, affects_rating FROM tb_exams WHERE id = $1 AND status = 'published'",
+    )
+    .bind(exam_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(internal)?
+    .ok_or(ApiError::NotFound { resource: "exam" })?;
 
     let affects_rating: bool = exam_row.get("affects_rating");
 
     let section_rows = sqlx::query(
-        "SELECT question_ids, order_index FROM exam_sections \
+        "SELECT question_ids, order_index FROM tb_exam_sections \
          WHERE exam_id = $1 ORDER BY order_index ASC",
     )
     .bind(exam_id)
@@ -639,7 +640,7 @@ async fn build_exam_plan(pool: &PgPool, exam_id: Uuid) -> Result<CreatePlan, Api
 
     let q_rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM questions q WHERE q.id = ANY($1::uuid[]) AND q.status = 'live'",
+         FROM tb_questions q WHERE q.id = ANY($1::uuid[]) AND q.status = 'live'",
     )
     .bind(&all_ids)
     .fetch_all(pool)
@@ -702,7 +703,7 @@ fn option_order(
 
 async fn insert_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
     sqlx::query(
-        "INSERT INTO sessions \
+        "INSERT INTO tb_sessions \
          (id, user_id, kind, quiz_id, exam_id, filter, question_plan, status, affects_rating, \
           rating_snapshot, result, deadline_at, started_at, finished_at) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
@@ -731,7 +732,7 @@ async fn get_owned_session(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<Ses
     let row = sqlx::query(
         "SELECT id, user_id, kind, quiz_id, exam_id, filter, question_plan, status, affects_rating, \
                 rating_snapshot, result, deadline_at, started_at, finished_at \
-         FROM sessions WHERE id = $1 AND user_id = $2",
+         FROM tb_sessions WHERE id = $1 AND user_id = $2",
     )
     .bind(id)
     .bind(user_id)
@@ -779,7 +780,7 @@ async fn load_runtime_question(
 ) -> Result<RuntimeQuestion, ApiError> {
     let row = sqlx::query(
         "SELECT id, kind, payload, version, points, rating, attempts_count \
-         FROM questions WHERE id = $1",
+         FROM tb_questions WHERE id = $1",
     )
     .bind(question_id)
     .fetch_optional(pool)
@@ -813,9 +814,9 @@ async fn load_user_tag_ratings(
     let rows = sqlx::query(
         "SELECT t.id, COALESCE(utr.rating, 1200::double precision) AS rating, \
                 COALESCE(utr.attempts_count, 0) AS attempts_count \
-         FROM question_tags qt \
-         JOIN tags t ON t.id = qt.tag_id \
-         LEFT JOIN user_tag_ratings utr ON utr.tag_id = t.id AND utr.user_id = $1 \
+         FROM tb_question_tags qt \
+         JOIN tb_tags t ON t.id = qt.tag_id \
+         LEFT JOIN tb_user_tag_ratings utr ON utr.tag_id = t.id AND utr.user_id = $1 \
          WHERE qt.question_id = $2",
     )
     .bind(user_id)
@@ -851,7 +852,7 @@ async fn list_session_attempts(pool: &PgPool, session_id: Uuid) -> Result<Vec<At
                 is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
                 rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
                 created_at \
-         FROM attempts WHERE session_id = $1 ORDER BY created_at ASC",
+         FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
     )
     .bind(session_id)
     .fetch_all(pool)
@@ -889,7 +890,7 @@ fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
 async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), ApiError> {
     let attempt = &outcome.attempt;
     sqlx::query(
-        "INSERT INTO attempts \
+        "INSERT INTO tb_attempts \
          (id, user_id, question_id, question_version, session_id, response, presentation, \
           is_correct, score, grade_status, time_to_answer_ms, rating_before_user_avg, \
           rating_before_question, user_tag_deltas, question_delta, created_at) \
@@ -925,7 +926,7 @@ async fn max_points_by_question(
         return Ok(HashMap::new());
     }
     let ids: Vec<Uuid> = attempts.iter().map(|attempt| attempt.question_id).collect();
-    let rows = sqlx::query("SELECT id, points FROM questions WHERE id = ANY($1::uuid[])")
+    let rows = sqlx::query("SELECT id, points FROM tb_questions WHERE id = ANY($1::uuid[])")
         .bind(&ids)
         .fetch_all(pool)
         .await
@@ -938,7 +939,7 @@ async fn max_points_by_question(
 }
 
 async fn update_finished_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
-    sqlx::query("UPDATE sessions SET status = $2, result = $3, finished_at = $4 WHERE id = $1")
+    sqlx::query("UPDATE tb_sessions SET status = $2, result = $3, finished_at = $4 WHERE id = $1")
         .bind(session.id)
         .bind(session.status.as_str())
         .bind(&session.result)
@@ -955,7 +956,7 @@ async fn persist_elo(
     question_id: Uuid,
     elo: &EloUpdate,
 ) -> Result<(), ApiError> {
-    sqlx::query("UPDATE questions SET rating = $2, attempts_count = $3 WHERE id = $1")
+    sqlx::query("UPDATE tb_questions SET rating = $2, attempts_count = $3 WHERE id = $1")
         .bind(question_id)
         .bind(elo.question.rating_after)
         .bind(elo.question.attempts_after)
@@ -965,7 +966,7 @@ async fn persist_elo(
 
     for tag in &elo.user_tags {
         sqlx::query(
-            "INSERT INTO user_tag_ratings (user_id, tag_id, rating, attempts_count, last_updated) \
+            "INSERT INTO tb_user_tag_ratings (user_id, tag_id, rating, attempts_count, last_updated) \
              VALUES ($1, $2, $3, $4, now()) \
              ON CONFLICT (user_id, tag_id) DO UPDATE \
              SET rating = EXCLUDED.rating, \
@@ -1055,9 +1056,9 @@ pub async fn list_pending_attempts(
                 (a.response->>'body') AS response_body, \
                 (a.response->>'word_count')::int AS response_word_count, \
                 a.created_at \
-         FROM attempts a \
-         JOIN users u ON u.id = a.user_id \
-         JOIN questions q ON q.id = a.question_id \
+         FROM tb_attempts a \
+         JOIN tb_users u ON u.id = a.user_id \
+         JOIN tb_questions q ON q.id = a.question_id \
          WHERE a.grade_status = 'pending_manual' \
          ORDER BY a.created_at ASC",
     )
@@ -1126,7 +1127,7 @@ pub async fn grade_attempt(
         }]));
     }
 
-    let row = sqlx::query("SELECT grade_status FROM attempts WHERE id = $1")
+    let row = sqlx::query("SELECT grade_status FROM tb_attempts WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.pool)
         .await
@@ -1144,7 +1145,7 @@ pub async fn grade_attempt(
     }
 
     let updated = sqlx::query(
-        "UPDATE attempts \
+        "UPDATE tb_attempts \
          SET score = $2, is_correct = ($2 > 0), grade_status = 'graded', grader_notes = $3 \
          WHERE id = $1 \
          RETURNING id, user_id, question_id, question_version, session_id, response, presentation, \

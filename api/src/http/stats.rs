@@ -79,7 +79,7 @@ pub async fn quiz_stats(
     Query(params): Query<QuizStatsParams>,
 ) -> Result<Json<QuizStatsResponse>, ApiError> {
     // Verify quiz exists
-    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM quizzes WHERE id = $1)")
+    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_quizzes WHERE id = $1)")
         .bind(id)
         .fetch_one(&state.pool)
         .await
@@ -95,7 +95,7 @@ pub async fn quiz_stats(
         "SELECT
             coalesce(avg((result->>'percent')::double precision), 0) as avg,
             coalesce(percentile_cont(0.5) within group (order by (result->>'percent')::double precision), 0) as median
-         FROM sessions
+         FROM tb_sessions
          WHERE quiz_id = $1
            AND status = 'finished'
            AND result is not null
@@ -114,7 +114,7 @@ pub async fn quiz_stats(
         "SELECT
             floor((result->>'percent')::double precision * 10)::int as bucket,
             count(*) as count
-         FROM sessions
+         FROM tb_sessions
          WHERE quiz_id = $1
            AND status = 'finished'
            AND result is not null
@@ -141,7 +141,7 @@ pub async fn quiz_stats(
         "WITH session_scores AS (
             SELECT s.id as session_id,
                    (s.result->>'percent')::double precision as pct
-            FROM sessions s
+            FROM tb_sessions s
             WHERE s.quiz_id = $1
               AND s.status = 'finished'
               AND s.result is not null
@@ -166,7 +166,7 @@ pub async fn quiz_stats(
                           )
                     ELSE NULL
                 END as discrimination_idx
-            FROM attempts a
+            FROM tb_attempts a
             JOIN session_scores ss ON a.session_id = ss.session_id
             GROUP BY a.question_id
          )
@@ -233,7 +233,7 @@ pub async fn exam_stats(
     Path(id): Path<Uuid>,
 ) -> Result<Json<ExamStatsResponse>, ApiError> {
     // Verify exam exists and get passing_points
-    let exam_row = sqlx::query("SELECT passing_points, total_points FROM exams WHERE id = $1")
+    let exam_row = sqlx::query("SELECT passing_points, total_points FROM tb_exams WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.pool)
         .await
@@ -250,7 +250,7 @@ pub async fn exam_stats(
                 avg(((result->>'points_awarded')::int >= $2)::int::double precision),
                 0
              )
-             FROM sessions
+             FROM tb_sessions
              WHERE exam_id = $1 AND status = 'finished' AND result is not null",
         )
         .bind(id)
@@ -266,7 +266,7 @@ pub async fn exam_stats(
                      / $2::double precision >= 0.6)::int::double precision),
                 0
              )
-             FROM sessions
+             FROM tb_sessions
              WHERE exam_id = $1 AND status = 'finished' AND result is not null",
         )
         .bind(id)
@@ -285,9 +285,9 @@ pub async fn exam_stats(
                 avg(a.score),
                 0
             ) as avg_score
-         FROM exam_sections es
-         LEFT JOIN sessions s ON s.exam_id = $1 AND s.status = 'finished'
-         LEFT JOIN attempts a
+         FROM tb_exam_sections es
+         LEFT JOIN tb_sessions s ON s.exam_id = $1 AND s.status = 'finished'
+         LEFT JOIN tb_attempts a
             ON a.session_id = s.id
             AND a.question_id = ANY(es.question_ids)
          WHERE es.exam_id = $1
@@ -315,7 +315,7 @@ pub async fn exam_stats(
                 (order by extract(epoch from (finished_at - started_at)) * 1000) as p50,
             percentile_cont(0.95) within group
                 (order by extract(epoch from (finished_at - started_at)) * 1000) as p95
-         FROM sessions
+         FROM tb_sessions
          WHERE exam_id = $1 AND status = 'finished' AND finished_at is not null",
     )
     .bind(id)
@@ -378,7 +378,7 @@ pub async fn me_stats(
     let attempts_row = sqlx::query(
         "SELECT COUNT(*) AS total, \
                 COUNT(*) FILTER (WHERE created_at > now() - interval '7 days') AS this_week \
-         FROM attempts WHERE user_id = $1",
+         FROM tb_attempts WHERE user_id = $1",
     )
     .bind(uid)
     .fetch_one(&state.pool)
@@ -396,7 +396,7 @@ pub async fn me_stats(
             AVG(CASE WHEN (result->>'max_points')::float > 0 \
                 THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
                 ELSE NULL END) FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days') AS avg_prior \
-         FROM sessions WHERE user_id = $1 AND status = 'finished' AND result IS NOT NULL",
+         FROM tb_sessions WHERE user_id = $1 AND status = 'finished' AND result IS NOT NULL",
     )
     .bind(uid)
     .fetch_one(&state.pool)
@@ -413,7 +413,7 @@ pub async fn me_stats(
                 FILTER (WHERE finished_at > now() - interval '28 days'), 0)::float8 AS hours_recent, \
             COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
                 FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days'), 0)::float8 AS hours_prior \
-         FROM sessions WHERE user_id = $1 AND status = 'finished'",
+         FROM tb_sessions WHERE user_id = $1 AND status = 'finished'",
     )
     .bind(uid)
     .fetch_one(&state.pool)
@@ -427,7 +427,7 @@ pub async fn me_stats(
     let streak_row = sqlx::query(
         "WITH daily AS ( \
             SELECT DISTINCT date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day \
-            FROM attempts WHERE user_id = $1 \
+            FROM tb_attempts WHERE user_id = $1 \
         ), \
         gaps AS ( \
             SELECT day, ROW_NUMBER() OVER (ORDER BY day) - \
@@ -455,7 +455,7 @@ pub async fn me_stats(
         "SELECT \
             COUNT(*) FILTER (WHERE rating >= 1400) AS mastered, \
             COUNT(*) AS total \
-         FROM user_tag_ratings WHERE user_id = $1",
+         FROM tb_user_tag_ratings WHERE user_id = $1",
     )
     .bind(uid)
     .fetch_one(&state.pool)

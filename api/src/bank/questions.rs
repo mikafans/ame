@@ -132,7 +132,7 @@ const QUESTION_COLUMNS: &str = "id, kind, prompt, code_snippet, payload, explana
 
 pub async fn get_question(pool: &PgPool, id: Uuid) -> Result<Option<Question>, ApiError> {
     let row = sqlx::query(&format!(
-        "SELECT {QUESTION_COLUMNS} FROM questions WHERE id = $1"
+        "SELECT {QUESTION_COLUMNS} FROM tb_questions WHERE id = $1"
     ))
     .bind(id)
     .fetch_optional(pool)
@@ -149,7 +149,7 @@ pub async fn list_question_versions(
 ) -> Result<Vec<QuestionVersion>, ApiError> {
     let rows = sqlx::query(
         "SELECT question_id, version, prompt, code_snippet, payload, explanation, archived_at \
-         FROM question_versions \
+         FROM tb_question_versions \
          WHERE question_id = $1 \
          ORDER BY version DESC",
     )
@@ -189,9 +189,9 @@ pub async fn list_questions(
     let rows = sqlx::query(
         "SELECT DISTINCT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.status, \
               q.source, q.points, q.rating, q.attempts_count, q.version, q.created_by, q.created_at, q.updated_at \
-         FROM questions q \
-         LEFT JOIN question_tags qt ON qt.question_id = q.id \
-         LEFT JOIN tags t ON t.id = qt.tag_id \
+         FROM tb_questions q \
+         LEFT JOIN tb_question_tags qt ON qt.question_id = q.id \
+         LEFT JOIN tb_tags t ON t.id = qt.tag_id \
          WHERE ($1::text IS NULL OR t.name = $1) \
            AND ($2::text IS NULL OR q.status = $2) \
            AND ($3::double precision IS NULL OR q.rating >= $3) \
@@ -249,7 +249,7 @@ pub async fn create_questions(
             .map_err(internal)?;
 
         let row = sqlx::query(&format!(
-            "INSERT INTO questions (kind, prompt, code_snippet, payload, explanation, source, points, created_by) \
+            "INSERT INTO tb_questions (kind, prompt, code_snippet, payload, explanation, source, points, created_by) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
              RETURNING {QUESTION_COLUMNS}"
         ))
@@ -290,7 +290,7 @@ pub async fn update_question(
 
     let current_row = sqlx::query(
         "SELECT prompt, code_snippet, payload, explanation, status, version \
-         FROM questions WHERE id = $1 FOR UPDATE",
+         FROM tb_questions WHERE id = $1 FOR UPDATE",
     )
     .bind(id)
     .fetch_optional(&mut *tx)
@@ -325,7 +325,7 @@ pub async fn update_question(
         let prev_explanation: Option<String> = current_row.get("explanation");
 
         sqlx::query(
-            "INSERT INTO question_versions \
+            "INSERT INTO tb_question_versions \
                  (question_id, version, prompt, code_snippet, payload, explanation) \
              VALUES ($1, $2, $3, $4, $5, $6)",
         )
@@ -349,7 +349,7 @@ pub async fn update_question(
         .map_err(internal)?;
 
     let sql = if bump {
-        "UPDATE questions SET \
+        "UPDATE tb_questions SET \
             prompt = COALESCE($2, prompt), \
             code_snippet = COALESCE($3, code_snippet), \
             payload = COALESCE($4, payload), \
@@ -359,7 +359,7 @@ pub async fn update_question(
             updated_at = now() \
          WHERE id = $1"
     } else {
-        "UPDATE questions SET \
+        "UPDATE tb_questions SET \
             prompt = COALESCE($2, prompt), \
             code_snippet = COALESCE($3, code_snippet), \
             payload = COALESCE($4, payload), \
@@ -387,7 +387,7 @@ pub async fn update_question(
     }
 
     let row = sqlx::query(&format!(
-        "SELECT {QUESTION_COLUMNS} FROM questions WHERE id = $1"
+        "SELECT {QUESTION_COLUMNS} FROM tb_questions WHERE id = $1"
     ))
     .bind(id)
     .fetch_one(&mut *tx)
@@ -401,7 +401,7 @@ pub async fn update_question(
 
 async fn set_status(pool: &PgPool, id: Uuid, target: QuestionStatus) -> Result<Question, ApiError> {
     let row = sqlx::query(&format!(
-        "UPDATE questions SET status = $2, updated_at = now() WHERE id = $1 RETURNING {QUESTION_COLUMNS}"
+        "UPDATE tb_questions SET status = $2, updated_at = now() WHERE id = $1 RETURNING {QUESTION_COLUMNS}"
     ))
     .bind(id)
     .bind(target.as_str())

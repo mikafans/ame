@@ -126,7 +126,7 @@ async fn check_and_count_anon(
     ip_hash: &str,
 ) -> Result<i64, ApiError> {
     sqlx::query_scalar(
-        "SELECT COUNT(*) FROM anonymous_attempts
+        "SELECT COUNT(*) FROM tb_anonymous_attempts
          WHERE share_id = $1 AND ip_hash = $2 AND ts >= now() - interval '10 minutes'",
     )
     .bind(share_id)
@@ -163,7 +163,7 @@ pub async fn create_share(
 
     // Natural-tuple dedup: return existing non-revoked share with same params
     let existing = sqlx::query(
-        "SELECT id FROM share_links
+        "SELECT id FROM tb_share_links
          WHERE created_by_user_id = $1
            AND kind = $2
            AND target_id = $3
@@ -190,7 +190,7 @@ pub async fn create_share(
     } else {
         let id = Uuid::now_v7();
         sqlx::query(
-            "INSERT INTO share_links
+            "INSERT INTO tb_share_links
              (id, kind, target_id, created_by_user_id, visibility,
               include_explanation, include_score, include_attribution)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
@@ -234,7 +234,7 @@ pub async fn get_share(
         "SELECT id, kind, target_id, created_by_user_id, visibility,
                 include_explanation, include_score, include_attribution,
                 og_image_url, created_at, revoked_at
-         FROM share_links WHERE id = $1",
+         FROM tb_share_links WHERE id = $1",
     )
     .bind(share_id)
     .fetch_optional(&state.pool)
@@ -266,12 +266,13 @@ pub async fn revoke_share(
     user: RequireAnyScope<ShareScopes>,
     Path(share_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    let row = sqlx::query("SELECT created_by_user_id, revoked_at FROM share_links WHERE id = $1")
-        .bind(share_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?
-        .ok_or(ApiError::NotFound { resource: "share" })?;
+    let row =
+        sqlx::query("SELECT created_by_user_id, revoked_at FROM tb_share_links WHERE id = $1")
+            .bind(share_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?
+            .ok_or(ApiError::NotFound { resource: "share" })?;
 
     let revoked_at: Option<OffsetDateTime> = row.get("revoked_at");
     if revoked_at.is_some() {
@@ -284,7 +285,7 @@ pub async fn revoke_share(
         return Err(ApiError::ScopeRequired("owner or admin"));
     }
 
-    sqlx::query("UPDATE share_links SET revoked_at = now() WHERE id = $1")
+    sqlx::query("UPDATE tb_share_links SET revoked_at = now() WHERE id = $1")
         .bind(share_id)
         .execute(&state.pool)
         .await
@@ -303,7 +304,7 @@ async fn embed_inner(
 ) -> Result<Json<Value>, ApiError> {
     let share_row = sqlx::query(
         "SELECT id, include_explanation, include_score, include_attribution
-         FROM share_links
+         FROM tb_share_links
          WHERE kind = $1 AND target_id = $2 AND revoked_at IS NULL
          ORDER BY created_at DESC LIMIT 1",
     )
@@ -395,7 +396,7 @@ async fn embed_attempt_inner(
     body: AnonymousAnswerBody,
 ) -> Result<Json<Value>, ApiError> {
     let share_row = sqlx::query(
-        "SELECT id FROM share_links
+        "SELECT id FROM tb_share_links
          WHERE kind = $1 AND target_id = $2 AND revoked_at IS NULL
          ORDER BY created_at DESC LIMIT 1",
     )
@@ -415,7 +416,7 @@ async fn embed_attempt_inner(
 
     let attempt_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO anonymous_attempts (id, share_id, question_id, ip_hash, response, is_correct)
+        "INSERT INTO tb_anonymous_attempts (id, share_id, question_id, ip_hash, response, is_correct)
          VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(attempt_id)

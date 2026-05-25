@@ -54,9 +54,9 @@ pub async fn create_study_plan(
         "SELECT t.name, \
                 COUNT(a.id) AS attempts, \
                 AVG(a.score::double precision) AS avg_score \
-         FROM attempts a \
-         JOIN question_tags qt ON qt.question_id = a.question_id \
-         JOIN tags t ON t.id = qt.tag_id \
+         FROM tb_attempts a \
+         JOIN tb_question_tags qt ON qt.question_id = a.question_id \
+         JOIN tb_tags t ON t.id = qt.tag_id \
          WHERE a.user_id = $1 \
            AND a.created_at >= now() - ($2::bigint * interval '1 day') \
          GROUP BY t.name \
@@ -115,7 +115,7 @@ pub async fn create_study_plan(
     let weeks_json = serde_json::to_value(&plan.weeks).map_err(|e| ApiError::Internal(e.into()))?;
 
     sqlx::query(
-        "INSERT INTO study_plans (id, user_id, goal, lookback_days, generated_at, weeks)
+        "INSERT INTO tb_study_plans (id, user_id, goal, lookback_days, generated_at, weeks)
          VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(plan.id)
@@ -135,7 +135,7 @@ pub async fn create_study_plan(
 pub async fn get_study_plan(pool: &PgPool, plan_id: Uuid) -> Result<StudyPlan, ApiError> {
     let row = sqlx::query(
         "SELECT id, user_id, goal, lookback_days, generated_at, weeks
-         FROM study_plans WHERE id = $1",
+         FROM tb_study_plans WHERE id = $1",
     )
     .bind(plan_id)
     .fetch_optional(pool)
@@ -233,26 +233,26 @@ pub async fn plan_quiz(
     let mode = request.tags_mode.as_str().to_string();
     let rows = sqlx::query(
         "SELECT q.id, q.kind, q.version, q.payload \
-         FROM questions q \
+         FROM tb_questions q \
          WHERE q.status = 'live' \
            AND ($2::double precision IS NULL OR q.rating >= $2) \
            AND ($3::double precision IS NULL OR q.rating <= $3) \
            AND (cardinality($4::text[]) = 0 \
                 OR ($5::text = 'any' AND EXISTS ( \
-                    SELECT 1 FROM question_tags qt \
-                    JOIN tags t ON t.id = qt.tag_id \
+                    SELECT 1 FROM tb_question_tags qt \
+                    JOIN tb_tags t ON t.id = qt.tag_id \
                     WHERE qt.question_id = q.id AND t.name = ANY($4::text[]) \
                 )) \
                 OR ($5::text = 'all' AND NOT EXISTS ( \
                     SELECT 1 FROM unnest($4::text[]) required(name) \
                     WHERE NOT EXISTS ( \
-                        SELECT 1 FROM question_tags qt \
-                        JOIN tags t ON t.id = qt.tag_id \
+                        SELECT 1 FROM tb_question_tags qt \
+                        JOIN tb_tags t ON t.id = qt.tag_id \
                         WHERE qt.question_id = q.id AND t.name = required.name \
                     ) \
                 ))) \
            AND ($6::bigint IS NULL OR NOT EXISTS ( \
-                SELECT 1 FROM attempts a \
+                SELECT 1 FROM tb_attempts a \
                 WHERE a.user_id = $1 \
                   AND a.question_id = q.id \
                   AND a.created_at >= now() - ($6::bigint * interval '1 hour') \

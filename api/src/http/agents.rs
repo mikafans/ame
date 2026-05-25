@@ -108,7 +108,7 @@ pub async fn register(
     let user_id = Uuid::now_v7();
     let display_name = format!("agent:{}", &user_id.to_string()[..8]);
 
-    sqlx::query("INSERT INTO users (id, display_name, role) VALUES ($1, $2, 'agent')")
+    sqlx::query("INSERT INTO tb_users (id, display_name, role) VALUES ($1, $2, 'agent')")
         .bind(user_id)
         .bind(&display_name)
         .execute(&state.pool)
@@ -120,7 +120,7 @@ pub async fn register(
     let hash = crate::http::me::hash_secret(&secret)?;
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)
@@ -174,7 +174,7 @@ pub async fn activity(
     let rows = if let Some(cursor) = q.cursor {
         sqlx::query(
             "SELECT id, ts, tool_name, method, path, status, note, target_id
-             FROM activity_log
+             FROM tb_activity_log
              WHERE agent_id = $1 AND id < $2
              ORDER BY id DESC
              LIMIT $3",
@@ -187,7 +187,7 @@ pub async fn activity(
     } else {
         sqlx::query(
             "SELECT id, ts, tool_name, method, path, status, note, target_id
-             FROM activity_log
+             FROM tb_activity_log
              WHERE agent_id = $1
              ORDER BY id DESC
              LIMIT $2",

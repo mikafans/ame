@@ -106,7 +106,7 @@ pub async fn list_keys(
 ) -> Result<Json<ListKeysResponse>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, name, scopes, last_used_at, created_at
-         FROM api_tokens
+         FROM tb_api_tokens
          WHERE user_id = $1 AND revoked_at IS NULL
          ORDER BY created_at DESC",
     )
@@ -170,7 +170,7 @@ pub async fn create_key(
     let prefix = format!("hk_{}", &secret[..8]);
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user.user.id)
@@ -198,7 +198,7 @@ pub async fn rotate_key(
 ) -> Result<Json<RotateKeyResponse>, ApiError> {
     // Verify key belongs to caller and is active
     let row = sqlx::query(
-        "SELECT id, name, scopes FROM api_tokens
+        "SELECT id, name, scopes FROM tb_api_tokens
          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(key_id)
@@ -212,7 +212,7 @@ pub async fn rotate_key(
     let scopes: Vec<String> = row.get("scopes");
 
     // Revoke old key
-    sqlx::query("UPDATE api_tokens SET revoked_at = now() WHERE id = $1")
+    sqlx::query("UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1")
         .bind(key_id)
         .execute(&state.pool)
         .await
@@ -224,7 +224,7 @@ pub async fn rotate_key(
     let new_hash = hash_secret(&new_secret)?;
 
     sqlx::query(
-        "INSERT INTO api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(new_token_id)
     .bind(user.user.id)
@@ -246,7 +246,7 @@ pub async fn revoke_key(
     Path(key_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let affected = sqlx::query(
-        "UPDATE api_tokens SET revoked_at = now()
+        "UPDATE tb_api_tokens SET revoked_at = now()
          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(key_id)
@@ -270,7 +270,7 @@ pub async fn list_webhooks(
 ) -> Result<Json<ListWebhooksResponse>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, url, events, created_at
-         FROM webhooks
+         FROM tb_webhooks
          WHERE user_id = $1 AND revoked_at IS NULL
          ORDER BY created_at DESC",
     )
@@ -309,7 +309,7 @@ pub async fn create_webhook(
     let hash = hash_secret(&secret)?;
 
     sqlx::query(
-        "INSERT INTO webhooks (id, user_id, url, events, secret_hash, signing_key)
+        "INSERT INTO tb_webhooks (id, user_id, url, events, secret_hash, signing_key)
          VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(webhook_id)
@@ -338,7 +338,7 @@ pub async fn delete_webhook(
     Path(webhook_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let affected = sqlx::query(
-        "UPDATE webhooks SET revoked_at = now()
+        "UPDATE tb_webhooks SET revoked_at = now()
          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(webhook_id)
@@ -464,7 +464,7 @@ async fn list_attempts(
                     rating_before_user_avg, rating_before_question,
                     user_tag_deltas, question_delta, created_at,
                     COUNT(*) OVER() AS total
-             FROM attempts
+             FROM tb_attempts
              WHERE user_id = $1 AND session_id = $2
              ORDER BY created_at DESC
              LIMIT $3 OFFSET $4",
@@ -483,7 +483,7 @@ async fn list_attempts(
                     rating_before_user_avg, rating_before_question,
                     user_tag_deltas, question_delta, created_at,
                     COUNT(*) OVER() AS total
-             FROM attempts
+             FROM tb_attempts
              WHERE user_id = $1
              ORDER BY created_at DESC
              LIMIT $2 OFFSET $3",
@@ -574,7 +574,7 @@ async fn get_cohort_stats(
     let user_id = auth.user.id;
 
     let cohort_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT cm.cohort_id FROM cohort_memberships cm WHERE cm.user_id = $1 LIMIT 1",
+        "SELECT cm.cohort_id FROM tb_cohort_memberships cm WHERE cm.user_id = $1 LIMIT 1",
     )
     .bind(user_id)
     .fetch_optional(&state.pool)
@@ -591,7 +591,7 @@ async fn get_cohort_stats(
     };
 
     let total_members: i64 =
-        sqlx::query_scalar("SELECT count(*) FROM cohort_memberships WHERE cohort_id = $1")
+        sqlx::query_scalar("SELECT count(*) FROM tb_cohort_memberships WHERE cohort_id = $1")
             .bind(cohort_id)
             .fetch_one(&state.pool)
             .await
@@ -610,12 +610,12 @@ async fn get_cohort_stats(
         "SELECT
             avg((s.result->>'percent')::double precision) as cohort_avg,
             count(distinct s.user_id) as finishers
-         FROM sessions s
+         FROM tb_sessions s
          WHERE s.quiz_id = $1
            AND s.status = 'finished'
            AND s.result IS NOT NULL
            AND s.user_id IN (
-               SELECT cm.user_id FROM cohort_memberships cm WHERE cm.cohort_id = $2
+               SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
            )",
     )
     .bind(quiz_id)
@@ -630,7 +630,7 @@ async fn get_cohort_stats(
 
     let user_score: Option<f64> = sqlx::query_scalar(
         "SELECT (result->>'percent')::double precision
-         FROM sessions
+         FROM tb_sessions
          WHERE quiz_id = $1
            AND user_id = $2
            AND status = 'finished'
@@ -650,12 +650,12 @@ async fn get_cohort_stats(
             "SELECT count(*) FROM (
                 SELECT DISTINCT ON (s.user_id) s.user_id,
                     (s.result->>'percent')::double precision as best_score
-                FROM sessions s
+                FROM tb_sessions s
                 WHERE s.quiz_id = $1
                   AND s.status = 'finished'
                   AND s.result IS NOT NULL
                   AND s.user_id IN (
-                      SELECT cm.user_id FROM cohort_memberships cm WHERE cm.cohort_id = $2
+                      SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
                   )
                 ORDER BY s.user_id, (s.result->>'percent')::double precision DESC
              ) ranked
@@ -676,12 +676,12 @@ async fn get_cohort_stats(
         "SELECT
             floor((s.result->>'percent')::double precision * 10)::int as bucket,
             count(*) as count
-         FROM sessions s
+         FROM tb_sessions s
          WHERE s.quiz_id = $1
            AND s.status = 'finished'
            AND s.result IS NOT NULL
            AND s.user_id IN (
-               SELECT cm.user_id FROM cohort_memberships cm WHERE cm.cohort_id = $2
+               SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
            )
          GROUP BY 1
          ORDER BY 1",
@@ -756,7 +756,7 @@ async fn create_cohort(
         }]));
     }
     let id = Uuid::now_v7();
-    sqlx::query("INSERT INTO cohorts (id, name, description) VALUES ($1, $2, $3)")
+    sqlx::query("INSERT INTO tb_cohorts (id, name, description) VALUES ($1, $2, $3)")
         .bind(id)
         .bind(&body.name)
         .bind(&body.description)
@@ -779,7 +779,7 @@ async fn add_cohort_member(
     Path(cohort_id): Path<Uuid>,
     Json(body): Json<AddCohortMemberBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM cohorts WHERE id = $1)")
+    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_cohorts WHERE id = $1)")
         .bind(cohort_id)
         .fetch_one(&state.pool)
         .await
@@ -789,7 +789,7 @@ async fn add_cohort_member(
     }
 
     sqlx::query(
-        "INSERT INTO cohort_memberships (id, cohort_id, user_id) VALUES ($1, $2, $3)
+        "INSERT INTO tb_cohort_memberships (id, cohort_id, user_id) VALUES ($1, $2, $3)
          ON CONFLICT (cohort_id, user_id) DO NOTHING",
     )
     .bind(Uuid::now_v7())

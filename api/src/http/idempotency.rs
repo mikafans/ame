@@ -74,7 +74,7 @@ pub async fn idempotency_middleware(
     let token_record = sqlx::query(
         r#"
         SELECT token_hash, revoked_at
-        FROM api_tokens
+        FROM tb_api_tokens
         WHERE id = $1
         "#,
     )
@@ -109,7 +109,7 @@ pub async fn idempotency_middleware(
     let existing = sqlx::query(
         r#"
         SELECT request_hash, response_status, response_body
-        FROM idempotency_keys
+        FROM tb_idempotency_keys
         WHERE token_id = $1 AND key = $2
         "#,
     )
@@ -147,7 +147,7 @@ pub async fn idempotency_middleware(
         let status = resp_parts.status.as_u16() as i16;
         sqlx::query(
             r#"
-            INSERT INTO idempotency_keys (token_id, key, request_hash, response_status, response_body)
+            INSERT INTO tb_idempotency_keys (token_id, key, request_hash, response_status, response_body)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (token_id, key) DO NOTHING
             "#,

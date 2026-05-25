@@ -31,10 +31,11 @@ fn row_to_tag(row: sqlx::postgres::PgRow) -> Tag {
 
 /// Return every tag, ordered by name. Used by `GET /tags`.
 pub async fn list_tags(pool: &PgPool) -> Result<Vec<Tag>, ApiError> {
-    let rows = sqlx::query("SELECT id, name, description, created_at FROM tags ORDER BY name ASC")
-        .fetch_all(pool)
-        .await
-        .map_err(internal)?;
+    let rows =
+        sqlx::query("SELECT id, name, description, created_at FROM tb_tags ORDER BY name ASC")
+            .fetch_all(pool)
+            .await
+            .map_err(internal)?;
     Ok(rows.into_iter().map(row_to_tag).collect())
 }
 
@@ -49,7 +50,7 @@ pub async fn create_tag(
     let lower = name.to_lowercase();
 
     sqlx::query(
-        "INSERT INTO tags (name, description) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
+        "INSERT INTO tb_tags (name, description) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
     )
     .bind(&lower)
     .bind(description)
@@ -57,7 +58,7 @@ pub async fn create_tag(
     .await
     .map_err(internal)?;
 
-    let row = sqlx::query("SELECT id, name, description, created_at FROM tags WHERE name = $1")
+    let row = sqlx::query("SELECT id, name, description, created_at FROM tb_tags WHERE name = $1")
         .bind(&lower)
         .fetch_one(pool)
         .await
@@ -86,14 +87,16 @@ pub async fn get_or_create_tags_tx(
         }
     }
 
-    sqlx::query("INSERT INTO tags (name) SELECT unnest($1::text[]) ON CONFLICT (name) DO NOTHING")
-        .bind(&unique)
-        .execute(&mut **tx)
-        .await
-        .map_err(internal)?;
+    sqlx::query(
+        "INSERT INTO tb_tags (name) SELECT unnest($1::text[]) ON CONFLICT (name) DO NOTHING",
+    )
+    .bind(&unique)
+    .execute(&mut **tx)
+    .await
+    .map_err(internal)?;
 
     let rows =
-        sqlx::query("SELECT id, name, description, created_at FROM tags WHERE name = ANY($1)")
+        sqlx::query("SELECT id, name, description, created_at FROM tb_tags WHERE name = ANY($1)")
             .bind(&unique)
             .fetch_all(&mut **tx)
             .await
@@ -118,7 +121,7 @@ pub async fn set_question_tags(
     question_id: Uuid,
     tag_ids: &[Uuid],
 ) -> Result<(), ApiError> {
-    sqlx::query("DELETE FROM question_tags WHERE question_id = $1")
+    sqlx::query("DELETE FROM tb_question_tags WHERE question_id = $1")
         .bind(question_id)
         .execute(&mut **tx)
         .await
@@ -126,7 +129,7 @@ pub async fn set_question_tags(
 
     for tag_id in tag_ids {
         sqlx::query(
-            "INSERT INTO question_tags (question_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO tb_question_tags (question_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         )
         .bind(question_id)
         .bind(tag_id)
