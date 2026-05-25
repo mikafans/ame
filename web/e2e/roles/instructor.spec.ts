@@ -17,26 +17,38 @@ test.describe("Instructor role", () => {
   });
 
   test("grading page accessible and shows queue", async ({ page }) => {
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/grading`);
     await expect(
-      page.locator("text=/essay grading|no essays pending/i").first()
+      page.locator("text=/essay grading|no essays pending/i").first(),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test("exams page accessible and shows compose button", async ({ page }) => {
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/exams`);
-    await expect(
-      page.locator("text=/compose exam/i").first()
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=/compose exam/i").first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test("agent page accessible and shows API keys tab", async ({ page }) => {
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/agent`);
     await expect(
-      page.locator("text=/new api key|api key/i").first()
+      page.locator("text=/new api key|api key/i").first(),
     ).toBeVisible({ timeout: 10000 });
   });
 });

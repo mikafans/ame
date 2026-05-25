@@ -32,7 +32,11 @@ test.describe("Learner role", () => {
   });
 
   test("library page loads quizzes", async ({ page }) => {
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/`);
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 8000 });
   });
@@ -54,7 +58,11 @@ test.describe("Learner role", () => {
     expect(sr.status()).toBe(201);
     sessionId = (await sr.json()).sessionId;
 
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/sessions/${sessionId}`);
     await expect(page.locator("text=/question/i").first()).toBeVisible({
       timeout: 8000,
@@ -80,18 +88,26 @@ test.describe("Learner role", () => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/sessions/${sessionId}/results`);
-    await expect(
-      page.locator("text=/%|correct|score/i").first()
-    ).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=/%|correct|score/i").first()).toBeVisible({
+      timeout: 8000,
+    });
   });
 
   test("progress page renders stats", async ({ page }) => {
-    await page.context().addCookies([{ name: "ame_token", value: token, domain: "localhost", path: "/" }]);
+    await page
+      .context()
+      .addCookies([
+        { name: "ame_token", value: token, domain: "localhost", path: "/" },
+      ]);
     await page.goto(`${BASE}/progress`);
     await expect(
-      page.locator("text=/progress|avg score|streak/i").first()
+      page.locator("text=/progress|avg score|streak/i").first(),
     ).toBeVisible({ timeout: 8000 });
   });
 });

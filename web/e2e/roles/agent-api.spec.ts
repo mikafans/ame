@@ -12,7 +12,13 @@ test.describe("Agent API surface", () => {
     const ar = await request.post(`${API}/v1/agents/register`, {
       data: {
         label: `e2e-agent-${ts}`,
-        scopes: ["quiz.read", "quiz.write", "stats.read", "plan.write", "plan.read"],
+        scopes: [
+          "quiz.read",
+          "quiz.write",
+          "stats.read",
+          "plan.write",
+          "plan.read",
+        ],
       },
     });
     expect([200, 201]).toContain(ar.status());
@@ -21,7 +27,9 @@ test.describe("Agent API surface", () => {
     expect(agentKey).toBeTruthy();
   });
 
-  test("MCP manifest contains question and stats tools", async ({ request }) => {
+  test("MCP manifest contains question and stats tools", async ({
+    request,
+  }) => {
     const r = await request.get(`${API}/v1/agents/mcp.json`);
     expect(r.status()).toBe(200);
     const manifest = await r.json();
