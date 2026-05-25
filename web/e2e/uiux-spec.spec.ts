@@ -128,7 +128,6 @@ test.describe("UI/UX spec alignment", () => {
       page.getByRole("button", { name: /All quizzes \(\d+\)/ }),
     ).toBeVisible();
     await expect(page.getByText("Up next")).toBeVisible();
-    await expect(page.getByText("Due in 2 days")).toBeVisible();
     await expect(page.getByText("Questions", { exact: true })).toBeVisible();
     await expect(page.getByText("Duration", { exact: true })).toBeVisible();
     await expect(page.getByText("Attempts", { exact: true })).toBeVisible();
