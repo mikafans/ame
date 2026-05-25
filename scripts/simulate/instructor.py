@@ -51,23 +51,23 @@ def main() -> None:
                     "kind": "mc",
                     "prompt": "Sim MC question?",
                     "payload": {
-                        "options": [{"text": "A"}, {"text": "B"}, {"text": "C"}],
+                        "options": ["A", "B", "C"],
                         "correct_index": 0,
                     },
                     "explanation": "A is correct.",
-                    "tags": [],
+                    "tags": ["algorithms"],
                 },
                 {
                     "kind": "tf",
                     "prompt": "Is simulation useful?",
                     "payload": {"correct": True},
-                    "tags": [],
+                    "tags": ["algorithms"],
                 },
                 {
                     "kind": "essay",
                     "prompt": "Describe simulation in one sentence.",
-                    "payload": {"min_words": 5},
-                    "tags": [],
+                    "payload": {"min_words": 5, "judge": "manual"},
+                    "tags": ["algorithms"],
                 },
             ]
         },
@@ -76,11 +76,16 @@ def main() -> None:
     step("create questions", r.status_code in (200, 201), str(r.status_code))
     q_ids = [q["id"] for q in r.json()["questions"]]
 
-    # 4. Add questions to quiz (snake_case body — no rename_all on this endpoint)
+    # 3b. Promote questions to live (required before quiz can be published)
+    for qid in q_ids:
+        r = c.post(f"/v1/questions/{qid}/promote", headers=headers)
+        step("promote question to live", r.status_code == 200, str(r.status_code))
+
+    # 4. Add questions to quiz
     for qid in q_ids:
         r = c.post(
             f"/v1/quizzes/{quiz_id}/questions",
-            json={"question_id": qid},
+            json={"questionId": qid},
             headers=headers,
         )
         step("add question to quiz", r.status_code in (200, 201, 204), str(r.status_code))

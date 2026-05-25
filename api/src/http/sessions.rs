@@ -1022,7 +1022,7 @@ pub struct PendingAttemptRow {
     pub attempt_id: Uuid,
     pub session_id: Uuid,
     pub user_id: Uuid,
-    pub user_email: String,
+    pub user_email: Option<String>,
     pub user_display_name: String,
     pub question_id: Uuid,
     pub question_prompt: String,

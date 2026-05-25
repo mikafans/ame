@@ -17,7 +17,7 @@ pub enum Role {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct User {
     pub id: Uuid,
-    pub email: String,
+    pub email: Option<String>,
     pub display_name: String,
     pub role: Role,
     #[serde(with = "time::serde::rfc3339")]

@@ -896,7 +896,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             displayName: string;
-            email: string;
+            email?: string | null;
             /** Format: uuid */
             id: string;
             role: components["schemas"]["Role"];
@@ -963,7 +963,7 @@ export interface components {
             /** Format: uuid */
             session_id: string;
             user_display_name: string;
-            user_email: string;
+            user_email?: string | null;
             /** Format: uuid */
             user_id: string;
         };
@@ -1251,7 +1251,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             display_name: string;
-            email: string;
+            email?: string | null;
             /** Format: uuid */
             id: string;
             role: components["schemas"]["Role"];

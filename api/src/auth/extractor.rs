@@ -34,7 +34,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             return Ok(AuthenticatedUser {
                 user: User {
                     id: uuid::Uuid::nil(),
-                    email: "haru@harus.dev".into(),
+                    email: Some("haru@harus.dev".into()),
                     display_name: "Haru".into(),
                     role: crate::domain::user::Role::Instructor,
                     created_at: time::OffsetDateTime::now_utc(),

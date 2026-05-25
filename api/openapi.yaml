@@ -2108,7 +2108,6 @@ components:
       required:
       - id
       - displayName
-      - email
       - role
       - createdAt
       properties:
@@ -2118,7 +2117,9 @@ components:
         displayName:
           type: string
         email:
-          type: string
+          type:
+          - string
+          - 'null'
         id:
           type: string
           format: uuid
@@ -2234,7 +2235,6 @@ components:
       - attempt_id
       - session_id
       - user_id
-      - user_email
       - user_display_name
       - question_id
       - question_prompt
@@ -2264,7 +2264,9 @@ components:
         user_display_name:
           type: string
         user_email:
-          type: string
+          type:
+          - string
+          - 'null'
         user_id:
           type: string
           format: uuid
@@ -2969,7 +2971,6 @@ components:
       type: object
       required:
       - id
-      - email
       - display_name
       - role
       - created_at
@@ -2980,7 +2981,9 @@ components:
         display_name:
           type: string
         email:
-          type: string
+          type:
+          - string
+          - 'null'
         id:
           type: string
           format: uuid

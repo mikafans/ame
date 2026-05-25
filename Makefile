@@ -111,8 +111,8 @@ db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API r
 	uv run scripts/seed.py
 
 simulate: ## Run all three role simulation scripts against local API (requires make dev-env + make db-seed)
-	uv run scripts/simulate/learner.py
 	uv run scripts/simulate/instructor.py
+	uv run scripts/simulate/learner.py
 	uv run scripts/simulate/agent.py
 
 init-env: ## One-time setup: mise install + sqlx-cli + web deps + playwright
