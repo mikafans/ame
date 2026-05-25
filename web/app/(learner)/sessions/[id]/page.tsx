@@ -447,7 +447,7 @@ export default function ActiveQuizPage({
               </h2>
 
               {/* Question input */}
-              <div style={{ marginTop: 32 }}>
+              <div data-testid="question-input" style={{ marginTop: 32 }}>
                 <QuestionInput
                   question={cur}
                   value={curAnswer}

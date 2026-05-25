@@ -156,7 +156,8 @@ test.describe("UI/UX spec alignment", () => {
     await expect(page.getByText("Allowed")).toBeVisible();
     await expect(page.getByText("One sheet of notes (any)")).toBeVisible();
     await expect(page.getByText(/\d{1,2}:\d{2}/)).toBeVisible();
-    await page.getByRole("button", { name: "O(log n)" }).click();
+    // Click the first answer option; scoped to the question input area
+    await page.getByTestId("question-input").locator("button").first().click();
     await expect(page.getByText("Answered · 1", { exact: true })).toBeVisible();
     await screenshot(page, "active-session");
 
