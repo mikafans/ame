@@ -1,0 +1,11 @@
+{"id":1,"title":"Add question tools to MCP manifest","stage":1,"status":"done","file":"api/src/http/agents.rs"}
+{"id":2,"title":"Surface explanation in session results","stage":1,"status":"done","file":"web/app/(learner)/sessions/[id]/results/page.tsx"}
+{"id":3,"title":"Add study plan detail page","stage":1,"status":"done","file":"web/app/(learner)/plans/[id]/page.tsx"}
+{"id":4,"title":"Write learner simulation script","stage":2,"status":"done","file":"scripts/simulate/learner.py"}
+{"id":5,"title":"Write instructor simulation script","stage":2,"status":"done","file":"scripts/simulate/instructor.py"}
+{"id":6,"title":"Write agent simulation script","stage":2,"status":"done","file":"scripts/simulate/agent.py"}
+{"id":7,"title":"Add make simulate target","stage":2,"status":"done","file":"Makefile"}
+{"id":8,"title":"Write learner Playwright spec","stage":3,"status":"done","file":"web/e2e/roles/learner.spec.ts"}
+{"id":9,"title":"Write instructor Playwright spec","stage":3,"status":"done","file":"web/e2e/roles/instructor.spec.ts"}
+{"id":10,"title":"Write agent API Playwright spec","stage":3,"status":"done","file":"web/e2e/roles/agent-api.spec.ts"}
+{"id":11,"title":"Write MCP prompts doc","stage":3,"status":"done","file":"docs/specs/mcp-prompts.md"}

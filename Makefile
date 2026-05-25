@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check validate pre-remote db-up db-down db-reset db-migrate db-shell db-seed init-env dev-stop dev-env hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check validate pre-remote db-up db-down db-reset db-migrate db-shell db-seed simulate init-env dev-stop dev-env hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -109,6 +109,11 @@ db-shell: ## Open interactive pgcli session to local Postgres
 
 db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API running)
 	uv run scripts/seed.py
+
+simulate: ## Run all three role simulation scripts against local API (requires make dev-env + make db-seed)
+	uv run scripts/simulate/instructor.py
+	uv run scripts/simulate/learner.py
+	uv run scripts/simulate/agent.py
 
 init-env: ## One-time setup: mise install + sqlx-cli + web deps + playwright
 	mise install
