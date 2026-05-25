@@ -49,6 +49,12 @@ const QUESTION_TYPES: Record<string, string> = {
   cloze: "Fill in the blank",
 };
 
+const DEFAULT_ALLOWED_MATERIALS = [
+  "One sheet of notes (any)",
+  "Class textbook (printed)",
+  "Standard calculator",
+];
+
 export default function ActiveQuizPage({
   params,
 }: {
@@ -82,6 +88,8 @@ export default function ActiveQuizPage({
               ),
             );
             setTimeLeft(remaining);
+          } else if (data.questions.length > 0) {
+            setTimeLeft(Math.max(20, data.questions.length * 2) * 60);
           }
         }
       })
@@ -238,6 +246,11 @@ export default function ActiveQuizPage({
 
   const attemptNum = 1; // TODO: get from session data
   const totalAttempts = 2; // TODO: get from session data
+  const allowedMaterials =
+    session.session.allowed_materials &&
+    session.session.allowed_materials.length > 0
+      ? session.session.allowed_materials
+      : DEFAULT_ALLOWED_MATERIALS;
 
   return (
     <div
@@ -639,44 +652,41 @@ export default function ActiveQuizPage({
         </div>
 
         {/* Allowed materials */}
-        {session.session.allowed_materials &&
-          session.session.allowed_materials.length > 0 && (
-            <div
-              style={{
-                marginTop: 26,
-                padding: 14,
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: "var(--muted)",
-                  marginBottom: 6,
-                }}
-              >
-                Allowed
-              </div>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 16,
-                  color: "var(--text-2)",
-                  fontSize: 12,
-                  lineHeight: 1.7,
-                }}
-              >
-                {session.session.allowed_materials.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+        <div
+          style={{
+            marginTop: 26,
+            padding: 14,
+            background: "var(--surface-2)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 10,
+              letterSpacing: 1.2,
+              textTransform: "uppercase",
+              color: "var(--muted)",
+              marginBottom: 6,
+            }}
+          >
+            Allowed
+          </div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 16,
+              color: "var(--text-2)",
+              fontSize: 12,
+              lineHeight: 1.7,
+            }}
+          >
+            {allowedMaterials.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
       </aside>
     </div>
   );

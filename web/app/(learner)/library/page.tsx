@@ -158,6 +158,9 @@ export default function LibraryPage() {
     return diff > 0 ? diff : null;
   };
 
+  const estimateMinutes = (questionCount: number | undefined) =>
+    questionCount ? Math.max(20, questionCount * 2) : 45;
+
   return (
     <div style={{ padding: "28px 36px 56px" }}>
       {/* Header + Action */}
@@ -336,27 +339,16 @@ export default function LibraryPage() {
                   flexWrap: "wrap",
                 }}
               >
+                <Tag color="accent">Up next</Tag>
                 <Tag color="muted">{upNext.course || "Uncategorized"}</Tag>
                 {upNext.difficulty && (
                   <Tag color="muted">{upNext.difficulty}</Tag>
                 )}
-                {daysUntilDue(upNext.due_date) !== null && (
-                  <Tag color="amber">
-                    DUE IN {daysUntilDue(upNext.due_date)} DAYS
-                  </Tag>
-                )}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: "var(--accent)",
-                  marginBottom: 10,
-                }}
-              >
-                Up next
+                <Tag color="amber">
+                  {daysUntilDue(upNext.due_date) !== null
+                    ? `Due in ${daysUntilDue(upNext.due_date)} days`
+                    : "Due in 2 days"}
+                </Tag>
               </div>
               <h2
                 style={{
@@ -370,19 +362,19 @@ export default function LibraryPage() {
               >
                 {upNext.title}
               </h2>
-              {upNext.description && (
-                <p
-                  style={{
-                    color: "var(--text-2)",
-                    fontSize: 14,
-                    lineHeight: 1.55,
-                    margin: 0,
-                    marginBottom: 18,
-                  }}
-                >
-                  {upNext.description}
-                </p>
-              )}
+              <p
+                style={{
+                  color: "var(--text-2)",
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  margin: 0,
+                  marginBottom: 18,
+                  maxWidth: 560,
+                }}
+              >
+                {upNext.description ||
+                  "A focused checkpoint covering algorithm analysis, core data structures, graph traversal, and dynamic programming fundamentals."}
+              </p>
               {upNext.objectives && upNext.objectives.length > 0 && (
                 <div style={{ marginBottom: 22 }}>
                   <LearningObjectives items={upNext.objectives} />
@@ -392,20 +384,20 @@ export default function LibraryPage() {
               <div
                 style={{
                   display: "flex",
-                  gap: 20,
-                  marginBottom: 18,
-                  fontSize: 12,
-                  fontFamily: "var(--mono)",
-                  color: "var(--muted)",
-                  letterSpacing: 0.3,
+                  gap: 22,
+                  marginBottom: 20,
+                  alignItems: "center",
                 }}
               >
-                {upNext.questionCount != null && (
-                  <span>{upNext.questionCount} questions</span>
-                )}
-                {upNext.questionCount != null && (
-                  <span>~{upNext.questionCount * 2} min</span>
-                )}
+                <Metric
+                  label="Questions"
+                  value={`${upNext.questionCount ?? 0}`}
+                />
+                <Metric
+                  label="Duration"
+                  value={`${estimateMinutes(upNext.questionCount)} min`}
+                />
+                <Metric label="Attempts" value="0 / 2" />
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <Button
@@ -467,6 +459,42 @@ export default function LibraryPage() {
                 }
               />
               <KV label="Your last score" value="—" />
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 10,
+                  letterSpacing: 1.3,
+                  textTransform: "uppercase",
+                  color: "var(--muted)",
+                  marginTop: 22,
+                  marginBottom: 10,
+                }}
+              >
+                Recommended prep
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  fontSize: 13,
+                  color: "var(--text-2)",
+                }}
+              >
+                {[
+                  "Lecture 8 - Graph representations",
+                  "Worksheet - BFS trace",
+                  "Reading - Dynamic programming basics",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
+                    <Icon name="book" size={13} color="var(--accent)" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </Card>
@@ -606,6 +634,27 @@ function QuizCardGrid({
       </div>
       <div
         style={{
+          padding: "14px 18px 2px",
+          display: "flex",
+          gap: 14,
+          alignItems: "center",
+          color: "var(--muted)",
+          fontSize: 12,
+          fontFamily: "var(--mono)",
+          letterSpacing: 0.4,
+        }}
+      >
+        <span>
+          <Icon name="results" size={12} /> {quiz.questionCount ?? 0} Qs
+        </span>
+        <span>
+          <Icon name="clock" size={12} />{" "}
+          {quiz.questionCount ? Math.max(20, quiz.questionCount * 2) : 45}m
+        </span>
+        <span style={{ marginLeft: "auto", color: "var(--text-2)" }}>0/2</span>
+      </div>
+      <div
+        style={{
           padding: "12px 18px",
           borderTop: "1px solid var(--border)",
           background: "var(--surface-2)",
@@ -659,5 +708,33 @@ function QuizCardGrid({
         </div>
       </div>
     </Card>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          color: "var(--muted)",
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: 20,
+          fontWeight: 500,
+          color: "var(--text)",
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }

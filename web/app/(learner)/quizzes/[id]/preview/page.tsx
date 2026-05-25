@@ -58,8 +58,9 @@ export default function QuizPreviewPage({
       const { data } = await (makeClient(token) as any).POST("/v1/sessions", {
         body: { quizId: id, count: quiz.questions.length },
       });
-      if (data?.session_id) {
-        router.push(`/sessions/${data.session_id}`);
+      const sessionId = data?.sessionId ?? data?.session_id;
+      if (sessionId) {
+        router.push(`/sessions/${sessionId}`);
       }
     } finally {
       setStarting(false);
