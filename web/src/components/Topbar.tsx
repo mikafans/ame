@@ -1,7 +1,10 @@
 "use client";
 
 import React from "react";
-import { Icon } from "@/components/ui";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 
 interface TopbarProps {
   title: string;
@@ -12,11 +15,14 @@ interface TopbarProps {
 
 export function Topbar({ title, subtitle, breadcrumb, actions }: TopbarProps) {
   return (
-    <header
-      style={{
-        padding: "20px 36px",
-        borderBottom: "1px solid var(--border)",
-        background: "var(--bg)",
+    <Box
+      component="header"
+      sx={{
+        px: 4.5,
+        py: 2.5,
+        borderBottom: 1,
+        borderColor: "divider",
+        bgcolor: "background.default",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -25,67 +31,49 @@ export function Topbar({ title, subtitle, breadcrumb, actions }: TopbarProps) {
         zIndex: 5,
       }}
     >
-      <div>
-        {breadcrumb ? (
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
+      <Box>
+        {breadcrumb && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
               letterSpacing: 1.3,
               textTransform: "uppercase",
-              color: "var(--muted)",
-              marginBottom: 6,
+              display: "block",
+              mb: 0.75,
             }}
           >
             {breadcrumb}
-          </div>
-        ) : null}
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: "var(--serif)",
-            fontWeight: 500,
-            fontSize: 26,
-            letterSpacing: -0.3,
-            color: "var(--text)",
-          }}
-        >
+          </Typography>
+        )}
+        <Typography variant="h5" sx={{ fontWeight: 500, letterSpacing: -0.3 }}>
           {title}
-        </h1>
-        {subtitle ? (
-          <div
-            style={{
-              marginTop: 4,
-              color: "var(--muted)",
-              fontSize: 13,
-            }}
-          >
+        </Typography>
+        {subtitle && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {subtitle}
-          </div>
-        ) : null}
-      </div>
+          </Typography>
+        )}
+      </Box>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
         {actions}
-        <div
-          style={{
+        <Box
+          sx={{
             display: "flex",
             alignItems: "center",
-            gap: 10,
-            paddingLeft: 14,
-            borderLeft: "1px solid var(--border)",
+            gap: 1.25,
+            pl: 1.75,
+            borderLeft: 1,
+            borderColor: "divider",
           }}
         >
-          <Icon name="bell" size={16} color="var(--muted)" />
-          <Icon name="search" size={16} color="var(--muted)" />
-        </div>
-      </div>
-    </header>
+          <NotificationsNoneOutlinedIcon
+            sx={{ fontSize: 18, color: "text.secondary" }}
+          />
+          <SearchOutlinedIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+        </Box>
+      </Box>
+    </Box>
   );
 }

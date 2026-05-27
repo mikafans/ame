@@ -1,7 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
+import Button from "@mui/material/Button";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 
 interface Props {
   value: string;
@@ -32,39 +34,37 @@ export function CodeRenderer({
       }}
     >
       {/* File header */}
-      <div
-        style={{
-          padding: "8px 14px",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
+      <Box
+        sx={{
+          px: 1.75,
+          py: 1,
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "action.hover",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontFamily: "var(--mono)",
-            fontSize: 11,
-            color: "var(--muted)",
-            letterSpacing: 0.8,
-          }}
-        >
-          <Icon name="code" size={12} />
-          {filename} · {language}
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <Button variant="ghost" size="sm">
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <CodeOutlinedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontFamily: "monospace", letterSpacing: 0.8 }}
+          >
+            {filename} · {language}
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 0.75 }}>
+          <Button size="small" variant="text">
             Run tests
           </Button>
-          <Button variant="ghost" size="sm">
+          <Button size="small" variant="text">
             Reset
           </Button>
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* Code textarea */}
       <textarea
