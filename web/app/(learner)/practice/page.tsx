@@ -4,8 +4,16 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
+import Alert from "@mui/material/Alert";
 
-interface Tag {
+interface TagItem {
   name: string;
 }
 
@@ -19,7 +27,7 @@ const QUESTION_TYPES = [
 export default function PracticePage() {
   const { token } = useAuth();
   const router = useRouter();
-  const [tags, setTags] = useState<Tag[] | null>(null);
+  const [tags, setTags] = useState<TagItem[] | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [count, setCount] = useState(10);
@@ -31,7 +39,7 @@ export default function PracticePage() {
     if (!token) return;
     makeClient(token)
       .GET("/v1/tags" as never)
-      .then(({ data }: { data?: Tag[] }) => {
+      .then(({ data }: { data?: TagItem[] }) => {
         setTags(Array.isArray(data) ? data : []);
       })
       .catch(() => setTags([]));
@@ -83,68 +91,51 @@ export default function PracticePage() {
   }
 
   return (
-    <div style={{ padding: "28px 36px 56px", maxWidth: 640 }}>
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 10,
+    <Box sx={{ p: "28px 36px 56px", maxWidth: 640 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          fontFamily: "monospace",
           letterSpacing: 1.3,
           textTransform: "uppercase",
-          color: "var(--muted)",
-          marginBottom: 6,
+          display: "block",
+          mb: 0.75,
         }}
       >
         Session setup
-      </div>
-      <h1
-        style={{
-          margin: "0 0 32px",
-          fontSize: 24,
-          fontWeight: 600,
-          color: "var(--text)",
-        }}
-      >
+      </Typography>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
         Practice
-      </h1>
+      </Typography>
 
-      <form onSubmit={handleStart}>
+      <Box component="form" onSubmit={handleStart}>
         {/* Tags */}
         <SetupBlock label="Topics" kicker="Filter by tag">
           {tags === null ? (
-            <span style={{ color: "var(--muted)", fontSize: 13 }}>
+            <Typography variant="body2" color="text.secondary">
               Loading tags…
-            </span>
+            </Typography>
           ) : tags.length === 0 ? (
-            <span style={{ color: "var(--muted)", fontSize: 13 }}>
+            <Typography variant="body2" color="text.secondary">
               No tags yet — all questions will be included.
-            </span>
+            </Typography>
           ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {tags.map((t) => {
-                const active = selectedTags.includes(t.name);
-                return (
-                  <button
-                    key={t.name}
-                    type="button"
-                    onClick={() => toggleTag(t.name)}
-                    style={{
-                      padding: "5px 12px",
-                      background: active
-                        ? "var(--accent-dim)"
-                        : "var(--surface-2)",
-                      border: `1px solid ${active ? "var(--accent-line)" : "var(--border)"}`,
-                      borderRadius: 4,
-                      color: active ? "var(--accent)" : "var(--text-2)",
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontFamily: "var(--mono)",
-                    }}
-                  >
-                    {t.name}
-                  </button>
-                );
-              })}
-            </div>
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+              {tags.map((t) => (
+                <Chip
+                  key={t.name}
+                  label={t.name}
+                  size="small"
+                  onClick={() => toggleTag(t.name)}
+                  color={selectedTags.includes(t.name) ? "primary" : "default"}
+                  variant={
+                    selectedTags.includes(t.name) ? "filled" : "outlined"
+                  }
+                  sx={{ cursor: "pointer" }}
+                />
+              ))}
+            </Stack>
           )}
         </SetupBlock>
 
@@ -154,154 +145,104 @@ export default function PracticePage() {
           kicker="Leave empty for all types"
           hint="Mix and match"
         >
-          <div style={{ display: "flex", gap: 8 }}>
-            {QUESTION_TYPES.map((qt) => {
-              const active = selectedTypes.includes(qt.value);
-              return (
-                <button
-                  key={qt.value}
-                  type="button"
-                  onClick={() => toggleType(qt.value)}
-                  style={{
-                    padding: "6px 14px",
-                    background: active
-                      ? "var(--accent-dim)"
-                      : "var(--surface-2)",
-                    border: `1px solid ${active ? "var(--accent-line)" : "var(--border)"}`,
-                    borderRadius: 4,
-                    color: active ? "var(--accent)" : "var(--text-2)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                  }}
-                >
-                  {qt.label}
-                </button>
-              );
-            })}
-          </div>
+          <Stack direction="row" spacing={1}>
+            {QUESTION_TYPES.map((qt) => (
+              <Chip
+                key={qt.value}
+                label={qt.label}
+                size="small"
+                onClick={() => toggleType(qt.value)}
+                color={selectedTypes.includes(qt.value) ? "primary" : "default"}
+                variant={
+                  selectedTypes.includes(qt.value) ? "filled" : "outlined"
+                }
+                sx={{ cursor: "pointer" }}
+              />
+            ))}
+          </Stack>
         </SetupBlock>
 
         {/* Count */}
         <SetupBlock label="Questions" kicker="How many">
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             {[5, 10, 20, 50].map((n) => (
-              <button
+              <Chip
                 key={n}
-                type="button"
+                label={n}
+                size="small"
                 onClick={() => setCount(n)}
-                style={{
-                  padding: "6px 14px",
-                  background:
-                    count === n ? "var(--accent-dim)" : "var(--surface-2)",
-                  border: `1px solid ${count === n ? "var(--accent-line)" : "var(--border)"}`,
-                  borderRadius: 4,
-                  color: count === n ? "var(--accent)" : "var(--text-2)",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontFamily: "var(--mono)",
-                }}
-              >
-                {n}
-              </button>
+                color={count === n ? "primary" : "default"}
+                variant={count === n ? "filled" : "outlined"}
+                sx={{ cursor: "pointer", fontFamily: "monospace" }}
+              />
             ))}
-            <input
+            <Box
+              component="input"
               type="number"
               min={1}
               max={200}
               value={count}
-              onChange={(e) => setCount(parseInt(e.target.value) || 10)}
-              style={{
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setCount(parseInt(e.target.value) || 10)
+              }
+              sx={{
                 width: 64,
-                padding: "6px 10px",
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                color: "var(--text)",
+                p: "6px 10px",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                fontFamily: "monospace",
                 fontSize: 13,
-                fontFamily: "var(--mono)",
                 textAlign: "center",
+                bgcolor: "background.paper",
+                color: "text.primary",
+                outline: "none",
               }}
             />
-          </div>
+          </Stack>
         </SetupBlock>
 
         {/* Duration */}
         <SetupBlock label="Time limit" kicker="Minutes (optional)">
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Stack direction="row" spacing={1}>
             {[10, 20, 30, 60].map((n) => (
-              <button
+              <Chip
                 key={n}
-                type="button"
+                label={`${n}m`}
+                size="small"
                 onClick={() => setDuration(duration === n ? "" : n)}
-                style={{
-                  padding: "6px 14px",
-                  background:
-                    duration === n ? "var(--accent-dim)" : "var(--surface-2)",
-                  border: `1px solid ${duration === n ? "var(--accent-line)" : "var(--border)"}`,
-                  borderRadius: 4,
-                  color: duration === n ? "var(--accent)" : "var(--text-2)",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontFamily: "var(--mono)",
-                }}
-              >
-                {n}m
-              </button>
+                color={duration === n ? "primary" : "default"}
+                variant={duration === n ? "filled" : "outlined"}
+                sx={{ cursor: "pointer", fontFamily: "monospace" }}
+              />
             ))}
-            <button
-              type="button"
+            <Chip
+              label="No limit"
+              size="small"
               onClick={() => setDuration("")}
-              style={{
-                padding: "6px 14px",
-                background:
-                  duration === "" ? "var(--accent-dim)" : "var(--surface-2)",
-                border: `1px solid ${duration === "" ? "var(--accent-line)" : "var(--border)"}`,
-                borderRadius: 4,
-                color: duration === "" ? "var(--accent)" : "var(--muted)",
-                cursor: "pointer",
-                fontSize: 12,
-              }}
-            >
-              No limit
-            </button>
-          </div>
+              color={duration === "" ? "primary" : "default"}
+              variant={duration === "" ? "filled" : "outlined"}
+              sx={{ cursor: "pointer" }}
+            />
+          </Stack>
         </SetupBlock>
 
         {error && (
-          <div
-            style={{
-              padding: "10px 14px",
-              background: "var(--red-dim)",
-              border: "1px solid var(--red)",
-              borderRadius: 4,
-              color: "var(--red)",
-              fontSize: 13,
-              marginBottom: 16,
-            }}
-          >
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-          </div>
+          </Alert>
         )}
 
-        <button
+        <Button
           type="submit"
+          variant="contained"
+          size="large"
           disabled={loading}
-          style={{
-            padding: "11px 28px",
-            background: "var(--accent)",
-            border: "none",
-            borderRadius: 4,
-            color: "#000",
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.7 : 1,
-          }}
         >
           {loading ? "Starting…" : "Start session →"}
-        </button>
-      </form>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   );
 }
 
@@ -317,47 +258,35 @@ function SetupBlock({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        marginBottom: 28,
-        padding: "18px 20px",
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          gap: 10,
-          marginBottom: 14,
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
-          {label}
-        </span>
-        {kicker && (
-          <span
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10.5,
-              letterSpacing: 0.8,
-              color: "var(--muted)",
-            }}
-          >
-            {kicker}
-          </span>
-        )}
-        {hint && (
-          <span
-            style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}
-          >
-            {hint}
-          </span>
-        )}
-      </div>
-      {children}
-    </div>
+    <Card variant="outlined" sx={{ mb: 3.5 }}>
+      <CardContent>
+        <Box
+          sx={{ display: "flex", alignItems: "baseline", gap: 1.25, mb: 1.75 }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {label}
+          </Typography>
+          {kicker && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontFamily: "monospace", letterSpacing: 0.8 }}
+            >
+              {kicker}
+            </Typography>
+          )}
+          {hint && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ ml: "auto" }}
+            >
+              {hint}
+            </Typography>
+          )}
+        </Box>
+        {children}
+      </CardContent>
+    </Card>
   );
 }
