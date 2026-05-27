@@ -95,9 +95,8 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2) || "JT";
-  const displayName = user?.displayName || "Jordan Tahir";
-  const cohort = "CS '27";
+      .slice(0, 2) ?? "?";
+  const displayName = user?.displayName ?? "";
 
   return (
     <Drawer
@@ -125,7 +124,7 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
             mt: 0.5,
           }}
         >
-          Assessment Platform · v2.4
+          ame
         </Typography>
       </Box>
 
@@ -180,7 +179,7 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
             {displayName}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {user?.role || "Student"} · {cohort}
+            {user?.role ?? ""}
           </Typography>
         </Box>
         <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>

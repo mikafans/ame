@@ -142,7 +142,9 @@ stop: ## Stop API, frontend, and Postgres
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
 	docker compose -f db/docker-compose.yml down
 
-dev: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
+API_HOST ?= localhost
+
+dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override: make dev API_HOST=harus-macmini
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	$(MAKE) db-migrate
@@ -151,8 +153,9 @@ dev: db-up ## Kill stale processes, migrate, then start API + frontend (http://l
 	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
 		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
 		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee .tmp/ame-api.log &
-	@echo "Starting frontend on :3000 (logs → .tmp/ame-web.log)"
-	@cd web && mise exec -- bun run dev 2>&1 | tee .tmp/ame-web.log
+	@echo "Starting frontend on :3000 targeting $(API_HOST):8080 (logs → .tmp/ame-web.log)"
+	@cd web && NEXT_PUBLIC_API_URL=http://$(API_HOST):8080 NEXT_ALLOWED_ORIGINS=$(API_HOST) \
+		mise exec -- bun run dev 2>&1 | tee $(CURDIR)/.tmp/ame-web.log
 
 hooks-install: ## Point git at .githooks/
 	git config core.hooksPath .githooks
