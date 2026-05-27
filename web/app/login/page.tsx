@@ -51,11 +51,19 @@ export default function LoginPage() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        const message =
-          data?.error?.details?.[0]?.message ||
-          data?.error?.message ||
-          "Authentication failed";
+        let message = "Authentication failed";
+        try {
+          const data = await response.json();
+          // Look for errors in different possible structures
+          message =
+            data?.error?.message ||
+            data?.message ||
+            (typeof data?.error === "string" ? data.error : null) ||
+            `Error: ${response.statusText}`;
+        } catch {
+          // If response body isn't JSON, fallback to status text
+          message = `Authentication failed: ${response.status} ${response.statusText}`;
+        }
         setError(message);
         return;
       }
@@ -309,6 +317,9 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="email"
+                  id="email"
+                  name="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   style={{
@@ -353,6 +364,11 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="password"
+                  id="password"
+                  name="password"
+                  autoComplete={
+                    tab === "signup" ? "new-password" : "current-password"
+                  }
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   style={{
