@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check validate pre-remote db-up db-down db-reset db-migrate db-shell db-seed simulate init-env dev-stop dev-env hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -84,9 +84,7 @@ uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 
 check: fmt-check lint test ## Pre-commit gate (read-only)
 
-validate: check e2e ## Pre-PR gate
-
-pre-remote: check test-db e2e ## Strict pre-remote gate (requires `make db-up`)
+ci: check test-db e2e ## Full CI gate: fmt + lint + unit + db tests + e2e
 
 db-up: ## Start Postgres in docker
 	docker compose -f db/docker-compose.yml up -d
@@ -110,7 +108,7 @@ db-shell: ## Open interactive pgcli session to local Postgres
 db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API running)
 	uv run scripts/seed.py
 
-simulate: ## Run all three role simulation scripts against local API (requires make dev-env + make db-seed)
+simulate: ## Run all three role simulation scripts against local API (requires make dev + make db-seed)
 	uv run scripts/simulate/instructor.py
 	uv run scripts/simulate/learner.py
 	uv run scripts/simulate/agent.py
@@ -120,13 +118,13 @@ init-env: ## One-time setup: mise install + sqlx-cli + web deps + playwright
 	cargo install sqlx-cli --no-default-features --features postgres
 	cd web && mise exec -- bun install
 	cd web && mise exec -- bunx playwright install --with-deps
-	@echo "init-env done — run 'make dev-env' to start the stack"
+	@echo "init-env done — run 'make dev' to start the stack"
 
-dev-stop: ## Stop API, frontend, and Postgres
+stop: ## Stop API, frontend, and Postgres
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
 	docker compose -f db/docker-compose.yml down
 
-dev-env: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
+dev: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	$(MAKE) db-migrate
