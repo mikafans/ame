@@ -68,9 +68,27 @@ openapi: ## Regenerate api/openapi.yaml and web TypeScript schema
 		echo "[web] skipping schema regen (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
-e2e: ## Playwright (requires `make db-up`)
+e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not running)
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run e2e; \
+		_api_owned=0; \
+		if ! curl -sf http://localhost:8080/healthz > /dev/null 2>&1; then \
+			echo "[e2e] API not running — starting..."; \
+			mkdir -p .tmp; \
+			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
+				mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api >> .tmp/ame-api-e2e.log 2>&1 & \
+			echo $$! > .tmp/ame-api-e2e.pid; \
+			_api_owned=1; \
+			echo "[e2e] Waiting for API on :8080..."; \
+			until curl -sf http://localhost:8080/healthz > /dev/null 2>&1; do sleep 1; done; \
+		fi; \
+		echo "[e2e] Seeding..."; \
+		uv run scripts/seed.py >> .tmp/ame-api-e2e.log 2>&1 || true; \
+		cd web && mise exec -- bun run e2e; _exit=$$?; \
+		if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
+			kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; \
+			rm -f .tmp/ame-api-e2e.pid; \
+		fi; \
+		exit $$_exit; \
 	else \
 		echo "[web] skipping e2e (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi

@@ -38,7 +38,9 @@ test.describe("Learner role", () => {
         { name: "ame_token", value: token, domain: "localhost", path: "/" },
       ]);
     await page.goto(`${BASE}/`);
-    await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("heading").first()).toBeVisible({
+      timeout: 8000,
+    });
   });
 
   test("can start a quiz session and answer questions", async ({
