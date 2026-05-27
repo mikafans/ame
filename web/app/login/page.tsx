@@ -3,14 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setAuthToken } from "@/hooks/useAuth";
-import { Button, Icon, Logo } from "@/components/ui";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
+import Grid from "@mui/material/Grid";
+import Paper from "@mui/material/Paper";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import Alert from "@mui/material/Alert";
+import AutoFixHighOutlinedIcon from "@mui/icons-material/AutoFixHighOutlined";
+import { Logo } from "@/components/Logo";
 
-type Tab = "signup" | "login";
+type TabId = "signup" | "login";
 type Role = "learner" | "instructor" | "agent";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("signup");
+  const [tab, setTab] = useState<TabId>("signup");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,44 +41,30 @@ export default function LoginPage() {
         tab === "signup"
           ? `${apiUrl}/v1/auth/register`
           : `${apiUrl}/v1/auth/login`;
-
       const body =
         tab === "signup"
-          ? {
-              email,
-              name: fullName,
-              password,
-              role,
-            }
-          : {
-              email,
-              password,
-            };
-
+          ? { email, name: fullName, password, role }
+          : { email, password };
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       if (!response.ok) {
         let message = "Authentication failed";
         try {
           const data = await response.json();
-          // Look for errors in different possible structures
           message =
             data?.error?.message ||
             data?.message ||
             (typeof data?.error === "string" ? data.error : null) ||
             `Error: ${response.statusText}`;
         } catch {
-          // If response body isn't JSON, fallback to status text
           message = `Authentication failed: ${response.status} ${response.statusText}`;
         }
         setError(message);
         return;
       }
-
       const data = await response.json();
       setAuthToken(data.token);
       router.push("/library");
@@ -87,21 +84,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        gridTemplateColumns: "1.05fr 1fr",
-        background: "var(--bg)",
-      }}
-    >
-      {/* LEFT PANEL: Marketing */}
-      <div
-        style={{
-          padding: "56px 64px",
-          borderRight: "1px solid var(--border)",
-          background:
-            "linear-gradient(180deg, var(--surface) 0%, var(--bg) 70%)",
+    <Grid container sx={{ minHeight: "100vh" }}>
+      {/* Left panel */}
+      <Grid
+        size={6}
+        sx={{
+          p: "56px 64px",
+          borderRight: 1,
+          borderColor: "divider",
+          background: "linear-gradient(180deg, #f5f5f5 0%, #ffffff 70%)",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -109,458 +100,237 @@ export default function LoginPage() {
       >
         <Logo size={28} />
 
-        <div style={{ maxWidth: 520 }}>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
+        <Box sx={{ maxWidth: 520 }}>
+          <Typography
+            variant="caption"
+            sx={{
               letterSpacing: 1.6,
               textTransform: "uppercase",
-              color: "var(--accent)",
-              marginBottom: 18,
+              color: "primary.main",
+              mb: 2.25,
+              display: "block",
             }}
           >
             Assessment platform · est. 2025
-          </div>
-          <h1
-            style={{
-              fontFamily: "var(--serif)",
-              fontSize: 56,
-              lineHeight: 1.04,
-              margin: 0,
+          </Typography>
+          <Typography
+            variant="h3"
+            sx={{
               fontWeight: 500,
               letterSpacing: -1.2,
+              lineHeight: 1.04,
+              mb: 2.75,
             }}
           >
             Quizzes that learners and agents can both read.
-          </h1>
-          <p
-            style={{
-              color: "var(--text-2)",
-              fontSize: 16,
-              lineHeight: 1.55,
-              marginTop: 22,
-              maxWidth: 460,
-            }}
+          </Typography>
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{ lineHeight: 1.55, maxWidth: 460 }}
           >
             Harus is an assessment platform built for two audiences at once.
             Students get a focused test-taking experience and a real progress
             dashboard. Authors and AI agents share the same structured surface —
             every quiz, attempt, and rubric is addressable, importable, and
             queryable through a single API.
-          </p>
+          </Typography>
 
-          <div
-            style={{
-              marginTop: 36,
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-              maxWidth: 460,
-            }}
-          >
+          <Grid container spacing={1.5} sx={{ mt: 4.5, maxWidth: 460 }}>
             {[
               ["18,402", "active learners"],
               ["1,243", "instructors"],
               ["94", "institutions"],
               ["6.1M", "graded attempts"],
             ].map(([value, label]) => (
-              <div
-                key={label}
-                style={{
-                  padding: "12px 14px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: "var(--serif)",
-                    fontSize: 22,
-                    fontWeight: 500,
-                  }}
-                >
-                  {value}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "var(--muted)",
-                    fontFamily: "var(--mono)",
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    marginTop: 2,
-                  }}
-                >
-                  {label}
-                </div>
-              </div>
+              <Grid size={6} key={label}>
+                <Paper variant="outlined" sx={{ p: "12px 14px" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                    {value}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ letterSpacing: 1, textTransform: "uppercase" }}
+                  >
+                    {label}
+                  </Typography>
+                </Paper>
+              </Grid>
             ))}
-          </div>
-        </div>
+          </Grid>
+        </Box>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 18,
-            alignItems: "center",
-            color: "var(--muted)",
-            fontSize: 12,
-            fontFamily: "var(--mono)",
-            letterSpacing: 0.6,
-          }}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ letterSpacing: 0.6 }}
         >
-          <span>SSO · SAML</span>
-          <span>·</span>
-          <span>FERPA · GDPR</span>
-          <span>·</span>
-          <span>OpenAPI 3.1 · MCP</span>
-        </div>
-      </div>
+          SSO · SAML &nbsp;·&nbsp; FERPA · GDPR &nbsp;·&nbsp; OpenAPI 3.1 · MCP
+        </Typography>
+      </Grid>
 
-      {/* RIGHT PANEL: Form */}
-      <div
-        style={{
-          padding: "56px 64px",
-          display: "flex",
-          alignItems: "center",
-        }}
+      {/* Right panel */}
+      <Grid
+        size={6}
+        sx={{ p: "56px 64px", display: "flex", alignItems: "center" }}
       >
-        <div style={{ width: "100%", maxWidth: 420 }}>
-          {/* Tab Bar */}
-          <div
-            style={{
-              display: "flex",
-              gap: 0,
-              borderBottom: "1px solid var(--border)",
-              marginBottom: 28,
-            }}
+        <Box sx={{ width: "100%", maxWidth: 420 }}>
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            sx={{ mb: 3.5, borderBottom: 1, borderColor: "divider" }}
           >
-            {(["signup", "login"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "10px 0",
-                  marginRight: 24,
-                  color: tab === t ? "var(--text)" : "var(--muted)",
-                  borderBottom: `2px solid ${
-                    tab === t ? "var(--accent)" : "transparent"
-                  }`,
-                  fontWeight: tab === t ? 600 : 500,
-                  fontSize: 13,
-                  letterSpacing: 0.3,
-                  cursor: "pointer",
-                  fontFamily: "var(--sans)",
-                }}
-              >
-                {t === "signup" ? "Create account" : "Sign in"}
-              </button>
-            ))}
-          </div>
+            <Tab
+              value="signup"
+              label="Create account"
+              sx={{ textTransform: "none", fontWeight: 500 }}
+            />
+            <Tab
+              value="login"
+              label="Sign in"
+              sx={{ textTransform: "none", fontWeight: 500 }}
+            />
+          </Tabs>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Full Name (signup only) */}
-              {tab === "signup" && (
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 11,
-                      fontFamily: "var(--mono)",
-                      letterSpacing: 1.2,
-                      textTransform: "uppercase",
-                      color: "var(--muted)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Full name
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "var(--surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 6,
-                      padding: "10px 12px",
-                      fontSize: 14,
-                      color: "var(--text)",
-                      outline: "none",
-                      fontFamily: "var(--sans)",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              )}
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          >
+            {tab === "signup" && (
+              <TextField
+                label="Full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                fullWidth
+                size="small"
+              />
+            )}
+            <TextField
+              label="Institutional email"
+              type="email"
+              id="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              fullWidth
+              size="small"
+              helperText="Recognized: stanford.edu · SSO available"
+            />
+            <TextField
+              label="Password"
+              type="password"
+              id="password"
+              name="password"
+              autoComplete={
+                tab === "signup" ? "new-password" : "current-password"
+              }
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              fullWidth
+              size="small"
+            />
 
-              {/* Email */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11,
-                    fontFamily: "var(--mono)",
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
+            {tab === "signup" && (
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 1 }}
                 >
-                  Institutional email
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: "100%",
-                    background: "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: "10px 12px",
-                    fontSize: 14,
-                    color: "var(--text)",
-                    outline: "none",
-                    fontFamily: "var(--sans)",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "var(--muted)",
-                    marginTop: 6,
-                    fontFamily: "var(--mono)",
-                  }}
-                >
-                  Recognized: stanford.edu · SSO available
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11,
-                    fontFamily: "var(--mono)",
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  Password
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  autoComplete={
-                    tab === "signup" ? "new-password" : "current-password"
-                  }
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: "100%",
-                    background: "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: "10px 12px",
-                    fontSize: 14,
-                    color: "var(--text)",
-                    outline: "none",
-                    fontFamily: "var(--sans)",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              {/* Role Picker (signup only) */}
-              {tab === "signup" && (
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 11,
-                      fontFamily: "var(--mono)",
-                      letterSpacing: 1.2,
-                      textTransform: "uppercase",
-                      color: "var(--muted)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Role
-                  </label>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr 1fr",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {(["learner", "instructor", "agent"] as const).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
+                  Role
+                </Typography>
+                <Grid container spacing={1} sx={{ mb: 1 }}>
+                  {(["learner", "instructor", "agent"] as const).map((r) => (
+                    <Grid size={4} key={r}>
+                      <Button
+                        fullWidth
+                        variant={role === r ? "contained" : "outlined"}
+                        size="small"
                         onClick={() => setRole(r)}
-                        style={{
-                          padding: "10px 8px",
-                          background:
-                            role === r ? "var(--accent-dim)" : "var(--surface)",
-                          border: `1px solid ${
-                            role === r ? "var(--accent-line)" : "var(--border)"
-                          }`,
-                          color: role === r ? "var(--accent)" : "var(--text-2)",
-                          borderRadius: 6,
-                          fontSize: 12,
-                          fontWeight: 500,
-                          textTransform: "capitalize",
-                          cursor: "pointer",
-                          fontFamily: "var(--sans)",
-                        }}
+                        sx={{ textTransform: "capitalize" }}
                       >
                         {r}
-                      </button>
-                    ))}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "var(--muted)",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {roleDescriptions[role]}
-                  </div>
-                </div>
-              )}
+                      </Button>
+                    </Grid>
+                  ))}
+                </Grid>
+                <Typography variant="caption" color="text.secondary">
+                  {roleDescriptions[role]}
+                </Typography>
+              </Box>
+            )}
 
-              {/* Error Message */}
-              {error && (
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    background: "var(--red-dim)",
-                    border: "1px solid var(--red)",
-                    borderRadius: 6,
-                    color: "var(--red)",
-                    fontSize: 12,
-                  }}
-                >
-                  {error}
-                </div>
-              )}
+            {error && <Alert severity="error">{error}</Alert>}
 
-              {/* Primary Button */}
-              <div style={{ marginTop: 12 }}>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  type="submit"
-                  disabled={loading}
-                  style={{ width: "100%", justifyContent: "center" }}
-                >
-                  {loading
-                    ? "Loading…"
-                    : tab === "signup"
-                      ? "Create account"
-                      : "Sign in"}
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={loading}
+              fullWidth
+              sx={{ mt: 1.5 }}
+            >
+              {loading
+                ? "Loading…"
+                : tab === "signup"
+                  ? "Create account"
+                  : "Sign in"}
+            </Button>
+
+            <Divider sx={{ my: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                OR
+              </Typography>
+            </Divider>
+
+            <Grid container spacing={1}>
+              <Grid size={6}>
+                <Button variant="text" fullWidth>
+                  Continue with SSO
                 </Button>
-              </div>
+              </Grid>
+              <Grid size={6}>
+                <Button variant="text" fullWidth>
+                  Use access code
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
 
-              {/* OR Divider */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  color: "var(--muted)",
-                  fontSize: 11,
-                  margin: "8px 0",
-                }}
-              >
-                <div
-                  style={{ flex: 1, height: 1, background: "var(--border)" }}
-                />
-                <span style={{ fontFamily: "var(--mono)", letterSpacing: 1.2 }}>
-                  OR
-                </span>
-                <div
-                  style={{ flex: 1, height: 1, background: "var(--border)" }}
-                />
-              </div>
-
-              {/* Ghost Buttons */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 8,
-                }}
-              >
-                <Button variant="ghost">Continue with SSO</Button>
-                <Button variant="ghost">Use access code</Button>
-              </div>
-            </div>
-          </form>
-
-          {/* Agent Shortcut Callout */}
-          <div
-            style={{
-              marginTop: 36,
-              padding: 14,
-              border: "1px dashed var(--border-strong)",
-              borderRadius: 6,
-              background: "var(--surface)",
-            }}
+          <Paper
+            variant="outlined"
+            sx={{ mt: 4.5, p: 1.75, borderStyle: "dashed" }}
           >
-            <div
-              style={{
+            <Box
+              sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
-                color: "var(--accent)",
-                fontSize: 12,
-                fontWeight: 600,
-                marginBottom: 4,
+                gap: 1,
+                color: "primary.main",
+                mb: 0.5,
               }}
             >
-              <Icon name="sparkle" size={14} color="var(--accent)" />
-              Agent shortcut
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--text-2)",
-                lineHeight: 1.5,
-              }}
-            >
+              <AutoFixHighOutlinedIcon sx={{ fontSize: 14 }} />
+              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                Agent shortcut
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
               Programmatic access?{" "}
-              <span
-                style={{
-                  fontFamily: "var(--mono)",
-                  color: "var(--text)",
-                }}
+              <Box
+                component="span"
+                sx={{ fontFamily: "monospace", color: "text.primary" }}
               >
                 POST /v1/agents/register
-              </span>{" "}
+              </Box>{" "}
               returns a key, an OpenAPI schema, and an MCP manifest in one call.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </Typography>
+          </Paper>
+        </Box>
+      </Grid>
+    </Grid>
   );
 }
