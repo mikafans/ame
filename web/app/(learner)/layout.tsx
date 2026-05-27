@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -16,43 +22,36 @@ export default function LearnerLayout({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Redirect to login if unauthenticated
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
+    if (!loading && !user) router.push("/login");
   }, [loading, user, router]);
 
-  // Tweaks panel state (demo-only)
   const [theme, setTheme] = useState("slate");
   const [statsDepth, setStatsDepth] = useState<"minimal" | "standard" | "full">(
     "standard",
   );
   const [showTweaks, setShowTweaks] = useState(false);
 
-  // Apply theme
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     try {
       localStorage.setItem("harus.theme", theme);
     } catch {
-      // ignore
+      /* ignore */
     }
   }, [theme]);
 
-  // Read persisted theme on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem("harus.theme");
       if (saved) setTheme(saved);
     } catch {
-      // ignore
+      /* ignore */
     }
   }, []);
 
   const role = user?.role ?? "learner";
 
-  // Map pathname to route ID for Sidebar
   const getRouteId = () => {
     if (pathname.startsWith("/library")) return "library";
     if (pathname.startsWith("/exams")) return "exams";
@@ -82,22 +81,15 @@ export default function LearnerLayout({
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-      }}
-    >
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar
         route={currentRoute}
         setRoute={handleRouteChange}
         showAgent={role !== "learner"}
       />
-
-      {/* Main */}
-      <main style={{ flex: 1, overflowY: "auto" }}>{children}</main>
-
-      {/* Tweaks panel (demo-only, never in production) */}
+      <Box component="main" sx={{ flex: 1, overflowY: "auto" }}>
+        {children}
+      </Box>
       {DEMO_MODE && showTweaks && (
         <TweaksPanel
           theme={theme}
@@ -107,7 +99,7 @@ export default function LearnerLayout({
           onClose={() => setShowTweaks(false)}
         />
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -124,132 +116,106 @@ function TweaksPanel({
   setStatsDepth: (d: "minimal" | "standard" | "full") => void;
   onClose: () => void;
 }) {
-  // Runtime assertion — this component must never mount in production.
   if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "TweaksPanel must not be rendered in production. Check NEXT_PUBLIC_DEMO_MODE.",
-    );
+    throw new Error("TweaksPanel must not be rendered in production.");
   }
 
   return (
-    <div
-      style={{
+    <Paper
+      elevation={8}
+      sx={{
         position: "fixed",
         bottom: 24,
         right: 24,
-        background: "var(--surface)",
-        border: "1px solid var(--accent)",
-        borderRadius: 8,
-        padding: 20,
+        p: 2.5,
         width: 260,
         zIndex: 200,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
       }}
     >
-      <div
-        style={{
+      <Box
+        sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 16,
+          mb: 2,
         }}
       >
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 9,
+        <Box>
+          <Typography
+            variant="caption"
+            color="primary"
+            sx={{
               letterSpacing: 1.5,
               textTransform: "uppercase",
-              color: "var(--accent)",
-              marginBottom: 2,
+              display: "block",
             }}
           >
             Demo only
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+          </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
             Tweaks
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "var(--muted)",
-            fontSize: 16,
-            cursor: "pointer",
-            lineHeight: 1,
+          </Typography>
+        </Box>
+        <IconButton size="small" onClick={onClose}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: "block",
+            mb: 1,
+            letterSpacing: 1.2,
+            textTransform: "uppercase",
           }}
         >
-          ×
-        </button>
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <div style={tweakLabel}>Theme</div>
-        <div style={{ display: "flex", gap: 6 }}>
+          Theme
+        </Typography>
+        <Box sx={{ display: "flex", gap: 0.75 }}>
           {["slate", "paper", "cobalt"].map((t) => (
-            <button
+            <Button
               key={t}
+              size="small"
+              variant={theme === t ? "contained" : "outlined"}
               onClick={() => setTheme(t)}
-              style={{
-                flex: 1,
-                padding: "6px 4px",
-                background:
-                  theme === t
-                    ? "var(--accent-dim, rgba(0,200,100,0.15))"
-                    : "var(--surface-2)",
-                border: `1px solid ${theme === t ? "var(--accent)" : "var(--border)"}`,
-                borderRadius: 4,
-                color: theme === t ? "var(--accent)" : "var(--text-2)",
-                fontSize: 11,
-                cursor: "pointer",
-                fontFamily: "var(--mono)",
-              }}
+              sx={{ flex: 1, fontSize: 11 }}
             >
               {t}
-            </button>
+            </Button>
           ))}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <div>
-        <div style={tweakLabel}>Stats depth</div>
-        <div style={{ display: "flex", gap: 6 }}>
+      <Box>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: "block",
+            mb: 1,
+            letterSpacing: 1.2,
+            textTransform: "uppercase",
+          }}
+        >
+          Stats depth
+        </Typography>
+        <Box sx={{ display: "flex", gap: 0.75 }}>
           {(["minimal", "standard", "full"] as const).map((d) => (
-            <button
+            <Button
               key={d}
+              size="small"
+              variant={statsDepth === d ? "contained" : "outlined"}
               onClick={() => setStatsDepth(d)}
-              style={{
-                flex: 1,
-                padding: "6px 4px",
-                background:
-                  statsDepth === d
-                    ? "var(--accent-dim, rgba(0,200,100,0.15))"
-                    : "var(--surface-2)",
-                border: `1px solid ${statsDepth === d ? "var(--accent)" : "var(--border)"}`,
-                borderRadius: 4,
-                color: statsDepth === d ? "var(--accent)" : "var(--text-2)",
-                fontSize: 10,
-                cursor: "pointer",
-                fontFamily: "var(--mono)",
-              }}
+              sx={{ flex: 1, fontSize: 10 }}
             >
               {d}
-            </button>
+            </Button>
           ))}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Box>
+    </Paper>
   );
 }
-
-const tweakLabel: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 10,
-  letterSpacing: 1.2,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  marginBottom: 8,
-};
