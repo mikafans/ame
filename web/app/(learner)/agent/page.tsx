@@ -180,7 +180,7 @@ export default function AgentPage() {
           <CodeBlock
             label="curl"
             lines={[
-              `curl https://api.harus.app/v1/quizzes \\`,
+              `curl https://api.ame-platform.app/v1/quizzes \\`,
               `  -H "Authorization: Bearer hk_live_3fY9…ax2P" \\`,
               `  -H "Content-Type: application/json"`,
               ``,

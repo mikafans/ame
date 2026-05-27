@@ -160,6 +160,7 @@ export default function LibraryPage() {
   }
 
   const { quizzes } = allQuizzes[tab];
+  const featuredQuiz = allQuizzes.all.quizzes[0] ?? null;
 
   return (
     <Box sx={{ p: 4 }}>
@@ -205,6 +206,97 @@ export default function LibraryPage() {
           </Button>
         )}
       </Box>
+
+      {featuredQuiz && (
+        <Card variant="outlined" sx={{ mb: 4, borderColor: "primary.main" }}>
+          <CardContent>
+            <Typography
+              variant="overline"
+              color="primary"
+              sx={{ display: "block", mb: 0.5 }}
+            >
+              Up next
+            </Typography>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
+              {featuredQuiz.title}
+            </Typography>
+            {featuredQuiz.description && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1.5 }}
+              >
+                {featuredQuiz.description}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Questions
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {featuredQuiz.questionCount ?? "—"}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Duration
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {featuredQuiz.durationMin
+                    ? `${featuredQuiz.durationMin}m`
+                    : "—"}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Attempts
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {featuredQuiz.attemptLimit ?? "Unlimited"}
+                </Typography>
+              </Box>
+            </Stack>
+            {featuredQuiz.objectives && featuredQuiz.objectives.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    display: "block",
+                    mb: 0.5,
+                    letterSpacing: 1.2,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Recommended prep
+                </Typography>
+                <LearningObjectives items={featuredQuiz.objectives} />
+              </Box>
+            )}
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() =>
+                  router.push(`/quizzes/${featuredQuiz.id}/preview`)
+                }
+              >
+                Preview questions
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<PlayArrowOutlinedIcon />}
+                disabled={starting === featuredQuiz.id}
+                onClick={() => startQuiz(featuredQuiz.id)}
+              >
+                {starting === featuredQuiz.id ? "Starting…" : "Start"}
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs
         value={tab}

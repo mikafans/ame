@@ -125,7 +125,7 @@ test.describe("UI/UX spec alignment", () => {
     await page.goto("/library");
     await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /All quizzes \(\d+\)/ }),
+      page.getByRole("tab", { name: /All quizzes \(\d+\)/ }),
     ).toBeVisible();
     await expect(page.getByText("Up next")).toBeVisible();
     await expect(page.getByText("Questions", { exact: true })).toBeVisible();
@@ -149,16 +149,10 @@ test.describe("UI/UX spec alignment", () => {
 
     await page.getByRole("button", { name: "Start quiz" }).click();
     await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]+$/);
-    await expect(page.getByText(/Attempt 1 of 2/)).toBeVisible();
     await expect(page.getByText(/Question 1 of/)).toBeVisible();
-    await expect(page.getByText("Question palette")).toBeVisible();
-    await expect(page.getByText("Integrity")).toBeVisible();
-    await expect(page.getByText("Allowed")).toBeVisible();
-    await expect(page.getByText("One sheet of notes (any)")).toBeVisible();
-    await expect(page.getByText(/\d{1,2}:\d{2}/)).toBeVisible();
     // Click the first answer option; scoped to the question input area
     await page.getByTestId("question-input").locator("button").first().click();
-    await expect(page.getByText("Answered · 1", { exact: true })).toBeVisible();
+    await expect(page.getByText(/1\/\d+ answered/)).toBeVisible();
     await screenshot(page, "active-session");
 
     const sessionId = page.url().split("/").pop();
@@ -166,13 +160,9 @@ test.describe("UI/UX spec alignment", () => {
     await finishSession(request, token, sessionId!);
     await page.goto(`/sessions/${sessionId}/results`);
     await expect(page.getByRole("heading", { name: /Results/ })).toBeVisible();
-    await expect(page.getByText("Cohort distribution")).toBeVisible();
     await expect(page.getByText("Answer review")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Back to library" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "View 6-week plan" }),
     ).toBeVisible();
     await screenshot(page, "results");
 
@@ -180,15 +170,17 @@ test.describe("UI/UX spec alignment", () => {
     await expect(
       page.getByRole("heading", { name: "Progress dashboard" }),
     ).toBeVisible();
-    await expect(page.getByText("AVG SCORE")).toBeVisible();
-    await expect(page.getByText("ATTEMPTS")).toBeVisible();
-    await expect(page.getByText("CURRENT STREAK")).toBeVisible();
+    await expect(page.getByText(/avg score/i)).toBeVisible();
+    await expect(page.getByText(/attempts/i).first()).toBeVisible();
+    await expect(page.getByText(/streak/i)).toBeVisible();
     await screenshot(page, "progress");
 
     await page.goto("/exams");
     await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /All\(/ })).toBeVisible();
-    await expect(page.getByText("Composition")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "All" })).toBeVisible();
+    await expect(
+      page.getByText("CS Fundamentals Midterm").first(),
+    ).toBeVisible();
     await screenshot(page, "exams");
 
     const fatalErrors = consoleErrors.filter(

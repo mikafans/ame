@@ -3,25 +3,48 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setAuthToken } from "@/hooks/useAuth";
+import { useColorMode } from "@/components/ThemeRegistry";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
-import Paper from "@mui/material/Paper";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Alert from "@mui/material/Alert";
-import AutoFixHighOutlinedIcon from "@mui/icons-material/AutoFixHighOutlined";
-import { Logo } from "@/components/Logo";
+import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import { useTheme } from "@mui/material/styles";
 
 type TabId = "signup" | "login";
-type Role = "learner" | "instructor" | "agent";
+type Role = "learner" | "instructor";
+
+const ROLES: { id: Role; label: string; color: string; desc: string }[] = [
+  {
+    id: "learner",
+    label: "Learner",
+    color: "#22c55e",
+    desc: "Take quizzes, track scores, build a progress history. Adaptive difficulty adjusts to your level over time.",
+  },
+  {
+    id: "instructor",
+    label: "Instructor",
+    color: "#f59e0b",
+    desc: "Author quizzes with a point-per-question rubric, manage cohorts, and review graded attempts.",
+  },
+];
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<TabId>("signup");
+  const { mode, toggle } = useColorMode();
+  const theme = useTheme();
+  const isDark = mode === "dark";
+
+  const [tab, setTab] = useState<TabId>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +58,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       const endpoint =
         tab === "signup"
@@ -77,105 +99,205 @@ export default function LoginPage() {
     }
   }
 
-  const roleDescriptions: Record<Role, string> = {
-    learner: "Take assigned quizzes and track your progress.",
-    instructor: "Author quizzes, manage cohorts, and review attempts.",
-    agent: "Get an API key, an OpenAPI schema, and MCP tool descriptors.",
-  };
+  const leftBg = isDark ? "#0d1117" : "#f5f7ff";
+  const leftBorder = isDark ? "none" : `1px solid ${theme.palette.divider}`;
+  const cardBg = isDark ? "rgba(255,255,255,0.04)" : "#ffffff";
+  const cardBorder = isDark
+    ? "1px solid rgba(255,255,255,0.1)"
+    : `1px solid ${theme.palette.divider}`;
+  const subColor = isDark
+    ? "rgba(255,255,255,0.45)"
+    : theme.palette.text.secondary;
+  const agentBg = isDark ? "rgba(37,99,235,0.1)" : "#eff6ff";
+  const agentBorder = isDark
+    ? "1px solid rgba(96,165,250,0.25)"
+    : "1px dashed #93c5fd";
+  const agentCodeColor = isDark ? "#93c5fd" : "#1d4ed8";
+  const agentTextColor = isDark ? "rgba(255,255,255,0.4)" : "#64748b";
 
   return (
-    <Grid container sx={{ minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       {/* Left panel */}
-      <Grid
-        size={6}
+      <Box
         sx={{
-          p: "56px 64px",
-          borderRight: 1,
-          borderColor: "divider",
-          background: "linear-gradient(180deg, #f5f5f5 0%, #ffffff 70%)",
-          display: "flex",
+          width: { xs: "100%", md: "50%" },
+          display: { xs: "none", md: "flex" },
           flexDirection: "column",
-          justifyContent: "space-between",
+          p: "44px 48px",
+          background: leftBg,
+          borderRight: leftBorder,
         }}
       >
-        <Logo size={28} />
+        {/* Logo + toggle */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            mb: 5,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Box
+              sx={{
+                width: 30,
+                height: 30,
+                background: "#1976d2",
+                borderRadius: "7px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "white",
+                fontFamily: "monospace",
+                letterSpacing: -0.5,
+              }}
+            >
+              ame
+            </Box>
+            <Typography
+              sx={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}
+            >
+              ame-platform
+            </Typography>
+          </Box>
+          <Tooltip title={isDark ? "Light mode" : "Dark mode"}>
+            <IconButton size="small" onClick={toggle}>
+              {isDark ? (
+                <LightModeOutlinedIcon fontSize="small" />
+              ) : (
+                <DarkModeOutlinedIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        </Box>
 
-        <Box sx={{ maxWidth: 520 }}>
+        {/* Tagline */}
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: 600, lineHeight: 1.25, letterSpacing: -0.4, mb: 1 }}
+        >
+          Assessment infrastructure
+          <br />
+          for learners and agents.
+        </Typography>
+        <Typography
+          sx={{ fontSize: 13, color: subColor, lineHeight: 1.65, mb: 4 }}
+        >
+          A structured quiz engine with a real API. Every quiz, attempt, and
+          rubric is typed, documented, and queryable.
+        </Typography>
+
+        {/* Role cards */}
+        <Box
+          sx={{ display: "flex", flexDirection: "column", gap: 1.25, mb: 3 }}
+        >
+          {ROLES.map((r) => (
+            <Box
+              key={r.id}
+              sx={{
+                border: cardBorder,
+                borderRadius: 2,
+                p: "12px 16px",
+                background: cardBg,
+                display: "flex",
+                gap: 1.5,
+                alignItems: "flex-start",
+              }}
+            >
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: r.color,
+                  flexShrink: 0,
+                  mt: "5px",
+                }}
+              />
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, mb: 0.25 }}>
+                  {r.label}
+                </Typography>
+                <Typography
+                  sx={{ fontSize: 12, color: subColor, lineHeight: 1.5 }}
+                >
+                  {r.desc}
+                </Typography>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Agent block */}
+        <Box
+          sx={{
+            border: agentBorder,
+            borderRadius: 2,
+            p: "12px 16px",
+            background: agentBg,
+            mt: "auto",
+          }}
+        >
           <Typography
-            variant="caption"
             sx={{
-              letterSpacing: 1.6,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 1.5,
               textTransform: "uppercase",
-              color: "primary.main",
-              mb: 2.25,
-              display: "block",
+              color: "#1976d2",
+              mb: 0.75,
             }}
           >
-            Assessment platform · est. 2025
+            For agents &amp; integrations
           </Typography>
           <Typography
-            variant="h3"
+            component="span"
             sx={{
-              fontWeight: 500,
-              letterSpacing: -1.2,
-              lineHeight: 1.04,
-              mb: 2.75,
+              fontFamily: "monospace",
+              fontSize: 12,
+              color: agentCodeColor,
             }}
           >
-            Quizzes that learners and agents can both read.
+            POST /v1/agents/register
           </Typography>
           <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ lineHeight: 1.55, maxWidth: 460 }}
+            sx={{
+              fontSize: 11,
+              color: agentTextColor,
+              mt: 0.5,
+              lineHeight: 1.5,
+            }}
           >
-            Harus is an assessment platform built for two audiences at once.
-            Students get a focused test-taking experience and a real progress
-            dashboard. Authors and AI agents share the same structured surface —
-            every quiz, attempt, and rubric is addressable, importable, and
-            queryable through a single API.
+            Returns an API key, OpenAPI 3.1 schema, and MCP manifest in one
+            call. No account needed.
           </Typography>
-
-          <Grid container spacing={1.5} sx={{ mt: 4.5, maxWidth: 460 }}>
-            {[
-              ["18,402", "active learners"],
-              ["1,243", "instructors"],
-              ["94", "institutions"],
-              ["6.1M", "graded attempts"],
-            ].map(([value, label]) => (
-              <Grid size={6} key={label}>
-                <Paper variant="outlined" sx={{ p: "12px 14px" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                    {value}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ letterSpacing: 1, textTransform: "uppercase" }}
-                  >
-                    {label}
-                  </Typography>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
         </Box>
 
         <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ letterSpacing: 0.6 }}
+          sx={{
+            fontSize: 10,
+            color: isDark ? "rgba(255,255,255,0.2)" : "text.disabled",
+            letterSpacing: 0.5,
+            mt: 2.5,
+          }}
         >
-          SSO · SAML &nbsp;·&nbsp; FERPA · GDPR &nbsp;·&nbsp; OpenAPI 3.1 · MCP
+          OpenAPI 3.1 · MCP · FERPA · GDPR · SAML
         </Typography>
-      </Grid>
+      </Box>
 
-      {/* Right panel */}
-      <Grid
-        size={6}
-        sx={{ p: "56px 64px", display: "flex", alignItems: "center" }}
+      {/* Right panel — form */}
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: "52px 48px",
+        }}
       >
-        <Box sx={{ width: "100%", maxWidth: 420 }}>
+        <Box sx={{ width: "100%", maxWidth: 380 }}>
           <Tabs
             value={tab}
             onChange={(_, v) => setTab(v)}
@@ -205,10 +327,11 @@ export default function LoginPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 fullWidth
                 size="small"
+                autoComplete="name"
               />
             )}
             <TextField
-              label="Institutional email"
+              label="Email"
               type="email"
               id="email"
               name="email"
@@ -217,7 +340,6 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               fullWidth
               size="small"
-              helperText="Recognized: stanford.edu · SSO available"
             />
             <TextField
               label="Password"
@@ -242,23 +364,23 @@ export default function LoginPage() {
                 >
                   Role
                 </Typography>
-                <Grid container spacing={1} sx={{ mb: 1 }}>
-                  {(["learner", "instructor", "agent"] as const).map((r) => (
-                    <Grid size={4} key={r}>
+                <Grid container spacing={1} sx={{ mb: 0.5 }}>
+                  {ROLES.map((r) => (
+                    <Grid size={6} key={r.id}>
                       <Button
                         fullWidth
-                        variant={role === r ? "contained" : "outlined"}
+                        variant={role === r.id ? "contained" : "outlined"}
                         size="small"
-                        onClick={() => setRole(r)}
+                        onClick={() => setRole(r.id)}
                         sx={{ textTransform: "capitalize" }}
                       >
-                        {r}
+                        {r.label}
                       </Button>
                     </Grid>
                   ))}
                 </Grid>
                 <Typography variant="caption" color="text.secondary">
-                  {roleDescriptions[role]}
+                  {ROLES.find((r) => r.id === role)?.desc}
                 </Typography>
               </Box>
             )}
@@ -271,7 +393,7 @@ export default function LoginPage() {
               size="large"
               disabled={loading}
               fullWidth
-              sx={{ mt: 1.5 }}
+              sx={{ mt: 0.5 }}
             >
               {loading
                 ? "Loading…"
@@ -280,7 +402,7 @@ export default function LoginPage() {
                   : "Sign in"}
             </Button>
 
-            <Divider sx={{ my: 1 }}>
+            <Divider sx={{ my: 0.5 }}>
               <Typography variant="caption" color="text.secondary">
                 OR
               </Typography>
@@ -300,37 +422,33 @@ export default function LoginPage() {
             </Grid>
           </Box>
 
-          <Paper
-            variant="outlined"
-            sx={{ mt: 4.5, p: 1.75, borderStyle: "dashed" }}
+          <Box
+            sx={{
+              mt: 4,
+              p: 1.75,
+              border: "1px dashed",
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
           >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                color: "primary.main",
-                mb: 0.5,
-              }}
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 600, display: "block", mb: 0.5 }}
             >
-              <AutoFixHighOutlinedIcon sx={{ fontSize: 14 }} />
-              <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                Agent shortcut
-              </Typography>
-            </Box>
-            <Typography variant="caption" color="text.secondary">
-              Programmatic access?{" "}
-              <Box
-                component="span"
-                sx={{ fontFamily: "monospace", color: "text.primary" }}
-              >
-                POST /v1/agents/register
-              </Box>{" "}
-              returns a key, an OpenAPI schema, and an MCP manifest in one call.
+              Programmatic access?
             </Typography>
-          </Paper>
+            <Typography variant="caption" color="text.secondary">
+              <Chip
+                label="POST /v1/agents/register"
+                size="small"
+                variant="outlined"
+                sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
+              />
+              returns a key, schema &amp; MCP manifest — no account needed.
+            </Typography>
+          </Box>
         </Box>
-      </Grid>
-    </Grid>
+      </Box>
+    </Box>
   );
 }

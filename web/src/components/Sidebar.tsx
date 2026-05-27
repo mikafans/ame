@@ -19,9 +19,15 @@ import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GradingOutlinedIcon from "@mui/icons-material/GradingOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import { Logo } from "@/components/Logo";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, clearAuthToken } from "@/hooks/useAuth";
+import { useColorMode } from "@/components/ThemeRegistry";
+import { useRouter } from "next/navigation";
 
 const DRAWER_WIDTH = 232;
 
@@ -44,6 +50,13 @@ interface SidebarProps {
 
 export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
   const { user } = useAuth();
+  const router = useRouter();
+  const { mode, toggle } = useColorMode();
+
+  function handleLogout() {
+    clearAuthToken();
+    router.push("/login");
+  }
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   const items = [
@@ -170,7 +183,20 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
             {user?.role || "Student"} · {cohort}
           </Typography>
         </Box>
-        <SettingsOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+        <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+          <IconButton size="small" onClick={toggle}>
+            {mode === "dark" ? (
+              <LightModeOutlinedIcon sx={{ fontSize: 16 }} />
+            ) : (
+              <DarkModeOutlinedIcon sx={{ fontSize: 16 }} />
+            )}
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Sign out">
+          <IconButton size="small" onClick={handleLogout}>
+            <LogoutOutlinedIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
       </Box>
     </Drawer>
   );

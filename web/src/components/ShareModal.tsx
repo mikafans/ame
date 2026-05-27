@@ -47,7 +47,9 @@ export function ShareModal({ payload, onClose, bearerToken }: Props) {
         },
       });
       if (data) {
-        setShareUrl(`https://harus.app/${slug}/${(data as { id: string }).id}`);
+        setShareUrl(
+          `https://ame-platform.app/${slug}/${(data as { id: string }).id}`,
+        );
       }
     } finally {
       setLoading(false);

@@ -1,4 +1,4 @@
-project: ame (Harus)
+project: ame-platform
 description: Quiz/exam SaaS — Rust API + Bun/Next.js frontend
 
 # --- Runtime ports ---

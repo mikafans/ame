@@ -315,14 +315,16 @@ export default function ActiveQuizPage({
               {cur.prompt}
             </Typography>
 
-            <QuestionInput
-              question={cur}
-              value={curAnswer}
-              onChange={(v) =>
-                setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
-              }
-              disabled={false}
-            />
+            <Box data-testid="question-input">
+              <QuestionInput
+                question={cur}
+                value={curAnswer}
+                onChange={(v) =>
+                  setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
+                }
+                disabled={false}
+              />
+            </Box>
           </>
         )}
       </Box>

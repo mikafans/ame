@@ -37,7 +37,7 @@ export function Logo({ size = 24 }: LogoProps) {
           color: "text.primary",
         }}
       >
-        Harus
+        ame
       </Typography>
     </Link>
   );
