@@ -4,6 +4,20 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import TextField from "@mui/material/TextField";
+import CircularProgress from "@mui/material/CircularProgress";
+import Alert from "@mui/material/Alert";
+import Divider from "@mui/material/Divider";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
 import { ShareModal } from "@/components/ShareModal";
 
@@ -34,7 +48,6 @@ interface Exam {
 }
 
 type TabId = "all" | "published" | "scheduled" | "draft";
-type ComposeStep = "form" | "sections";
 
 interface SectionDraft {
   title: string;
@@ -50,7 +63,6 @@ export default function ExamsPage() {
   const [tab, setTab] = useState<TabId>("all");
   const [loading, setLoading] = useState(true);
   const [showCompose, setShowCompose] = useState(false);
-  const [composeStep, setComposeStep] = useState<ComposeStep>("form");
   const [composeName, setComposeName] = useState("");
   const [composeDesc, setComposeDesc] = useState("");
   const [composeDuration, setComposeDuration] = useState(60);
@@ -164,1108 +176,305 @@ export default function ExamsPage() {
     }
   }
 
+  async function handlePublish(id: string) {
+    if (!token) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (makeClient(token) as any).PATCH(`/v1/exams/${id}`, {
+      body: { status: "published" },
+    });
+    load();
+  }
+
   return (
-    <div style={{ padding: "28px 36px 56px" }}>
-      {/* Header */}
-      <div
-        style={{
+    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      {/* Left: exam list */}
+      <Box
+        sx={{
+          width: 320,
+          borderRight: 1,
+          borderColor: "divider",
           display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginBottom: 20,
+          flexDirection: "column",
         }}
       >
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              letterSpacing: 1.3,
-              textTransform: "uppercase",
-              color: "var(--muted)",
-              marginBottom: 6,
-            }}
-          >
-            Composed assessments · multi-quiz · weighted
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 26,
-              fontWeight: 600,
-              color: "var(--text)",
-            }}
-          >
+        <Box sx={{ p: 2.5, borderBottom: 1, borderColor: "divider" }}>
+          <Typography variant="h6" sx={{ fontWeight: 500 }}>
             Exams
-          </h1>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {isInstructor && (
-            <button
-              style={{
-                padding: "8px 16px",
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                color: "var(--text)",
-                fontWeight: 500,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              Filter
-            </button>
-          )}
-          {isInstructor && (
-            <button
-              onClick={() => setShowCompose(true)}
-              style={{
-                padding: "8px 16px",
-                background: "var(--accent)",
-                border: "none",
-                borderRadius: 4,
-                color: "#000",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              + Compose exam
-            </button>
-          )}
-        </div>
-      </div>
+          </Typography>
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mt: 1 }}>
+            {tabs.map((t) => (
+              <Tab
+                key={t.id}
+                value={t.id}
+                label={t.label}
+                sx={{ textTransform: "none", minWidth: 0, fontSize: 12 }}
+              />
+            ))}
+          </Tabs>
+        </Box>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          borderBottom: "1px solid var(--border)",
-          marginBottom: 22,
-        }}
-      >
-        {tabs.map((t) => {
-          const active = tab === t.id;
-          const count =
-            t.id === "all"
-              ? exams.length
-              : exams.filter((e) => e.status === t.id).length;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "10px 14px",
-                fontSize: 13,
-                fontWeight: active ? 600 : 500,
-                color: active ? "var(--text)" : "var(--muted)",
-                borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
-                marginBottom: -1,
-              }}
-            >
-              {t.label}
-              <span
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  marginLeft: 4,
-                }}
-              >
-                ({count})
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {loading ? (
-        <div
-          style={{
-            color: "var(--muted)",
-            fontFamily: "var(--mono)",
-            fontSize: 13,
-          }}
-        >
-          Loading…
-        </div>
-      ) : (
-        <div
-          style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 18 }}
-        >
-          {/* List */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filtered.length === 0 ? (
-              <div
-                style={{
-                  color: "var(--muted)",
-                  fontSize: 13,
-                  padding: "24px 0",
-                }}
-              >
-                No exams.
-              </div>
-            ) : (
-              filtered.map((e) => (
-                <ExamListItem
-                  key={e.id}
-                  exam={e}
-                  selected={selected === e.id}
-                  onClick={() => setSelected(e.id)}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Detail */}
-          {exam ? (
-            <ExamDetail
-              exam={exam}
-              isInstructor={isInstructor}
-              starting={starting}
-              onStart={startExam}
-              onShare={() => setShareExam(exam)}
-            />
+        <Box sx={{ flex: 1, overflowY: "auto", p: 1 }}>
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : filtered.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+              No exams.
+            </Typography>
           ) : (
-            <div
-              style={{
-                color: "var(--muted)",
-                fontSize: 13,
-                padding: "48px 0",
-                textAlign: "center",
+            filtered.map((e) => (
+              <Card
+                key={e.id}
+                variant="outlined"
+                onClick={() => setSelected(e.id)}
+                sx={{
+                  mb: 1,
+                  cursor: "pointer",
+                  ...(selected === e.id && { borderColor: "primary.main" }),
+                }}
+              >
+                <CardContent sx={{ pb: "12px !important" }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
+                    {e.name}
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }}>
+                    <Chip label={e.status} size="small" variant="outlined" />
+                    {e.durationMin && (
+                      <Chip
+                        label={`${e.durationMin}m`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Box>
+
+        {isInstructor && (
+          <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={() => setShowCompose(true)}
+            >
+              Compose exam
+            </Button>
+          </Box>
+        )}
+      </Box>
+
+      {/* Right: exam detail */}
+      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+        {!exam ? (
+          <Typography color="text.secondary">Select an exam.</Typography>
+        ) : (
+          <Stack spacing={2}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
               }}
             >
-              Select an exam to view details.
-            </div>
-          )}
-        </div>
-      )}
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                  {exam.name}
+                </Typography>
+                {exam.description && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
+                    {exam.description}
+                  </Typography>
+                )}
+              </Box>
+              <Stack direction="row" spacing={1}>
+                {exam.status === "published" && (
+                  <Button
+                    variant="contained"
+                    disabled={starting}
+                    onClick={startExam}
+                  >
+                    {starting ? "Starting…" : "Start exam"}
+                  </Button>
+                )}
+                {isInstructor && exam.status !== "published" && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => handlePublish(exam.id)}
+                  >
+                    Publish
+                  </Button>
+                )}
+                <Button
+                  variant="outlined"
+                  startIcon={<ShareOutlinedIcon />}
+                  onClick={() => setShareExam(exam)}
+                >
+                  Share
+                </Button>
+              </Stack>
+            </Box>
 
-      {/* Compose modal */}
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+              <Chip label={exam.status} variant="outlined" />
+              {exam.course && <Chip label={exam.course} variant="outlined" />}
+              {exam.durationMin && (
+                <Chip label={`${exam.durationMin} min`} variant="outlined" />
+              )}
+            </Stack>
+
+            {exam.objectives.length > 0 && (
+              <LearningObjectives items={exam.objectives} />
+            )}
+
+            {exam.sections && exam.sections.length > 0 && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                  Sections
+                </Typography>
+                <Stack spacing={1}>
+                  {exam.sections.map((s) => (
+                    <Card key={s.id} variant="outlined">
+                      <CardContent sx={{ pb: "12px !important" }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {s.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {s.items} questions · {s.weight}pts
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Stack>
+        )}
+      </Box>
+
       {showCompose && (
-        <ComposeModal
-          step={composeStep}
-          setStep={setComposeStep}
-          name={composeName}
-          setName={setComposeName}
-          desc={composeDesc}
-          setDesc={setComposeDesc}
-          duration={composeDuration}
-          setDuration={setComposeDuration}
-          sections={sections}
-          setSections={setSections}
-          error={composeError}
-          composing={composing}
-          onCompose={handleCompose}
-          onClose={() => {
-            setShowCompose(false);
-            setComposeError(null);
-            setComposeStep("form");
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            bgcolor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1300,
           }}
-        />
+        >
+          <Card sx={{ width: 480, maxHeight: "80vh", overflowY: "auto" }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Compose exam
+              </Typography>
+              <Stack spacing={2}>
+                <TextField
+                  label="Name"
+                  value={composeName}
+                  onChange={(e) => setComposeName(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+                <TextField
+                  label="Description"
+                  value={composeDesc}
+                  onChange={(e) => setComposeDesc(e.target.value)}
+                  fullWidth
+                  size="small"
+                  multiline
+                  rows={2}
+                />
+                <TextField
+                  label="Duration (min)"
+                  type="number"
+                  value={composeDuration}
+                  onChange={(e) => setComposeDuration(Number(e.target.value))}
+                  fullWidth
+                  size="small"
+                />
+                <Divider />
+                <Typography variant="subtitle2">Sections</Typography>
+                {sections.map((s, i) => (
+                  <Stack key={i} spacing={1}>
+                    <TextField
+                      label="Section title"
+                      value={s.title}
+                      onChange={(e) => {
+                        const ns = [...sections];
+                        ns[i].title = e.target.value;
+                        setSections(ns);
+                      }}
+                      fullWidth
+                      size="small"
+                    />
+                    <TextField
+                      label="Question IDs (comma-separated)"
+                      value={s.questionIds}
+                      onChange={(e) => {
+                        const ns = [...sections];
+                        ns[i].questionIds = e.target.value;
+                        setSections(ns);
+                      }}
+                      fullWidth
+                      size="small"
+                    />
+                  </Stack>
+                ))}
+                <Button
+                  onClick={() =>
+                    setSections([
+                      ...sections,
+                      { title: "", weight: 1, questionIds: "" },
+                    ])
+                  }
+                  variant="outlined"
+                  size="small"
+                >
+                  Add section
+                </Button>
+                {composeError && <Alert severity="error">{composeError}</Alert>}
+              </Stack>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ justifyContent: "flex-end", mt: 2 }}
+              >
+                <Button onClick={() => setShowCompose(false)}>Cancel</Button>
+                <Button
+                  variant="contained"
+                  disabled={composing}
+                  onClick={handleCompose}
+                >
+                  {composing ? "Composing…" : "Compose"}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Box>
       )}
 
       {shareExam && (
         <ShareModal
-          payload={{
-            kind: "exam",
-            id: shareExam.id,
-            title: shareExam.name,
-          }}
+          payload={{ kind: "exam", id: shareExam.id, title: shareExam.name }}
           onClose={() => setShareExam(null)}
         />
       )}
-    </div>
+    </Box>
   );
 }
-
-function ExamListItem({
-  exam,
-  selected,
-  onClick,
-}: {
-  exam: Exam;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const statusColor =
-    exam.status === "published"
-      ? "var(--accent)"
-      : exam.status === "scheduled"
-        ? "var(--blue, #4f8ef7)"
-        : "var(--muted)";
-
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        width: "100%",
-        textAlign: "left",
-        cursor: "pointer",
-        background: "var(--surface)",
-        border: `1px solid ${selected ? "var(--accent-line, var(--accent))" : "var(--border)"}`,
-        borderLeft: `3px solid ${selected ? "var(--accent)" : "transparent"}`,
-        borderRadius: 6,
-        padding: "14px 16px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 6,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-            color: "var(--muted)",
-          }}
-        >
-          {exam.course || "—"}
-        </span>
-        <span
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            color: statusColor,
-            textTransform: "uppercase",
-            letterSpacing: 0.8,
-          }}
-        >
-          {exam.status}
-        </span>
-      </div>
-      <div
-        style={{
-          fontFamily: "var(--serif, serif)",
-          fontSize: 16,
-          fontWeight: 500,
-          lineHeight: 1.3,
-          letterSpacing: -0.1,
-          color: "var(--text)",
-          marginBottom: 8,
-        }}
-      >
-        {exam.name}
-      </div>
-      <div
-        style={{
-          display: "flex",
-          gap: 14,
-          alignItems: "center",
-          fontFamily: "var(--mono)",
-          fontSize: 11,
-          color: "var(--muted)",
-          letterSpacing: 0.4,
-        }}
-      >
-        <span>◆ {exam.durationMin ?? "—"}m</span>
-        <span>▪ {(exam.sections ?? []).length} sec</span>
-        <span
-          style={{
-            marginLeft: "auto",
-            color: exam.method === "agent" ? "var(--accent)" : "var(--text-2)",
-          }}
-        >
-          {exam.method === "agent" ? "◇ agent" : "◇ manual"}
-        </span>
-      </div>
-    </button>
-  );
-}
-
-function ExamDetail({
-  exam,
-  isInstructor,
-  starting,
-  onStart,
-  onShare,
-}: {
-  exam: Exam;
-  isInstructor: boolean;
-  starting: boolean;
-  onStart: () => void;
-  onShare: () => void;
-}) {
-  const sections = exam.sections ?? [];
-  const totalWeight = sections.reduce((s, x) => s + x.weight, 0);
-
-  return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-        overflow: "hidden",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: "24px 28px",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 9,
-              letterSpacing: 1.1,
-              textTransform: "uppercase",
-              color: "var(--muted)",
-              background: "var(--surface-2)",
-              padding: "4px 8px",
-              borderRadius: 3,
-              border: "1px solid var(--border)",
-            }}
-          >
-            {exam.status}
-          </span>
-          {exam.course && (
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 9,
-                letterSpacing: 1.1,
-                textTransform: "uppercase",
-                color: "var(--muted)",
-                background: "var(--surface-2)",
-                padding: "4px 8px",
-                borderRadius: 3,
-                border: "1px solid var(--border)",
-              }}
-            >
-              {exam.course}
-            </span>
-          )}
-          {exam.tags?.map((tag) => (
-            <span
-              key={tag}
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 9,
-                letterSpacing: 1.1,
-                textTransform: "uppercase",
-                color: "var(--muted)",
-                background: "var(--surface-2)",
-                padding: "4px 8px",
-                borderRadius: 3,
-                border: "1px solid var(--border)",
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 24,
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2
-              style={{
-                margin: 0,
-                fontFamily: "var(--serif, serif)",
-                fontSize: 30,
-                fontWeight: 500,
-                letterSpacing: -0.4,
-                color: "var(--text)",
-                marginBottom: 6,
-              }}
-            >
-              {exam.name}
-            </h2>
-            {exam.description && (
-              <p
-                style={{
-                  color: "var(--text-2)",
-                  fontSize: 13.5,
-                  lineHeight: 1.6,
-                  margin: 0,
-                  maxWidth: 600,
-                }}
-              >
-                {exam.description}
-              </p>
-            )}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              alignItems: "flex-end",
-              flexShrink: 0,
-            }}
-          >
-            {exam.status === "published" && (
-              <button
-                onClick={onStart}
-                disabled={starting}
-                style={{
-                  padding: "9px 20px",
-                  background: "var(--accent)",
-                  border: "none",
-                  borderRadius: 4,
-                  color: "#000",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: starting ? "not-allowed" : "pointer",
-                  opacity: starting ? 0.7 : 1,
-                }}
-              >
-                {starting ? "Starting…" : "Start exam →"}
-              </button>
-            )}
-            <button
-              onClick={onShare}
-              style={{
-                padding: "6px 12px",
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                color: "var(--text-2)",
-                fontSize: 12,
-                cursor: "pointer",
-                fontFamily: "var(--mono)",
-              }}
-            >
-              ↑ Share
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats strip */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        {[
-          { l: "Duration", v: exam.durationMin ? `${exam.durationMin}m` : "—" },
-          { l: "Sections", v: (exam.sections ?? []).length },
-          { l: "Total pts", v: exam.totalPoints },
-          {
-            l: "Pass mark",
-            v: exam.passingPoints ? `${exam.passingPoints} pts` : "—",
-          },
-        ].map((s, i) => (
-          <div
-            key={s.l}
-            style={{
-              padding: "14px 22px",
-              borderRight: i < 3 ? "1px solid var(--border)" : "none",
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10,
-                letterSpacing: 1.2,
-                textTransform: "uppercase",
-                color: "var(--muted)",
-                marginBottom: 4,
-              }}
-            >
-              {s.l}
-            </div>
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 600,
-                color: "var(--text)",
-              }}
-            >
-              {String(s.v)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Learning objectives */}
-      {exam.objectives?.length > 0 && (
-        <div
-          style={{
-            padding: "20px 28px",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
-          <LearningObjectives items={exam.objectives} />
-        </div>
-      )}
-
-      {/* Composition */}
-      <div
-        style={{
-          padding: "20px 28px",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            marginBottom: 14,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "var(--serif, serif)",
-              fontSize: 17,
-              fontWeight: 500,
-              color: "var(--text)",
-            }}
-          >
-            Composition
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
-              color: "var(--muted)",
-            }}
-          >
-            {sections.length} sections · {totalWeight} pts total
-          </div>
-        </div>
-
-        {/* Weight bar */}
-        <div
-          style={{
-            display: "flex",
-            height: 8,
-            borderRadius: 4,
-            overflow: "hidden",
-            border: "1px solid var(--border)",
-            marginBottom: 14,
-          }}
-        >
-          {sections.map((s, i) => {
-            const colors = ["var(--accent)", "#4f8ef7", "#f59e0b", "#ef4444"];
-            return (
-              <div
-                key={s.id}
-                style={{
-                  flex: s.weight,
-                  background: colors[i % colors.length],
-                  borderRight:
-                    i < sections.length - 1
-                      ? "1px solid var(--bg, #000)"
-                      : "none",
-                }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Section rows */}
-        <div
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "32px 1fr 80px 80px",
-              padding: "8px 14px",
-              background: "var(--surface-2)",
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              letterSpacing: 1.1,
-              textTransform: "uppercase",
-              color: "var(--muted)",
-              borderBottom: "1px solid var(--border)",
-            }}
-          >
-            <span>§</span>
-            <span>Section</span>
-            <span style={{ textAlign: "right" }}>Items</span>
-            <span style={{ textAlign: "right" }}>Weight</span>
-          </div>
-          {sections.map((s, i) => {
-            const colors = ["var(--accent)", "#4f8ef7", "#f59e0b", "#ef4444"];
-            return (
-              <div
-                key={s.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "32px 1fr 80px 80px",
-                  padding: "12px 14px",
-                  borderBottom:
-                    i < sections.length - 1
-                      ? "1px solid var(--border)"
-                      : "none",
-                  alignItems: "center",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 16,
-                    fontWeight: 600,
-                    color: colors[i % colors.length],
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "var(--text)",
-                  }}
-                >
-                  {s.title}
-                </div>
-                <span
-                  style={{
-                    textAlign: "right",
-                    fontFamily: "var(--mono)",
-                    fontSize: 13,
-                    color: "var(--text)",
-                  }}
-                >
-                  {s.items}
-                </span>
-                <span
-                  style={{
-                    textAlign: "right",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "var(--text)",
-                  }}
-                >
-                  {s.weight} pts
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Composition trace (instructor only) */}
-      {isInstructor && (
-        <div style={{ padding: "20px 28px" }}>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              letterSpacing: 1.3,
-              textTransform: "uppercase",
-              color: "var(--muted)",
-              marginBottom: 10,
-            }}
-          >
-            Composition trace
-          </div>
-          {exam.method === "agent" && exam.compositionTrace ? (
-            <pre
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--border)",
-                borderRadius: 4,
-                padding: 12,
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--text-2)",
-                lineHeight: 1.6,
-                overflowX: "auto",
-                margin: 0,
-              }}
-            >
-              {JSON.stringify(exam.compositionTrace, null, 2)}
-            </pre>
-          ) : (
-            <div
-              style={{
-                fontSize: 12.5,
-                color: "var(--text-2)",
-                lineHeight: 1.6,
-              }}
-            >
-              Manually composed
-              {exam.composedBy ? ` by ${exam.composedBy}` : ""}.
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ComposeModal({
-  step,
-  setStep,
-  name,
-  setName,
-  desc,
-  setDesc,
-  duration,
-  setDuration,
-  sections,
-  setSections,
-  error,
-  composing,
-  onCompose,
-  onClose,
-}: {
-  step: ComposeStep;
-  setStep: (s: ComposeStep) => void;
-  name: string;
-  setName: (v: string) => void;
-  desc: string;
-  setDesc: (v: string) => void;
-  duration: number;
-  setDuration: (v: number) => void;
-  sections: SectionDraft[];
-  setSections: (v: SectionDraft[]) => void;
-  error: string | null;
-  composing: boolean;
-  onCompose: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-      }}
-    >
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          width: 560,
-          maxHeight: "85vh",
-          overflowY: "auto",
-          padding: 28,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 24,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10,
-                letterSpacing: 1.3,
-                textTransform: "uppercase",
-                color: "var(--muted)",
-                marginBottom: 4,
-              }}
-            >
-              {step === "form" ? "Step 1 of 2" : "Step 2 of 2"}
-            </div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 20,
-                fontWeight: 600,
-                color: "var(--text)",
-              }}
-            >
-              {step === "form" ? "Compose exam" : "Add sections"}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--muted)",
-              fontSize: 18,
-              cursor: "pointer",
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {step === "form" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <label style={{ display: "block" }}>
-              <div style={labelStyle}>Exam name *</div>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={inputStyle}
-                placeholder="e.g. Midterm Examination"
-              />
-            </label>
-            <label style={{ display: "block" }}>
-              <div style={labelStyle}>Description</div>
-              <textarea
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                rows={2}
-                style={{ ...inputStyle, resize: "vertical" }}
-                placeholder="Optional description"
-              />
-            </label>
-            <label style={{ display: "block" }}>
-              <div style={labelStyle}>Duration (minutes)</div>
-              <input
-                type="number"
-                min={5}
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value) || 60)}
-                style={{ ...inputStyle, width: 120 }}
-              />
-            </label>
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                justifyContent: "flex-end",
-                marginTop: 8,
-              }}
-            >
-              <button onClick={onClose} style={btnGhost}>
-                Cancel
-              </button>
-              <button
-                onClick={() => setStep("sections")}
-                disabled={!name.trim()}
-                style={{
-                  ...btnPrimary,
-                  opacity: name.trim() ? 1 : 0.5,
-                  cursor: name.trim() ? "pointer" : "not-allowed",
-                }}
-              >
-                Next: sections →
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {sections.map((s, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: 16,
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: 10,
-                      letterSpacing: 1.2,
-                      textTransform: "uppercase",
-                      color: "var(--muted)",
-                    }}
-                  >
-                    Section {i + 1}
-                  </div>
-                  {sections.length > 1 && (
-                    <button
-                      onClick={() =>
-                        setSections(sections.filter((_, j) => j !== i))
-                      }
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "var(--muted)",
-                        cursor: "pointer",
-                        fontSize: 12,
-                      }}
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                >
-                  <label style={{ display: "block" }}>
-                    <div style={labelStyle}>Title</div>
-                    <input
-                      value={s.title}
-                      onChange={(e) => {
-                        const next = [...sections];
-                        next[i] = { ...next[i], title: e.target.value };
-                        setSections(next);
-                      }}
-                      style={inputStyle}
-                      placeholder={`Section ${i + 1}`}
-                    />
-                  </label>
-                  <label style={{ display: "block" }}>
-                    <div style={labelStyle}>Weight (points)</div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={s.weight}
-                      onChange={(e) => {
-                        const next = [...sections];
-                        next[i] = {
-                          ...next[i],
-                          weight: parseInt(e.target.value) || 1,
-                        };
-                        setSections(next);
-                      }}
-                      style={{ ...inputStyle, width: 100 }}
-                    />
-                  </label>
-                  <label style={{ display: "block" }}>
-                    <div style={labelStyle}>Question IDs (comma-separated)</div>
-                    <input
-                      value={s.questionIds}
-                      onChange={(e) => {
-                        const next = [...sections];
-                        next[i] = { ...next[i], questionIds: e.target.value };
-                        setSections(next);
-                      }}
-                      style={inputStyle}
-                      placeholder="uuid, uuid, ..."
-                    />
-                  </label>
-                </div>
-              </div>
-            ))}
-
-            <button
-              onClick={() =>
-                setSections([
-                  ...sections,
-                  { title: "", weight: 1, questionIds: "" },
-                ])
-              }
-              style={btnGhost}
-            >
-              + Add section
-            </button>
-
-            {error && (
-              <div
-                style={{
-                  padding: "10px 14px",
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid #ef4444",
-                  borderRadius: 4,
-                  color: "#ef4444",
-                  fontSize: 13,
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                justifyContent: "flex-end",
-                marginTop: 8,
-              }}
-            >
-              <button onClick={() => setStep("form")} style={btnGhost}>
-                ← Back
-              </button>
-              <button
-                onClick={onCompose}
-                disabled={composing}
-                style={{ ...btnPrimary, opacity: composing ? 0.7 : 1 }}
-              >
-                {composing ? "Composing…" : "Compose exam"}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const labelStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: 10,
-  letterSpacing: 1.3,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  marginBottom: 6,
-  display: "block",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 6,
-  padding: "9px 12px",
-  color: "var(--text)",
-  fontFamily: "var(--sans, sans-serif)",
-  fontSize: 13.5,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const btnPrimary: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "var(--accent)",
-  border: "none",
-  borderRadius: 4,
-  color: "#000",
-  fontWeight: 700,
-  fontSize: 13,
-  cursor: "pointer",
-};
-
-const btnGhost: React.CSSProperties = {
-  padding: "8px 14px",
-  background: "var(--surface-2)",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  color: "var(--text-2)",
-  fontSize: 13,
-  cursor: "pointer",
-};
