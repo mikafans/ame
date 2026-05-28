@@ -1,14 +1,19 @@
 use std::sync::Arc;
 
 use axum::{
-    Json, Router, middleware,
+    Json, Router,
+    extract::State,
+    http::StatusCode,
+    middleware,
     routing::{get, post},
 };
+use axum_prometheus::PrometheusMetricLayer;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::cors::{AllowOrigin, CorsLayer};
-use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
 /// Shared HTTP state. Cloned per request by Axum, so anything added here must
@@ -91,22 +96,69 @@ pub fn router(pool: PgPool) -> Router {
 
     let cors = build_cors_layer();
 
+    // Tag every request with an x-request-id (incoming value is reused if
+    // present, else a UUID is minted), surface it on the tracing span so logs
+    // correlate, and echo it back on the response.
     let trace = TraceLayer::new_for_http()
-        .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+        .make_span_with(|request: &axum::http::Request<axum::body::Body>| {
+            let request_id = request
+                .headers()
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("unknown");
+            tracing::info_span!(
+                "http",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %request_id,
+            )
+        })
         .on_response(DefaultOnResponse::new().level(Level::INFO));
+    let observability = tower::ServiceBuilder::new()
+        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+        .layer(trace)
+        .layer(PropagateRequestIdLayer::x_request_id());
 
     Router::new()
         .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
         .merge(openapi::router(state.clone()))
         .merge(public_limited)
         .merge(logged)
         .layer(cors)
-        .layer(trace)
+        .layer(observability)
         .with_state(state)
 }
 
+/// Prometheus `/metrics` route + the layer that records per-request metrics.
+///
+/// Kept separate from [`router`] because [`PrometheusMetricLayer::pair`]
+/// installs a *global* recorder, which can only happen once per process.
+/// `main` calls this exactly once; tests that rebuild [`router`] do not.
+pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
+    let (layer, handle) = PrometheusMetricLayer::pair();
+    let route = Router::new().route(
+        "/metrics",
+        get(move || {
+            let rendered = handle.render();
+            async move { rendered }
+        }),
+    );
+    (layer, route)
+}
+
+/// Liveness: the process is up. Does not touch the database.
 async fn healthz() -> Json<Value> {
     Json(json!({ "status": "ok" }))
+}
+
+/// Readiness: the process can serve traffic, i.e. the DB pool is reachable.
+/// Returns 503 so k8s can hold traffic off until the pool is live.
+async fn readyz(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
+    match sqlx::query("SELECT 1").execute(&state.pool).await {
+        Ok(_) => Ok(Json(json!({ "status": "ready" }))),
+        Err(_) => Err(StatusCode::SERVICE_UNAVAILABLE),
+    }
 }
 
 /// CORS policy:

@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -38,6 +38,13 @@ test: ## Backend + frontend unit / integration tests
 	else \
 		echo "[web] skipping bun test (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
+
+bench: ## Criterion micro-benchmarks for hot paths (token verify, grader, elo)
+	cd api && mise exec -- cargo bench --bench hot_paths
+
+bench-load: ## k6 load test against a running API (requires `make dev` + `make db-seed`)
+	@command -v k6 >/dev/null 2>&1 || { echo "k6 not found — install it (https://k6.io/docs/get-started/installation/)"; exit 1; }
+	BASE_URL=http://localhost:$(API_PORT) k6 run api_tests/perf/answer_load.js
 
 test-engine: ## Engine unit and integration-test compile gate
 	cd api && mise exec -- cargo test engine
