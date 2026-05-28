@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -42,28 +42,27 @@ export default function QuizPreviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [quiz, setQuiz] = useState<QuizDetail | null>(null);
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    makeClient(token)
+    api
       .GET("/v1/quizzes/{id}" as never, { params: { path: { id } } } as never)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data: d }: { data?: any }) => {
         if (d) setQuiz(d);
       })
       .catch(console.error);
-  }, [token, id]);
+  }, [id]);
 
   const handleStart = async () => {
-    if (!token || !quiz) return;
+    if (!quiz) return;
     setStarting(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST("/v1/sessions", {
+      const { data } = await (api as any).POST("/v1/sessions", {
         body: { quizId: id, count: quiz.questions.length },
       });
       const sessionId = data?.sessionId ?? data?.session_id;

@@ -29,6 +29,12 @@ pub fn parse_bearer_token(bearer: &str) -> Option<ParsedToken> {
         return None;
     }
     let token = &bearer[prefix.len()..];
+    parse_token_value(token)
+}
+
+/// Parse a raw token value without the "Bearer " prefix.
+/// Used for both Authorization header (after stripping "Bearer ") and Cookie header.
+pub fn parse_token_value(token: &str) -> Option<ParsedToken> {
     let (id, secret) = token.split_once('_')?;
     if secret.is_empty() {
         return None;

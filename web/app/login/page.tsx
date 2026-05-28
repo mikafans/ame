@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setAuthToken } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -69,6 +68,7 @@ export default function LoginPage() {
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(body),
       });
       if (!response.ok) {
@@ -87,7 +87,6 @@ export default function LoginPage() {
         return;
       }
       const data = await response.json();
-      setAuthToken(data.token);
       router.push("/library");
     } catch (err) {
       setError(

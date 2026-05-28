@@ -14,51 +14,30 @@ const API_URL =
     ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080")
     : "http://localhost:8080";
 
-function getCookieToken(): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  return (document.cookie.match(/(?:^|;\s*)ame_token=([^;]+)/) ?? [])[1];
-}
-
-// Cookie is non-HttpOnly because we read the token client-side to attach it as
-// a Bearer header. `Secure` is set in production so it cannot leak over plain
-// HTTP. SameSite=Lax is sufficient since cross-origin requests use the
-// `Authorization` header rather than ambient cookies.
-const COOKIE_FLAGS =
-  process.env.NODE_ENV === "production"
-    ? "path=/; max-age=86400; SameSite=Lax; Secure"
-    : "path=/; max-age=86400; SameSite=Lax";
-
-export function setAuthToken(token: string) {
-  document.cookie = `ame_token=${token}; ${COOKIE_FLAGS}`;
-}
-
-export function clearAuthToken() {
-  const expire =
-    process.env.NODE_ENV === "production"
-      ? "path=/; max-age=0; SameSite=Lax; Secure"
-      : "path=/; max-age=0; SameSite=Lax";
-  document.cookie = `ame_token=; ${expire}`;
+export async function logout() {
+  try {
+    await fetch(`${API_URL}/v1/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (err) {
+    console.error("Logout request failed:", err);
+  }
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
 }
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const t = getCookieToken();
-    if (!t) {
-      setLoading(false);
-      return;
-    }
-    setToken(t);
     fetch(`${API_URL}/v1/me`, {
-      headers: { Authorization: `Bearer ${t}` },
+      credentials: "include",
     })
       .then((r) => {
         if (!r.ok) {
-          clearAuthToken();
-          setToken(undefined);
           return null;
         }
         return r.json();
@@ -67,10 +46,10 @@ export function useAuth() {
         if (data) setUser(data as AuthUser);
       })
       .catch(() => {
-        setToken(undefined);
+        // Not logged in or request failed
       })
       .finally(() => setLoading(false));
   }, []);
 
-  return { user, loading, token };
+  return { user, loading };
 }

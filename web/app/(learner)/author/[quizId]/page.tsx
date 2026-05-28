@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -69,7 +69,7 @@ export default function AuthorStudioPage({
   params: Promise<{ quizId: string }>;
 }) {
   const { quizId } = use(params);
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,10 +95,9 @@ export default function AuthorStudioPage({
   const [showKindPicker, setShowKindPicker] = useState(false);
 
   function load(showSpinner = false) {
-    if (!token) return;
     if (showSpinner) setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET(`/v1/quizzes/${quizId}`)
       .then(({ data }: { data?: Quiz }) => {
         if (data) {
@@ -120,7 +119,7 @@ export default function AuthorStudioPage({
   useEffect(() => {
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, quizId]);
+  }, [quizId]);
 
   const selectedQ = quiz?.questions.find((q) => q.id === selectedId) ?? null;
 
@@ -136,11 +135,10 @@ export default function AuthorStudioPage({
   }, [selectedQ]);
 
   async function saveMetadata() {
-    if (!token) return;
     setSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).PATCH(`/v1/quizzes/${quizId}`, {
+      await (api as any).PATCH(`/v1/quizzes/${quizId}`, {
         body: {
           title: editTitle,
           course: editCourse,
@@ -158,7 +156,7 @@ export default function AuthorStudioPage({
   }
 
   async function saveQuestion(payloadOverride?: Record<string, unknown>) {
-    if (!token || !selectedId) return;
+    if (!selectedId) return;
     setSaving(true);
     const tags = editTag
       .split(",")
@@ -166,7 +164,7 @@ export default function AuthorStudioPage({
       .filter(Boolean);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).PATCH(`/v1/questions/${selectedId}`, {
+      await (api as any).PATCH(`/v1/questions/${selectedId}`, {
         body: {
           prompt: editPrompt,
           explanation: editExplanation || undefined,
@@ -184,12 +182,11 @@ export default function AuthorStudioPage({
   }
 
   async function addQuestion(kind: string) {
-    if (!token) return;
     setShowKindPicker(false);
     setSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST(
+      const { data } = await (api as any).POST(
         `/v1/quizzes/${quizId}/questions`,
         { body: { kind, prompt: "" } },
       );
@@ -203,7 +200,6 @@ export default function AuthorStudioPage({
   }
 
   async function deleteQuestion(id: string) {
-    if (!token) return;
     const remaining = quiz?.questions.filter((q) => q.id !== id) ?? [];
     if (selectedId === id)
       setSelectedId(remaining.length > 0 ? remaining[0].id : null);
@@ -212,9 +208,7 @@ export default function AuthorStudioPage({
     );
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).DELETE(
-        `/v1/quizzes/${quizId}/questions/${id}`,
-      );
+      await (api as any).DELETE(`/v1/quizzes/${quizId}/questions/${id}`);
       load();
     } catch (err) {
       console.error("delete failed", err);
@@ -223,12 +217,12 @@ export default function AuthorStudioPage({
   }
 
   async function changeKind(newKind: string) {
-    if (!token || !selectedId || !selectedQ) return;
+    if (!selectedId || !selectedQ) return;
     if (newKind === selectedQ.kind) return;
     setSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = makeClient(token) as any;
+      const client = api as any;
       const { data } = await client.POST(`/v1/quizzes/${quizId}/questions`, {
         body: {
           kind: newKind,
@@ -248,12 +242,11 @@ export default function AuthorStudioPage({
   }
 
   async function publish() {
-    if (!token) return;
     setPublishing(true);
     setPublishError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).PATCH(`/v1/quizzes/${quizId}`, {
+      await (api as any).PATCH(`/v1/quizzes/${quizId}`, {
         body: { status: "active" },
       });
       load();

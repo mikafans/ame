@@ -26,9 +26,8 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { Logo } from "@/components/Logo";
-import { useAuth, clearAuthToken } from "@/hooks/useAuth";
+import { useAuth, logout } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
-import { useRouter } from "next/navigation";
 
 const DRAWER_WIDTH = 232;
 
@@ -52,12 +51,10 @@ interface SidebarProps {
 
 export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
   const { user } = useAuth();
-  const router = useRouter();
   const { mode, toggle } = useColorMode();
 
-  function handleLogout() {
-    clearAuthToken();
-    router.push("/login");
+  async function handleLogout() {
+    await logout();
   }
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 

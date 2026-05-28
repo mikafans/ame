@@ -1,4 +1,4 @@
-//! Email+password auth routes: register, login.
+//! Email+password auth routes: register, login, logout.
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Json, http::StatusCode, response::IntoResponse};
@@ -48,11 +48,23 @@ pub struct UserInfo {
 
 // ── handlers ──────────────────────────────────────────────────────────────────
 
+fn set_token_cookie_header(token: &str) -> String {
+    let secure = if std::env::var("AME_PRODUCTION").is_ok() {
+        "; Secure"
+    } else {
+        ""
+    };
+    format!(
+        "ame_token={}; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=86400",
+        token, secure
+    )
+}
+
 /// POST /v1/auth/register — register a new user with email and password.
 pub async fn register(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<RegisterBody>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Validate email
     if body.email.trim().is_empty() {
         return Err(ApiError::Validation(vec![FieldError {
@@ -145,10 +157,14 @@ pub async fn register(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
+    let token_str = format!("{token_id}_{secret}");
+    let cookie_header = set_token_cookie_header(&token_str);
+
     Ok((
         StatusCode::CREATED,
+        [("set-cookie".to_string(), cookie_header)],
         Json(AuthResponse {
-            token: format!("{token_id}_{secret}"),
+            token: token_str,
             user: UserInfo {
                 id: user_id,
                 name: display_name,
@@ -163,7 +179,7 @@ pub async fn register(
 pub async fn login(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<LoginBody>,
-) -> Result<Json<AuthResponse>, ApiError> {
+) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Fetch user by email
     let user_row = sqlx::query(
         "SELECT id, email, display_name, role, password_hash FROM tb_users WHERE email = $1",
@@ -229,15 +245,22 @@ pub async fn login(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok(Json(AuthResponse {
-        token: format!("{token_id}_{secret}"),
-        user: UserInfo {
-            id: user_id,
-            name: display_name,
-            email,
-            role,
-        },
-    }))
+    let token_str = format!("{token_id}_{secret}");
+    let cookie_header = set_token_cookie_header(&token_str);
+
+    Ok((
+        StatusCode::OK,
+        [("set-cookie".to_string(), cookie_header)],
+        Json(AuthResponse {
+            token: token_str,
+            user: UserInfo {
+                id: user_id,
+                name: display_name,
+                email,
+                role,
+            },
+        }),
+    ))
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -286,6 +309,24 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
     Argon2::default()
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok()
+}
+
+/// POST /v1/auth/logout — clear the HttpOnly token cookie.
+pub async fn logout() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [(
+            "set-cookie".to_string(),
+            format!(
+                "ame_token=; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=0",
+                if std::env::var("AME_PRODUCTION").is_ok() {
+                    "; Secure"
+                } else {
+                    ""
+                }
+            ),
+        )],
+    )
 }
 
 // Routes are mounted (with rate limiting) in `http::mod::router`. The handlers

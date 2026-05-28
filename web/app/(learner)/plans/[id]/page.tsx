@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -12,6 +12,7 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import { formatDuration } from "@/utils/format";
 
 interface PlanItem {
   kind: string;
@@ -39,16 +40,15 @@ export default function PlanPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/plans/{id}", { params: { path: { id } } })
       .then(({ data, error }: { data?: StudyPlan; error?: unknown }) => {
         if (error || !data) {
@@ -59,7 +59,7 @@ export default function PlanPage({
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [token, id]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -109,7 +109,8 @@ export default function PlanPage({
             mb: 0.75,
           }}
         >
-          Study plan · {plan.weeks.length} weeks · {totalHours.toFixed(1)}h est.
+          Study plan · {plan.weeks.length} weeks · {formatDuration(totalHours)}{" "}
+          est.
         </Typography>
         <Typography variant="h5" sx={{ fontWeight: 500, mb: 1 }}>
           {plan.goal}
@@ -155,7 +156,9 @@ export default function PlanPage({
                 color="text.secondary"
                 sx={{ fontFamily: "monospace" }}
               >
-                {week.items.reduce((s, i) => s + i.hours_est, 0).toFixed(1)}h
+                {formatDuration(
+                  week.items.reduce((s, i) => s + i.hours_est, 0),
+                )}
               </Typography>
             </Box>
             <CardContent>
@@ -196,7 +199,7 @@ export default function PlanPage({
                       color="text.secondary"
                       sx={{ fontFamily: "monospace" }}
                     >
-                      {item.hours_est}h
+                      {formatDuration(item.hours_est)}
                     </Typography>
                   </Box>
                 ))}

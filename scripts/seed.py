@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from dataclasses import dataclass, field
 from typing import Any
@@ -25,7 +26,7 @@ console = Console()
 # Config
 # ---------------------------------------------------------------------------
 
-DEFAULT_API = "http://localhost:8080"
+DEFAULT_API = os.environ.get("AME_API_URL", "http://localhost:8080")
 
 USERS = [
     {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "learner"},
@@ -344,7 +345,27 @@ def seed_questions(client: httpx.Client, auth: dict, result: SeedResult) -> None
     console.print(f"  Promoted {promoted}/{len(created)} questions to live")
 
 
+def _find_quiz_by_title(client: httpx.Client, auth: dict, title: str) -> str | None:
+    """Return the id of an existing active quiz with this title, if any.
+
+    Keeps the seed idempotent so repeated runs (e.g. the e2e auto-seed) don't
+    pile up duplicate quizzes.
+    """
+    resp = client.get("/v1/quizzes", params={"status": "active", "limit": 200}, headers=auth)
+    if not resp.is_success:
+        return None
+    for q in resp.json().get("quizzes", []):
+        if q.get("title") == title:
+            return q["id"]
+    return None
+
+
 def _create_and_publish_quiz(client: httpx.Client, auth: dict, meta: dict, questions: list[dict], result: SeedResult) -> str | None:
+    existing = _find_quiz_by_title(client, auth, meta["title"])
+    if existing:
+        console.print(f"  Reusing quiz {existing[:8]}…  '{meta['title']}' (already seeded)")
+        return existing
+
     resp = client.post("/v1/quizzes", json=meta, headers=auth)
     if not resp.is_success:
         console.print(f"[red]Failed to create quiz '{meta['title']}':[/red] {resp.text[:200]}")

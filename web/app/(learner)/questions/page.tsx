@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -57,7 +57,7 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 export default function QuestionsPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [kind, setKind] = useState("all");
@@ -82,19 +82,22 @@ export default function QuestionsPage() {
 
   // Fetch tags
   useEffect(() => {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/tags")
       .then(({ data }: { data?: Tag[] }) => {
-        setTags(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setTags(
+          [...list].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+          ),
+        );
       })
       .catch(() => {});
-  }, [token]);
+  }, []);
 
   // Fetch questions
   const fetchQuestions = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
     try {
       const query: Record<string, unknown> = {
@@ -107,7 +110,7 @@ export default function QuestionsPage() {
       if (status !== "all") query.status = status;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).GET("/v1/questions", {
+      const { data } = await (api as any).GET("/v1/questions", {
         params: { query },
       });
 
@@ -125,16 +128,7 @@ export default function QuestionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    token,
-    page,
-    pageSize,
-    debouncedSearch,
-    kind,
-    tagId,
-    selectedTag?.name,
-    status,
-  ]);
+  }, [page, pageSize, debouncedSearch, kind, tagId, selectedTag?.name, status]);
 
   useEffect(() => {
     fetchQuestions();
@@ -202,6 +196,7 @@ export default function QuestionsPage() {
           exclusive
           onChange={handleKindChange}
           size="small"
+          sx={{ "& .MuiToggleButtonGroup-grouped": { height: 40 } }}
         >
           {Object.entries(KIND_LABELS).map(([k, label]) => (
             <ToggleButton key={k} value={k}>
@@ -217,9 +212,7 @@ export default function QuestionsPage() {
           onChange={(_, newValue) => handleTagChange(newValue)}
           size="small"
           sx={{ minWidth: 200 }}
-          renderInput={(params) => (
-            <TextField {...params} label="Tag" placeholder="Select tag" />
-          )}
+          renderInput={(params) => <TextField {...params} placeholder="Tag" />}
         />
 
         <Select
@@ -299,10 +292,13 @@ export default function QuestionsPage() {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Stack
-                      direction="row"
-                      spacing={0.5}
-                      sx={{ flexWrap: "wrap" }}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 0.5,
+                        alignItems: "center",
+                      }}
                     >
                       {q.tags.slice(0, 3).map((tag) => (
                         <Chip
@@ -319,7 +315,7 @@ export default function QuestionsPage() {
                           variant="outlined"
                         />
                       )}
-                    </Stack>
+                    </Box>
                   </TableCell>
                   <TableCell align="right">
                     <Typography variant="body2">{q.points}</Typography>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -69,7 +69,7 @@ export default function ActiveQuizPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [idx, setIdx] = useState(0);
@@ -80,8 +80,7 @@ export default function ActiveQuizPage({
   const autosaveScheduled = useRef(false);
 
   useEffect(() => {
-    if (!token) return;
-    makeClient(token)
+    api
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
       .then(({ data }: { data?: SessionData }) => {
         if (data) {
@@ -101,13 +100,13 @@ export default function ActiveQuizPage({
         }
       })
       .catch(console.error);
-  }, [token, id]);
+  }, [id]);
 
   const handleFinish = useCallback(async () => {
-    if (finishing || !token) return;
+    if (finishing) return;
     setFinishing(true);
     try {
-      const client = makeClient(token);
+      const client = api;
       for (const [qid, val] of Object.entries(answers)) {
         const q = session?.questions.find((x) => x.questionId === qid);
         if (!q) continue;
@@ -152,7 +151,7 @@ export default function ActiveQuizPage({
       console.error(err);
       setFinishing(false);
     }
-  }, [token, id, router, finishing, answers, session]);
+  }, [id, router, finishing, answers, session]);
 
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
@@ -171,19 +170,14 @@ export default function ActiveQuizPage({
   }, [timeLeft !== null && timeLeft > 0]);
 
   useEffect(() => {
-    if (
-      !token ||
-      Object.keys(answers).length === 0 ||
-      autosaveScheduled.current
-    )
-      return;
+    if (Object.keys(answers).length === 0 || autosaveScheduled.current) return;
     autosaveScheduled.current = true;
     const timer = setTimeout(() => {
       const answersList = Object.entries(answers).map(([qid, val]) => ({
         questionId: qid,
         answer: val,
       }));
-      makeClient(token)
+      api
         .PATCH(
           "/v1/sessions/{id}/answers" as never,
           {
@@ -200,12 +194,11 @@ export default function ActiveQuizPage({
       clearTimeout(timer);
       autosaveScheduled.current = false;
     };
-  }, [answers, token, id]);
+  }, [answers, id]);
 
   const handleSaveExit = useCallback(async () => {
-    if (!token) return;
     try {
-      await makeClient(token).PATCH(
+      await api.PATCH(
         "/v1/sessions/{id}" as never,
         {
           params: { path: { id } },
@@ -216,7 +209,7 @@ export default function ActiveQuizPage({
     } catch (err) {
       console.error(err);
     }
-  }, [token, id, router]);
+  }, [id, router]);
 
   if (!session) {
     return (

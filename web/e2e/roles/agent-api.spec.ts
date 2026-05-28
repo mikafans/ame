@@ -12,6 +12,7 @@ test.describe("Agent API surface", () => {
     const ar = await request.post(`${API}/v1/agents/register`, {
       data: {
         label: `e2e-agent-${ts}`,
+        access_code: process.env.AME_AGENT_ACCESS_CODE ?? "e2e-access-code",
         scopes: [
           "quiz.read",
           "quiz.write",

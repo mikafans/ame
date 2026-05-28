@@ -269,6 +269,13 @@ paths:
       tags:
       - crate::http::stats
       operationId: me_stats
+      parameters:
+      - name: window
+        in: query
+        description: One of `last30d` (≈4 weeks), `last90d` (≈12 weeks), or `all`.
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: User stats summary

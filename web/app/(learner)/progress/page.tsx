@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -11,6 +11,7 @@ import CardContent from "@mui/material/CardContent";
 import CircularProgress from "@mui/material/CircularProgress";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import ToggleButton from "@mui/material/ToggleButton";
+import { formatScore, formatDuration } from "@/utils/format";
 
 type WindowType = "4w" | "12w" | "all";
 
@@ -48,7 +49,7 @@ interface TagAvg {
 }
 
 export default function ProgressPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [win, setWin] = useState<WindowType>("12w");
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -57,10 +58,10 @@ export default function ProgressPage() {
   const [attemptsLoading, setAttemptsLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
     setStatsLoading(true);
-    const apiWindow = win === "4w" ? "last30d" : "all";
-    makeClient(token)
+    const apiWindow =
+      win === "4w" ? "last30d" : win === "12w" ? "last90d" : "all";
+    api
       .GET(
         "/v1/me/stats" as never,
         { params: { query: { window: apiWindow } } } as never,
@@ -70,13 +71,12 @@ export default function ProgressPage() {
       })
       .catch(console.error)
       .finally(() => setStatsLoading(false));
-  }, [token, win]);
+  }, [win]);
 
   useEffect(() => {
-    if (!token) return;
     setAttemptsLoading(true);
     Promise.all([
-      makeClient(token)
+      api
         .GET(
           "/v1/me/attempts" as never,
           { params: { query: { limit: 500 } } } as never,
@@ -85,7 +85,7 @@ export default function ProgressPage() {
           ({ data }: { data?: { attempts: Attempt[]; total: number } }) =>
             data?.attempts ?? [],
         ),
-      makeClient(token)
+      api
         .GET("/v1/tags" as never, {} as never)
         .then(({ data }: { data?: { id: string; name: string }[] }) =>
           Array.isArray(data) ? data : [],
@@ -99,7 +99,7 @@ export default function ProgressPage() {
       })
       .catch(console.error)
       .finally(() => setAttemptsLoading(false));
-  }, [token]);
+  }, []);
 
   const filteredAttempts = filterByWindow(attempts, win);
   const weeklyAvgs = computeWeeklyAverages(filteredAttempts);
@@ -160,11 +160,11 @@ export default function ProgressPage() {
               label: "Avg score",
               value:
                 windowAvgScore !== null
-                  ? `${Math.round(windowAvgScore * 100)}%`
-                  : `${Math.round((stats.avg_score ?? 0) * 100)}%`,
+                  ? formatScore(windowAvgScore)
+                  : formatScore(stats.avg_score),
             },
             { label: "Attempts", value: String(filteredAttempts.length) },
-            { label: "Time", value: formatHours(stats.hours_spent ?? 0) },
+            { label: "Time", value: formatDuration(stats.hours_spent ?? 0) },
             { label: "Streak", value: `${stats.current_streak ?? 0}d` },
           ].map(({ label, value }) => (
             <Card key={label} variant="outlined" sx={{ flex: 1 }}>
@@ -289,6 +289,7 @@ function BarChart({ data }: { data: TagAvg[] }) {
       sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%" }}
     >
       {data.map((item) => {
+        const pctText = formatScore(item.score);
         const pct = Math.round(item.score * 100);
         return (
           <Box
@@ -331,19 +332,13 @@ function BarChart({ data }: { data: TagAvg[] }) {
               color="text.secondary"
               sx={{ width: 32, textAlign: "right" }}
             >
-              {pct}%
+              {pctText}
             </Typography>
           </Box>
         );
       })}
     </Box>
   );
-}
-
-function formatHours(h: number): string {
-  if (h < 1 / 60) return "< 1m";
-  if (h < 1) return `${Math.round(h * 60)}m`;
-  return `${h.toFixed(1)}h`;
 }
 
 function filterByWindow(attempts: Attempt[], win: WindowType): Attempt[] {

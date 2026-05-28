@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -61,7 +61,7 @@ const SAMPLE_IMPORT = JSON.stringify(
 );
 
 export default function AgentPage() {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const [tab, setTab] = useState<TabId>("keys");
 
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
@@ -211,10 +211,10 @@ export default function AgentPage() {
         />
       </Tabs>
 
-      {tab === "keys" && <KeysTab token={token} />}
-      {tab === "tools" && <ToolsTab token={token} />}
-      {tab === "import" && <ImportTab token={token} />}
-      {tab === "activity" && <ActivityTab token={token} />}
+      {tab === "keys" && <KeysTab />}
+      {tab === "tools" && <ToolsTab />}
+      {tab === "import" && <ImportTab />}
+      {tab === "activity" && <ActivityTab />}
     </Box>
   );
 }
@@ -326,7 +326,7 @@ function CodeBlock({
 
 // ── API Keys tab ──────────────────────────────────────────────────────────────
 
-function KeysTab({ token }: { token: string | undefined }) {
+function KeysTab() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -337,9 +337,8 @@ function KeysTab({ token }: { token: string | undefined }) {
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
 
   function loadKeys() {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/me/keys")
       .then(({ data }: { data?: { keys: ApiKey[] } }) => {
         if (data?.keys) setKeys(data.keys);
@@ -351,15 +350,14 @@ function KeysTab({ token }: { token: string | undefined }) {
   useEffect(() => {
     loadKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function createKey() {
-    if (!token) return;
     setCreating(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST("/v1/me/keys", {
+      const { data } = await (api as any).POST("/v1/me/keys", {
         body: {
           name: newKeyName || "New key",
           scopes: newKeyScopes
@@ -382,19 +380,15 @@ function KeysTab({ token }: { token: string | undefined }) {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function revokeKey(id: string) {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (makeClient(token) as any).DELETE(`/v1/me/keys/${id}`);
+    await (api as any).DELETE(`/v1/me/keys/${id}`);
     loadKeys();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function rotateKey(id: string) {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (makeClient(token) as any).POST(
-      `/v1/me/keys/${id}/rotate`,
-    );
+    const { data } = await (api as any).POST(`/v1/me/keys/${id}/rotate`);
     if (data?.apiKey) setCreatedSecret(data.apiKey);
     loadKeys();
   }
@@ -662,15 +656,14 @@ function KeysTab({ token }: { token: string | undefined }) {
 
 // ── MCP Tools tab ─────────────────────────────────────────────────────────────
 
-function ToolsTab({ token }: { token: string | undefined }) {
+function ToolsTab() {
   const [tools, setTools] = useState<McpTool[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/agents/mcp.json")
       .then(({ data }: { data?: { tools: McpTool[] } }) => {
         if (data?.tools) {
@@ -680,7 +673,7 @@ function ToolsTab({ token }: { token: string | undefined }) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   const tool = tools.find((t) => t.name === active) ?? null;
 
@@ -830,7 +823,7 @@ function ToolsTab({ token }: { token: string | undefined }) {
 
 // ── Import demo tab ───────────────────────────────────────────────────────────
 
-function ImportTab({ token }: { token: string | undefined }) {
+function ImportTab() {
   const [text, setText] = useState(SAMPLE_IMPORT);
   const [response, setResponse] = useState<{
     ok: boolean;
@@ -841,7 +834,6 @@ function ImportTab({ token }: { token: string | undefined }) {
   const [running, setRunning] = useState(false);
 
   async function send() {
-    if (!token) return;
     setRunning(true);
     const t0 = Date.now();
     try {
@@ -858,7 +850,7 @@ function ImportTab({ token }: { token: string | undefined }) {
         return;
       }
       /* eslint-disable @typescript-eslint/no-explicit-any */
-      const client = makeClient(token) as any;
+      const client = api as any;
       /* eslint-enable @typescript-eslint/no-explicit-any */
       const {
         data,
@@ -1030,21 +1022,20 @@ function ImportTab({ token }: { token: string | undefined }) {
 
 // ── Activity tab ──────────────────────────────────────────────────────────────
 
-function ActivityTab({ token }: { token: string | undefined }) {
+function ActivityTab() {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/agents/activity", { params: { query: { limit: 50 } } })
       .then(({ data }: { data?: { entries: ActivityEntry[] } }) => {
         if (data?.entries) setEntries(data.entries);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   return (
     <Card variant="outlined">

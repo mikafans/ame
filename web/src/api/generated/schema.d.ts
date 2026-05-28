@@ -1637,7 +1637,10 @@ export interface operations {
     };
     me_stats: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description One of `last30d` (≈4 weeks), `last90d` (≈12 weeks), or `all`. */
+                window?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

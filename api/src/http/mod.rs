@@ -82,6 +82,7 @@ pub fn router(pool: PgPool) -> Router {
     let public_limited = Router::new()
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))
+        .route("/v1/auth/logout", post(auth::logout))
         .route("/v1/agents/register", post(agents::register))
         .layer(GovernorLayer {
             config: governor_conf,
@@ -115,8 +116,8 @@ async fn healthz() -> Json<Value> {
 /// allowed origins. Setting it to `*` re-enables permissive CORS (use only when
 /// the API is intentionally public).
 ///
-/// We do not allow credentials — the frontend authenticates via the
-/// `Authorization` header (Bearer token), not cookies sent cross-origin.
+/// Credentials are allowed when specific origins are configured. When using
+/// wildcard (`*`), credentials are not allowed per CORS spec.
 fn build_cors_layer() -> CorsLayer {
     use axum::http::{HeaderValue, Method, header};
 
@@ -151,6 +152,7 @@ fn build_cors_layer() -> CorsLayer {
         .allow_origin(AllowOrigin::list(origins))
         .allow_methods(methods)
         .allow_headers(headers)
+        .allow_credentials(true)
 }
 
 fn env_u32(key: &str, default: u32) -> u32 {

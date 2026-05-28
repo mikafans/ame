@@ -21,10 +21,18 @@ async fn main() -> anyhow::Result<()> {
         .connect(&database_url)
         .await?;
 
-    let addr: SocketAddr = "0.0.0.0:8080".parse()?;
+    let port = std::env::var("AME_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(8080);
+    let addr: SocketAddr = format!("0.0.0.0:{port}").parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, "ame-api listening");
 
-    axum::serve(listener, ame_api::http::router(pool)).await?;
+    axum::serve(
+        listener,
+        ame_api::http::router(pool).into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }

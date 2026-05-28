@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -18,6 +18,7 @@ import Alert from "@mui/material/Alert";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
+import { formatMinutes } from "@/utils/format";
 
 interface Quiz {
   id: string;
@@ -38,7 +39,7 @@ interface Quiz {
 type TabId = "all" | "drafts";
 
 export default function LibraryPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("all");
   const [allQuizzes, setAllQuizzes] = useState<
@@ -52,9 +53,8 @@ export default function LibraryPage() {
   const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
-    const client = makeClient(token);
+    const client = api;
 
     const fetchStatus = async (
       status: string,
@@ -78,14 +78,13 @@ export default function LibraryPage() {
         setAllQuizzes({ all: active, drafts });
       })
       .finally(() => setLoading(false));
-  }, [token, user?.role]);
+  }, [user?.role]);
 
   async function startQuiz(quizId: string) {
-    if (!token) return;
     setStarting(quizId);
     setStartError(null);
     try {
-      const client = makeClient(token);
+      const client = api;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (client as any).POST("/v1/sessions", {
         body: { quizId },
@@ -144,14 +143,10 @@ export default function LibraryPage() {
             variant="outlined"
             startIcon={<AddOutlinedIcon />}
             onClick={async () => {
-              if (!token) return;
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { data } = await (makeClient(token) as any).POST(
-                "/v1/quizzes",
-                {
-                  body: { title: "Untitled quiz" },
-                },
-              );
+              const { data } = await (api as any).POST("/v1/quizzes", {
+                body: { title: "Untitled quiz" },
+              });
               if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
             }}
           >
@@ -197,7 +192,7 @@ export default function LibraryPage() {
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                   {featuredQuiz.durationMin
-                    ? `${featuredQuiz.durationMin}m`
+                    ? formatMinutes(featuredQuiz.durationMin)
                     : "—"}
                 </Typography>
               </Box>
@@ -340,7 +335,7 @@ export default function LibraryPage() {
                       )}
                       {quiz.durationMin != null && (
                         <Typography variant="caption" color="text.secondary">
-                          {quiz.durationMin} min
+                          {formatMinutes(quiz.durationMin)}
                         </Typography>
                       )}
                     </Stack>

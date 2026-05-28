@@ -31,7 +31,7 @@ interface GradeState {
 }
 
 export default function GradingPage() {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const [attempts, setAttempts] = useState<PendingAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [grades, setGrades] = useState<Record<string, GradeState>>({});
@@ -39,10 +39,10 @@ export default function GradingPage() {
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   useEffect(() => {
-    if (!token || !isInstructor) return;
+    if (!isInstructor) return;
     fetch(
       `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/pending`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { credentials: "include" },
     )
       .then((r) => r.json())
       .then((data: PendingAttempt[]) => {
@@ -60,11 +60,11 @@ export default function GradingPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token, isInstructor]);
+  }, [isInstructor]);
 
   const handleGrade = async (attemptId: string) => {
     const g = grades[attemptId];
-    if (!g || !token) return;
+    if (!g) return;
     const scoreNum = parseFloat(g.score);
     if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) return;
     setGrades((prev) => ({
@@ -77,9 +77,9 @@ export default function GradingPage() {
         {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          credentials: "include",
           body: JSON.stringify({
             score: scoreNum / 100,
             notes: g.notes || null,

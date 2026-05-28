@@ -3,15 +3,24 @@ import { test, expect } from "@playwright/test";
 const API_URL = process.env.E2E_API_URL ?? "http://localhost:8080";
 
 test.describe("learner golden path", () => {
-  test.beforeEach(async ({ page, request }) => {
+  let learnerToken: string;
+
+  test.beforeAll(async ({ request }) => {
     const resp = await request.post(`${API_URL}/v1/auth/login`, {
       data: { email: "learner@example.com", password: "password123" },
     });
-    const { token } = await resp.json();
-    await page.goto("/login");
-    await page.evaluate((t) => {
-      document.cookie = `ame_token=${t}; path=/; max-age=86400`;
-    }, token);
+    learnerToken = (await resp.json()).token;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.context().addCookies([
+      {
+        name: "ame_token",
+        value: learnerToken,
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
   });
 
   test("login page renders and rejects bad credentials", async ({ page }) => {

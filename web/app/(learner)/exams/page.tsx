@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -61,7 +61,7 @@ interface SectionDraft {
 }
 
 export default function ExamsPage() {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -85,10 +85,9 @@ export default function ExamsPage() {
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   function load() {
-    if (!token) return;
     setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/exams")
       .then(({ data }: { data?: { exams: Exam[] } }) => {
         if (data?.exams) {
@@ -103,7 +102,7 @@ export default function ExamsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "all", label: "All" },
@@ -116,11 +115,11 @@ export default function ExamsPage() {
   const exam = exams.find((e) => e.id === selected) ?? null;
 
   async function startExam() {
-    if (!token || !selected) return;
+    if (!selected) return;
     setStarting(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST("/v1/sessions", {
+      const { data } = await (api as any).POST("/v1/sessions", {
         body: { examId: selected },
       });
       if (data?.sessionId) router.push(`/sessions/${data.sessionId}`);
@@ -133,9 +132,8 @@ export default function ExamsPage() {
 
   function openCompose() {
     setShowCompose(true);
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/questions", {
         params: { query: { status: "live", limit: 200 } },
       })
@@ -146,7 +144,6 @@ export default function ExamsPage() {
   }
 
   async function handleCompose() {
-    if (!token) return;
     setComposing(true);
     setComposeError(null);
     try {
@@ -164,10 +161,7 @@ export default function ExamsPage() {
         })),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (makeClient(token) as any).POST(
-        "/v1/exams",
-        { body },
-      );
+      const { data, error } = await (api as any).POST("/v1/exams", { body });
       if (error) {
         if (
           typeof error === "object" &&
@@ -195,9 +189,8 @@ export default function ExamsPage() {
   }
 
   async function handlePublish(id: string) {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (makeClient(token) as any).PATCH(`/v1/exams/${id}`, {
+    await (api as any).PATCH(`/v1/exams/${id}`, {
       body: { status: "published" },
     });
     load();

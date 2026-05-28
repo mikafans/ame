@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -62,7 +62,7 @@ export default function ResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<ResultData | null>(null);
   const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
@@ -70,9 +70,8 @@ export default function ResultsPage({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
-    makeClient(token)
+    api
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data: d }: { data?: any }) => {
@@ -141,7 +140,7 @@ export default function ResultsPage({
         if (session.quiz_id) {
           fetch(
             `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${session.quiz_id}`,
-            { headers: { Authorization: `Bearer ${token}` } },
+            { credentials: "include" },
           )
             .then((r) => (r.ok ? r.json() : null))
             .then((cs: CohortStats | null) => {
@@ -152,7 +151,7 @@ export default function ResultsPage({
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token, id]);
+  }, [id]);
 
   if (loading) {
     return (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -31,7 +31,7 @@ interface Quiz {
 }
 
 export default function AuthorIndexPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [drafts, setDrafts] = useState<Quiz[] | null>(null);
   const [creating, setCreating] = useState(false);
@@ -39,27 +39,25 @@ export default function AuthorIndexPage() {
   const [confirmQuiz, setConfirmQuiz] = useState<Quiz | null>(null);
 
   useEffect(() => {
-    if (!token) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (makeClient(token) as any)
+    (api as any)
       .GET("/v1/quizzes", { params: { query: { status: "draft" } } })
       .then(({ data }: { data?: { quizzes: Quiz[] } }) => {
         setDrafts(data?.quizzes ?? []);
       })
       .catch(() => setDrafts([]));
-  }, [token]);
+  }, []);
 
   async function discardDraft(id: string) {
-    if (!token) return;
     setConfirmQuiz(null);
     setDeleting(id);
     setDrafts((d) => d?.filter((q) => q.id !== id) ?? d);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).DELETE(`/v1/quizzes/${id}`);
+      await (api as any).DELETE(`/v1/quizzes/${id}`);
     } catch {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (makeClient(token) as any)
+      (api as any)
         .GET("/v1/quizzes", { params: { query: { status: "draft" } } })
         .then(({ data }: { data?: { quizzes: Quiz[] } }) =>
           setDrafts(data?.quizzes ?? []),
@@ -71,11 +69,10 @@ export default function AuthorIndexPage() {
   }
 
   async function createNew() {
-    if (!token) return;
     setCreating(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (makeClient(token) as any).POST("/v1/quizzes", {
+      const { data } = await (api as any).POST("/v1/quizzes", {
         body: { title: "Untitled quiz" },
       });
       if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);

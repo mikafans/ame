@@ -41,6 +41,7 @@ pub struct RegisterBody {
     pub scopes: Vec<String>,
     /// Shared secret matching the server's `AME_AGENT_ACCESS_CODE` env var.
     /// Required; registration is disabled when the env var is unset.
+    #[serde(rename = "access_code")]
     pub access_code: Option<String>,
 }
 

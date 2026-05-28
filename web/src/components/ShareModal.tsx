@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 
 export type ShareKind = "quiz" | "exam" | "item";
 
@@ -17,12 +17,11 @@ interface SharePayload {
 interface Props {
   payload: SharePayload;
   onClose: () => void;
-  bearerToken?: string;
 }
 
 type Tab = "link" | "embed";
 
-export function ShareModal({ payload, onClose, bearerToken }: Props) {
+export function ShareModal({ payload, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("link");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,9 +34,8 @@ export function ShareModal({ payload, onClose, bearerToken }: Props) {
     if (shareUrl) return;
     setLoading(true);
     try {
-      const client = makeClient(bearerToken);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (client as any).POST("/v1/shares", {
+      const { data } = await (api as any).POST("/v1/shares", {
         body: {
           kind: payload.kind,
           id: payload.id,
@@ -54,7 +52,7 @@ export function ShareModal({ payload, onClose, bearerToken }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [payload, slug, bearerToken, shareUrl]);
+  }, [payload, slug, shareUrl]);
 
   const copy = useCallback((text: string) => {
     navigator.clipboard.writeText(text).then(() => {

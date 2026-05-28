@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -25,7 +25,7 @@ const QUESTION_TYPES = [
 ];
 
 export default function PracticePage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [tags, setTags] = useState<TagItem[] | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -36,14 +36,13 @@ export default function PracticePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) return;
-    makeClient(token)
+    api
       .GET("/v1/tags" as never)
       .then(({ data }: { data?: TagItem[] }) => {
         setTags(Array.isArray(data) ? data : []);
       })
       .catch(() => setTags([]));
-  }, [token]);
+  }, []);
 
   function toggleTag(name: string) {
     setSelectedTags((prev) =>
@@ -59,11 +58,10 @@ export default function PracticePage() {
 
   async function handleStart(e: FormEvent) {
     e.preventDefault();
-    if (!token) return;
     setError(null);
     setLoading(true);
     try {
-      const client = makeClient(token);
+      const client = api;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error: apiErr } = await (client as any).POST(
         "/v1/sessions",
