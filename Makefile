@@ -74,6 +74,10 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 	@if [ -x web/node_modules/.bin/next ]; then \
 		_api_owned=0; \
 		mkdir -p .tmp; \
+		if ! DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate info --source db/migrations > /dev/null 2>&1; then \
+			echo "[e2e] FAILED: Postgres is not reachable on :5432. Run 'make db-up' first."; \
+			exit 1; \
+		fi; \
 		if ! curl -sf http://localhost:8080/healthz > /dev/null 2>&1; then \
 			echo "[e2e] API not running — starting..."; \
 			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
@@ -85,15 +89,24 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 			until curl -sf http://localhost:8080/healthz > /dev/null 2>&1; do sleep 1; done; \
 		fi; \
 		echo "[e2e] Seeding..."; \
-		uv run scripts/seed.py >> .tmp/ame-seed-e2e.log 2>&1 || true; \
+		if ! uv run scripts/seed.py >> .tmp/ame-seed-e2e.log 2>&1; then \
+			echo "[e2e] FAILED: seeding errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
+			tail -20 .tmp/ame-seed-e2e.log; \
+			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
+				kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; rm -f .tmp/ame-api-e2e.pid; \
+			fi; \
+			exit 1; \
+		fi; \
 		echo "[e2e] Running playwright tests..."; \
-		cd web && mise exec -- bun run e2e > ../.tmp/playwright-e2e.log 2>&1; _exit=$$?; \
+		cd web && mise exec -- bun run e2e > ../.tmp/playwright-e2e.log 2>&1; _exit=$$?; cd ..; \
 		if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
 			kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; \
 			rm -f .tmp/ame-api-e2e.pid; \
 		fi; \
 		if [ $$_exit -ne 0 ]; then \
-			echo "[e2e] Tests failed. Logs in .tmp/{ame-api-e2e.log,ame-seed-e2e.log,playwright-e2e.log}"; \
+			echo "[e2e] Tests failed — last 40 lines of .tmp/playwright-e2e.log:"; \
+			tail -40 .tmp/playwright-e2e.log; \
+			echo "[e2e] (full logs: .tmp/{ame-api-e2e.log,ame-seed-e2e.log,playwright-e2e.log})"; \
 		else \
 			echo "[e2e] Tests passed."; \
 		fi; \

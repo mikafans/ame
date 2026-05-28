@@ -4,7 +4,7 @@ use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::{
@@ -138,26 +138,7 @@ pub async fn register(
     let display_name: String = result.get("display_name");
     let role: String = result.get("role");
 
-    // Generate and insert API key
-    let token_id = Uuid::now_v7();
-    let secret = generate_secret();
-    let token_hash = hash_secret(&secret);
-
-    let initial_scopes = scopes_for_role(&role);
-    sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-         VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(token_id)
-    .bind(user_id)
-    .bind("default")
-    .bind(&token_hash)
-    .bind(initial_scopes)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let token_str = format!("{token_id}_{secret}");
+    let token_str = issue_token(&state.pool, user_id, &role).await?;
     let cookie_header = set_token_cookie_header(&token_str);
 
     Ok((
@@ -202,50 +183,7 @@ pub async fn login(
         return Err(ApiError::Unauthorized);
     }
 
-    // Fetch or create API key
-    let token_row = sqlx::query("SELECT id FROM tb_api_tokens WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1")
-        .bind(user_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let token_id = if let Some(row) = token_row {
-        row.get("id")
-    } else {
-        // Create new key
-        let new_token_id = Uuid::now_v7();
-        let secret = generate_secret();
-        let token_hash = hash_secret(&secret);
-
-        let initial_scopes = scopes_for_role(&role);
-        sqlx::query(
-            "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-             VALUES ($1, $2, $3, $4, $5)",
-        )
-        .bind(new_token_id)
-        .bind(user_id)
-        .bind("default")
-        .bind(&token_hash)
-        .bind(initial_scopes)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-        new_token_id
-    };
-
-    // Generate a fresh secret to return (we don't store the plaintext)
-    let secret = generate_secret();
-    let token_hash = hash_secret(&secret);
-
-    sqlx::query("UPDATE tb_api_tokens SET token_hash = $1 WHERE id = $2")
-        .bind(&token_hash)
-        .bind(token_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let token_str = format!("{token_id}_{secret}");
+    let token_str = issue_token(&state.pool, user_id, &role).await?;
     let cookie_header = set_token_cookie_header(&token_str);
 
     Ok((
@@ -264,6 +202,30 @@ pub async fn login(
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+/// Mint a new API token row and return the plaintext `{id}_{secret}`. Only the
+/// hash is persisted, and each call creates an independent row so concurrent
+/// logins (multiple devices, parallel e2e specs) don't invalidate one another.
+async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String, ApiError> {
+    let token_id = Uuid::now_v7();
+    let secret = generate_secret();
+    let token_hash = hash_secret(&secret);
+
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind("default")
+    .bind(&token_hash)
+    .bind(scopes_for_role(role))
+    .execute(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(format!("{token_id}_{secret}"))
+}
 
 fn scopes_for_role(role: &str) -> Vec<&'static str> {
     match role {
