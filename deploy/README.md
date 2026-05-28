@@ -35,13 +35,12 @@ then starts the API.
 
 Before pointing real users at a deployment:
 
-- [ ] `DEMO_MODE` is **unset** in the API environment. Setting it disables auth.
 - [ ] `POSTGRES_PASSWORD` is rotated from the example value.
 - [ ] Terminate TLS at a reverse proxy (Caddy, nginx, Envoy, cloudflared). The
       API speaks plain HTTP.
-- [ ] CORS is currently `Any/Any/Any` in `api/src/http/mod.rs` — front the API
-      with a proxy that strips disallowed origins, or patch the layer until the
-      security-hardening phase lands.
+- [ ] `AME_CORS_ORIGINS` is set to your frontend origin(s), comma-separated. It
+      defaults to `http://localhost:3000`; setting it to `*` re-enables permissive
+      CORS (credentials are then disallowed per the CORS spec).
 - [ ] Add a rate limiter in front of `/v1/auth/login`, `/v1/auth/register`, and
       `/v1/agents/register` (the latter is unauthenticated by design).
 - [ ] Configure log shipping — the API logs structured tracing to stdout.

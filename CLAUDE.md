@@ -22,8 +22,9 @@ After making code changes, **always restart the dev server** via `make dev` to p
 
 ## Stack
 
-- **API**: Rust (axum), port 8080
-- **Frontend**: Next.js (bun), port 3000
+- **API**: Rust (axum) — `make dev` serves on `:28080` (override with `API_PORT`; the bare `ame-api` binary defaults to `AME_PORT` 8080)
+- **Frontend**: Next.js (bun) — `make dev` serves on `:23000` (override with `WEB_PORT`)
+- Access remotely via Tailscale: `make dev API_HOST=harus-mini` → http://harus-mini:23000
 - **DB**: Postgres via docker/podman compose (`db/docker-compose.yml`)
 - **Schema**: OpenAPI at `api/openapi.yaml`; regenerate with `make openapi`
 

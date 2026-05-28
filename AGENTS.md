@@ -3,21 +3,21 @@
 This file is the canonical, machine-readable rundown of how to work in this repo.
 
 ## Stack
-- Backend: Rust (edition 2021), Axum 0.8, Tokio, sqlx (added in Plan 2), Postgres 18.
+- Backend: Rust (edition 2024), Axum 0.8, Tokio, sqlx (added in Plan 2), Postgres 18.
 - Frontend: Next.js 16 App Router, React 19, TypeScript, MUI 7 (Emotion). Runtime + package manager is **bun** (no node, no npm). One deployment; role gating is enforced per-route in the API.
 - Infra: Postgres in Docker (`db/docker-compose.yml`). Local dev only — production runs in Kubernetes.
 - Toolchain: `mise` for language runtimes (rust, bun, uv). SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`; migrations: `sqlx migrate run` (sqlx-cli via cargo); sqlfluff via `uvx sqlfluff`.
 
 ## Commands
-- `make init-env` — one-time setup on a fresh checkout: `mise install` (rust, bun, uv runtimes) + `sqlx-cli` via cargo + `bun install` for web deps + Playwright browsers. Run before `make dev-env`.
-- `make dev-env` — start full local stack: DB up → migrate → API on `:8080` → frontend on `:3000`.
+- `make init-env` — one-time setup on a fresh checkout: `mise install` (rust, bun, uv runtimes) + `sqlx-cli` via cargo + `bun install` for web deps + Playwright browsers. Run before `make dev`.
+- `make dev` — start full local stack: DB up → migrate → API on `:28080` → frontend on `:23000`. Override host with `make dev API_HOST=harus-mini`.
 - `make db-seed` — seed demo data (requires API running).
 - `make check` — fmt-check + lint + test. Required before every commit (pre-commit hook enforces).
-- `make validate` — `make check` + e2e. Required before opening a PR.
+- `make ci` — full gate: `make check` + DB tests + e2e (resets the DB between them).
 - `make test-db` — DB-backed API integration tests. Requires `make db-up`; `make check` skips these unless `AME_RUN_DB_TESTS=1`.
 - `make db-up` / `make db-down` — start / stop Postgres.
-- `cd api && mise exec -- cargo run` — boot the API on `:8080`.
-- `cd web && mise exec -- bun run dev` — boot the frontend on `:3000`.
+- `cd api && mise exec -- cargo run` — boot the API directly (defaults to `:8080`; `make dev` sets `AME_PORT` to `:28080`).
+- `cd web && mise exec -- bun run dev` — boot the frontend directly (defaults to `:3000`; `make dev` runs it on `:23000`).
 
 ## Conventions
 - Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `deploy:`. No emojis.
@@ -45,7 +45,7 @@ See `docs/plans/` for implementation plans, including `docs/plans/2026-05-20-des
 ### Running the test suite
 ```bash
 # Full Playwright suite (non-interactive)
-E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:3000 \
+E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:23000 \
   bunx @playwright/test test --project=chromium
 ```
 
@@ -54,7 +54,7 @@ E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:3000 \
 # Package is @playwright/cli — NOT playwright-cli (that 404s on npm)
 # Run from .tmp/ so snapshots land there, not in web/
 cd .tmp
-bunx @playwright/cli open http://localhost:3000
+bunx @playwright/cli open http://localhost:23000
 
 # Auth pattern — cookies don't survive goto; must re-set on each new page:
 bunx @playwright/cli cookie-set ame_token "<token>" --domain=localhost
@@ -63,7 +63,7 @@ sleep 3   # useAuth is async; screenshot too early catches Loading state
 bunx @playwright/cli screenshot --filename=page.png
 
 # Common commands
-bunx @playwright/cli goto http://localhost:3000/exams
+bunx @playwright/cli goto http://localhost:23000/exams
 bunx @playwright/cli snapshot          # accessibility tree with refs
 bunx @playwright/cli click e42
 bunx @playwright/cli eval "document.cookie"
@@ -73,7 +73,7 @@ bunx @playwright/cli close
 
 ### Getting a learner token
 ```bash
-curl -s -X POST http://localhost:8080/v1/auth/login \
+curl -s -X POST http://localhost:28080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"learner@example.com","password":"password123"}' | jq -r .token
 ```

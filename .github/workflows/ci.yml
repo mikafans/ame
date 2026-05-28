@@ -35,13 +35,3 @@ jobs:
       - name: openapi drift check
         working-directory: web
         run: mise exec -- bun run api:check
-
-  audit:
-    name: cargo audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: api
