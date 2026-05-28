@@ -17,6 +17,7 @@ import Tooltip from "@mui/material/Tooltip";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useTheme } from "@mui/material/styles";
+import { useAuth } from "@/hooks/useAuth";
 
 type TabId = "signup" | "login";
 type Role = "learner" | "instructor";
@@ -38,6 +39,7 @@ const ROLES: { id: Role; label: string; color: string; desc: string }[] = [
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const { mode, toggle } = useColorMode();
   const theme = useTheme();
   const isDark = mode === "dark";
@@ -86,7 +88,7 @@ export default function LoginPage() {
         setError(message);
         return;
       }
-      const data = await response.json();
+      await refresh();
       router.push("/library");
     } catch (err) {
       setError(

@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:23000";
+const WEB_PORT = new URL(BASE_URL).port || "23000";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -8,7 +11,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: "list",
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL: BASE_URL,
     trace: "on-first-retry",
   },
   projects: [
@@ -17,12 +20,10 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: process.env.E2E_BASE_URL
-    ? undefined
-    : {
-        command: "bun run dev",
-        url: "http://localhost:3000",
-        reuseExistingServer: !process.env.CI,
-        timeout: 60_000,
-      },
+  webServer: {
+    command: `bun run dev -- -p ${WEB_PORT} >> ../.tmp/ame-web-e2e.log 2>&1`,
+    url: BASE_URL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 90_000,
+  },
 });

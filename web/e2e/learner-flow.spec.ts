@@ -17,8 +17,7 @@ test.describe("learner golden path", () => {
       {
         name: "ame_token",
         value: learnerToken,
-        domain: "localhost",
-        path: "/",
+        url: API_URL,
       },
     ]);
   });

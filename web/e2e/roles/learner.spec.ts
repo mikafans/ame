@@ -34,10 +34,13 @@ test.describe("Learner role", () => {
   test("library page loads quizzes", async ({ page }) => {
     await page
       .context()
-      .addCookies([
-        { name: "ame_token", value: token, domain: "localhost", path: "/" },
-      ]);
+      .addCookies([{ name: "ame_token", value: token, url: BASE }]);
     await page.goto(`${BASE}/`);
+    // Wait for the auth loading to finish and user to be visible in sidebar
+    await expect(page.getByText(/E2E Learner/i)).toBeVisible({
+      timeout: 10000,
+    });
+
     await expect(page.getByRole("heading").first()).toBeVisible({
       timeout: 8000,
     });
@@ -62,9 +65,7 @@ test.describe("Learner role", () => {
 
     await page
       .context()
-      .addCookies([
-        { name: "ame_token", value: token, domain: "localhost", path: "/" },
-      ]);
+      .addCookies([{ name: "ame_token", value: token, url: BASE }]);
     await page.goto(`${BASE}/sessions/${sessionId}`);
     await expect(page.locator("text=/question/i").first()).toBeVisible({
       timeout: 8000,
@@ -92,9 +93,7 @@ test.describe("Learner role", () => {
 
     await page
       .context()
-      .addCookies([
-        { name: "ame_token", value: token, domain: "localhost", path: "/" },
-      ]);
+      .addCookies([{ name: "ame_token", value: token, url: BASE }]);
     await page.goto(`${BASE}/sessions/${sessionId}/results`);
     await expect(page.locator("text=/%|correct|score/i").first()).toBeVisible({
       timeout: 8000,
@@ -104,9 +103,7 @@ test.describe("Learner role", () => {
   test("progress page renders stats", async ({ page }) => {
     await page
       .context()
-      .addCookies([
-        { name: "ame_token", value: token, domain: "localhost", path: "/" },
-      ]);
+      .addCookies([{ name: "ame_token", value: token, url: BASE }]);
     await page.goto(`${BASE}/progress`);
     await expect(
       page.locator("text=/progress|avg score|streak/i").first(),

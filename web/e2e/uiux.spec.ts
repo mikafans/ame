@@ -33,11 +33,13 @@ async function login(request: APIRequestContext) {
 }
 
 async function setAuthCookie(page: Page, token: string) {
-  await page
-    .context()
-    .addCookies([
-      { name: "ame_token", value: token, domain: "localhost", path: "/" },
-    ]);
+  await page.context().addCookies([
+    {
+      name: "ame_token",
+      value: token,
+      url: process.env.E2E_BASE_URL ?? "http://localhost:23000",
+    },
+  ]);
 }
 
 async function screenshot(page: Page, name: string) {
@@ -146,6 +148,11 @@ test.describe("UI/UX spec alignment", () => {
 
     // --- Library ---
     await page.goto("/library");
+    // Wait for the auth loading to finish and user to be visible in sidebar
+    await expect(page.getByText(/Alice Learner/i)).toBeVisible({
+      timeout: 10000,
+    });
+
     await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
     await expect(
       page.getByRole("tab", { name: /All quizzes \(\d+\)/ }),

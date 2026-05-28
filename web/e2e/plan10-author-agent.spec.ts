@@ -22,9 +22,7 @@ async function loginAs(
 async function withToken(page: Page, token: string) {
   await page
     .context()
-    .addCookies([
-      { name: "ame_token", value: token, domain: "localhost", path: "/" },
-    ]);
+    .addCookies([{ name: "ame_token", value: token, url: API_URL }]);
 }
 
 async function withLearner(page: Page, token: string) {
