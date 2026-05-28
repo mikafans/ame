@@ -8,7 +8,11 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
-import { deriveBack, hasModelAnswer, type FlashQuestion } from "@/lib/flashcards";
+import {
+  deriveBack,
+  hasModelAnswer,
+  type FlashQuestion,
+} from "@/lib/flashcards";
 
 const KIND_LABEL: Record<string, string> = {
   mc: "Multiple choice",
@@ -73,7 +77,10 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
 
       <Card variant="outlined" sx={{ minHeight: 240 }}>
         <CardContent sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: snippet ? 2 : 0 }}>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 600, mb: snippet ? 2 : 0 }}
+          >
             {question.prompt}
           </Typography>
 
@@ -105,7 +112,10 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
                   >
                     Answer
                   </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 600, mb: back.explanation ? 2 : 0 }}>
+                  <Typography
+                    variant="body1"
+                    sx={{ fontWeight: 600, mb: back.explanation ? 2 : 0 }}
+                  >
                     {back.answer}
                   </Typography>
                 </>
@@ -138,7 +148,11 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
 
       <Box sx={{ mt: 2.5 }}>
         {!revealed ? (
-          <Button variant="contained" size="large" onClick={() => setRevealed(true)}>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => setRevealed(true)}
+          >
             Show answer (Space)
           </Button>
         ) : (

@@ -21,23 +21,34 @@ function q(partial: Partial<FlashQuestion>): FlashQuestion {
 describe("deriveBack", () => {
   it("mc → option at correct_index", () => {
     const back = deriveBack(
-      q({ kind: "mc", payload: { options: ["a", "b", "c"], correct_index: 1 } }),
+      q({
+        kind: "mc",
+        payload: { options: ["a", "b", "c"], correct_index: 1 },
+      }),
     );
     expect(back.answer).toBe("b");
   });
 
   it("tf → True/False string", () => {
-    expect(deriveBack(q({ kind: "tf", payload: { correct: true } })).answer).toBe("True");
-    expect(deriveBack(q({ kind: "tf", payload: { correct: false } })).answer).toBe("False");
+    expect(
+      deriveBack(q({ kind: "tf", payload: { correct: true } })).answer,
+    ).toBe("True");
+    expect(
+      deriveBack(q({ kind: "tf", payload: { correct: false } })).answer,
+    ).toBe("False");
   });
 
   it("short → accepted joined", () => {
-    const back = deriveBack(q({ kind: "short", payload: { accepted: ["x", "y"] } }));
+    const back = deriveBack(
+      q({ kind: "short", payload: { accepted: ["x", "y"] } }),
+    );
     expect(back.answer).toBe("x, y");
   });
 
   it("essay/code → no crisp answer, explanation passed through", () => {
-    const back = deriveBack(q({ kind: "essay", explanation: "discuss tradeoffs" }));
+    const back = deriveBack(
+      q({ kind: "essay", explanation: "discuss tradeoffs" }),
+    );
     expect(back.answer).toBeNull();
     expect(back.explanation).toBe("discuss tradeoffs");
   });
@@ -65,7 +76,10 @@ describe("filterByTypes", () => {
     expect(filterByTypes(items, [])).toHaveLength(3);
   });
   it("keeps only selected kinds", () => {
-    expect(filterByTypes(items, ["mc", "tf"]).map((x) => x.kind)).toEqual(["mc", "tf"]);
+    expect(filterByTypes(items, ["mc", "tf"]).map((x) => x.kind)).toEqual([
+      "mc",
+      "tf",
+    ]);
   });
 });
 
@@ -78,7 +92,9 @@ describe("buildDeck", () => {
     expect(buildDeck(items.slice(0, 5), 30)).toHaveLength(5);
   });
   it("is a permutation (no dropped/duplicated items) for full deck", () => {
-    const ids = buildDeck(items, 100).map((x) => x.id).sort();
+    const ids = buildDeck(items, 100)
+      .map((x) => x.id)
+      .sort();
     expect(ids).toEqual(items.map((x) => x.id).sort());
   });
   it("uses injected rng deterministically", () => {

@@ -52,7 +52,10 @@ export function hasModelAnswer(back: CardBack): boolean {
   return back.explanation !== null && back.explanation.trim() !== "";
 }
 
-export function filterByTypes<T extends { kind: Kind }>(items: T[], types: string[]): T[] {
+export function filterByTypes<T extends { kind: Kind }>(
+  items: T[],
+  types: string[],
+): T[] {
   if (types.length === 0) return items;
   return items.filter((i) => types.includes(i.kind));
 }
@@ -66,6 +69,10 @@ export function shuffle<T>(items: T[], rng: () => number = Math.random): T[] {
   return a;
 }
 
-export function buildDeck<T>(items: T[], count: number, rng: () => number = Math.random): T[] {
+export function buildDeck<T>(
+  items: T[],
+  count: number,
+  rng: () => number = Math.random,
+): T[] {
   return shuffle(items, rng).slice(0, count);
 }

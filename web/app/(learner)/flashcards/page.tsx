@@ -11,11 +11,7 @@ import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
 import { api } from "@/api/client";
 import { FlashcardReview } from "@/components/flashcards/FlashcardReview";
-import {
-  buildDeck,
-  filterByTypes,
-  type FlashQuestion,
-} from "@/lib/flashcards";
+import { buildDeck, filterByTypes, type FlashQuestion } from "@/lib/flashcards";
 
 interface TagItem {
   name: string;
@@ -53,7 +49,9 @@ export default function FlashcardsPage() {
   useEffect(() => {
     api
       .GET("/v1/tags" as never)
-      .then(({ data }: { data?: TagItem[] }) => setTags(Array.isArray(data) ? data : []))
+      .then(({ data }: { data?: TagItem[] }) =>
+        setTags(Array.isArray(data) ? data : []),
+      )
       .catch(() => setTags([]));
   }, []);
 
@@ -76,7 +74,10 @@ export default function FlashcardsPage() {
     setNote(null);
     setLoading(true);
     try {
-      const params: Record<string, string | number> = { status: "live", limit: 200 };
+      const params: Record<string, string | number> = {
+        status: "live",
+        limit: 200,
+      };
       if (selectedTag) params.tag = selectedTag;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error: apiErr } = await (api as any).GET("/v1/questions", {
@@ -93,7 +94,9 @@ export default function FlashcardsPage() {
         return;
       }
       if (filtered.length < deckSize) {
-        setNote(`Only ${filtered.length} live questions match — using all of them.`);
+        setNote(
+          `Only ${filtered.length} live questions match — using all of them.`,
+        );
       }
       startReview(buildDeck(filtered, deckSize));
     } catch {
@@ -170,7 +173,9 @@ export default function FlashcardsPage() {
                 size="small"
                 onClick={() => toggleType(qt.value)}
                 color={selectedTypes.includes(qt.value) ? "primary" : "default"}
-                variant={selectedTypes.includes(qt.value) ? "filled" : "outlined"}
+                variant={
+                  selectedTypes.includes(qt.value) ? "filled" : "outlined"
+                }
                 sx={{ cursor: "pointer" }}
               />
             ))}
@@ -199,7 +204,12 @@ export default function FlashcardsPage() {
           </Alert>
         )}
 
-        <Button variant="contained" size="large" disabled={loading} onClick={handleStart}>
+        <Button
+          variant="contained"
+          size="large"
+          disabled={loading}
+          onClick={handleStart}
+        >
           {loading ? "Loading…" : "Start deck →"}
         </Button>
       </Box>
@@ -246,7 +256,11 @@ export default function FlashcardsPage() {
         >
           Review missed ({missed.length})
         </Button>
-        <Button variant="outlined" size="large" onClick={() => setPhase("setup")}>
+        <Button
+          variant="outlined"
+          size="large"
+          onClick={() => setPhase("setup")}
+        >
           New deck
         </Button>
       </Stack>
@@ -284,7 +298,9 @@ function SetupBlock({
   return (
     <Card variant="outlined" sx={{ mb: 3.5 }}>
       <CardContent>
-        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.25, mb: 1.75 }}>
+        <Box
+          sx={{ display: "flex", alignItems: "baseline", gap: 1.25, mb: 1.75 }}
+        >
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
             {label}
           </Typography>
