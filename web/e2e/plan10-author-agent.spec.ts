@@ -1,47 +1,73 @@
-import { test, expect, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Page,
+  type APIRequestContext,
+} from "@playwright/test";
 
-const API_TOKEN = process.env.E2E_API_TOKEN ?? "";
-const INSTRUCTOR_TOKEN = process.env.E2E_INSTRUCTOR_TOKEN ?? "";
+const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const API_URL = process.env.E2E_API_URL ?? "http://localhost:8080";
 
-async function setToken(page: Page, token: string) {
-  await page.goto("/login");
-  await page.evaluate((t) => {
-    document.cookie = `ame_token=${t}; path=/; max-age=86400`;
-  }, token);
+async function loginAs(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const resp = await request.post(`${API_URL}/v1/auth/login`, {
+    data: { email, password: "password123" },
+  });
+  expect(resp.status()).toBe(200);
+  return (await resp.json()).token;
+}
+
+async function withToken(page: Page, token: string) {
+  await page
+    .context()
+    .addCookies([
+      { name: "ame_token", value: token, domain: "localhost", path: "/" },
+    ]);
+}
+
+async function withLearner(page: Page, token: string) {
+  await withToken(page, token);
+}
+
+async function withInstructor(page: Page, token: string) {
+  await withToken(page, token);
 }
 
 test.describe("role-gated navigation", () => {
-  test.skip(!API_TOKEN, "E2E_API_TOKEN not set");
+  let learnerToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    learnerToken = await loginAs(request, "learner@example.com");
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await withLearner(page, learnerToken);
+  });
 
   test("learner cannot navigate to /author/*", async ({ page }) => {
-    await setToken(page, API_TOKEN);
     await page.goto("/author/some-quiz-id");
-    // Should redirect to login or show not found — either way Author studio is not visible
     const url = page.url();
     const hasAuthorContent = await page
       .getByText("Author studio")
       .isVisible()
       .catch(() => false);
-    // A learner should either be redirected to login or see no Author studio UI
     expect(url.includes("/login") || !hasAuthorContent).toBeTruthy();
   });
 
   test("learner does not see Author studio in nav", async ({ page }) => {
-    await setToken(page, API_TOKEN);
     await page.goto("/");
     await expect(page.getByText("Author studio")).not.toBeVisible();
   });
 
   test("learner does not see Agent API in nav", async ({ page }) => {
-    await setToken(page, API_TOKEN);
     await page.goto("/");
     await expect(page.getByText("Agent API")).not.toBeVisible();
   });
 
   test("learner cannot navigate to /agent", async ({ page }) => {
-    await setToken(page, API_TOKEN);
     await page.goto("/agent");
-    // Access denied message shown or redirect
     const denied = await page
       .getByText("Agent integration is available to instructors")
       .isVisible()
@@ -51,7 +77,6 @@ test.describe("role-gated navigation", () => {
   });
 
   test("exams page is visible to all authenticated users", async ({ page }) => {
-    await setToken(page, API_TOKEN);
     await page.goto("/exams");
     await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible({
       timeout: 8000,
@@ -59,79 +84,81 @@ test.describe("role-gated navigation", () => {
   });
 });
 
-test.describe("author studio publish gating", () => {
-  test.skip(!INSTRUCTOR_TOKEN, "E2E_INSTRUCTOR_TOKEN not set");
+// All instructor tests share one token — the API replaces the token hash on every
+// login call, so multiple concurrent beforeAll hooks would invalidate each other.
+test.describe("instructor flows", () => {
+  test.describe.configure({ mode: "serial" });
 
-  test("publish button disabled when no questions", async ({ page }) => {
-    await setToken(page, INSTRUCTOR_TOKEN);
-    await page.goto("/exams");
-    await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible({
-      timeout: 8000,
-    });
+  let instructorToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    instructorToken = await loginAs(request, "instructor@example.com");
+  });
+
+  test("instructor can reach Author studio", async ({ page }) => {
+    await withInstructor(page, instructorToken);
+    await page.goto(`${BASE}/author`);
+    await expect(
+      page.getByRole("heading", { name: "Author studio" }),
+    ).toBeVisible({ timeout: 8000 });
   });
 
   test("instructor sees Author studio in nav", async ({ page }) => {
-    await setToken(page, INSTRUCTOR_TOKEN);
-    await page.goto("/");
+    await withInstructor(page, instructorToken);
+    await page.goto(`${BASE}/library`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("Author studio")).toBeVisible({
       timeout: 8000,
     });
   });
 
   test("instructor sees Agent API in nav", async ({ page }) => {
-    await setToken(page, INSTRUCTOR_TOKEN);
-    await page.goto("/");
+    await withInstructor(page, instructorToken);
+    await page.goto(`${BASE}/library`);
+    await page.waitForLoadState("networkidle");
     await expect(page.getByText("Agent API")).toBeVisible({ timeout: 8000 });
   });
-});
-
-test.describe("MCP descriptor view", () => {
-  test.skip(!INSTRUCTOR_TOKEN, "E2E_INSTRUCTOR_TOKEN not set");
 
   test("MCP tools tab renders descriptors without errors", async ({ page }) => {
-    // Capture console errors
     const errors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") errors.push(msg.text());
     });
 
-    await setToken(page, INSTRUCTOR_TOKEN);
-    await page.goto("/agent");
+    await withInstructor(page, instructorToken);
+    await page.goto(`${BASE}/agent`);
     await page.getByText("MCP tools").click();
-    // Should show tool list without JS errors
     await page.waitForTimeout(2000);
     const fatalErrors = errors.filter(
       (e) => !e.includes("net::ERR") && !e.includes("Failed to load resource"),
     );
     expect(fatalErrors).toHaveLength(0);
   });
-});
 
-test.describe("exams compose pool_insufficient", () => {
-  test.skip(!INSTRUCTOR_TOKEN, "E2E_INSTRUCTOR_TOKEN not set");
-
-  test("compose form is reachable and shows sections step", async ({
-    page,
-  }) => {
-    await setToken(page, INSTRUCTOR_TOKEN);
-    await page.goto("/exams");
+  test("compose form is reachable and shows fields", async ({ page }) => {
+    await withInstructor(page, instructorToken);
+    await page.goto(`${BASE}/exams`);
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible({
+      timeout: 8000,
+    });
     await page.getByText("Compose exam").click();
-    await expect(page.getByText("Step 1 of 2")).toBeVisible({ timeout: 5000 });
-    await page.fill(
-      "input[placeholder='e.g. Midterm Examination']",
-      "Test exam",
-    );
-    await page.getByText("Next: sections →").click();
-    await expect(page.getByText("Step 2 of 2")).toBeVisible({ timeout: 3000 });
+    await expect(
+      page.getByRole("heading", { name: "Compose exam" }),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(page.getByLabel("Name")).toBeVisible();
+    await expect(page.getByText("Sections")).toBeVisible();
   });
 });
 
 test.describe("tweaks panel (demo mode)", () => {
-  test("tweaks panel not visible when DEMO_MODE is off", async ({ page }) => {
-    await setToken(page, API_TOKEN || INSTRUCTOR_TOKEN);
+  test("tweaks panel not visible when DEMO_MODE is off", async ({
+    page,
+    request,
+  }) => {
+    const token = await loginAs(request, "learner@example.com");
+    await withLearner(page, token);
     await page.goto("/");
-    const tweaks = page.getByText("Tweaks (demo)");
-    // Should not be visible in non-demo mode (env var unset in test)
-    await expect(tweaks).not.toBeVisible();
+    await expect(page.getByText("Tweaks (demo)")).not.toBeVisible();
   });
 });

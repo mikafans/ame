@@ -1,5 +1,9 @@
 "use client";
 
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
+
 interface McqOption {
   text: string;
   index: number;
@@ -12,66 +16,84 @@ interface Props {
   disabled?: boolean;
 }
 
+const LABELS = ["A", "B", "C", "D", "E", "F"];
+
 export function McqRenderer({
   options,
   value,
   onChange,
   disabled = false,
 }: Props) {
+  const theme = useTheme();
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {options.map((opt) => {
+    <Box sx={{ display: "flex", flexDirection: "column" }}>
+      {options.map((opt, displayIdx) => {
         const selected = value === opt.index;
         return (
-          <button
+          <Box
             key={opt.index}
-            type="button"
+            role="button"
+            tabIndex={disabled ? -1 : 0}
             onClick={() => !disabled && onChange(opt.index)}
-            style={{
+            onKeyDown={(e) =>
+              e.key === "Enter" || e.key === " "
+                ? !disabled && onChange(opt.index)
+                : undefined
+            }
+            sx={{
               display: "flex",
-              alignItems: "flex-start",
-              gap: 12,
-              padding: "14px 16px",
-              background: selected ? "var(--accent-dim)" : "var(--surface-2)",
-              border: `1px solid ${selected ? "var(--accent-line)" : "var(--border)"}`,
-              borderRadius: 6,
-              cursor: disabled ? "not-allowed" : "pointer",
-              textAlign: "left",
-              width: "100%",
+              alignItems: "center",
+              gap: 2,
+              px: 2.5,
+              py: 1.75,
+              borderTop:
+                displayIdx === 0
+                  ? `1px solid ${theme.palette.divider}`
+                  : "none",
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              borderLeft: `3px solid ${selected ? theme.palette.primary.main : "transparent"}`,
+              bgcolor: selected ? "primary.50" : "background.paper",
+              cursor: disabled ? "default" : "pointer",
+              transition: "background-color 0.15s, border-left-color 0.15s",
+              "&:hover": disabled
+                ? {}
+                : {
+                    bgcolor: selected ? "primary.50" : "action.hover",
+                  },
             }}
           >
-            <span
-              style={{
+            <Box
+              sx={{
                 flexShrink: 0,
-                width: 22,
-                height: 22,
+                width: 28,
+                height: 28,
                 borderRadius: "50%",
-                border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
-                background: selected ? "var(--accent)" : "transparent",
+                border: `2px solid ${selected ? theme.palette.primary.main : theme.palette.divider}`,
+                bgcolor: selected ? "primary.main" : "transparent",
+                color: selected ? "primary.contrastText" : "text.secondary",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 700,
               }}
             >
-              {selected && (
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "#000",
-                  }}
-                />
-              )}
-            </span>
-            <span
-              style={{ color: "var(--text)", fontSize: 14, lineHeight: 1.5 }}
+              {LABELS[displayIdx] ?? displayIdx + 1}
+            </Box>
+
+            <Typography
+              variant="body1"
+              sx={{
+                color: selected ? "primary.main" : "text.primary",
+                lineHeight: 1.5,
+              }}
             >
               {opt.text}
-            </span>
-          </button>
+            </Typography>
+          </Box>
         );
       })}
-    </div>
+    </Box>
   );
 }

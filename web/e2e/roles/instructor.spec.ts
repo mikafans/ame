@@ -10,7 +10,7 @@ test.describe("Instructor role", () => {
 
   test.beforeAll(async ({ request }) => {
     const r = await request.post(`${API}/v1/auth/login`, {
-      data: { email: "instructor@example.com", password: "password123" },
+      data: { email: "admin@example.com", password: "password123" },
     });
     expect(r.status()).toBe(200);
     token = (await r.json()).token;
