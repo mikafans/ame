@@ -269,6 +269,13 @@ paths:
       tags:
       - crate::http::stats
       operationId: me_stats
+      parameters:
+      - name: window
+        in: query
+        description: One of `last30d` (≈4 weeks), `last90d` (≈12 weeks), or `all`.
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: User stats summary
@@ -403,6 +410,36 @@ paths:
           - 'null'
           format: int64
       - name: offset
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      - name: search
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: page
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      - name: page_size
         in: path
         required: true
         schema:
@@ -2356,6 +2393,10 @@ components:
     QuestionFilter:
       type: object
       properties:
+        kind:
+          type:
+          - string
+          - 'null'
         limit:
           type: integer
           format: int64
@@ -2372,6 +2413,10 @@ components:
         offset:
           type: integer
           format: int64
+        search:
+          type:
+          - string
+          - 'null'
         status:
           oneOf:
           - type: 'null'

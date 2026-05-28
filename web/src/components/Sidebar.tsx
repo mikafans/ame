@@ -1,8 +1,47 @@
 "use client";
 
 import React from "react";
-import { Logo, Icon } from "@/components/ui";
+import Box from "@mui/material/Box";
+import Drawer from "@mui/material/Drawer";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import Typography from "@mui/material/Typography";
+import Avatar from "@mui/material/Avatar";
+import Divider from "@mui/material/Divider";
+import LibraryBooksOutlinedIcon from "@mui/icons-material/LibraryBooksOutlined";
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
+import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import GradingOutlinedIcon from "@mui/icons-material/GradingOutlined";
+import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import { useColorMode } from "@/components/ThemeRegistry";
+
+const DRAWER_WIDTH = 232;
+
+const ICON_MAP: Record<string, React.ReactElement> = {
+  library: <LibraryBooksOutlinedIcon fontSize="small" />,
+  stack: <LayersOutlinedIcon fontSize="small" />,
+  take: <PlayArrowOutlinedIcon fontSize="small" />,
+  results: <AssessmentOutlinedIcon fontSize="small" />,
+  dashboard: <DashboardOutlinedIcon fontSize="small" />,
+  author: <EditOutlinedIcon fontSize="small" />,
+  grade: <GradingOutlinedIcon fontSize="small" />,
+  questions: <FormatListBulletedOutlinedIcon fontSize="small" />,
+  agent: <SmartToyOutlinedIcon fontSize="small" />,
+};
 
 interface SidebarProps {
   route: string;
@@ -11,14 +50,24 @@ interface SidebarProps {
 }
 
 export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
-  const { user } = useAuth();
+  const { user, logout: logoutContext } = useAuth();
+  const { mode, toggle } = useColorMode();
 
+  async function handleLogout() {
+    await logoutContext();
+  }
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   const items = [
     { id: "library", label: "Library", icon: "library", section: "Learn" },
     { id: "exams", label: "Exams", icon: "stack", section: "Learn" },
     { id: "quiz", label: "Take quiz", icon: "take", section: "Learn" },
+    {
+      id: "questions",
+      label: "Question bank",
+      icon: "questions",
+      section: "Learn",
+    },
     { id: "results", label: "Last results", icon: "results", section: "Learn" },
     { id: "dashboard", label: "Progress", icon: "dashboard", section: "Learn" },
     ...(isInstructor
@@ -29,12 +78,7 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
             icon: "author",
             section: "Teach",
           },
-          {
-            id: "grading",
-            label: "Grading",
-            icon: "grade",
-            section: "Teach",
-          },
+          { id: "grading", label: "Grading", icon: "grade", section: "Teach" },
         ]
       : []),
     ...(showAgent && isInstructor
@@ -50,167 +94,114 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
   ];
 
   const sections = ["Learn", "Teach", "Integrate"];
-
-  // Extract initials from displayName
   const initials =
     user?.displayName
       ?.split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2) || "JT";
-
-  const displayName = user?.displayName || "Jordan Tahir";
-  const role = user?.role || "Student";
-  const cohort = "CS '27"; // Default cohort
+      .slice(0, 2) ?? "?";
+  const displayName = user?.displayName ?? "";
 
   return (
-    <aside
-      style={{
-        width: 232,
-        flex: "0 0 232px",
-        borderRight: "1px solid var(--border)",
-        background: "var(--surface)",
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        position: "sticky",
-        top: 0,
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: DRAWER_WIDTH,
+        flexShrink: 0,
+        "& .MuiDrawer-paper": {
+          width: DRAWER_WIDTH,
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+        },
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: "20px 20px 16px",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
+      <Box sx={{ p: 2.5, pb: 2, borderBottom: 1, borderColor: "divider" }}>
         <Logo />
-        <div
-          style={{
-            marginTop: 4,
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            color: "var(--muted)",
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
             letterSpacing: 1.2,
             textTransform: "uppercase",
+            display: "block",
+            mt: 0.5,
           }}
         >
-          Assessment Platform · v2.4
-        </div>
-      </div>
+          ame
+        </Typography>
+      </Box>
 
-      {/* Navigation */}
-      <nav style={{ flex: 1, overflowY: "auto", padding: "16px 12px" }}>
+      <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>
         {sections.map((sec) => {
           const inSec = items.filter((i) => i.section === sec);
           if (!inSec.length) return null;
-
           return (
-            <div key={sec} style={{ marginBottom: 18 }}>
-              <div
-                style={{
-                  padding: "6px 10px 8px",
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
+            <Box key={sec} sx={{ mb: 2 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 1.5,
+                  py: 0.75,
+                  display: "block",
                   letterSpacing: 1.4,
-                  color: "var(--muted)",
                   textTransform: "uppercase",
+                  color: "text.secondary",
                 }}
               >
                 {sec}
-              </div>
-
-              {inSec.map((it) => {
-                const active = route === it.id;
-                return (
-                  <button
-                    key={it.id}
-                    onClick={() => setRoute(it.id)}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "9px 10px",
-                      background: active ? "var(--accent-dim)" : "transparent",
-                      border: "1px solid",
-                      borderColor: active
-                        ? "var(--accent-line)"
-                        : "transparent",
-                      color: active ? "var(--accent)" : "var(--text-2)",
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 500,
-                      borderRadius: 6,
-                      textAlign: "left",
-                      marginBottom: 2,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Icon name={it.icon} size={16} />
-                    <span>{it.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              </Typography>
+              <List dense disablePadding>
+                {inSec.map((it) => (
+                  <ListItem key={it.id} disablePadding>
+                    <ListItemButton
+                      selected={route === it.id}
+                      onClick={() => setRoute(it.id)}
+                      sx={{ borderRadius: 1, mx: 0.5 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        {ICON_MAP[it.icon]}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={it.label}
+                        slotProps={{ primary: { sx: { fontSize: 13 } } }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
           );
         })}
-      </nav>
+      </Box>
 
-      {/* Footer */}
-      <div
-        style={{
-          borderTop: "1px solid var(--border)",
-          padding: 14,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: "var(--surface-3)",
-              border: "1px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "var(--serif)",
-              fontSize: 14,
-              fontWeight: 500,
-              color: "var(--text)",
-            }}
-          >
-            {initials}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 12.5,
-                fontWeight: 500,
-                color: "var(--text)",
-              }}
-            >
-              {displayName}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--muted)",
-              }}
-            >
-              {role} · {cohort}
-            </div>
-          </div>
-          <Icon name="settings" size={14} color="var(--muted)" />
-        </div>
-      </div>
-    </aside>
+      <Divider />
+      <Box sx={{ p: 1.75, display: "flex", alignItems: "center", gap: 1.25 }}>
+        <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>{initials}</Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+            {displayName}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {user?.role ?? ""}
+          </Typography>
+        </Box>
+        <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
+          <IconButton size="small" onClick={toggle}>
+            {mode === "dark" ? (
+              <LightModeOutlinedIcon sx={{ fontSize: 16 }} />
+            ) : (
+              <DarkModeOutlinedIcon sx={{ fontSize: 16 }} />
+            )}
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Sign out">
+          <IconButton size="small" onClick={handleLogout}>
+            <LogoutOutlinedIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    </Drawer>
   );
 }

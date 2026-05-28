@@ -1,21 +1,29 @@
 import { test, expect } from "@playwright/test";
 
-const API_TOKEN = process.env.E2E_API_TOKEN ?? "";
+const API_URL = process.env.E2E_API_URL ?? "http://localhost:8080";
 
 test.describe("learner golden path", () => {
-  test.skip(!API_TOKEN, "E2E_API_TOKEN not set — skipping learner flow tests");
+  let learnerToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    const resp = await request.post(`${API_URL}/v1/auth/login`, {
+      data: { email: "learner@example.com", password: "password123" },
+    });
+    learnerToken = (await resp.json()).token;
+  });
 
   test.beforeEach(async ({ page }) => {
-    // Set auth cookie directly instead of going through login UI
-    await page.goto("/login");
-    await page.evaluate((token) => {
-      document.cookie = `ame_token=${token}; path=/; max-age=86400`;
-    }, API_TOKEN);
+    await page.context().addCookies([
+      {
+        name: "ame_token",
+        value: learnerToken,
+        url: API_URL,
+      },
+    ]);
   });
 
   test("login page renders and rejects bad credentials", async ({ page }) => {
     await page.goto("/login");
-    await page.getByRole("button", { name: "Sign in" }).click();
     await page.fill('input[type="email"]', "nobody@example.com");
     await page.fill('input[type="password"]', "badpass");
     await page.click('button[type="submit"]');

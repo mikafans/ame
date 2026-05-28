@@ -1,46 +1,83 @@
 "use client";
 
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import { useTheme } from "@mui/material/styles";
+
 interface Props {
   value: boolean | null;
-  onChange: (v: boolean | null) => void;
+  onChange: (v: boolean) => void;
   disabled?: boolean;
 }
 
+const OPTIONS = [
+  {
+    v: true,
+    label: "True",
+    Icon: CheckCircleOutlineIcon,
+    color: "success" as const,
+  },
+  {
+    v: false,
+    label: "False",
+    Icon: CancelOutlinedIcon,
+    color: "error" as const,
+  },
+];
+
 export function TfRenderer({ value, onChange, disabled = false }: Props) {
+  const theme = useTheme();
+
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 12,
-      }}
-    >
-      {[
-        { v: true, label: "True" },
-        { v: false, label: "False" },
-      ].map(({ v, label }) => {
+    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+      {OPTIONS.map(({ v, label, Icon, color }) => {
         const selected = value === v;
+        const palette = theme.palette[color];
         return (
-          <button
+          <Box
             key={label}
-            type="button"
             onClick={() => !disabled && onChange(v)}
-            style={{
-              padding: "26px 18px",
-              background: selected ? "var(--accent-dim)" : "var(--surface-2)",
-              border: `1px solid ${selected ? "var(--accent-line)" : "var(--border)"}`,
-              color: selected ? "var(--accent)" : "var(--text-2)",
-              borderRadius: 6,
-              fontFamily: "var(--serif)",
-              fontSize: 24,
-              fontWeight: 500,
-              cursor: disabled ? "not-allowed" : "pointer",
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1.5,
+              py: 4,
+              border: `2px solid ${selected ? palette.main : theme.palette.divider}`,
+              borderRadius: 2,
+              bgcolor: selected ? `${color}.50` : "background.paper",
+              cursor: disabled ? "default" : "pointer",
+              transition: "border-color 0.15s, background-color 0.15s",
+              "&:hover": disabled
+                ? {}
+                : {
+                    borderColor: selected ? palette.main : palette.light,
+                    bgcolor: selected ? `${color}.50` : `${color}.50`,
+                  },
             }}
           >
-            {label}
-          </button>
+            <Icon
+              sx={{
+                fontSize: 36,
+                color: selected ? palette.main : "text.disabled",
+                transition: "color 0.15s",
+              }}
+            />
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: selected ? palette.main : "text.secondary",
+              }}
+            >
+              {label}
+            </Typography>
+          </Box>
         );
       })}
-    </div>
+    </Box>
   );
 }

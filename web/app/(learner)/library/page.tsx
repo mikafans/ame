@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Tag } from "@/components/ui/Tag";
-import { Icon } from "@/components/ui/Icon";
-import { KV } from "@/components/ui/KV";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import CircularProgress from "@mui/material/CircularProgress";
+import Alert from "@mui/material/Alert";
+import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
-import { ShareModal } from "@/components/ShareModal";
+import { formatMinutes } from "@/utils/format";
 
 interface Quiz {
   id: string;
@@ -28,36 +36,25 @@ interface Quiz {
   createdAt: string;
 }
 
-interface CohortStats {
-  cohortAvg: number | null;
-  percentile: number | null;
-  completionRate: number | null;
-}
-
-type TabId = "all" | "assigned" | "completed" | "drafts";
+type TabId = "all" | "drafts";
 
 export default function LibraryPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("all");
   const [allQuizzes, setAllQuizzes] = useState<
     Record<TabId, { quizzes: Quiz[]; total: number }>
   >({
     all: { quizzes: [], total: 0 },
-    assigned: { quizzes: [], total: 0 },
-    completed: { quizzes: [], total: 0 },
     drafts: { quizzes: [], total: 0 },
   });
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState<string | null>(null);
-  const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
-    const client = makeClient(token);
+    const client = api;
 
     const fetchStatus = async (
       status: string,
@@ -78,41 +75,16 @@ export default function LibraryPage() {
         : Promise.resolve({ quizzes: [], total: 0 }),
     ])
       .then(([active, drafts]) => {
-        setAllQuizzes({
-          all: active,
-          assigned: active,
-          completed: { quizzes: [], total: 0 },
-          drafts,
-        });
+        setAllQuizzes({ all: active, drafts });
       })
       .finally(() => setLoading(false));
-  }, [token, user?.role]);
-
-  const upNextId =
-    tab === "all" || tab === "assigned"
-      ? (allQuizzes[tab].quizzes[0]?.id ?? null)
-      : null;
-
-  useEffect(() => {
-    if (!token || !upNextId) return;
-    setCohortStats(null);
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${upNextId}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((cs: CohortStats | null) => {
-        if (cs) setCohortStats(cs);
-      })
-      .catch(() => {});
-  }, [token, upNextId]);
+  }, [user?.role]);
 
   async function startQuiz(quizId: string) {
-    if (!token) return;
     setStarting(quizId);
     setStartError(null);
     try {
-      const client = makeClient(token);
+      const client = api;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (client as any).POST("/v1/sessions", {
         body: { quizId },
@@ -134,616 +106,257 @@ export default function LibraryPage() {
   }
 
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
-  const tabs: Array<{ id: TabId; label: string }> = [
-    { id: "all", label: "All quizzes" },
-    { id: "assigned", label: "Assigned to me" },
-    { id: "completed", label: "Completed" },
-  ];
-  if (isInstructor) {
-    tabs.push({ id: "drafts", label: "Drafts" });
-  }
 
-  const currentData = allQuizzes[tab];
-  const { quizzes } = currentData;
-  const upNext = upNextId
-    ? (quizzes.find((q) => q.id === upNextId) ?? null)
-    : null;
-  const remaining = upNext ? quizzes.slice(1) : quizzes;
-
-  const daysUntilDue = (dueDate: string | undefined) => {
-    if (!dueDate) return null;
-    const due = new Date(dueDate);
-    const now = new Date();
-    const diff = Math.ceil(
-      (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    return diff > 0 ? diff : null;
-  };
-
-  const estimateMinutes = (questionCount: number | undefined) =>
-    questionCount ? Math.max(20, questionCount * 2) : 45;
-
-  return (
-    <div style={{ padding: "28px 36px 56px" }}>
-      {/* Header + Action */}
-      <div
-        style={{
+  if (loading) {
+    return (
+      <Box
+        sx={{
           display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          marginBottom: 24,
+          justifyContent: "center",
+          alignItems: "center",
+          height: "60vh",
         }}
       >
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              letterSpacing: 1.3,
-              textTransform: "uppercase",
-              color: "var(--muted)",
-              marginBottom: 6,
-            }}
-          >
-            Spring 2026 · Active term
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 26,
-              fontWeight: 600,
-              color: "var(--text)",
-            }}
-          >
-            Library
-          </h1>
-        </div>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  const { quizzes } = allQuizzes[tab];
+  const featuredQuiz = allQuizzes.all.quizzes[0] ?? null;
+
+  return (
+    <Box sx={{ p: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: 500 }}>
+          Library
+        </Typography>
         {isInstructor && (
           <Button
-            variant="outline"
-            icon={<Icon name="plus" size={14} />}
+            variant="outlined"
+            startIcon={<AddOutlinedIcon />}
             onClick={async () => {
-              if (!token) return;
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { data } = await (makeClient(token) as any).POST(
-                "/v1/quizzes",
-                {
-                  body: { title: "Untitled quiz" },
-                },
-              );
+              const { data } = await (api as any).POST("/v1/quizzes", {
+                body: { title: "Untitled quiz" },
+              });
               if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
             }}
           >
             New quiz
           </Button>
         )}
-      </div>
+      </Box>
 
-      {/* Start error */}
-      {startError && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "10px 14px",
-            background: "var(--red-subtle, #fff1f0)",
-            border: "1px solid var(--red, #f5222d)",
-            borderRadius: 6,
-            color: "var(--red, #cf1322)",
-            fontSize: 13,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <span>{startError}</span>
-          <button
-            onClick={() => setStartError(null)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "inherit",
-              fontWeight: 600,
-              fontSize: 16,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          borderBottom: "1px solid var(--border)",
-          marginBottom: 24,
-        }}
-      >
-        {tabs.map((t) => {
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "10px 14px",
-                fontSize: 13,
-                fontWeight: active ? 600 : 500,
-                color: active ? "var(--text)" : "var(--muted)",
-                borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
-                marginBottom: -1,
-              }}
+      {featuredQuiz && (
+        <Card variant="outlined" sx={{ mb: 4, borderColor: "primary.main" }}>
+          <CardContent>
+            <Typography
+              variant="overline"
+              color="primary"
+              sx={{ display: "block", mb: 0.5 }}
             >
-              {t.label}{" "}
-              <span
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  marginLeft: 4,
-                }}
+              Up next
+            </Typography>
+            <Typography variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
+              {featuredQuiz.title}
+            </Typography>
+            {featuredQuiz.description && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1.5 }}
               >
-                ({allQuizzes[t.id].total})
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Loading state */}
-      {loading && (
-        <div
-          style={{
-            color: "var(--muted)",
-            fontFamily: "var(--mono)",
-            fontSize: 13,
-          }}
-        >
-          Loading…
-        </div>
-      )}
-
-      {/* No quizzes state */}
-      {!loading && quizzes.length === 0 && (
-        <div
-          style={{
-            padding: "48px 0",
-            textAlign: "center",
-            color: "var(--muted)",
-            fontSize: 14,
-          }}
-        >
-          No quizzes found.
-        </div>
-      )}
-
-      {/* Hero card (Up next) */}
-      {!loading && upNext && (
-        <Card style={{ marginBottom: 24, overflow: "hidden", padding: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr" }}>
-            <div
-              style={{
-                padding: "28px 32px",
-                borderRight: "1px solid var(--border)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginBottom: 14,
-                  flexWrap: "wrap",
-                }}
-              >
-                <Tag color="accent">Up next</Tag>
-                <Tag color="muted">{upNext.course || "Uncategorized"}</Tag>
-                {upNext.difficulty && (
-                  <Tag color="muted">{upNext.difficulty}</Tag>
-                )}
-                {daysUntilDue(upNext.due_date) !== null && (
-                  <Tag color="amber">
-                    Due in {daysUntilDue(upNext.due_date)} days
-                  </Tag>
-                )}
-              </div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontFamily: "var(--serif)",
-                  fontSize: 24,
-                  fontWeight: 500,
-                  letterSpacing: -0.3,
-                  marginBottom: 10,
-                }}
-              >
-                {upNext.title}
-              </h2>
-              <p
-                style={{
-                  color: "var(--text-2)",
-                  fontSize: 14,
-                  lineHeight: 1.55,
-                  margin: 0,
-                  marginBottom: 18,
-                  maxWidth: 560,
-                }}
-              >
-                {upNext.description ||
-                  "A focused checkpoint covering algorithm analysis, core data structures, graph traversal, and dynamic programming fundamentals."}
-              </p>
-              {upNext.objectives && upNext.objectives.length > 0 && (
-                <div style={{ marginBottom: 22 }}>
-                  <LearningObjectives items={upNext.objectives} />
-                </div>
-              )}
-              {/* Stat strip */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 22,
-                  marginBottom: 20,
-                  alignItems: "center",
-                }}
-              >
-                <Metric
-                  label="Questions"
-                  value={`${upNext.questionCount ?? 0}`}
-                />
-                <Metric
-                  label="Duration"
-                  value={
-                    upNext.durationMin
-                      ? `${upNext.durationMin} min`
-                      : `${estimateMinutes(upNext.questionCount)} min`
-                  }
-                />
-                <Metric
-                  label="Attempts"
-                  value={`0 / ${upNext.attemptLimit ?? 2}`}
-                />
-              </div>
-              <div style={{ display: "flex", gap: 12 }}>
-                <Button
-                  variant="primary"
-                  icon={<Icon name="arrow" size={14} />}
-                  onClick={() => startQuiz(upNext.id)}
-                  disabled={starting === upNext.id}
+                {featuredQuiz.description}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Questions
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {featuredQuiz.questionCount ?? "—"}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Duration
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {featuredQuiz.durationMin
+                    ? formatMinutes(featuredQuiz.durationMin)
+                    : "—"}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Attempts
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {featuredQuiz.attemptLimit ?? "Unlimited"}
+                </Typography>
+              </Box>
+            </Stack>
+            {featuredQuiz.objectives && featuredQuiz.objectives.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    display: "block",
+                    mb: 0.5,
+                    letterSpacing: 1.2,
+                    textTransform: "uppercase",
+                  }}
                 >
-                  {starting === upNext.id ? "Starting…" : "Start"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/quizzes/${upNext.id}/preview`)}
-                >
-                  Preview questions
-                </Button>
-                <Button variant="ghost" onClick={() => setShareOpen(upNext.id)}>
-                  Share
-                </Button>
-              </div>
-            </div>
-            <div
-              style={{ padding: "28px 32px", background: "var(--surface-2)" }}
-            >
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.3,
-                  textTransform: "uppercase",
-                  color: "var(--muted)",
-                  marginBottom: 14,
-                }}
-              >
-                Cohort context
-              </div>
-              <KV
-                label="Class average"
-                value={
-                  cohortStats?.cohortAvg != null
-                    ? `${Math.round(cohortStats.cohortAvg * 100)}%`
-                    : "—"
+                  Recommended prep
+                </Typography>
+                <LearningObjectives items={featuredQuiz.objectives} />
+              </Box>
+            )}
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() =>
+                  router.push(`/quizzes/${featuredQuiz.id}/preview`)
                 }
-              />
-              <KV
-                label="Completion rate"
-                value={
-                  cohortStats?.completionRate != null
-                    ? `${Math.round(cohortStats.completionRate * 100)}%`
-                    : "—"
-                }
-              />
-              <KV
-                label="Your percentile"
-                value={
-                  cohortStats?.percentile != null
-                    ? `${cohortStats.percentile}th`
-                    : "—"
-                }
-              />
-              <KV label="Your last score" value="—" />
-              <div
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: 1.3,
-                  textTransform: "uppercase",
-                  color: "var(--muted)",
-                  marginTop: 22,
-                  marginBottom: 10,
-                }}
               >
-                Recommended prep
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                  fontSize: 13,
-                  color: "var(--text-2)",
-                }}
+                Preview questions
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<PlayArrowOutlinedIcon />}
+                disabled={starting === featuredQuiz.id}
+                onClick={() => startQuiz(featuredQuiz.id)}
               >
-                {[
-                  "Lecture 8 - Graph representations",
-                  "Worksheet - BFS trace",
-                  "Reading - Dynamic programming basics",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    <Icon name="book" size={13} color="var(--accent)" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                {starting === featuredQuiz.id ? "Starting…" : "Start"}
+              </Button>
+            </Stack>
+          </CardContent>
         </Card>
       )}
 
-      {/* Quiz grid */}
-      {!loading && remaining.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))",
-            gap: 16,
-          }}
-        >
-          {remaining.map((q) => (
-            <QuizCardGrid
-              key={q.id}
-              quiz={q}
-              starting={starting === q.id}
-              onStart={() => startQuiz(q.id)}
-              onShare={() => setShareOpen(q.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Share modal */}
-      {shareOpen && (
-        <ShareModal
-          payload={{
-            kind: "quiz",
-            id: shareOpen,
-            title: quizzes.find((q) => q.id === shareOpen)?.title || "",
-          }}
-          onClose={() => setShareOpen(null)}
-          bearerToken={token}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Tab
+          value="all"
+          label={`All quizzes (${allQuizzes.all.total})`}
+          sx={{ textTransform: "none" }}
         />
-      )}
-    </div>
-  );
-}
-
-function QuizCardGrid({
-  quiz,
-  starting,
-  onStart,
-  onShare,
-}: {
-  quiz: Quiz;
-  starting: boolean;
-  onStart: () => void;
-  onShare: () => void;
-}) {
-  const accentColor =
-    quiz.color === "amber"
-      ? "var(--amber)"
-      : quiz.color === "blue"
-        ? "var(--blue)"
-        : "var(--accent)";
-
-  return (
-    <Card
-      style={{
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        padding: 0,
-      }}
-    >
-      <div
-        style={{
-          padding: "16px 18px",
-          borderBottom: "1px solid var(--border)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            letterSpacing: 1.2,
-            color: "var(--muted)",
-            textTransform: "uppercase",
-          }}
-        >
-          {quiz.course && quiz.difficulty
-            ? `${quiz.course} · ${quiz.difficulty}`
-            : quiz.course || quiz.difficulty || "Uncategorized"}
-        </div>
-        {quiz.status === "draft" && <Tag color="muted">Draft</Tag>}
-      </div>
-      <div style={{ padding: "18px 18px 0", flex: 1 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-          <div
-            style={{
-              width: 4,
-              alignSelf: "stretch",
-              background: accentColor,
-              borderRadius: 2,
-            }}
+        {allQuizzes.drafts.total > 0 && (
+          <Tab
+            value="drafts"
+            label={`Drafts (${allQuizzes.drafts.total})`}
+            sx={{ textTransform: "none" }}
           />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h3
-              style={{
-                margin: 0,
-                fontFamily: "var(--serif)",
-                fontSize: 16,
-                fontWeight: 500,
-                lineHeight: 1.25,
-                letterSpacing: -0.2,
-              }}
-            >
-              {quiz.title}
-            </h3>
-            {quiz.description && (
-              <p
-                style={{
-                  color: "var(--muted)",
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                  margin: "8px 0 0",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                }}
-              >
-                {quiz.description}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-      <div
-        style={{
-          padding: "14px 18px 2px",
-          display: "flex",
-          gap: 14,
-          alignItems: "center",
-          color: "var(--muted)",
-          fontSize: 12,
-          fontFamily: "var(--mono)",
-          letterSpacing: 0.4,
-        }}
-      >
-        <span>
-          <Icon name="results" size={12} /> {quiz.questionCount ?? 0} Qs
-        </span>
-        <span>
-          <Icon name="clock" size={12} />{" "}
-          {quiz.questionCount ? Math.max(20, quiz.questionCount * 2) : 45}m
-        </span>
-        <span style={{ marginLeft: "auto", color: "var(--text-2)" }}>0/2</span>
-      </div>
-      <div
-        style={{
-          padding: "12px 18px",
-          borderTop: "1px solid var(--border)",
-          background: "var(--surface-2)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", gap: 6 }}>
-          {/* Tags could go here if needed */}
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button
-            onClick={onShare}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--muted)",
-              padding: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 11,
-              fontFamily: "var(--mono)",
-              letterSpacing: 0.5,
-            }}
-          >
-            <Icon name="stack" size={12} /> Share
-          </button>
-          <button
-            onClick={onStart}
-            disabled={starting}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--accent)",
-              fontWeight: 600,
-              fontSize: 12,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              cursor: starting ? "not-allowed" : "pointer",
-              opacity: starting ? 0.6 : 1,
-            }}
-          >
-            {starting ? "Starting…" : "Open"}{" "}
-            <Icon name="arrow" size={12} color="var(--accent)" />
-          </button>
-        </div>
-      </div>
-    </Card>
-  );
-}
+        )}
+      </Tabs>
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 10,
-          color: "var(--muted)",
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: "var(--serif)",
-          fontSize: 20,
-          fontWeight: 500,
-          color: "var(--text)",
-        }}
-      >
-        {value}
-      </div>
-    </div>
+      {startError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {startError}
+        </Alert>
+      )}
+
+      {quizzes.length === 0 ? (
+        <Typography color="text.secondary">No quizzes in this tab.</Typography>
+      ) : (
+        <Stack spacing={2}>
+          {quizzes.map((quiz) => (
+            <Card key={quiz.id} variant="outlined">
+              <CardContent>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                        {quiz.title}
+                      </Typography>
+                      {quiz.course && (
+                        <Chip
+                          label={quiz.course}
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
+                      {quiz.difficulty && (
+                        <Chip
+                          label={quiz.difficulty}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
+                    {quiz.description && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 1 }}
+                      >
+                        {quiz.description}
+                      </Typography>
+                    )}
+                    {quiz.objectives && quiz.objectives.length > 0 && (
+                      <Box sx={{ mb: 1 }}>
+                        <LearningObjectives items={quiz.objectives} />
+                      </Box>
+                    )}
+                    <Stack direction="row" spacing={2}>
+                      {quiz.questionCount != null && (
+                        <Typography variant="caption" color="text.secondary">
+                          {quiz.questionCount} questions
+                        </Typography>
+                      )}
+                      {quiz.durationMin != null && (
+                        <Typography variant="caption" color="text.secondary">
+                          {formatMinutes(quiz.durationMin)}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Box>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<PlayArrowOutlinedIcon />}
+                      disabled={starting === quiz.id}
+                      onClick={() => startQuiz(quiz.id)}
+                    >
+                      {starting === quiz.id ? "Starting…" : "Start"}
+                    </Button>
+                  </Stack>
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      )}
+    </Box>
   );
 }

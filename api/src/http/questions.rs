@@ -14,7 +14,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     middleware,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use serde::Deserialize;
@@ -54,6 +54,14 @@ pub struct ListQuestionsQuery {
     pub limit: Option<i64>,
     #[serde(default)]
     pub offset: Option<i64>,
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub page: Option<i64>,
+    #[serde(default)]
+    pub page_size: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -64,6 +72,12 @@ pub struct CreateQuestionsBody {
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct QuestionListResponse {
     pub questions: Vec<Question>,
+}
+
+#[derive(Debug, serde::Serialize, ToSchema)]
+pub struct QuestionBankListResponse {
+    pub questions: Vec<repo::QuestionRow>,
+    pub total: i64,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
@@ -90,7 +104,33 @@ pub async fn list_questions(
     State(state): State<AppState>,
     _user: AuthenticatedUser,
     Query(q): Query<ListQuestionsQuery>,
-) -> Result<Json<QuestionListResponse>, ApiError> {
+) -> Result<Response, ApiError> {
+    // If using new pagination params (page/page_size/search/kind), use list_questions_paged
+    if q.page.is_some() || q.page_size.is_some() || q.search.is_some() || q.kind.is_some() {
+        let page = q.page.unwrap_or(1).max(1);
+        let page_size = q.page_size.unwrap_or(25).clamp(1, 200);
+        let offset = (page - 1) * page_size;
+
+        let filter = repo::QuestionFilter {
+            tag: q.tag,
+            status: q.status,
+            min_rating: q.min_rating,
+            max_rating: q.max_rating,
+            limit: page_size,
+            offset,
+            search: q.search,
+            kind: q.kind,
+        };
+
+        let (rows, total) = repo::list_questions_paged(&state.pool, &filter).await?;
+        return Ok(Json(QuestionBankListResponse {
+            questions: rows,
+            total,
+        })
+        .into_response());
+    }
+
+    // Fall back to old API for backward compatibility
     let filter = repo::QuestionFilter {
         tag: q.tag,
         status: q.status,
@@ -98,9 +138,11 @@ pub async fn list_questions(
         max_rating: q.max_rating,
         limit: q.limit.unwrap_or(50),
         offset: q.offset.unwrap_or(0),
+        search: None,
+        kind: None,
     };
     let questions = repo::list_questions(&state.pool, &filter).await?;
-    Ok(Json(QuestionListResponse { questions }))
+    Ok(Json(QuestionListResponse { questions }).into_response())
 }
 
 #[utoipa::path(

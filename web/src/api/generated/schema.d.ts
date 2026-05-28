@@ -1001,6 +1001,7 @@ export interface components {
             version: number;
         };
         QuestionFilter: {
+            kind?: string | null;
             /** Format: int64 */
             limit?: number;
             /** Format: double */
@@ -1009,6 +1010,7 @@ export interface components {
             min_rating?: number | null;
             /** Format: int64 */
             offset?: number;
+            search?: string | null;
             status?: null | components["schemas"]["QuestionStatus"];
             tag?: string | null;
         };
@@ -1635,7 +1637,10 @@ export interface operations {
     };
     me_stats: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description One of `last30d` (≈4 weeks), `last90d` (≈12 weeks), or `all`. */
+                window?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1798,6 +1803,10 @@ export interface operations {
                 max_rating: number | null;
                 limit: number | null;
                 offset: number | null;
+                search: string | null;
+                kind: string | null;
+                page: number | null;
+                page_size: number | null;
             };
             cookie?: never;
         };

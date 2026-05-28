@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, Stat, Button } from "@/components/ui";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import CircularProgress from "@mui/material/CircularProgress";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import ToggleButton from "@mui/material/ToggleButton";
+import { formatScore, formatDuration } from "@/utils/format";
 
 type WindowType = "4w" | "12w" | "all";
 
@@ -41,8 +49,8 @@ interface TagAvg {
 }
 
 export default function ProgressPage() {
-  const { token } = useAuth();
-  const [window, setWindow] = useState<WindowType>("12w");
+  const { user } = useAuth();
+  const [win, setWin] = useState<WindowType>("12w");
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [tagNames, setTagNames] = useState<Record<string, string>>({});
@@ -50,38 +58,34 @@ export default function ProgressPage() {
   const [attemptsLoading, setAttemptsLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
-
     setStatsLoading(true);
-    makeClient(token)
+    const apiWindow =
+      win === "4w" ? "last30d" : win === "12w" ? "last90d" : "all";
+    api
       .GET(
         "/v1/me/stats" as never,
-        {
-          params: { query: { window } },
-        } as never,
+        { params: { query: { window: apiWindow } } } as never,
       )
       .then(({ data }: { data?: StatsResponse }) => {
         if (data) setStats(data);
       })
       .catch(console.error)
       .finally(() => setStatsLoading(false));
-  }, [token, window]);
+  }, [win]);
 
   useEffect(() => {
-    if (!token) return;
-
     setAttemptsLoading(true);
     Promise.all([
-      makeClient(token)
+      api
         .GET(
           "/v1/me/attempts" as never,
-          { params: { query: { limit: 200 } } } as never,
+          { params: { query: { limit: 500 } } } as never,
         )
         .then(
           ({ data }: { data?: { attempts: Attempt[]; total: number } }) =>
             data?.attempts ?? [],
         ),
-      makeClient(token)
+      api
         .GET("/v1/tags" as never, {} as never)
         .then(({ data }: { data?: { id: string; name: string }[] }) =>
           Array.isArray(data) ? data : [],
@@ -95,337 +99,184 @@ export default function ProgressPage() {
       })
       .catch(console.error)
       .finally(() => setAttemptsLoading(false));
-  }, [token]);
+  }, []);
 
-  const weeklyAvgs = computeWeeklyAverages(attempts);
-  const tagAvgs = computeTagAverages(attempts, tagNames);
+  const filteredAttempts = filterByWindow(attempts, win);
+  const weeklyAvgs = computeWeeklyAverages(filteredAttempts);
+  const tagAvgs = computeTagAverages(filteredAttempts, tagNames);
   const topTags = tagAvgs.sort((a, b) => b.count - a.count).slice(0, 6);
 
+  const windowAvgScore = filteredAttempts.length
+    ? filteredAttempts.reduce((s, a) => s + a.score, 0) /
+      filteredAttempts.length
+    : null;
+
   return (
-    <div style={{ padding: "28px 36px 56px" }}>
-      {/* Page header */}
-      <div
-        style={{
+    <Box sx={{ p: 4 }}>
+      <Box
+        sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 24,
+          mb: 3,
         }}
       >
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              letterSpacing: 1.3,
+        <Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              letterSpacing: 1.4,
               textTransform: "uppercase",
-              color: "var(--muted)",
-              marginBottom: 6,
+              display: "block",
             }}
           >
-            ALL COURSES
-          </div>
-          <h2
-            style={{
-              margin: 0,
-              fontFamily: "var(--serif)",
-              fontSize: 28,
-              fontWeight: 500,
-              letterSpacing: -0.5,
-              color: "var(--text)",
-            }}
-          >
+            All courses
+          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 500 }}>
             Progress dashboard
-          </h2>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div
-            style={{
-              display: "flex",
-              gap: 2,
-              background: "var(--surface-2)",
-              borderRadius: 6,
-              padding: 2,
-            }}
-          >
-            {(["4w", "12w", "all"] as WindowType[]).map((w) => (
-              <button
-                key={w}
-                onClick={() => setWindow(w)}
-                style={{
-                  padding: "8px 12px",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  border: "1px solid transparent",
-                  borderRadius: 4,
-                  background: window === w ? "var(--accent)" : "transparent",
-                  color: window === w ? "#0b1410" : "var(--text-2)",
-                  cursor: "pointer",
-                  transition: "background 120ms, color 120ms",
-                }}
-              >
-                {w === "4w" ? "4w" : w === "12w" ? "12w" : "All"}
-              </button>
-            ))}
-          </div>
-          <Button variant="ghost" size="md" disabled>
-            Export
-          </Button>
-        </div>
-      </div>
+          </Typography>
+        </Box>
+        <ToggleButtonGroup
+          value={win}
+          exclusive
+          onChange={(_, v) => v && setWin(v)}
+          size="small"
+        >
+          <ToggleButton value="4w">4w</ToggleButton>
+          <ToggleButton value="12w">12w</ToggleButton>
+          <ToggleButton value="all">All</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
-      {/* Stats strip */}
       {statsLoading ? (
-        <div
-          style={{
-            color: "var(--muted)",
-            fontFamily: "var(--mono)",
-            fontSize: 13,
-            marginBottom: 24,
-          }}
-        >
+        <Typography color="text.secondary" sx={{ mb: 3 }}>
           Loading…
-        </div>
+        </Typography>
       ) : stats ? (
-        <Card style={{ marginBottom: 24, padding: 0 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 0,
-            }}
-          >
-            {[
-              {
-                label: "AVG SCORE",
-                value: `${(stats.avg_score * 100).toFixed(1)}%`,
-                delta: `${stats.avg_score_delta >= 0 ? "+" : ""}${stats.avg_score_delta.toFixed(1)} vs prior`,
-                positive: stats.avg_score_delta >= 0,
-              },
-              {
-                label: "ATTEMPTS",
-                value: stats.attempts_total,
-                delta: `${stats.attempts_this_week} this week`,
-              },
-              {
-                label: "HOURS SPENT",
-                value: stats.hours_spent.toFixed(1),
-                delta: `${stats.hours_spent_delta >= 0 ? "+" : ""}${stats.hours_spent_delta.toFixed(1)} vs avg`,
-                positive: stats.hours_spent_delta >= 0,
-              },
-              {
-                label: "CURRENT STREAK",
-                value: `${stats.current_streak} d`,
-                delta: `best: ${stats.best_streak} d`,
-              },
-              {
-                label: "MASTERED TOPICS",
-                value: `${stats.mastered_topics} / ${stats.mastered_topics_total}`,
-                delta: `+${stats.mastered_topics_delta_since}`,
-              },
-            ].map((s, i) => (
-              <div
-                key={s.label}
-                style={{
-                  padding: "22px 24px",
-                  borderRight: i < 4 ? "1px solid var(--border)" : "none",
-                }}
-              >
-                <Stat
-                  label={s.label}
-                  value={s.value}
-                  delta={s.delta}
-                  deltaPositive={"positive" in s ? s.positive : undefined}
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        <div
-          style={{
-            color: "var(--muted)",
-            fontSize: 13,
-            marginBottom: 24,
-          }}
-        >
-          No data yet.
-        </div>
-      )}
+        <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+          {[
+            {
+              label: "Avg score",
+              value:
+                windowAvgScore !== null
+                  ? formatScore(windowAvgScore)
+                  : formatScore(stats.avg_score),
+            },
+            { label: "Attempts", value: String(filteredAttempts.length) },
+            { label: "Time", value: formatDuration(stats.hours_spent ?? 0) },
+            { label: "Streak", value: `${stats.current_streak ?? 0}d` },
+          ].map(({ label, value }) => (
+            <Card key={label} variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                  {value}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: "uppercase", letterSpacing: 1 }}
+                >
+                  {label}
+                </Typography>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      ) : null}
 
-      {/* Charts row */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.5fr 1fr",
-          gap: 18,
-        }}
-      >
-        {/* Score trend chart */}
-        <Card style={{ padding: 24 }}>
-          <div style={{ marginBottom: 14 }}>
-            <div
-              style={{
-                fontFamily: "var(--serif)",
-                fontSize: 18,
-                fontWeight: 500,
-                letterSpacing: -0.2,
-              }}
-            >
+      <Stack direction="row" spacing={2}>
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
               Score trend
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--muted)",
-                marginTop: 2,
-              }}
-            >
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
               Weekly rolling average across all subjects
-            </div>
-          </div>
-
-          {attemptsLoading ? (
-            <div
-              style={{
-                height: 220,
+            </Typography>
+            <Box
+              sx={{
+                height: 200,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--muted)",
-                fontSize: 13,
               }}
             >
-              Loading…
-            </div>
-          ) : weeklyAvgs.length === 0 ? (
-            <div
-              style={{
-                height: 220,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--muted)",
-                fontSize: 13,
-              }}
-            >
-              No data yet
-            </div>
-          ) : (
-            <ScoreLineChart data={weeklyAvgs} />
-          )}
+              {attemptsLoading ? (
+                <CircularProgress size={24} />
+              ) : weeklyAvgs.length > 0 ? (
+                <ScoreLineChart data={weeklyAvgs} />
+              ) : (
+                <Typography color="text.secondary">No data</Typography>
+              )}
+            </Box>
+          </CardContent>
         </Card>
-
-        {/* By subject chart */}
-        <Card style={{ padding: 24 }}>
-          <div style={{ marginBottom: 14 }}>
-            <div
-              style={{
-                fontFamily: "var(--serif)",
-                fontSize: 18,
-                fontWeight: 500,
-                letterSpacing: -0.2,
-              }}
-            >
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
               By subject
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--muted)",
-                marginTop: 2,
-              }}
-            >
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
               Average score, last N weeks
-            </div>
-          </div>
-
-          {attemptsLoading ? (
-            <div
-              style={{
-                height: 232,
+            </Typography>
+            <Box
+              sx={{
+                height: 200,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--muted)",
-                fontSize: 13,
               }}
             >
-              Loading…
-            </div>
-          ) : topTags.length === 0 ? (
-            <div
-              style={{
-                height: 232,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--muted)",
-                fontSize: 13,
-              }}
-            >
-              No data yet
-            </div>
-          ) : (
-            <BarChart data={topTags} />
-          )}
+              {attemptsLoading ? (
+                <CircularProgress size={24} />
+              ) : topTags.length > 0 ? (
+                <BarChart data={topTags} />
+              ) : (
+                <Typography color="text.secondary">No data</Typography>
+              )}
+            </Box>
+          </CardContent>
         </Card>
-      </div>
-    </div>
+      </Stack>
+    </Box>
   );
 }
 
 function ScoreLineChart({ data }: { data: WeeklyAvg[] }) {
   const width = 600;
-  const height = 220;
+  const height = 180;
   const padding = 40;
   const innerWidth = width - padding * 2;
   const innerHeight = height - padding * 2;
 
-  const maxScore = 1;
-  const minScore = 0;
-
   const points = data.map((d, i) => {
     const x = (i / (data.length - 1 || 1)) * innerWidth + padding;
-    const y =
-      padding +
-      innerHeight -
-      ((d.score - minScore) / (maxScore - minScore)) * innerHeight;
-    return { x, y, score: d.score };
+    const y = padding + innerHeight - d.score * innerHeight;
+    return { x, y };
   });
 
   return (
-    <svg width={width} height={height} style={{ overflow: "visible" }}>
+    <svg
+      width="100%"
+      viewBox={`0 0 ${width} ${height}`}
+      style={{ overflow: "visible" }}
+    >
       <polyline
         points={points.map((p) => `${p.x},${p.y}`).join(" ")}
         fill="none"
-        stroke="var(--accent)"
+        stroke="#1976d2"
         strokeWidth={2}
       />
       {points.map((p, i) => (
-        <circle
-          key={i}
-          cx={p.x}
-          cy={p.y}
-          r={3}
-          fill="var(--accent)"
-          opacity="0.8"
-        />
+        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#1976d2" opacity="0.8" />
       ))}
       <line
         x1={padding}
         y1={padding + innerHeight}
         x2={width - padding}
         y2={padding + innerHeight}
-        stroke="var(--border)"
-        strokeWidth={1}
-      />
-      <line
-        x1={padding}
-        y1={padding}
-        x2={padding}
-        y2={padding + innerHeight}
-        stroke="var(--border)"
+        stroke="#e0e0e0"
         strokeWidth={1}
       />
     </svg>
@@ -433,93 +284,100 @@ function ScoreLineChart({ data }: { data: WeeklyAvg[] }) {
 }
 
 function BarChart({ data }: { data: TagAvg[] }) {
-  const barHeight = 24;
-  const gap = 8;
-  const labelWidth = 120;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap }}>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%" }}
+    >
       {data.map((item) => {
+        const pctText = formatScore(item.score);
         const pct = Math.round(item.score * 100);
         return (
-          <div
+          <Box
             key={item.tag}
-            style={{ display: "flex", gap: 12, alignItems: "center" }}
+            sx={{ display: "flex", gap: 1, alignItems: "center" }}
           >
-            <div
-              style={{
-                width: labelWidth,
-                fontSize: 12,
-                color: "var(--text-2)",
-                fontFamily: "var(--mono)",
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                width: 100,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
             >
               {item.tag}
-            </div>
-            <div
-              style={{
+            </Typography>
+            <Box
+              sx={{
                 flex: 1,
-                height: barHeight,
-                background: "var(--surface-2)",
-                borderRadius: 4,
+                height: 20,
+                bgcolor: "action.hover",
+                borderRadius: 1,
                 overflow: "hidden",
               }}
             >
-              <div
-                style={{
+              <Box
+                sx={{
                   height: "100%",
                   width: `${pct}%`,
-                  background: "var(--accent)",
-                  borderRadius: 4,
+                  bgcolor: "primary.main",
+                  borderRadius: 1,
                   transition: "width 0.4s ease",
                 }}
               />
-            </div>
-            <div
-              style={{
-                width: 36,
-                textAlign: "right",
-                fontSize: 12,
-                fontFamily: "var(--mono)",
-                color: "var(--text-2)",
-              }}
+            </Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ width: 32, textAlign: "right" }}
             >
-              {pct}%
-            </div>
-          </div>
+              {pctText}
+            </Typography>
+          </Box>
         );
       })}
-    </div>
+    </Box>
   );
+}
+
+function filterByWindow(attempts: Attempt[], win: WindowType): Attempt[] {
+  if (win === "all") return attempts;
+  const weeks = win === "4w" ? 4 : 12;
+  const cutoff = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
+  return attempts.filter((a) => new Date(a.created_at).getTime() >= cutoff);
+}
+
+function yearWeekKey(date: Date): string {
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const year = d.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return `${year}-${String(week).padStart(2, "0")}`;
 }
 
 function computeWeeklyAverages(attempts: Attempt[]): WeeklyAvg[] {
   if (attempts.length === 0) return [];
-
-  const weekMap = new Map<number, { sum: number; count: number }>();
-
+  const weekMap = new Map<string, { sum: number; count: number }>();
   for (const a of attempts) {
-    const date = new Date(a.created_at);
-    const week = getISO8601Week(date);
-    if (!weekMap.has(week)) {
-      weekMap.set(week, { sum: 0, count: 0 });
-    }
-    const entry = weekMap.get(week)!;
+    const key = yearWeekKey(new Date(a.created_at));
+    const entry = weekMap.get(key) ?? { sum: 0, count: 0 };
     entry.sum += a.score;
     entry.count++;
+    weekMap.set(key, entry);
   }
-
-  const sorted = Array.from(weekMap.entries())
-    .sort((a, b) => a[0] - b[0])
-    .slice(-12);
-
-  return sorted.map(([week, data]) => ({
-    week,
-    score: data.sum / data.count,
-  }));
+  return Array.from(weekMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([week, data]) => ({
+      week: parseInt(week.split("-")[1]),
+      score: data.sum / data.count,
+    }));
 }
 
 function computeTagAverages(
@@ -527,32 +385,19 @@ function computeTagAverages(
   tagNames: Record<string, string> = {},
 ): TagAvg[] {
   const tagMap = new Map<string, { sum: number; count: number }>();
-
   for (const a of attempts) {
     for (const tagId of Object.keys(a.user_tag_deltas)) {
-      const tag = tagNames[tagId] ?? tagId;
-      if (!tagMap.has(tag)) {
-        tagMap.set(tag, { sum: 0, count: 0 });
-      }
-      const entry = tagMap.get(tag)!;
+      const name = tagNames[tagId];
+      if (!name) continue; // skip unknown tag IDs
+      const entry = tagMap.get(name) ?? { sum: 0, count: 0 };
       entry.sum += a.score;
       entry.count++;
+      tagMap.set(name, entry);
     }
   }
-
   return Array.from(tagMap.entries()).map(([tag, data]) => ({
     tag,
     score: data.sum / data.count,
     count: data.count,
   }));
-}
-
-function getISO8601Week(date: Date): number {
-  const d = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-  );
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }

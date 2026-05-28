@@ -2,9 +2,23 @@
 
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { makeClient } from "@/api/client";
+import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Button, Tag, Card } from "@/components/ui";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
+
+const KIND_LABEL: Record<string, string> = {
+  mc: "MC",
+  tf: "T/F",
+  short: "Short",
+  essay: "Essay",
+  code: "Code",
+};
 
 interface PreviewQuestion {
   id: string;
@@ -22,46 +36,37 @@ interface QuizDetail {
   questions: PreviewQuestion[];
 }
 
-const KIND_LABEL: Record<string, string> = {
-  mc: "MC",
-  tf: "TF",
-  short: "Short",
-  essay: "Essay",
-  code: "Code",
-};
-
 export default function QuizPreviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { token } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [quiz, setQuiz] = useState<QuizDetail | null>(null);
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    makeClient(token)
+    api
       .GET("/v1/quizzes/{id}" as never, { params: { path: { id } } } as never)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data: d }: { data?: any }) => {
         if (d) setQuiz(d);
       })
       .catch(console.error);
-  }, [token, id]);
+  }, [id]);
 
   const handleStart = async () => {
-    if (!token || !quiz) return;
+    if (!quiz) return;
     setStarting(true);
     try {
-      const { data } = await (makeClient(token) as any).POST("/v1/sessions", {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (api as any).POST("/v1/sessions", {
         body: { quizId: id, count: quiz.questions.length },
       });
       const sessionId = data?.sessionId ?? data?.session_id;
-      if (sessionId) {
-        router.push(`/sessions/${sessionId}`);
-      }
+      if (sessionId) router.push(`/sessions/${sessionId}`);
     } finally {
       setStarting(false);
     }
@@ -69,19 +74,16 @@ export default function QuizPreviewPage({
 
   if (!quiz) {
     return (
-      <div
-        style={{
+      <Box
+        sx={{
           minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--muted)",
-          fontFamily: "var(--mono)",
-          fontSize: 13,
         }}
       >
-        Loading…
-      </div>
+        <CircularProgress />
+      </Box>
     );
   }
 
@@ -99,165 +101,172 @@ export default function QuizPreviewPage({
   );
 
   return (
-    <div style={{ padding: "28px 36px 56px", maxWidth: 860 }}>
+    <Box sx={{ p: "28px 36px 56px", maxWidth: 860 }}>
       {/* Breadcrumb */}
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 11,
-          letterSpacing: 1.1,
-          textTransform: "uppercase",
-          color: "var(--muted)",
-          marginBottom: 16,
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-        }}
-      >
-        <span
-          style={{ cursor: "pointer", textDecoration: "underline" }}
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            fontFamily: "monospace",
+            letterSpacing: 1.1,
+            textTransform: "uppercase",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
           onClick={() => router.push("/library")}
         >
           Library
-        </span>
-        <span>›</span>
-        <span>{quiz.title}</span>
-      </div>
-
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        {quiz.course && (
-          <Tag color="accent" style={{ marginBottom: 10 }}>
-            {quiz.course}
-          </Tag>
-        )}
-        <h1
-          style={{
-            fontFamily: "var(--serif)",
-            fontSize: 36,
-            fontWeight: 500,
-            letterSpacing: -0.7,
-            lineHeight: 1.1,
-            color: "var(--text)",
-            margin: "0 0 16px",
-            textWrap: "balance",
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          ›
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            fontFamily: "monospace",
+            letterSpacing: 1.1,
+            textTransform: "uppercase",
           }}
         >
           {quiz.title}
-        </h1>
-        {quiz.objectives && quiz.objectives.length > 0 && (
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: 18,
-              color: "var(--text-2)",
-              fontSize: 13,
-              lineHeight: 1.7,
-            }}
-          >
-            {quiz.objectives.map((obj, i) => (
-              <li key={i}>{obj}</li>
-            ))}
-          </ul>
+        </Typography>
+      </Box>
+
+      {/* Header */}
+      <Box sx={{ mb: 3 }}>
+        {quiz.course && (
+          <Chip
+            label={quiz.course}
+            color="primary"
+            size="small"
+            sx={{ mb: 1.25 }}
+          />
         )}
-      </div>
+        <Typography variant="h4" sx={{ fontWeight: 500, mb: 2 }}>
+          {quiz.title}
+        </Typography>
+        {quiz.objectives && quiz.objectives.length > 0 && (
+          <Box component="ul" sx={{ m: 0, pl: 2.25, color: "text.secondary" }}>
+            {quiz.objectives.map((obj, i) => (
+              <Typography
+                key={i}
+                component="li"
+                variant="body2"
+                sx={{ lineHeight: 1.7 }}
+              >
+                {obj}
+              </Typography>
+            ))}
+          </Box>
+        )}
+      </Box>
 
       {/* Stat strip */}
-      <div
-        style={{
-          fontFamily: "var(--mono)",
-          fontSize: 11,
-          letterSpacing: 1.1,
-          textTransform: "uppercase",
-          color: "var(--muted)",
-          marginBottom: 24,
-          display: "flex",
-          gap: 20,
-        }}
-      >
-        <span>{quiz.questions.length} questions</span>
-        <span>{totalPoints} pts</span>
-        {kindSummary && <span>{kindSummary}</span>}
-      </div>
+      <Stack direction="row" spacing={2.5} sx={{ mb: 3 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            fontFamily: "monospace",
+            letterSpacing: 1.1,
+            textTransform: "uppercase",
+          }}
+        >
+          {quiz.questions.length} questions
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            fontFamily: "monospace",
+            letterSpacing: 1.1,
+            textTransform: "uppercase",
+          }}
+        >
+          {totalPoints} pts
+        </Typography>
+        {kindSummary && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontFamily: "monospace",
+              letterSpacing: 1.1,
+              textTransform: "uppercase",
+            }}
+          >
+            {kindSummary}
+          </Typography>
+        )}
+      </Stack>
 
       {/* Question list */}
-      <Card style={{ padding: 0, marginBottom: 32 }}>
+      <Card variant="outlined" sx={{ mb: 4 }}>
         {sorted.map((q, i) => (
-          <div
+          <Box
             key={q.id}
-            style={{
-              padding: "16px 22px",
-              borderBottom:
-                i < sorted.length - 1 ? "1px solid var(--border)" : "none",
+            sx={{
+              px: "22px",
+              py: 2,
+              borderBottom: i < sorted.length - 1 ? 1 : 0,
+              borderColor: "divider",
               display: "grid",
               gridTemplateColumns: "28px 1fr auto",
-              gap: 14,
+              gap: 1.75,
               alignItems: "start",
             }}
           >
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-                paddingTop: 2,
-              }}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontFamily: "monospace", pt: 0.25 }}
             >
               {i + 1}
-            </span>
-            <div>
-              <Tag
-                color="muted"
-                style={{ marginBottom: 6, fontSize: 9, letterSpacing: 1 }}
-              >
-                {KIND_LABEL[q.kind] ?? q.kind}
-              </Tag>
-              <div
-                style={{
-                  fontSize: 14,
-                  color: "var(--text)",
-                  lineHeight: 1.5,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {q.prompt}
-              </div>
-            </div>
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-                whiteSpace: "nowrap",
-                paddingTop: 2,
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.primary",
+                lineHeight: 1.5,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
               }}
             >
+              {q.prompt}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontFamily: "monospace", whiteSpace: "nowrap", pt: 0.25 }}
+            >
               {q.points} pt{q.points !== 1 ? "s" : ""}
-            </span>
-          </div>
+            </Typography>
+          </Box>
         ))}
       </Card>
 
       {/* Footer */}
-      <div
-        style={{
+      <Box
+        sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          paddingTop: 24,
-          borderTop: "1px solid var(--border)",
+          pt: 3,
+          borderTop: 1,
+          borderColor: "divider",
         }}
       >
-        <Button variant="outline" onClick={() => router.push("/library")}>
+        <Button variant="outlined" onClick={() => router.push("/library")}>
           Back to library
         </Button>
-        <Button variant="primary" onClick={handleStart} disabled={starting}>
+        <Button variant="contained" onClick={handleStart} disabled={starting}>
           {starting ? "Starting…" : "Start quiz"}
         </Button>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

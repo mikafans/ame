@@ -1,4 +1,6 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check validate pre-remote db-up db-down db-reset db-migrate db-shell db-seed simulate init-env dev-stop dev-env hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+
+COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
@@ -37,6 +39,13 @@ test: ## Backend + frontend unit / integration tests
 		echo "[web] skipping bun test (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
+bench: ## Criterion micro-benchmarks for hot paths (token verify, grader, elo)
+	cd api && mise exec -- cargo bench --bench hot_paths
+
+bench-load: ## k6 load test against a running API (requires `make dev` + `make db-seed`)
+	@command -v k6 >/dev/null 2>&1 || { echo "k6 not found — install it (https://k6.io/docs/get-started/installation/)"; exit 1; }
+	BASE_URL=http://localhost:$(API_PORT) k6 run api_tests/perf/answer_load.js
+
 test-engine: ## Engine unit and integration-test compile gate
 	cd api && mise exec -- cargo test engine
 	cd api && mise exec -- cargo test --test planner
@@ -68,34 +77,80 @@ openapi: ## Regenerate api/openapi.yaml and web TypeScript schema
 		echo "[web] skipping schema regen (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
-e2e: ## Playwright (requires `make db-up`)
+e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not running)
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run e2e; \
+		_api_owned=0; \
+		mkdir -p .tmp; \
+		if ! DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate info --source db/migrations > /dev/null 2>&1; then \
+			echo "[e2e] FAILED: Postgres is not reachable on :5432. Run 'make db-up' first."; \
+			exit 1; \
+		fi; \
+		if ! curl -sf http://localhost:$(API_PORT)/healthz > /dev/null 2>&1; then \
+			echo "[e2e] API not running — starting..."; \
+			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
+			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://localhost:$(WEB_PORT) \
+			AME_RATELIMIT_BURST=100 AME_AGENT_ACCESS_CODE=e2e-access-code \
+				mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api >> .tmp/ame-api-e2e.log 2>&1 & \
+			echo $$! > .tmp/ame-api-e2e.pid; \
+			_api_owned=1; \
+			echo "[e2e] Waiting for API on :$(API_PORT)..."; \
+			until curl -sf http://localhost:$(API_PORT)/healthz > /dev/null 2>&1; do sleep 1; done; \
+		fi; \
+		echo "[e2e] Seeding..."; \
+		if ! uv run scripts/seed.py --api http://localhost:$(API_PORT) >> .tmp/ame-seed-e2e.log 2>&1; then \
+			echo "[e2e] FAILED: seeding errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
+			tail -20 .tmp/ame-seed-e2e.log; \
+			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
+				kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; rm -f .tmp/ame-api-e2e.pid; \
+			fi; \
+			exit 1; \
+		fi; \
+		echo "[e2e] Running playwright tests..."; \
+		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://localhost:$(API_PORT) \
+			E2E_API_URL=http://localhost:$(API_PORT) E2E_BASE_URL=http://localhost:$(WEB_PORT) \
+			mise exec -- bun run e2e > ../.tmp/playwright-e2e.log 2>&1; _exit=$$?; cd ..; \
+		if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
+			kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; \
+			rm -f .tmp/ame-api-e2e.pid; \
+		fi; \
+		if [ $$_exit -ne 0 ]; then \
+			echo "[e2e] Tests failed — last 40 lines of .tmp/playwright-e2e.log:"; \
+			tail -40 .tmp/playwright-e2e.log; \
+			echo "[e2e] (full logs: .tmp/{ame-api-e2e.log,ame-seed-e2e.log,playwright-e2e.log})"; \
+		else \
+			echo "[e2e] Tests passed."; \
+		fi; \
+		exit $$_exit; \
 	else \
 		echo "[web] skipping e2e (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
 uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bunx playwright test e2e/uiux-spec.spec.ts --project=chromium; \
+		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://localhost:$(API_PORT) \
+			E2E_API_URL=http://localhost:$(API_PORT) E2E_BASE_URL=http://localhost:$(WEB_PORT) \
+			mise exec -- bunx playwright test e2e/uiux.spec.ts --project=chromium; \
 	else \
 		echo "[web] skipping uiux (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
 check: fmt-check lint test ## Pre-commit gate (read-only)
 
-validate: check e2e ## Pre-PR gate
+# db-reset between test-db and e2e: test-db writes users/sessions into the shared
+# dev DB, which pollutes the seeded state the e2e UI assertions depend on.
+ci: check test-db db-reset e2e ## Full CI gate: fmt + lint + unit + db tests + e2e
 
-pre-remote: check test-db e2e ## Strict pre-remote gate (requires `make db-up`)
-
-db-up: ## Start Postgres in docker
-	docker compose -f db/docker-compose.yml up -d
+db-up: ## Start Postgres (docker or podman)
+	$(COMPOSE) -f db/docker-compose.yml up -d
 
 db-down: ## Stop Postgres
-	docker compose -f db/docker-compose.yml down
+	$(COMPOSE) -f db/docker-compose.yml down
 
 db-reset: db-down ## Wipe and recreate DB from scratch (local dev only)
-	rm -rf db/data
+	@# Rootless podman writes db/data as a subordinate uid the host user can't
+	@# rm directly, so fall back to `podman unshare` to delete inside the userns.
+	@rm -rf db/data 2>/dev/null || podman unshare rm -rf db/data 2>/dev/null || true
+	@if [ -d db/data ]; then echo "[db-reset] could not remove db/data (try: sudo rm -rf db/data)"; exit 1; fi
 	$(MAKE) db-up
 	@echo "Waiting for Postgres to be ready..."
 	@until DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate info --source db/migrations > /dev/null 2>&1; do sleep 1; done
@@ -108,9 +163,9 @@ db-shell: ## Open interactive pgcli session to local Postgres
 	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
 
 db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API running)
-	uv run scripts/seed.py
+	uv run scripts/seed.py --api http://localhost:$(API_PORT)
 
-simulate: ## Run all three role simulation scripts against local API (requires make dev-env + make db-seed)
+simulate: ## Run all three role simulation scripts against local API (requires make dev + make db-seed)
 	uv run scripts/simulate/instructor.py
 	uv run scripts/simulate/learner.py
 	uv run scripts/simulate/agent.py
@@ -120,24 +175,46 @@ init-env: ## One-time setup: mise install + sqlx-cli + web deps + playwright
 	cargo install sqlx-cli --no-default-features --features postgres
 	cd web && mise exec -- bun install
 	cd web && mise exec -- bunx playwright install --with-deps
-	@echo "init-env done — run 'make dev-env' to start the stack"
+	@echo "init-env done — run 'make dev' to start the stack"
 
-dev-stop: ## Stop API, frontend, and Postgres
-	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
-	docker compose -f db/docker-compose.yml down
+stop: ## Stop API, frontend, and Postgres
+	@fuser -k -9 $(API_PORT)/tcp $(WEB_PORT)/tcp 2>/dev/null || true
+	$(COMPOSE) -f db/docker-compose.yml down
 
-dev-env: db-up ## Kill stale processes, migrate, then start API + frontend (http://localhost:3000)
-	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
+API_HOST ?= localhost
+API_PORT ?= 28080
+WEB_PORT ?= 23000
+
+dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override: make dev API_HOST=harus-mini
+	@fuser -k -9 $(API_PORT)/tcp $(WEB_PORT)/tcp 2>/dev/null || true
 	@sleep 1
 	$(MAKE) db-migrate
 	@mkdir -p .tmp
-	@echo "Starting API on :8080  (logs → .tmp/ame-api.log)"
+	@echo "Starting API on :$(API_PORT)  (logs → .tmp/ame-api.log)"
 	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
+		AME_PORT=$(API_PORT) \
+		AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
 		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
 		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee .tmp/ame-api.log &
-	@echo "Starting frontend on :3000 (logs → .tmp/ame-web.log)"
-	@cd web && mise exec -- bun run dev 2>&1 | tee .tmp/ame-web.log
+	@echo "Starting frontend on :$(WEB_PORT) targeting $(API_HOST):$(API_PORT) (logs → .tmp/ame-web.log)"
+	@cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://$(API_HOST):$(API_PORT) NEXT_ALLOWED_ORIGINS=$(API_HOST) \
+		mise exec -- bun run dev --port $(WEB_PORT) 2>&1 | tee $(CURDIR)/.tmp/ame-web.log
 
 hooks-install: ## Point git at .githooks/
 	git config core.hooksPath .githooks
 	@echo "git hooks installed (.githooks/)"
+
+# ── Containers ────────────────────────────────────────────────────────────
+# Production-shaped stack. See deploy/README.md.
+
+docker-build: ## Build api + web images via docker-compose.prod.yml
+	$(COMPOSE) -f docker-compose.prod.yml build
+
+docker-up: ## Start the prod-shaped stack (requires .env with POSTGRES_PASSWORD)
+	$(COMPOSE) -f docker-compose.prod.yml up -d
+
+docker-down: ## Stop the prod-shaped stack
+	$(COMPOSE) -f docker-compose.prod.yml down
+
+docker-logs: ## Tail logs from the prod-shaped stack
+	$(COMPOSE) -f docker-compose.prod.yml logs -f

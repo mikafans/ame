@@ -5,7 +5,7 @@
 
 use std::net::SocketAddr;
 
-use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
+use ame_api::auth::token::hash_secret;
 use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
@@ -55,11 +55,7 @@ async fn make_bearer(pool: &PgPool) -> String {
     let user_id = Uuid::now_v7();
     let token_id = Uuid::now_v7();
     let secret = "session_secret_123";
-    let salt = SaltString::generate(&mut rand::rngs::OsRng);
-    let hash = Argon2::default()
-        .hash_password(secret.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
+    let hash = hash_secret(secret);
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",

@@ -1,13 +1,14 @@
-//! Email+password auth routes: register, login.
+//! Email+password auth routes: register, login, logout.
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::{
+    auth::token::{generate_secret, hash_secret},
     domain::error::{ApiError, FieldError},
     http::AppState,
 };
@@ -47,11 +48,23 @@ pub struct UserInfo {
 
 // ── handlers ──────────────────────────────────────────────────────────────────
 
+fn set_token_cookie_header(token: &str) -> String {
+    let secure = if std::env::var("AME_PRODUCTION").is_ok() {
+        "; Secure"
+    } else {
+        ""
+    };
+    format!(
+        "ame_token={}; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=86400",
+        token, secure
+    )
+}
+
 /// POST /v1/auth/register — register a new user with email and password.
 pub async fn register(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<RegisterBody>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Validate email
     if body.email.trim().is_empty() {
         return Err(ApiError::Validation(vec![FieldError {
@@ -125,29 +138,14 @@ pub async fn register(
     let display_name: String = result.get("display_name");
     let role: String = result.get("role");
 
-    // Generate and insert API key
-    let token_id = Uuid::now_v7();
-    let secret = generate_secret();
-    let token_hash = hash_secret(&secret)?;
-
-    let initial_scopes = scopes_for_role(&role);
-    sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-         VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(token_id)
-    .bind(user_id)
-    .bind("default")
-    .bind(&token_hash)
-    .bind(initial_scopes)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    let token_str = issue_token(&state.pool, user_id, &role).await?;
+    let cookie_header = set_token_cookie_header(&token_str);
 
     Ok((
         StatusCode::CREATED,
+        [("set-cookie".to_string(), cookie_header)],
         Json(AuthResponse {
-            token: format!("{token_id}_{secret}"),
+            token: token_str,
             user: UserInfo {
                 id: user_id,
                 name: display_name,
@@ -162,7 +160,7 @@ pub async fn register(
 pub async fn login(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<LoginBody>,
-) -> Result<Json<AuthResponse>, ApiError> {
+) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Fetch user by email
     let user_row = sqlx::query(
         "SELECT id, email, display_name, role, password_hash FROM tb_users WHERE email = $1",
@@ -185,61 +183,49 @@ pub async fn login(
         return Err(ApiError::Unauthorized);
     }
 
-    // Fetch or create API key
-    let token_row = sqlx::query("SELECT id FROM tb_api_tokens WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1")
-        .bind(user_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    let token_str = issue_token(&state.pool, user_id, &role).await?;
+    let cookie_header = set_token_cookie_header(&token_str);
 
-    let token_id = if let Some(row) = token_row {
-        row.get("id")
-    } else {
-        // Create new key
-        let new_token_id = Uuid::now_v7();
-        let secret = generate_secret();
-        let token_hash = hash_secret(&secret)?;
-
-        let initial_scopes = scopes_for_role(&role);
-        sqlx::query(
-            "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-             VALUES ($1, $2, $3, $4, $5)",
-        )
-        .bind(new_token_id)
-        .bind(user_id)
-        .bind("default")
-        .bind(&token_hash)
-        .bind(initial_scopes)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-        new_token_id
-    };
-
-    // Generate a fresh secret to return (we don't store the plaintext)
-    let secret = generate_secret();
-    let token_hash = hash_secret(&secret)?;
-
-    sqlx::query("UPDATE tb_api_tokens SET token_hash = $1 WHERE id = $2")
-        .bind(&token_hash)
-        .bind(token_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok(Json(AuthResponse {
-        token: format!("{token_id}_{secret}"),
-        user: UserInfo {
-            id: user_id,
-            name: display_name,
-            email,
-            role,
-        },
-    }))
+    Ok((
+        StatusCode::OK,
+        [("set-cookie".to_string(), cookie_header)],
+        Json(AuthResponse {
+            token: token_str,
+            user: UserInfo {
+                id: user_id,
+                name: display_name,
+                email,
+                role,
+            },
+        }),
+    ))
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+/// Mint a new API token row and return the plaintext `{id}_{secret}`. Only the
+/// hash is persisted, and each call creates an independent row so concurrent
+/// logins (multiple devices, parallel e2e specs) don't invalidate one another.
+async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String, ApiError> {
+    let token_id = Uuid::now_v7();
+    let secret = generate_secret();
+    let token_hash = hash_secret(&secret);
+
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind("default")
+    .bind(&token_hash)
+    .bind(scopes_for_role(role))
+    .execute(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(format!("{token_id}_{secret}"))
+}
 
 fn scopes_for_role(role: &str) -> Vec<&'static str> {
     match role {
@@ -268,21 +254,6 @@ fn scopes_for_role(role: &str) -> Vec<&'static str> {
     }
 }
 
-pub fn generate_secret() -> String {
-    use rand::RngCore;
-    let mut bytes = [0u8; 24];
-    OsRng.fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}
-
-pub fn hash_secret(secret: &str) -> Result<String, ApiError> {
-    let salt = SaltString::generate(&mut OsRng);
-    Argon2::default()
-        .hash_password(secret.as_bytes(), &salt)
-        .map(|h| h.to_string())
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("argon2 hash failed: {e}")))
-}
-
 pub fn hash_password(password: &str) -> Result<String, ApiError> {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
@@ -302,11 +273,23 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
         .is_ok()
 }
 
-// ── router ────────────────────────────────────────────────────────────────────
-
-pub fn router(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/v1/auth/register", post(register))
-        .route("/v1/auth/login", post(login))
-        .with_state(state)
+/// POST /v1/auth/logout — clear the HttpOnly token cookie.
+pub async fn logout() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [(
+            "set-cookie".to_string(),
+            format!(
+                "ame_token=; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=0",
+                if std::env::var("AME_PRODUCTION").is_ok() {
+                    "; Secure"
+                } else {
+                    ""
+                }
+            ),
+        )],
+    )
 }
+
+// Routes are mounted (with rate limiting) in `http::mod::router`. The handlers
+// here are referenced directly from there.

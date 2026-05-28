@@ -9,22 +9,12 @@ function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 }
 
-function getBearerToken(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  // Cookie read happens server-side in route handlers; client reads from meta tag set by layout
-  return (document.cookie.match(/(?:^|;\s*)ame_token=([^;]+)/) ?? [])[1];
-}
-
-export function makeClient(bearerToken?: string) {
+export function makeClient() {
   return createClient<paths>({
     baseUrl: getBaseUrl(),
-    headers: bearerToken
-      ? { Authorization: `Bearer ${bearerToken}` }
-      : getBearerToken()
-        ? { Authorization: `Bearer ${getBearerToken()}` }
-        : {},
+    credentials: "include",
   });
 }
 
-// Default singleton client (browser only — picks up token from cookie)
+// Default singleton client (browser only — uses HttpOnly cookie)
 export const api = makeClient();

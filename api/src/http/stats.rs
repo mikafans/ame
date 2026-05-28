@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
@@ -345,6 +345,24 @@ fn window_sql_filter(window: Option<&str>) -> String {
 
 // ── me stats ──────────────────────────────────────────────────────────────────
 
+/// Time window for the rolling stats. Maps to a day bound used to filter
+/// `hours_spent` (and its prior-period delta). `all` applies no time filter.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct MeStatsQuery {
+    /// One of `last30d` (≈4 weeks), `last90d` (≈12 weeks), or `all`.
+    pub window: Option<String>,
+}
+
+/// Returns the day bound for a window string, or `None` for an unbounded window.
+fn window_days(window: Option<&str>) -> Option<i32> {
+    match window {
+        Some("last30d") => Some(30),
+        Some("last90d") => Some(90),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MeStatsResponse {
     pub avg_score: f64,
@@ -363,6 +381,7 @@ pub struct MeStatsResponse {
 #[utoipa::path(
     get,
     path = "/v1/me/stats",
+    params(MeStatsQuery),
     responses(
         (status = 200, description = "User stats summary", body = MeStatsResponse),
     ),
@@ -371,8 +390,10 @@ pub struct MeStatsResponse {
 pub async fn me_stats(
     State(state): State<AppState>,
     user: AuthenticatedUser,
+    Query(q): Query<MeStatsQuery>,
 ) -> Result<Json<MeStatsResponse>, ApiError> {
     let uid = user.user.id;
+    let days = window_days(q.window.as_deref());
 
     // attempts total and this week
     let attempts_row = sqlx::query(
@@ -406,16 +427,21 @@ pub async fn me_stats(
     let avg_prior: f64 = score_row.try_get::<f64, _>("avg_prior").unwrap_or(0.0);
     let avg_score_delta = avg_score - avg_prior;
 
-    // hours spent
+    // hours spent — windowed by `days` ($2). When $2 IS NULL (window=all) the
+    // recent sum spans all finished sessions and the prior period is empty.
     let hours_row = sqlx::query(
         "SELECT \
             COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
-                FILTER (WHERE finished_at > now() - interval '28 days'), 0)::float8 AS hours_recent, \
+                FILTER (WHERE $2::int IS NULL \
+                    OR finished_at > now() - make_interval(days => $2::int)), 0)::float8 AS hours_recent, \
             COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
-                FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days'), 0)::float8 AS hours_prior \
+                FILTER (WHERE $2::int IS NOT NULL \
+                    AND finished_at BETWEEN now() - make_interval(days => $2::int * 2) \
+                                        AND now() - make_interval(days => $2::int)), 0)::float8 AS hours_prior \
          FROM tb_sessions WHERE user_id = $1 AND status = 'finished'",
     )
     .bind(uid)
+    .bind(days)
     .fetch_one(&state.pool)
     .await
     .map_err(internal)?;

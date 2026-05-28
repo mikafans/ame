@@ -1,17 +1,18 @@
 use std::net::SocketAddr;
 
-use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{
     Json, Router, middleware,
     routing::{get, post},
 };
-use rand::rngs::OsRng;
 use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use ame_api::{
-    auth::{extractor::AuthenticatedUser, scope::RequireScope, scope::ScopeConstraint},
+    auth::{
+        extractor::AuthenticatedUser, scope::RequireScope, scope::ScopeConstraint,
+        token::hash_secret,
+    },
     domain::user::Scope,
     http::{AppState, idempotency::idempotency_middleware},
 };
@@ -100,11 +101,7 @@ async fn test_auth_and_idempotency() {
     let token_id = uuid::Uuid::now_v7();
     let secret = "my_secret_token_123";
 
-    let salt = SaltString::generate(&mut OsRng);
-    let hash = Argon2::default()
-        .hash_password(secret.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
+    let hash = hash_secret(secret);
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) \
@@ -231,11 +228,7 @@ async fn revoked_token_returns_unauthorized() {
     let token_id = uuid::Uuid::now_v7();
     let secret = "revoked_secret_xyz";
 
-    let salt = SaltString::generate(&mut OsRng);
-    let hash = Argon2::default()
-        .hash_password(secret.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
+    let hash = hash_secret(secret);
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) \

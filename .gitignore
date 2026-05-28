@@ -38,11 +38,12 @@ __pycache__/
 # Session skill fallback files (MCP is canonical)
 .agents/CURRENT_TASK.md
 .agents/MEMORY.md
+.agents/sessions/
 
 # Local agent CLI scratch (not part of repo)
 .antigravitycli/api/.env
 .tmp/
-.claude/worktrees
+.claude/
 .playwright-cli
 
 # Web tooling artifacts

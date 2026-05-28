@@ -10,7 +10,7 @@ use sqlx::Row;
 
 use crate::{domain::error::ApiError, http::AppState};
 
-use super::token::{parse_bearer_token, verify_token_secret};
+use super::token::{parse_bearer_token, parse_token_value, verify_token_secret};
 
 /// Authenticated request context produced by [`AuthenticatedUser::from_request_parts`].
 ///
@@ -29,36 +29,27 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        // Demo mode: skip auth entirely, return a synthetic instructor.
-        if std::env::var("DEMO_MODE").as_deref() == Ok("1") {
-            return Ok(AuthenticatedUser {
-                user: User {
-                    id: uuid::Uuid::nil(),
-                    email: Some("haru@harus.dev".into()),
-                    display_name: "Haru".into(),
-                    role: crate::domain::user::Role::Instructor,
-                    created_at: time::OffsetDateTime::now_utc(),
-                },
-                token_scopes: vec![
-                    Scope::from_str("quiz.read").unwrap(),
-                    Scope::from_str("quiz.write").unwrap(),
-                    Scope::from_str("attempt.read").unwrap(),
-                    Scope::from_str("attempt.write").unwrap(),
-                    Scope::from_str("stats.read").unwrap(),
-                    Scope::from_str("feedback.write").unwrap(),
-                    Scope::from_str("plan.read").unwrap(),
-                    Scope::from_str("plan.write").unwrap(),
-                ],
-            });
-        }
-
-        let auth_header = parts
+        // Try to extract token from Authorization: Bearer header first,
+        // then fall back to HttpOnly ame_token cookie.
+        let parsed = parts
             .headers
             .get(header::AUTHORIZATION)
             .and_then(|h| h.to_str().ok())
+            .and_then(parse_bearer_token)
+            .or_else(|| {
+                parts
+                    .headers
+                    .get(header::COOKIE)
+                    .and_then(|h| h.to_str().ok())
+                    .and_then(|cookies| {
+                        cookies.split(';').find_map(|c| {
+                            let c = c.trim();
+                            c.strip_prefix("ame_token=").map(|v| v.to_owned())
+                        })
+                    })
+                    .and_then(|v| parse_token_value(&v))
+            })
             .ok_or(ApiError::Unauthorized)?;
-
-        let parsed = parse_bearer_token(auth_header).ok_or(ApiError::Unauthorized)?;
 
         // Find token and user
         let record = sqlx::query(

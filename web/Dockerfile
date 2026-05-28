@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1.7
+# Multi-stage build for the ame web frontend (Next.js standalone output).
+# Build context must be the repo root so api/openapi.yaml is reachable for the schema codegen step.
+#
+#   docker build -f web/Dockerfile -t ame-web:dev .
+
+ARG BUN_VERSION=1.1
+ARG NODE_VERSION=22
+
+# ── deps ───────────────────────────────────────────────────────────────────
+FROM oven/bun:${BUN_VERSION} AS deps
+WORKDIR /build
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
+
+# ── builder ────────────────────────────────────────────────────────────────
+FROM oven/bun:${BUN_VERSION} AS builder
+WORKDIR /build
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=deps /build/node_modules ./node_modules
+COPY web/ ./
+# Generated OpenAPI types live in src/api/generated/schema.d.ts; if missing,
+# rebuild from the spec that ships at the repo root.
+COPY api/openapi.yaml /tmp/openapi.yaml
+RUN if [ ! -f src/api/generated/schema.d.ts ]; then \
+      bunx openapi-typescript /tmp/openapi.yaml -o src/api/generated/schema.d.ts; \
+    fi
+
+# NEXT_PUBLIC_API_URL is baked into the client bundle at build time.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+RUN bun run build
+
+# ── runtime ────────────────────────────────────────────────────────────────
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+RUN useradd --system --create-home --uid 1000 next
+
+# Next.js "standalone" output: a self-contained server.js plus minimal deps.
+COPY --from=builder --chown=next:next /build/.next/standalone ./
+COPY --from=builder --chown=next:next /build/.next/static ./.next/static
+COPY --from=builder --chown=next:next /build/public ./public
+
+USER next
+EXPOSE 3000
+CMD ["node", "server.js"]

@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Button, Card } from "@/components/ui";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import TextField from "@mui/material/TextField";
+import CircularProgress from "@mui/material/CircularProgress";
 
 interface PendingAttempt {
   attempt_id: string;
@@ -25,7 +31,7 @@ interface GradeState {
 }
 
 export default function GradingPage() {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const [attempts, setAttempts] = useState<PendingAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [grades, setGrades] = useState<Record<string, GradeState>>({});
@@ -33,12 +39,10 @@ export default function GradingPage() {
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   useEffect(() => {
-    if (!token || !isInstructor) return;
+    if (!isInstructor) return;
     fetch(
       `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/pending`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
+      { credentials: "include" },
     )
       .then((r) => r.json())
       .then((data: PendingAttempt[]) => {
@@ -56,36 +60,32 @@ export default function GradingPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token, isInstructor]);
+  }, [isInstructor]);
 
   const handleGrade = async (attemptId: string) => {
     const g = grades[attemptId];
-    if (!g || !token) return;
-
+    if (!g) return;
     const scoreNum = parseFloat(g.score);
     if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) return;
-
     setGrades((prev) => ({
       ...prev,
       [attemptId]: { ...prev[attemptId], submitting: true },
     }));
-
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/${attemptId}/grade`,
         {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          credentials: "include",
           body: JSON.stringify({
             score: scoreNum / 100,
             notes: g.notes || null,
           }),
         },
       );
-
       if (res.ok) {
         setGrades((prev) => ({
           ...prev,
@@ -108,322 +108,214 @@ export default function GradingPage() {
 
   if (!isInstructor) {
     return (
-      <div
-        style={{
-          padding: "28px 36px",
-          color: "var(--muted)",
-          fontFamily: "var(--mono)",
-          fontSize: 13,
-        }}
-      >
+      <Box sx={{ p: 4, color: "text.secondary", fontSize: 14 }}>
         Access restricted to instructors and admins.
-      </div>
+      </Box>
     );
   }
 
   if (loading) {
     return (
-      <div
-        style={{
+      <Box
+        sx={{
           minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--muted)",
-          fontFamily: "var(--mono)",
-          fontSize: 13,
         }}
       >
-        Loading pending essays…
-      </div>
+        <CircularProgress size={24} />
+      </Box>
     );
   }
 
   return (
-    <div style={{ padding: "28px 36px 56px" }}>
-      <div style={{ marginBottom: 28 }}>
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
+    <Box sx={{ p: "28px 36px 56px" }}>
+      <Box sx={{ mb: 3.5 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
             letterSpacing: 1.3,
             textTransform: "uppercase",
-            color: "var(--muted)",
-            marginBottom: 8,
+            display: "block",
+            mb: 1,
           }}
         >
           Instructor · Manual grading
-        </div>
-        <h1
-          style={{
-            fontFamily: "var(--serif)",
-            fontSize: 40,
-            fontWeight: 500,
-            letterSpacing: -0.8,
-            lineHeight: 1.1,
-            color: "var(--text)",
-            margin: 0,
-          }}
-        >
+        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 500 }}>
           Essay Grading
-        </h1>
-      </div>
+        </Typography>
+      </Box>
 
       {attempts.length === 0 ? (
-        <Card style={{ padding: 36, textAlign: "center" }}>
-          <div
-            style={{
-              color: "var(--muted)",
-              fontFamily: "var(--mono)",
-              fontSize: 13,
-            }}
-          >
+        <Card variant="outlined" sx={{ p: 4.5, textAlign: "center" }}>
+          <Typography variant="body2" color="text.secondary">
             No essays pending manual review.
-          </div>
+          </Typography>
         </Card>
       ) : (
-        <div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 11,
-              color: "var(--muted)",
-              marginBottom: 16,
-              letterSpacing: 0.5,
-            }}
-          >
+        <Stack spacing={2.5}>
+          <Typography variant="caption" color="text.secondary">
             {attempts.length} essay{attempts.length !== 1 ? "s" : ""} awaiting
             review
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {attempts.map((attempt) => {
-              const g = grades[attempt.attempt_id] ?? {
-                score: "",
-                notes: "",
-                submitting: false,
-                done: false,
-              };
-              const scoreNum = parseFloat(g.score);
-              const scoreValid =
-                !isNaN(scoreNum) && scoreNum >= 0 && scoreNum <= 100;
+          </Typography>
+          {attempts.map((attempt) => {
+            const g = grades[attempt.attempt_id] ?? {
+              score: "",
+              notes: "",
+              submitting: false,
+              done: false,
+            };
+            const scoreNum = parseFloat(g.score);
+            const scoreValid =
+              !isNaN(scoreNum) && scoreNum >= 0 && scoreNum <= 100;
 
-              return (
-                <Card key={attempt.attempt_id} style={{ padding: 0 }}>
-                  <div
-                    style={{
-                      padding: "16px 22px",
-                      borderBottom: "1px solid var(--border)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontFamily: "var(--mono)",
-                          fontSize: 10,
-                          letterSpacing: 1.3,
-                          textTransform: "uppercase",
-                          color: "var(--muted)",
-                          marginBottom: 4,
-                        }}
-                      >
-                        Essay · {attempt.response_word_count} words
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "var(--serif)",
-                          fontSize: 16,
-                          fontWeight: 500,
-                          color: "var(--text)",
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {attempt.question_prompt}
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        textAlign: "right",
-                        flexShrink: 0,
-                        marginLeft: 24,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontFamily: "var(--mono)",
-                          fontSize: 11,
-                          color: "var(--text-2)",
-                        }}
-                      >
-                        {attempt.user_display_name}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "var(--mono)",
-                          fontSize: 10,
-                          color: "var(--muted)",
-                          marginTop: 2,
-                        }}
-                      >
-                        {attempt.user_email}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "var(--mono)",
-                          fontSize: 10,
-                          color: "var(--muted)",
-                          marginTop: 2,
-                        }}
-                      >
-                        {new Date(attempt.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      padding: "16px 22px",
-                      borderBottom: "1px solid var(--border)",
-                      background: "var(--surface-2)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontFamily: "var(--mono)",
-                        fontSize: 10,
+            return (
+              <Card key={attempt.attempt_id} variant="outlined">
+                <Box
+                  sx={{
+                    px: "22px",
+                    py: 2,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        display: "block",
                         letterSpacing: 1.2,
                         textTransform: "uppercase",
-                        color: "var(--muted)",
-                        marginBottom: 8,
+                        mb: 0.5,
                       }}
                     >
-                      Learner's answer
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: "var(--serif)",
-                        fontSize: 14,
-                        lineHeight: 1.7,
-                        color: "var(--text)",
-                        whiteSpace: "pre-wrap",
-                      }}
+                      Essay · {attempt.response_word_count} words
+                    </Typography>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ fontWeight: 500, lineHeight: 1.4 }}
                     >
-                      {attempt.response_body || "(empty)"}
-                    </div>
-                  </div>
+                      {attempt.question_prompt}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: "right", flexShrink: 0, ml: 3 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block" }}
+                    >
+                      {attempt.user_display_name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.disabled"
+                      sx={{ display: "block" }}
+                    >
+                      {attempt.user_email}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.disabled"
+                      sx={{ display: "block" }}
+                    >
+                      {new Date(attempt.created_at).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </Box>
 
-                  <div
-                    style={{
-                      padding: "16px 22px",
-                      display: "grid",
-                      gridTemplateColumns: "120px 1fr auto",
-                      gap: 16,
-                      alignItems: "flex-end",
+                <Box
+                  sx={{
+                    px: "22px",
+                    py: 2,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    bgcolor: "action.hover",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      display: "block",
+                      letterSpacing: 1.2,
+                      textTransform: "uppercase",
+                      mb: 1,
                     }}
                   >
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontFamily: "var(--mono)",
-                          fontSize: 10,
-                          letterSpacing: 1.2,
-                          textTransform: "uppercase",
-                          color: "var(--muted)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Score (0–100)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={g.score}
-                        onChange={(e) =>
-                          setGrades((prev) => ({
-                            ...prev,
-                            [attempt.attempt_id]: {
-                              ...prev[attempt.attempt_id],
-                              score: e.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="e.g. 75"
-                        style={{
-                          width: "100%",
-                          padding: "8px 10px",
-                          background: "var(--surface)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 4,
-                          color: "var(--text)",
-                          fontFamily: "var(--mono)",
-                          fontSize: 13,
-                          boxSizing: "border-box",
-                        }}
-                      />
-                    </div>
+                    Learner&apos;s answer
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}
+                  >
+                    {attempt.response_body || "(empty)"}
+                  </Typography>
+                </Box>
 
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          fontFamily: "var(--mono)",
-                          fontSize: 10,
-                          letterSpacing: 1.2,
-                          textTransform: "uppercase",
-                          color: "var(--muted)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Notes (optional)
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={g.notes}
-                        onChange={(e) =>
-                          setGrades((prev) => ({
-                            ...prev,
-                            [attempt.attempt_id]: {
-                              ...prev[attempt.attempt_id],
-                              notes: e.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Good structure but missing examples…"
-                        style={{
-                          width: "100%",
-                          padding: "8px 10px",
-                          background: "var(--surface)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 4,
-                          color: "var(--text)",
-                          fontFamily: "var(--serif)",
-                          fontSize: 13,
-                          lineHeight: 1.5,
-                          resize: "vertical",
-                          boxSizing: "border-box",
-                        }}
-                      />
-                    </div>
-
-                    <Button
-                      variant="primary"
-                      disabled={!scoreValid || g.submitting}
-                      onClick={() => handleGrade(attempt.attempt_id)}
-                    >
-                      {g.submitting ? "Saving…" : "Grade"}
-                    </Button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
+                <Box
+                  sx={{
+                    px: "22px",
+                    py: 2,
+                    display: "grid",
+                    gridTemplateColumns: "120px 1fr auto",
+                    gap: 2,
+                    alignItems: "flex-end",
+                  }}
+                >
+                  <TextField
+                    label="Score (0–100)"
+                    type="number"
+                    size="small"
+                    slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }}
+                    value={g.score}
+                    onChange={(e) =>
+                      setGrades((prev) => ({
+                        ...prev,
+                        [attempt.attempt_id]: {
+                          ...prev[attempt.attempt_id],
+                          score: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="e.g. 75"
+                  />
+                  <TextField
+                    label="Notes (optional)"
+                    size="small"
+                    multiline
+                    rows={2}
+                    value={g.notes}
+                    onChange={(e) =>
+                      setGrades((prev) => ({
+                        ...prev,
+                        [attempt.attempt_id]: {
+                          ...prev[attempt.attempt_id],
+                          notes: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Good structure but missing examples…"
+                  />
+                  <Button
+                    variant="contained"
+                    disabled={!scoreValid || g.submitting}
+                    onClick={() => handleGrade(attempt.attempt_id)}
+                  >
+                    {g.submitting ? "Saving…" : "Grade"}
+                  </Button>
+                </Box>
+              </Card>
+            );
+          })}
+        </Stack>
       )}
-    </div>
+    </Box>
   );
 }
