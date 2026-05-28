@@ -7,7 +7,7 @@ Thanks for considering a contribution. ame is a small project; the bar is "works
 ```bash
 make init-env      # mise install + sqlx-cli + bun install + playwright
 make db-up         # start Postgres in Docker/Podman
-make dev           # API on :8080, frontend on :3000
+make dev           # API on :28080, frontend on :23000
 make db-seed       # seed demo users, quizzes, questions
 ```
 
@@ -24,7 +24,7 @@ Copy `.env.example` to `.env` if you need to override defaults.
 | `make validate` | Before opening a PR (check + e2e). |
 | `make openapi` | After changing Rust route handlers or DTOs. Regenerates `api/openapi.yaml` and the web TypeScript schema. |
 
-CI runs all of these on every PR — see `.github/workflows/ci.yml`.
+CI runs `make check` + `cargo audit` on every PR (see `.github/workflows/ci.yml`). The DB-backed and e2e suites need a Postgres service and are not run in CI — run `make validate` locally before opening a PR.
 
 ## Conventions
 

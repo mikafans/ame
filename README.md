@@ -12,7 +12,7 @@ Quiz and exam platform. Rust (Axum) backend, Next.js (App Router) frontend, Post
 make init-env       # mise install + sqlx-cli + web deps + Playwright
 make db-up          # start Postgres in Docker or Podman
 make db-migrate     # apply pending migrations
-make dev            # API on :8080, frontend on :3000
+make dev            # API on :28080, frontend on :23000
 make db-seed        # seed demo users, quizzes, questions (requires API running)
 ```
 
