@@ -1,7 +1,13 @@
-use axum::{Json, Router, middleware, routing::get};
+use std::sync::Arc;
+
+use axum::{
+    Json, Router, middleware,
+    routing::{get, post},
+};
 use serde_json::{Value, json};
 use sqlx::PgPool;
-use tower_http::cors::{Any, CorsLayer};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
@@ -59,10 +65,30 @@ pub fn router(pool: PgPool) -> Router {
             activity::activity_log_middleware,
         ));
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // Public, rate-limited endpoints. Credential-stuffing and key-faucet
+    // surface: limit harder than the rest of the API.
+    //
+    // Defaults: 10 req burst, refill 1 per 2s (≈30 req/min sustained per IP).
+    // Override with AME_RATELIMIT_BURST and AME_RATELIMIT_PERIOD_SECS.
+    let burst = env_u32("AME_RATELIMIT_BURST", 10);
+    let period_secs = env_u64("AME_RATELIMIT_PERIOD_SECS", 2);
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(period_secs)
+            .burst_size(burst)
+            .finish()
+            .expect("valid rate-limit config"),
+    );
+    let public_limited = Router::new()
+        .route("/v1/auth/register", post(auth::register))
+        .route("/v1/auth/login", post(auth::login))
+        .route("/v1/agents/register", post(agents::register))
+        .layer(GovernorLayer {
+            config: governor_conf,
+        })
+        .with_state(state.clone());
+
+    let cors = build_cors_layer();
 
     let trace = TraceLayer::new_for_http()
         .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -71,7 +97,7 @@ pub fn router(pool: PgPool) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .merge(openapi::router(state.clone()))
-        .merge(auth::router(state.clone()))
+        .merge(public_limited)
         .merge(logged)
         .layer(cors)
         .layer(trace)
@@ -80,4 +106,63 @@ pub fn router(pool: PgPool) -> Router {
 
 async fn healthz() -> Json<Value> {
     Json(json!({ "status": "ok" }))
+}
+
+/// CORS policy:
+///
+/// Default to `http://localhost:3000` so a fresh checkout works for `make dev`.
+/// In any other deployment, set `AME_CORS_ORIGINS` to a comma-separated list of
+/// allowed origins. Setting it to `*` re-enables permissive CORS (use only when
+/// the API is intentionally public).
+///
+/// We do not allow credentials — the frontend authenticates via the
+/// `Authorization` header (Bearer token), not cookies sent cross-origin.
+fn build_cors_layer() -> CorsLayer {
+    use axum::http::{HeaderValue, Method, header};
+
+    let raw =
+        std::env::var("AME_CORS_ORIGINS").unwrap_or_else(|_| "http://localhost:3000".to_string());
+
+    let methods = [
+        Method::GET,
+        Method::POST,
+        Method::PUT,
+        Method::PATCH,
+        Method::DELETE,
+        Method::OPTIONS,
+    ];
+    let headers = [header::AUTHORIZATION, header::CONTENT_TYPE];
+
+    if raw.trim() == "*" {
+        return CorsLayer::new()
+            .allow_origin(AllowOrigin::any())
+            .allow_methods(methods)
+            .allow_headers(headers);
+    }
+
+    let origins: Vec<HeaderValue> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| HeaderValue::from_str(s).ok())
+        .collect();
+
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(origins))
+        .allow_methods(methods)
+        .allow_headers(headers)
+}
+
+fn env_u32(key: &str, default: u32) -> u32 {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
+fn env_u64(key: &str, default: u64) -> u64 {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }

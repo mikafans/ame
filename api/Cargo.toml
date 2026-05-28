@@ -24,6 +24,7 @@ thiserror = "2"
 tokio = { version = "1.43", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
+tower_governor = "0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sqlx = { version = "0.8.3", features = ["runtime-tokio", "postgres", "uuid", "time", "json"] }
@@ -36,6 +37,7 @@ async-trait = "0.1"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
+subtle = "2"
 http-body-util = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 utoipa = { version = "5", features = ["uuid", "time"] }

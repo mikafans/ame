@@ -23,24 +23,25 @@ ame is designed for trusted instructor/learner cohorts behind authenticated sign
 ### Authentication
 
 - Email + password only. No MFA, no SSO/SAML, no password reset flow yet.
-- The `ame_token` session cookie is **not** `HttpOnly` — the frontend reads it client-side. Until that is moved server-side, deployments must rely on strict CSP and the absence of third-party scripts to mitigate XSS exfiltration.
-- API tokens (`/v1/auth/login` returns one; `/v1/agents/register` mints one) are Argon2-verified on every request. This is intentional but costly; do not deploy ame to untrusted networks without a rate limiter / WAF in front.
+- The `ame_token` session cookie is **not** `HttpOnly` — the frontend reads it client-side. `Secure` is set in production and a strict CSP is shipped in `web/next.config.mjs`; even so, an XSS payload could exfiltrate the token. Auth will move to a server-only cookie in a later phase.
+- API tokens are server-generated 192-bit random secrets, stored as `sha256(secret)` and compared in constant time. Password hashing (login flow) still uses Argon2.
 
 ### Authorization
 
-- `POST /v1/agents/register` is **unauthenticated by design** for self-onboarding MCP clients. Any public deployment must front it with an invite system or rate limit, or the endpoint becomes an open API-key faucet.
+- `POST /v1/agents/register` is gated by a shared `AME_AGENT_ACCESS_CODE` secret. When the env var is unset, registration is disabled entirely. Operators must opt in by setting it (e.g. `openssl rand -hex 32`).
+- `/v1/auth/login`, `/v1/auth/register`, and `/v1/agents/register` are rate-limited per IP (`tower_governor`). Defaults: burst 10, refill 1/2s. Tune via `AME_RATELIMIT_BURST` / `AME_RATELIMIT_PERIOD_SECS`.
 - Role gating happens in route handlers, not in middleware. Audit new routes carefully.
 
 ### Operational foot-guns
 
-- Setting `DEMO_MODE=1` in the API process disables authentication entirely and treats every request as an Instructor. This is for local demos only — never set it in production. Future versions will gate this behind a compile-time feature flag.
-- The default CORS policy allows any origin. Override before production.
-- No rate limiting is built in. Front the API with one (e.g. nginx `limit_req`, cloudflared, Envoy).
+- The previous `DEMO_MODE=1` runtime auth bypass has been removed entirely.
+- Default CORS policy now allows only `http://localhost:3000`. Override via `AME_CORS_ORIGINS` (comma-separated). Setting it to `*` re-enables permissive CORS.
+- Rate limiting is built in for the public auth/registration endpoints only. Front the API with an additional limiter (nginx `limit_req`, cloudflared, Envoy) if you expose any authenticated endpoint to untrusted traffic.
 
 ### Data
 
 - All passwords are Argon2-hashed (default params).
-- API token *ids* are stored in plaintext (UUID v7); the *secret* portion is Argon2-hashed.
+- API token *ids* are stored in plaintext (UUID v7); the *secret* portion is stored as `sha256(secret)` and compared in constant time.
 - The database does not encrypt data at rest beyond what Postgres provides.
 
 If you find a behavior that contradicts this document, please report it as a security issue.

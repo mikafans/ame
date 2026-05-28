@@ -1,6 +1,5 @@
 //! Profile, key and webhook management routes: /v1/me, /v1/me/keys, /v1/me/webhooks, /v1/me/attempts.
 
-use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -8,7 +7,6 @@ use axum::{
     response::IntoResponse,
     routing::{delete, get, post},
 };
-use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use time::OffsetDateTime;
@@ -19,6 +17,7 @@ use crate::{
     auth::{
         extractor::AuthenticatedUser,
         scope::{RequireAnyScope, ScopeOneOf},
+        token::{generate_secret, hash_secret},
     },
     domain::{
         attempt::Attempt,
@@ -166,7 +165,7 @@ pub async fn create_key(
 
     let token_id = Uuid::now_v7();
     let secret = generate_secret();
-    let hash = hash_secret(&secret)?;
+    let hash = hash_secret(&secret);
     let prefix = format!("hk_{}", &secret[..8]);
 
     sqlx::query(
@@ -221,7 +220,7 @@ pub async fn rotate_key(
     // Issue new key with same name and scopes
     let new_token_id = Uuid::now_v7();
     let new_secret = generate_secret();
-    let new_hash = hash_secret(&new_secret)?;
+    let new_hash = hash_secret(&new_secret);
 
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
@@ -306,7 +305,7 @@ pub async fn create_webhook(
 
     let webhook_id = Uuid::now_v7();
     let secret = generate_secret();
-    let hash = hash_secret(&secret)?;
+    let hash = hash_secret(&secret);
 
     sqlx::query(
         "INSERT INTO tb_webhooks (id, user_id, url, events, secret_hash, signing_key)
@@ -354,23 +353,6 @@ pub async fn delete_webhook(
     }
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-pub fn generate_secret() -> String {
-    use rand::RngCore;
-    let mut bytes = [0u8; 24];
-    OsRng.fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}
-
-pub fn hash_secret(secret: &str) -> Result<String, ApiError> {
-    let salt = SaltString::generate(&mut OsRng);
-    Argon2::default()
-        .hash_password(secret.as_bytes(), &salt)
-        .map(|h| h.to_string())
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("argon2 hash failed: {e}")))
 }
 
 // ── profile ───────────────────────────────────────────────────────────────────

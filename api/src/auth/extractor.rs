@@ -29,29 +29,6 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        // Demo mode: skip auth entirely, return a synthetic instructor.
-        if std::env::var("DEMO_MODE").as_deref() == Ok("1") {
-            return Ok(AuthenticatedUser {
-                user: User {
-                    id: uuid::Uuid::nil(),
-                    email: Some("haru@harus.dev".into()),
-                    display_name: "Haru".into(),
-                    role: crate::domain::user::Role::Instructor,
-                    created_at: time::OffsetDateTime::now_utc(),
-                },
-                token_scopes: vec![
-                    Scope::from_str("quiz.read").unwrap(),
-                    Scope::from_str("quiz.write").unwrap(),
-                    Scope::from_str("attempt.read").unwrap(),
-                    Scope::from_str("attempt.write").unwrap(),
-                    Scope::from_str("stats.read").unwrap(),
-                    Scope::from_str("feedback.write").unwrap(),
-                    Scope::from_str("plan.read").unwrap(),
-                    Scope::from_str("plan.write").unwrap(),
-                ],
-            });
-        }
-
         let auth_header = parts
             .headers
             .get(header::AUTHORIZATION)

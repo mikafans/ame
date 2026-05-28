@@ -19,12 +19,25 @@ function getCookieToken(): string | undefined {
   return (document.cookie.match(/(?:^|;\s*)ame_token=([^;]+)/) ?? [])[1];
 }
 
+// Cookie is non-HttpOnly because we read the token client-side to attach it as
+// a Bearer header. `Secure` is set in production so it cannot leak over plain
+// HTTP. SameSite=Lax is sufficient since cross-origin requests use the
+// `Authorization` header rather than ambient cookies.
+const COOKIE_FLAGS =
+  process.env.NODE_ENV === "production"
+    ? "path=/; max-age=86400; SameSite=Lax; Secure"
+    : "path=/; max-age=86400; SameSite=Lax";
+
 export function setAuthToken(token: string) {
-  document.cookie = `ame_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+  document.cookie = `ame_token=${token}; ${COOKIE_FLAGS}`;
 }
 
 export function clearAuthToken() {
-  document.cookie = "ame_token=; path=/; max-age=0";
+  const expire =
+    process.env.NODE_ENV === "production"
+      ? "path=/; max-age=0; SameSite=Lax; Secure"
+      : "path=/; max-age=0; SameSite=Lax";
+  document.cookie = `ame_token=; ${expire}`;
 }
 
 export function useAuth() {

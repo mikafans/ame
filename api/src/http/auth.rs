@@ -1,13 +1,14 @@
 //! Email+password auth routes: register, login.
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
 use crate::{
+    auth::token::{generate_secret, hash_secret},
     domain::error::{ApiError, FieldError},
     http::AppState,
 };
@@ -128,7 +129,7 @@ pub async fn register(
     // Generate and insert API key
     let token_id = Uuid::now_v7();
     let secret = generate_secret();
-    let token_hash = hash_secret(&secret)?;
+    let token_hash = hash_secret(&secret);
 
     let initial_scopes = scopes_for_role(&role);
     sqlx::query(
@@ -198,7 +199,7 @@ pub async fn login(
         // Create new key
         let new_token_id = Uuid::now_v7();
         let secret = generate_secret();
-        let token_hash = hash_secret(&secret)?;
+        let token_hash = hash_secret(&secret);
 
         let initial_scopes = scopes_for_role(&role);
         sqlx::query(
@@ -219,7 +220,7 @@ pub async fn login(
 
     // Generate a fresh secret to return (we don't store the plaintext)
     let secret = generate_secret();
-    let token_hash = hash_secret(&secret)?;
+    let token_hash = hash_secret(&secret);
 
     sqlx::query("UPDATE tb_api_tokens SET token_hash = $1 WHERE id = $2")
         .bind(&token_hash)
@@ -268,21 +269,6 @@ fn scopes_for_role(role: &str) -> Vec<&'static str> {
     }
 }
 
-pub fn generate_secret() -> String {
-    use rand::RngCore;
-    let mut bytes = [0u8; 24];
-    OsRng.fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}
-
-pub fn hash_secret(secret: &str) -> Result<String, ApiError> {
-    let salt = SaltString::generate(&mut OsRng);
-    Argon2::default()
-        .hash_password(secret.as_bytes(), &salt)
-        .map(|h| h.to_string())
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("argon2 hash failed: {e}")))
-}
-
 pub fn hash_password(password: &str) -> Result<String, ApiError> {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
@@ -302,11 +288,5 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
         .is_ok()
 }
 
-// ── router ────────────────────────────────────────────────────────────────────
-
-pub fn router(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/v1/auth/register", post(register))
-        .route("/v1/auth/login", post(login))
-        .with_state(state)
-}
+// Routes are mounted (with rate limiting) in `http::mod::router`. The handlers
+// here are referenced directly from there.

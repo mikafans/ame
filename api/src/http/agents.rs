@@ -14,12 +14,15 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    auth::scope::{RequireAnyScope, ScopeOneOf},
+    auth::{
+        scope::{RequireAnyScope, ScopeOneOf},
+        token::{generate_secret, hash_secret},
+    },
     domain::{
         error::{ApiError, FieldError},
         user::Scope,
     },
-    http::{AppState, me::generate_secret, openapi::openapi_yaml},
+    http::{AppState, openapi::openapi_yaml},
 };
 
 // ── scope guards ──────────────────────────────────────────────────────────────
@@ -36,6 +39,9 @@ impl ScopeOneOf for AgentReadScopes {
 pub struct RegisterBody {
     pub label: Option<String>,
     pub scopes: Vec<String>,
+    /// Shared secret matching the server's `AME_AGENT_ACCESS_CODE` env var.
+    /// Required; registration is disabled when the env var is unset.
+    pub access_code: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,11 +81,31 @@ pub struct ActivityQuery {
 
 // ── handlers ──────────────────────────────────────────────────────────────────
 
-/// POST /v1/agents/register — unauthenticated bootstrap for agent users.
+/// POST /v1/agents/register — bootstrap for agent users.
+///
+/// Gated by a shared access code (`AME_AGENT_ACCESS_CODE` env var). If the env
+/// var is unset, registration is disabled entirely — operators must opt in.
+/// This replaces the previous unauthenticated-by-design behaviour, which was
+/// an open API-key faucet for any public deployment.
 pub async fn register(
     State(state): State<AppState>,
     Json(body): Json<RegisterBody>,
 ) -> Result<impl IntoResponse, ApiError> {
+    // Access code gate — fail-safe: no env var configured ⇒ deny.
+    let expected = std::env::var("AME_AGENT_ACCESS_CODE")
+        .ok()
+        .filter(|s| !s.is_empty());
+    let provided = body.access_code.as_deref().unwrap_or("");
+    match expected {
+        None => return Err(ApiError::Unauthorized),
+        Some(want) => {
+            use subtle::ConstantTimeEq;
+            if !bool::from(want.as_bytes().ct_eq(provided.as_bytes())) {
+                return Err(ApiError::Unauthorized);
+            }
+        }
+    }
+
     if body.scopes.is_empty() {
         return Err(ApiError::Validation(vec![FieldError {
             field: "scopes".into(),
@@ -117,7 +143,7 @@ pub async fn register(
 
     let token_id = Uuid::now_v7();
     let secret = generate_secret();
-    let hash = crate::http::me::hash_secret(&secret)?;
+    let hash = hash_secret(&secret);
 
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
@@ -706,8 +732,8 @@ async fn invoke_quiz_import(
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
+    // /v1/agents/register is mounted (with rate limiting) in `http::mod::router`.
     Router::new()
-        .route("/v1/agents/register", post(register))
         .route("/v1/agents/mcp.json", get(mcp_manifest))
         .route("/v1/agents/openapi.json", get(openapi_json))
         .route("/v1/agents/activity", get(activity))
