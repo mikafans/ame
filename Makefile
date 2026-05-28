@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -162,3 +162,18 @@ dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override
 hooks-install: ## Point git at .githooks/
 	git config core.hooksPath .githooks
 	@echo "git hooks installed (.githooks/)"
+
+# ── Containers ────────────────────────────────────────────────────────────
+# Production-shaped stack. See deploy/README.md.
+
+docker-build: ## Build api + web images via docker-compose.prod.yml
+	$(COMPOSE) -f docker-compose.prod.yml build
+
+docker-up: ## Start the prod-shaped stack (requires .env with POSTGRES_PASSWORD)
+	$(COMPOSE) -f docker-compose.prod.yml up -d
+
+docker-down: ## Stop the prod-shaped stack
+	$(COMPOSE) -f docker-compose.prod.yml down
+
+docker-logs: ## Tail logs from the prod-shaped stack
+	$(COMPOSE) -f docker-compose.prod.yml logs -f

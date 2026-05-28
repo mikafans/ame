@@ -5,6 +5,7 @@ const allowedDevOrigins =
 
 const nextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
 };
 
