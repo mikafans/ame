@@ -8,7 +8,6 @@ Seed the ame database with demo users, tags, questions, quizzes, and exams.
 Usage:
     uv run scripts/seed.py
     uv run scripts/seed.py --api http://localhost:8080
-    uv run scripts/seed.py --wipe   # drop existing seed data first (re-seeds)
 """
 
 import argparse
@@ -45,7 +44,7 @@ TAGS = [
 ]
 
 QUESTIONS = [
-    # Multiple choice
+    # Multiple choice — options are bare strings matching McPayload.options: Vec<String>
     {
         "kind": "mc",
         "prompt": "What is the time complexity of binary search on a sorted array?",
@@ -132,7 +131,7 @@ QUESTIONS = [
         "kind": "short",
         "prompt": "What Python built-in function returns the length of a sequence?",
         "payload": {
-            "accepted": ["len", "len()", "len()"],
+            "accepted": ["len", "len()"],
             "normalize": "exact",
             "judge": "exact",
         },
@@ -164,6 +163,24 @@ QUESTIONS = [
         "tags": ["dynamic-programming"],
         "points": 8,
     },
+    # Code — uses exemplar for auto-grading; falls back to pending_manual without one
+    {
+        "kind": "code",
+        "prompt": "Write a Python function `triangle_sum(n)` that returns the sum 1 + 2 + ... + n.",
+        "payload": {
+            "language": "python",
+            "starter": "def triangle_sum(n):\n    pass",
+            "tests": [
+                {"name": "triangle_sum(1) == 1", "body": "assert triangle_sum(1) == 1"},
+                {"name": "triangle_sum(5) == 15", "body": "assert triangle_sum(5) == 15"},
+                {"name": "triangle_sum(10) == 55", "body": "assert triangle_sum(10) == 55"},
+            ],
+            "exemplar": "def triangle_sum(n):\n    return n * (n + 1) // 2",
+        },
+        "explanation": "The closed-form formula n*(n+1)//2 computes the sum in O(1) time.",
+        "tags": ["math", "python"],
+        "points": 3,
+    },
 ]
 
 QUIZ = {
@@ -176,11 +193,70 @@ QUIZ = {
     ],
 }
 
+QUIZ_PYTHON = {
+    "title": "Python Essentials",
+    "course": "Programming",
+    "difficulty": "beginner",
+    "objectives": [
+        "Use Python built-in functions correctly",
+        "Write small functions with correct logic",
+    ],
+}
+
 EXAM_BLUEPRINT = {
     "name": "CS Fundamentals Midterm",
     "description": "Covers algorithms, data structures, and complexity analysis.",
     "duration": 60,
+    "passing_points": 10,
 }
+
+# Answers to submit when seeding learner attempts.
+# Each entry maps to the corresponding QUESTIONS item by index.
+# MC: selected_position that maps to the correct option (position == correct_index
+#     when option_order is identity, which it may not be — we derive it at runtime).
+# TF/Short: hardcoded correct values.
+# Essay: sample body submitted for manual grading queue.
+# Code: the exemplar solution.
+QUESTION_ANSWERS = [
+    {"kind": "mc", "correct_index": 1},                      # binary search
+    {"kind": "mc", "correct_index": 1},                      # BFS
+    {"kind": "mc", "correct_index": 2},                      # quicksort
+    {"kind": "mc", "correct_index": 1},                      # DP substructure
+    {"kind": "tf", "answer": False},                         # BST guarantee
+    {"kind": "tf", "answer": True},                          # merge sort stable
+    {"kind": "tf", "answer": False},                         # Dijkstra negative
+    {"kind": "short", "answer": "stack"},                    # LIFO
+    {"kind": "short", "answer": "len"},                      # Python len
+    {                                                         # DFS vs BFS essay
+        "kind": "essay",
+        "body": (
+            "Depth-first search (DFS) explores as far as possible along each branch before "
+            "backtracking. It uses a stack (explicit or call stack) and requires O(depth) space. "
+            "DFS is well-suited for cycle detection, topological sorting, and exhaustive path "
+            "enumeration. Breadth-first search (BFS) visits all neighbors at the current depth "
+            "before moving deeper, using a queue (O(width) space). BFS guarantees the shortest "
+            "path in unweighted graphs and is ideal for level-order traversal or finding the "
+            "minimum number of hops between nodes."
+        ),
+    },
+    {                                                         # memoization vs tabulation
+        "kind": "essay",
+        "body": (
+            "Memoization is a top-down approach: a recursive function caches results for "
+            "subproblems as they are computed, avoiding redundant work. Example: Fibonacci "
+            "with a dict cache. Tabulation is bottom-up: fill a table from base cases up to "
+            "the target. Example: a loop building fib[0..n]. Memoization is more natural for "
+            "problems with complex recursion; tabulation avoids call-stack overhead and is "
+            "often faster in practice. Both have the same asymptotic complexity for well-defined "
+            "DP problems."
+        ),
+    },
+    {                                                         # code: triangle_sum
+        "kind": "code",
+        "source": "def triangle_sum(n):\n    return n * (n + 1) // 2",
+        "language": "python",
+    },
+]
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +269,10 @@ class SeedResult:
     tags: list[dict] = field(default_factory=list)
     questions: list[dict] = field(default_factory=list)
     quiz_id: str | None = None
+    quiz_python_id: str | None = None
     exam_id: str | None = None
     cohort_id: str | None = None
+    attempts_seeded: int = 0
 
 
 def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None, label: str = "") -> dict:
@@ -212,7 +290,6 @@ def register_or_login(client: httpx.Client, user: dict) -> dict | None:
     if resp.status_code == 201:
         return resp.json()
     if resp.status_code in (400, 422):
-        # Email already registered — log in instead
         resp2 = client.post("/v1/auth/login", json={"email": user["email"], "password": user["password"]})
         if resp2.is_success:
             return resp2.json()
@@ -253,9 +330,12 @@ def seed_questions(client: httpx.Client, auth: dict, result: SeedResult) -> None
 
     created = resp.json()["questions"]
     result.questions = created
-    console.print(f"  Created {len(created)} questions (draft)")
+    by_kind = {}
+    for q in created:
+        by_kind[q["kind"]] = by_kind.get(q["kind"], 0) + 1
+    summary = " · ".join(f"{n} {k}" for k, n in sorted(by_kind.items()))
+    console.print(f"  Created {len(created)} questions ({summary})")
 
-    # Promote all to live
     promoted = 0
     for q in created:
         r = client.post(f"/v1/questions/{q['id']}/promote", headers=auth)
@@ -264,35 +344,42 @@ def seed_questions(client: httpx.Client, auth: dict, result: SeedResult) -> None
     console.print(f"  Promoted {promoted}/{len(created)} questions to live")
 
 
-def seed_quiz(client: httpx.Client, auth: dict, result: SeedResult) -> None:
-    console.rule("[bold]Quiz")
-    resp = client.post("/v1/quizzes", json=QUIZ, headers=auth)
+def _create_and_publish_quiz(client: httpx.Client, auth: dict, meta: dict, questions: list[dict], result: SeedResult) -> str | None:
+    resp = client.post("/v1/quizzes", json=meta, headers=auth)
     if not resp.is_success:
-        console.print(f"[red]Failed to create quiz:[/red] {resp.text[:200]}")
-        return
+        console.print(f"[red]Failed to create quiz '{meta['title']}':[/red] {resp.text[:200]}")
+        return None
 
     quiz_id = resp.json()["quiz"]["id"]
-    result.quiz_id = quiz_id
-    console.print(f"  Created quiz {quiz_id}")
+    console.print(f"  Created quiz {quiz_id[:8]}…  '{meta['title']}'")
 
-    # Add live bank questions to the quiz
-    added = 0
-    for q in result.questions:
-        r = client.post(
-            f"/v1/quizzes/{quiz_id}/questions",
-            json={"questionId": q["id"]},
-            headers=auth,
-        )
-        if r.is_success:
-            added += 1
-    console.print(f"  Linked {added}/{len(result.questions)} questions to quiz")
+    added = sum(
+        1 for q in questions
+        if client.post(f"/v1/quizzes/{quiz_id}/questions", json={"questionId": q["id"]}, headers=auth).is_success
+    )
+    console.print(f"  Linked {added}/{len(questions)} questions")
 
-    # Publish
-    resp2 = client.patch(f"/v1/quizzes/{quiz_id}", json={"status": "active"}, headers=auth)
-    if resp2.is_success:
-        console.print("  Published quiz → active")
+    pub = client.patch(f"/v1/quizzes/{quiz_id}", json={"status": "active"}, headers=auth)
+    if pub.is_success:
+        console.print("  Published → active")
     else:
-        console.print(f"  [yellow]Could not publish:[/yellow] {resp2.text[:200]}")
+        console.print(f"  [yellow]Could not publish:[/yellow] {pub.text[:200]}")
+    return quiz_id
+
+
+def seed_quizzes(client: httpx.Client, auth: dict, result: SeedResult) -> None:
+    console.rule("[bold]Quizzes")
+    if not result.questions:
+        console.print("  [yellow]No questions — skipping[/yellow]")
+        return
+
+    # Main quiz: all question kinds
+    result.quiz_id = _create_and_publish_quiz(client, auth, QUIZ, result.questions, result)
+
+    # Python quiz: python + math questions only (short + code)
+    python_qs = [q for q in result.questions if q["kind"] in ("short", "code")]
+    if python_qs:
+        result.quiz_python_id = _create_and_publish_quiz(client, auth, QUIZ_PYTHON, python_qs, result)
 
 
 def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
@@ -317,6 +404,11 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
         exam_id = resp.json().get("examId") or resp.json().get("id")
         result.exam_id = exam_id
         console.print(f"  Created exam {exam_id} with {len(sections)} sections")
+        pub = client.patch(f"/v1/exams/{exam_id}", json={"status": "published"}, headers=auth)
+        if pub.is_success:
+            console.print("  Published exam → active")
+        else:
+            console.print(f"  [yellow]Could not publish exam:[/yellow] {pub.status_code} {pub.text[:120]}")
     else:
         console.print(f"  [yellow]Could not create exam (non-fatal):[/yellow] {resp.status_code} {resp.text[:200]}")
 
@@ -337,16 +429,99 @@ def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     console.print(f"  Created cohort {cohort_id}")
 
     learners = [u for u in result.users if u["role"] == "learner"]
-    enrolled = 0
-    for u in learners:
-        r = client.post(
-            f"/v1/cohorts/{cohort_id}/members",
-            json={"userId": u["id"]},
+    enrolled = sum(
+        1 for u in learners
+        if client.post(f"/v1/cohorts/{cohort_id}/members", json={"userId": u["id"]}, headers=auth).is_success
+    )
+    console.print(f"  Enrolled {enrolled}/{len(learners)} learners")
+
+
+def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
+    """Have the learner take the main quiz so grading/results/progress pages show data."""
+    console.rule("[bold]Attempts")
+    if not result.quiz_id:
+        console.print("  [yellow]No quiz — skipping attempts[/yellow]")
+        return
+
+    learner = next((u for u in result.users if u["role"] == "learner"), None)
+    if not learner:
+        console.print("  [yellow]No learner user — skipping attempts[/yellow]")
+        return
+
+    auth = {"Authorization": f"Bearer {learner['token']}"}
+
+    # Build question-id → answer lookup from the questions we created (same order as QUESTIONS)
+    id_to_answer: dict[str, dict] = {}
+    for q, ans in zip(result.questions, QUESTION_ANSWERS):
+        id_to_answer[q["id"]] = ans
+
+    # Start a session
+    resp = client.post("/v1/sessions", json={"quizId": result.quiz_id}, headers=auth)
+    if not resp.is_success:
+        console.print(f"  [yellow]Could not start session:[/yellow] {resp.status_code} {resp.text[:200]}")
+        return
+
+    body = resp.json()
+    session_id = (
+        body.get("sessionId")
+        or body.get("session_id")
+        or body.get("session", {}).get("id")
+    )
+    if not session_id:
+        console.print("  [yellow]No session ID in response — skipping[/yellow]")
+        return
+
+    # Fetch full session to get option_order per question
+    get_resp = client.get(f"/v1/sessions/{session_id}", headers=auth)
+    if not get_resp.is_success:
+        console.print(f"  [yellow]Could not fetch session: {get_resp.status_code}[/yellow]")
+        return
+
+    session_data = get_resp.json()
+    questions = session_data.get("questions", [])
+
+    answered = 0
+    for q in questions:
+        qid = str(q.get("questionId") or q.get("question_id", ""))
+        kind = q.get("kind", "")
+        option_order: list[int] = q.get("optionOrder") or q.get("option_order") or []
+        ans = id_to_answer.get(qid)
+
+        if kind == "mc":
+            correct_index = (ans or {}).get("correct_index", 0)
+            # Find which shuffled position maps to the correct canonical index.
+            # Falls back to position 0 if option_order is unavailable.
+            selected_position = next(
+                (pos for pos, canon in enumerate(option_order) if canon == correct_index),
+                0,
+            )
+            response = {"selected_position": selected_position}
+        elif kind == "tf":
+            response = {"answer": (ans or {}).get("answer", True)}
+        elif kind == "short":
+            response = {"answer": (ans or {}).get("answer", "stack")}
+        elif kind == "essay":
+            body_text = (ans or {}).get("body", "Sample essay response for grading.")
+            response = {"body": body_text, "word_count": len(body_text.split())}
+        elif kind == "code":
+            source = (ans or {}).get("source", "pass")
+            language = (ans or {}).get("language", "python")
+            response = {"source": source, "language": language}
+        else:
+            continue
+
+        answer_resp = client.post(
+            f"/v1/sessions/{session_id}/answer",
+            json={"questionId": qid, "response": response},
             headers=auth,
         )
-        if r.is_success:
-            enrolled += 1
-    console.print(f"  Enrolled {enrolled}/{len(learners)} learners")
+        if answer_resp.is_success:
+            answered += 1
+            result.attempts_seeded += 1
+        else:
+            console.print(f"  [yellow]Answer failed for {kind} {qid[:8]}:[/yellow] {answer_resp.status_code} {answer_resp.text[:120]}")
+
+    console.print(f"  Submitted {answered}/{len(questions)} answers for learner session {session_id[:8]}…")
 
 
 def print_summary(result: SeedResult) -> None:
@@ -357,9 +532,11 @@ def print_summary(result: SeedResult) -> None:
     table.add_row("Users", str(len(result.users)))
     table.add_row("Tags", str(len(result.tags)))
     table.add_row("Questions (live)", str(len(result.questions)))
-    table.add_row("Quiz", result.quiz_id or "—")
+    table.add_row("Quiz (main)", result.quiz_id or "—")
+    table.add_row("Quiz (python)", result.quiz_python_id or "—")
     table.add_row("Exam", result.exam_id or "—")
     table.add_row("Cohort", result.cohort_id or "—")
+    table.add_row("Attempts seeded", str(result.attempts_seeded))
     console.print(table)
 
     console.rule("[bold]Credentials")
@@ -381,7 +558,6 @@ def main() -> None:
     result = SeedResult()
 
     with httpx.Client(base_url=args.api, timeout=15.0) as client:
-        # Health check
         health = client.get("/healthz")
         if not health.is_success:
             console.print(f"[red]API not reachable at {args.api}[/red]")
@@ -400,9 +576,10 @@ def main() -> None:
 
         seed_tags(client, auth, result)
         seed_questions(client, auth, result)
-        seed_quiz(client, auth, result)
+        seed_quizzes(client, auth, result)
         seed_exam(client, auth, result)
         seed_cohort(client, admin_auth, result)
+        seed_attempts(client, result)
 
     print_summary(result)
 

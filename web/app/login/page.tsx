@@ -8,7 +8,6 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -283,7 +282,7 @@ export default function LoginPage() {
             mt: 2.5,
           }}
         >
-          OpenAPI 3.1 · MCP · FERPA · GDPR · SAML
+          OpenAPI 3.1 · MCP · FERPA · GDPR
         </Typography>
       </Box>
 
@@ -401,25 +400,6 @@ export default function LoginPage() {
                   ? "Create account"
                   : "Sign in"}
             </Button>
-
-            <Divider sx={{ my: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
-                OR
-              </Typography>
-            </Divider>
-
-            <Grid container spacing={1}>
-              <Grid size={6}>
-                <Button variant="text" fullWidth>
-                  Continue with SSO
-                </Button>
-              </Grid>
-              <Grid size={6}>
-                <Button variant="text" fullWidth>
-                  Use access code
-                </Button>
-              </Grid>
-            </Grid>
           </Box>
 
           <Box

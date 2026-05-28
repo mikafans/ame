@@ -12,6 +12,14 @@ import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 
+const KIND_LABEL: Record<string, string> = {
+  mc: "MC",
+  tf: "T/F",
+  short: "Short",
+  essay: "Essay",
+  code: "Code",
+};
+
 interface PreviewQuestion {
   id: string;
   kind: string;
@@ -27,14 +35,6 @@ interface QuizDetail {
   objectives?: string[];
   questions: PreviewQuestion[];
 }
-
-const KIND_LABEL: Record<string, string> = {
-  mc: "MC",
-  tf: "TF",
-  short: "Short",
-  essay: "Essay",
-  code: "Code",
-};
 
 export default function QuizPreviewPage({
   params,
@@ -226,27 +226,19 @@ export default function QuizPreviewPage({
             >
               {i + 1}
             </Typography>
-            <Box>
-              <Chip
-                label={KIND_LABEL[q.kind] ?? q.kind}
-                size="small"
-                variant="outlined"
-                sx={{ mb: 0.75, height: 18, fontSize: 9, letterSpacing: 1 }}
-              />
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "text.primary",
-                  lineHeight: 1.5,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {q.prompt}
-              </Typography>
-            </Box>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.primary",
+                lineHeight: 1.5,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {q.prompt}
+            </Typography>
             <Typography
               variant="caption"
               color="text.secondary"

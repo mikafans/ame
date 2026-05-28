@@ -18,6 +18,7 @@ import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GradingOutlinedIcon from "@mui/icons-material/GradingOutlined";
+import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
@@ -39,6 +40,7 @@ const ICON_MAP: Record<string, React.ReactElement> = {
   dashboard: <DashboardOutlinedIcon fontSize="small" />,
   author: <EditOutlinedIcon fontSize="small" />,
   grade: <GradingOutlinedIcon fontSize="small" />,
+  questions: <FormatListBulletedOutlinedIcon fontSize="small" />,
   agent: <SmartToyOutlinedIcon fontSize="small" />,
 };
 
@@ -63,6 +65,12 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
     { id: "library", label: "Library", icon: "library", section: "Learn" },
     { id: "exams", label: "Exams", icon: "stack", section: "Learn" },
     { id: "quiz", label: "Take quiz", icon: "take", section: "Learn" },
+    {
+      id: "questions",
+      label: "Question bank",
+      icon: "questions",
+      section: "Learn",
+    },
     { id: "results", label: "Last results", icon: "results", section: "Learn" },
     { id: "dashboard", label: "Progress", icon: "dashboard", section: "Learn" },
     ...(isInstructor

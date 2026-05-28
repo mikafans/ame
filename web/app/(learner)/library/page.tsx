@@ -15,11 +15,9 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
-import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
-import { ShareModal } from "@/components/ShareModal";
 
 interface Quiz {
   id: string;
@@ -37,13 +35,7 @@ interface Quiz {
   createdAt: string;
 }
 
-interface CohortStats {
-  cohortAvg: number | null;
-  percentile: number | null;
-  completionRate: number | null;
-}
-
-type TabId = "all" | "assigned" | "completed" | "drafts";
+type TabId = "all" | "drafts";
 
 export default function LibraryPage() {
   const { user, token } = useAuth();
@@ -53,15 +45,11 @@ export default function LibraryPage() {
     Record<TabId, { quizzes: Quiz[]; total: number }>
   >({
     all: { quizzes: [], total: 0 },
-    assigned: { quizzes: [], total: 0 },
-    completed: { quizzes: [], total: 0 },
     drafts: { quizzes: [], total: 0 },
   });
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState<string | null>(null);
-  const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -87,34 +75,10 @@ export default function LibraryPage() {
         : Promise.resolve({ quizzes: [], total: 0 }),
     ])
       .then(([active, drafts]) => {
-        setAllQuizzes({
-          all: active,
-          assigned: active,
-          completed: { quizzes: [], total: 0 },
-          drafts,
-        });
+        setAllQuizzes({ all: active, drafts });
       })
       .finally(() => setLoading(false));
   }, [token, user?.role]);
-
-  const upNextId =
-    tab === "all" || tab === "assigned"
-      ? (allQuizzes[tab].quizzes[0]?.id ?? null)
-      : null;
-
-  useEffect(() => {
-    if (!token || !upNextId) return;
-    setCohortStats(null);
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${upNextId}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((cs: CohortStats | null) => {
-        if (cs) setCohortStats(cs);
-      })
-      .catch(() => {});
-  }, [token, upNextId]);
 
   async function startQuiz(quizId: string) {
     if (!token) return;
@@ -164,17 +128,6 @@ export default function LibraryPage() {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          letterSpacing: 1.4,
-          textTransform: "uppercase",
-          display: "block",
-        }}
-      >
-        Spring 2026 · Active Term
-      </Typography>
       <Box
         sx={{
           display: "flex",
@@ -308,16 +261,6 @@ export default function LibraryPage() {
           label={`All quizzes (${allQuizzes.all.total})`}
           sx={{ textTransform: "none" }}
         />
-        <Tab
-          value="assigned"
-          label={`Assigned to me (${allQuizzes.assigned.total})`}
-          sx={{ textTransform: "none" }}
-        />
-        <Tab
-          value="completed"
-          label={`Completed (${allQuizzes.completed.total})`}
-          sx={{ textTransform: "none" }}
-        />
         {allQuizzes.drafts.total > 0 && (
           <Tab
             value="drafts"
@@ -405,14 +348,6 @@ export default function LibraryPage() {
                   <Stack direction="row" spacing={1}>
                     <Button
                       size="small"
-                      variant="outlined"
-                      startIcon={<ShareOutlinedIcon />}
-                      onClick={() => setShareOpen(quiz.id)}
-                    >
-                      Share
-                    </Button>
-                    <Button
-                      size="small"
                       variant="contained"
                       startIcon={<PlayArrowOutlinedIcon />}
                       disabled={starting === quiz.id}
@@ -426,18 +361,6 @@ export default function LibraryPage() {
             </Card>
           ))}
         </Stack>
-      )}
-
-      {shareOpen && (
-        <ShareModal
-          payload={{
-            kind: "quiz",
-            id: shareOpen,
-            title: quizzes.find((q) => q.id === shareOpen)?.title || "",
-          }}
-          onClose={() => setShareOpen(null)}
-          bearerToken={token}
-        />
       )}
     </Box>
   );

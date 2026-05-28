@@ -317,22 +317,17 @@ async fn patch_quiz(
             }]));
         }
 
-        let draft_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_quiz_questions qq
-             JOIN tb_questions q ON q.id = qq.question_id
-             WHERE qq.quiz_id = $1 AND q.status != 'live'",
+        // Auto-promote any draft questions attached to this quiz
+        sqlx::query(
+            "UPDATE tb_questions SET status = 'live'
+             WHERE id IN (
+                 SELECT question_id FROM tb_quiz_questions WHERE quiz_id = $1
+             ) AND status = 'draft'",
         )
         .bind(id)
-        .fetch_one(&state.pool)
+        .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
-
-        if draft_count > 0 {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "status".into(),
-                message: "all questions must be live before publishing".into(),
-            }]));
-        }
     }
 
     // Objectives soft-warn at > 6
@@ -599,7 +594,7 @@ async fn add_quiz_question(
     ))
 }
 
-fn default_payload_for_kind(kind: QuestionKind) -> Value {
+pub fn default_payload_for_kind(kind: QuestionKind) -> Value {
     match kind {
         QuestionKind::Mc => serde_json::json!({
             "options": ["Option A", "Option B", "Option C", "Option D"],
@@ -622,6 +617,129 @@ fn default_payload_for_kind(kind: QuestionKind) -> Value {
             "tests": []
         }),
     }
+}
+
+// ── delete quiz ───────────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    delete,
+    path = "/v1/quizzes/{id}",
+    params(("id" = Uuid, Path, description = "Quiz id")),
+    responses(
+        (status = 204, description = "Quiz deleted"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden — only draft quizzes can be deleted"),
+        (status = 404, description = "No such quiz"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
+async fn delete_quiz(
+    State(state): State<AppState>,
+    auth: RequireAnyScope<QuizWriteScopes>,
+    Path(id): Path<Uuid>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    use crate::domain::user::Role;
+    if auth.0.user.role == Role::Learner {
+        return Err(ApiError::ScopeRequired("quiz.write"));
+    }
+
+    let status: Option<String> = sqlx::query_scalar("SELECT status FROM tb_quizzes WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    match status.as_deref() {
+        None => return Err(ApiError::NotFound { resource: "quiz" }),
+        Some(s) if s != "draft" => {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "status".into(),
+                message: "only draft quizzes can be deleted; archive an active quiz instead".into(),
+            }]));
+        }
+        _ => {}
+    }
+
+    // Delete orphaned draft questions that were only used by this quiz
+    sqlx::query(
+        "DELETE FROM tb_questions
+         WHERE status = 'draft'
+           AND id IN (SELECT question_id FROM tb_quiz_questions WHERE quiz_id = $1)
+           AND NOT EXISTS (
+               SELECT 1 FROM tb_quiz_questions
+               WHERE question_id = tb_questions.id AND quiz_id != $1
+           )",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    sqlx::query("DELETE FROM tb_quizzes WHERE id = $1")
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+// ── remove question from quiz ─────────────────────────────────────────────────
+
+#[utoipa::path(
+    delete,
+    path = "/v1/quizzes/{id}/questions/{question_id}",
+    params(
+        ("id" = Uuid, Path, description = "Quiz id"),
+        ("question_id" = Uuid, Path, description = "Question id"),
+    ),
+    responses(
+        (status = 204, description = "Question removed from quiz"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "No such quiz or question"),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
+async fn remove_quiz_question(
+    State(state): State<AppState>,
+    auth: RequireAnyScope<QuizWriteScopes>,
+    Path((quiz_id, question_id)): Path<(Uuid, Uuid)>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    use crate::domain::user::Role;
+    if auth.0.user.role == Role::Learner {
+        return Err(ApiError::ScopeRequired("quiz.write"));
+    }
+
+    let deleted =
+        sqlx::query("DELETE FROM tb_quiz_questions WHERE quiz_id = $1 AND question_id = $2")
+            .bind(quiz_id)
+            .bind(question_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if deleted.rows_affected() == 0 {
+        return Err(ApiError::NotFound {
+            resource: "quiz_question",
+        });
+    }
+
+    // Delete the question itself if it's a draft not used by any other quiz
+    sqlx::query(
+        "DELETE FROM tb_questions
+         WHERE id = $1
+           AND status = 'draft'
+           AND NOT EXISTS (SELECT 1 FROM tb_quiz_questions WHERE question_id = $1)",
+    )
+    .bind(question_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 // ── count ────────────────────────────────────────────────────────────────────
@@ -731,7 +849,14 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/quizzes", get(list_quizzes).post(create_quiz))
         .route("/v1/quizzes/count", get(count_quizzes))
         .route("/v1/quizzes/generate", post(generate_quiz))
-        .route("/v1/quizzes/{id}", get(get_quiz).patch(patch_quiz))
+        .route(
+            "/v1/quizzes/{id}",
+            get(get_quiz).patch(patch_quiz).delete(delete_quiz),
+        )
         .route("/v1/quizzes/{id}/questions", post(add_quiz_question))
+        .route(
+            "/v1/quizzes/{id}/questions/{question_id}",
+            axum::routing::delete(remove_quiz_question),
+        )
         .with_state(state)
 }

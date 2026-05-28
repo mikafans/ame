@@ -410,6 +410,36 @@ paths:
           - integer
           - 'null'
           format: int64
+      - name: search
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: kind
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: page
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
+      - name: page_size
+        in: path
+        required: true
+        schema:
+          type:
+          - integer
+          - 'null'
+          format: int64
       responses:
         '200':
           description: Filtered list of questions
@@ -2356,6 +2386,10 @@ components:
     QuestionFilter:
       type: object
       properties:
+        kind:
+          type:
+          - string
+          - 'null'
         limit:
           type: integer
           format: int64
@@ -2372,6 +2406,10 @@ components:
         offset:
           type: integer
           format: int64
+        search:
+          type:
+          - string
+          - 'null'
         status:
           oneOf:
           - type: 'null'

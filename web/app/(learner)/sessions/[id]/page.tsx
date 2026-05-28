@@ -212,7 +212,7 @@ export default function ActiveQuizPage({
           body: { status: "abandoned" },
         } as never,
       );
-      router.push("/sessions");
+      router.push("/library");
     } catch (err) {
       console.error(err);
     }

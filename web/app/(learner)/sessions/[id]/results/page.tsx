@@ -16,8 +16,6 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircle";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
-import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
-import { ShareModal } from "@/components/ShareModal";
 
 interface Answer {
   qid: string;
@@ -68,7 +66,7 @@ export default function ResultsPage({
   const router = useRouter();
   const [data, setData] = useState<ResultData | null>(null);
   const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,7 +95,27 @@ export default function ResultsPage({
           total: result.max_points ?? 0,
           answers: questions.map((q: any) => {
             const attempt = byQuestion.get(q.questionId);
-            const body = attempt?.response?.body || attempt?.response?.answer;
+            const r = attempt?.response as Record<string, unknown> | undefined;
+            let given = "";
+            if (r) {
+              if ("selected_position" in r) {
+                const pos = r.selected_position as number;
+                given =
+                  ["A", "B", "C", "D", "E", "F"][pos] ?? `Option ${pos + 1}`;
+              } else if ("answer" in r) {
+                const ans = r.answer;
+                given =
+                  typeof ans === "boolean"
+                    ? ans
+                      ? "True"
+                      : "False"
+                    : String(ans ?? "");
+              } else if ("body" in r) {
+                given = String(r.body ?? "");
+              } else if ("source" in r) {
+                given = String(r.source ?? "");
+              }
+            }
             const score = attempt?.score ?? 0;
             const points = Math.round(score * q.points);
             const status = attempt?.grade_status ?? "ungraded";
@@ -108,7 +126,7 @@ export default function ResultsPage({
               max: q.points,
               type: q.kind,
               prompt: q.prompt,
-              given: typeof body === "string" ? body : "",
+              given,
               gradeStatus: status,
               note:
                 status === "pending_manual"
@@ -272,26 +290,7 @@ export default function ResultsPage({
         <Button variant="outlined" onClick={() => router.push("/library")}>
           Back to library
         </Button>
-        <Button
-          variant="outlined"
-          startIcon={<ShareOutlinedIcon />}
-          onClick={() => setShareOpen(true)}
-        >
-          Share
-        </Button>
       </Stack>
-
-      {shareOpen && data.quiz_id && (
-        <ShareModal
-          payload={{
-            kind: "quiz",
-            id: data.quiz_id,
-            title: data.quiz_title ?? "",
-          }}
-          onClose={() => setShareOpen(false)}
-          bearerToken={token}
-        />
-      )}
     </Box>
   );
 }

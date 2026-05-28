@@ -87,6 +87,10 @@ pub struct QuestionFilter {
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 fn default_limit() -> i64 {
@@ -95,6 +99,13 @@ fn default_limit() -> i64 {
 
 fn default_points() -> i32 {
     1
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct QuestionRow {
+    #[serde(flatten)]
+    pub question: Question,
+    pub tags: Vec<String>,
 }
 
 fn row_to_question(row: &sqlx::postgres::PgRow) -> Result<Question, ApiError> {
@@ -210,6 +221,64 @@ pub async fn list_questions(
     .map_err(internal)?;
 
     rows.iter().map(row_to_question).collect()
+}
+
+pub async fn list_questions_paged(
+    pool: &PgPool,
+    filter: &QuestionFilter,
+) -> Result<(Vec<QuestionRow>, i64), ApiError> {
+    let status_str = filter.status.map(|s| s.as_str().to_string());
+    let limit = filter.limit.clamp(1, 200);
+    let offset = filter.offset.max(0);
+
+    let rows = sqlx::query(
+        "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.status, \
+                q.source, q.points, q.rating, q.attempts_count, q.version, q.created_by, q.created_at, q.updated_at,
+                COUNT(*) OVER() as total_count,
+                COALESCE(ARRAY_AGG(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[]) as tag_names \
+         FROM tb_questions q \
+         LEFT JOIN tb_question_tags qt ON qt.question_id = q.id \
+         LEFT JOIN tb_tags t ON t.id = qt.tag_id \
+         WHERE ($1::text IS NULL OR EXISTS (SELECT 1 FROM tb_question_tags qt2 JOIN tb_tags t2 ON t2.id = qt2.tag_id WHERE qt2.question_id = q.id AND t2.name = $1)) \
+           AND ($2::text IS NULL OR q.status = $2) \
+           AND ($3::double precision IS NULL OR q.rating >= $3) \
+           AND ($4::double precision IS NULL OR q.rating <= $4) \
+           AND ($5::text IS NULL OR q.kind = $5) \
+           AND ($6::text IS NULL OR q.prompt_tsv @@ plainto_tsquery('english', $6)) \
+         GROUP BY q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.status, \
+                  q.source, q.points, q.rating, q.attempts_count, q.version, q.created_by, q.created_at, q.updated_at \
+         ORDER BY (CASE WHEN $6::text IS NOT NULL THEN ts_rank(q.prompt_tsv, plainto_tsquery('english', $6)) ELSE 0 END) DESC, q.created_at DESC \
+         LIMIT $7 OFFSET $8",
+    )
+    .bind(filter.tag.as_deref())
+    .bind(status_str)
+    .bind(filter.min_rating)
+    .bind(filter.max_rating)
+    .bind(filter.kind.as_deref())
+    .bind(filter.search.as_deref())
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    let total_count = if rows.is_empty() {
+        0
+    } else {
+        rows[0].get::<i64, _>("total_count")
+    };
+
+    let mut results = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let question = row_to_question(row)?;
+        let tag_names: Vec<String> = row.get("tag_names");
+        results.push(QuestionRow {
+            question,
+            tags: tag_names,
+        });
+    }
+
+    Ok((results, total_count))
 }
 
 pub async fn create_questions(

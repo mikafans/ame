@@ -1,5 +1,7 @@
 .PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi
 
+COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
+
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN{FS=":.*?## "}{printf "%-16s %s\n", $$1, $$2}'
 
@@ -104,11 +106,11 @@ check: fmt-check lint test ## Pre-commit gate (read-only)
 
 ci: check test-db e2e ## Full CI gate: fmt + lint + unit + db tests + e2e
 
-db-up: ## Start Postgres in docker
-	docker compose -f db/docker-compose.yml up -d
+db-up: ## Start Postgres (docker or podman)
+	$(COMPOSE) -f db/docker-compose.yml up -d
 
 db-down: ## Stop Postgres
-	docker compose -f db/docker-compose.yml down
+	$(COMPOSE) -f db/docker-compose.yml down
 
 db-reset: db-down ## Wipe and recreate DB from scratch (local dev only)
 	rm -rf db/data
@@ -140,7 +142,7 @@ init-env: ## One-time setup: mise install + sqlx-cli + web deps + playwright
 
 stop: ## Stop API, frontend, and Postgres
 	@lsof -ti :8080 -ti :3000 | xargs kill -9 2>/dev/null || true
-	docker compose -f db/docker-compose.yml down
+	$(COMPOSE) -f db/docker-compose.yml down
 
 API_HOST ?= localhost
 

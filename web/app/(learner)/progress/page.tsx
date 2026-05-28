@@ -6,7 +6,6 @@ import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -50,7 +49,7 @@ interface TagAvg {
 
 export default function ProgressPage() {
   const { token } = useAuth();
-  const [window, setWindow] = useState<WindowType>("12w");
+  const [win, setWin] = useState<WindowType>("12w");
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [tagNames, setTagNames] = useState<Record<string, string>>({});
@@ -60,14 +59,18 @@ export default function ProgressPage() {
   useEffect(() => {
     if (!token) return;
     setStatsLoading(true);
+    const apiWindow = win === "4w" ? "last30d" : "all";
     makeClient(token)
-      .GET("/v1/me/stats" as never, { params: { query: { window } } } as never)
+      .GET(
+        "/v1/me/stats" as never,
+        { params: { query: { window: apiWindow } } } as never,
+      )
       .then(({ data }: { data?: StatsResponse }) => {
         if (data) setStats(data);
       })
       .catch(console.error)
       .finally(() => setStatsLoading(false));
-  }, [token, window]);
+  }, [token, win]);
 
   useEffect(() => {
     if (!token) return;
@@ -76,7 +79,7 @@ export default function ProgressPage() {
       makeClient(token)
         .GET(
           "/v1/me/attempts" as never,
-          { params: { query: { limit: 200 } } } as never,
+          { params: { query: { limit: 500 } } } as never,
         )
         .then(
           ({ data }: { data?: { attempts: Attempt[]; total: number } }) =>
@@ -98,9 +101,15 @@ export default function ProgressPage() {
       .finally(() => setAttemptsLoading(false));
   }, [token]);
 
-  const weeklyAvgs = computeWeeklyAverages(attempts);
-  const tagAvgs = computeTagAverages(attempts, tagNames);
+  const filteredAttempts = filterByWindow(attempts, win);
+  const weeklyAvgs = computeWeeklyAverages(filteredAttempts);
+  const tagAvgs = computeTagAverages(filteredAttempts, tagNames);
   const topTags = tagAvgs.sort((a, b) => b.count - a.count).slice(0, 6);
+
+  const windowAvgScore = filteredAttempts.length
+    ? filteredAttempts.reduce((s, a) => s + a.score, 0) /
+      filteredAttempts.length
+    : null;
 
   return (
     <Box sx={{ p: 4 }}>
@@ -128,21 +137,16 @@ export default function ProgressPage() {
             Progress dashboard
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <ToggleButtonGroup
-            value={window}
-            exclusive
-            onChange={(_, v) => v && setWindow(v)}
-            size="small"
-          >
-            <ToggleButton value="4w">4w</ToggleButton>
-            <ToggleButton value="12w">12w</ToggleButton>
-            <ToggleButton value="all">All</ToggleButton>
-          </ToggleButtonGroup>
-          <Button variant="outlined" size="small">
-            Export
-          </Button>
-        </Stack>
+        <ToggleButtonGroup
+          value={win}
+          exclusive
+          onChange={(_, v) => v && setWin(v)}
+          size="small"
+        >
+          <ToggleButton value="4w">4w</ToggleButton>
+          <ToggleButton value="12w">12w</ToggleButton>
+          <ToggleButton value="all">All</ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       {statsLoading ? (
@@ -154,10 +158,13 @@ export default function ProgressPage() {
           {[
             {
               label: "Avg score",
-              value: `${Math.round(stats.avg_score * 100)}%`,
+              value:
+                windowAvgScore !== null
+                  ? `${Math.round(windowAvgScore * 100)}%`
+                  : `${Math.round((stats.avg_score ?? 0) * 100)}%`,
             },
-            { label: "Attempts", value: String(stats.attempts_total ?? 0) },
-            { label: "Hours", value: `${stats.hours_spent ?? 0}h` },
+            { label: "Attempts", value: String(filteredAttempts.length) },
+            { label: "Time", value: formatHours(stats.hours_spent ?? 0) },
             { label: "Streak", value: `${stats.current_streak ?? 0}d` },
           ].map(({ label, value }) => (
             <Card key={label} variant="outlined" sx={{ flex: 1 }}>
@@ -333,21 +340,49 @@ function BarChart({ data }: { data: TagAvg[] }) {
   );
 }
 
+function formatHours(h: number): string {
+  if (h < 1 / 60) return "< 1m";
+  if (h < 1) return `${Math.round(h * 60)}m`;
+  return `${h.toFixed(1)}h`;
+}
+
+function filterByWindow(attempts: Attempt[], win: WindowType): Attempt[] {
+  if (win === "all") return attempts;
+  const weeks = win === "4w" ? 4 : 12;
+  const cutoff = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
+  return attempts.filter((a) => new Date(a.created_at).getTime() >= cutoff);
+}
+
+function yearWeekKey(date: Date): string {
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  );
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const year = d.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return `${year}-${String(week).padStart(2, "0")}`;
+}
+
 function computeWeeklyAverages(attempts: Attempt[]): WeeklyAvg[] {
   if (attempts.length === 0) return [];
-  const weekMap = new Map<number, { sum: number; count: number }>();
+  const weekMap = new Map<string, { sum: number; count: number }>();
   for (const a of attempts) {
-    const date = new Date(a.created_at);
-    const week = getISO8601Week(date);
-    if (!weekMap.has(week)) weekMap.set(week, { sum: 0, count: 0 });
-    const entry = weekMap.get(week)!;
+    const key = yearWeekKey(new Date(a.created_at));
+    const entry = weekMap.get(key) ?? { sum: 0, count: 0 };
     entry.sum += a.score;
     entry.count++;
+    weekMap.set(key, entry);
   }
   return Array.from(weekMap.entries())
-    .sort((a, b) => a[0] - b[0])
-    .slice(-12)
-    .map(([week, data]) => ({ week, score: data.sum / data.count }));
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([week, data]) => ({
+      week: parseInt(week.split("-")[1]),
+      score: data.sum / data.count,
+    }));
 }
 
 function computeTagAverages(
@@ -357,11 +392,12 @@ function computeTagAverages(
   const tagMap = new Map<string, { sum: number; count: number }>();
   for (const a of attempts) {
     for (const tagId of Object.keys(a.user_tag_deltas)) {
-      const tag = tagNames[tagId] ?? tagId;
-      if (!tagMap.has(tag)) tagMap.set(tag, { sum: 0, count: 0 });
-      const entry = tagMap.get(tag)!;
+      const name = tagNames[tagId];
+      if (!name) continue; // skip unknown tag IDs
+      const entry = tagMap.get(name) ?? { sum: 0, count: 0 };
       entry.sum += a.score;
       entry.count++;
+      tagMap.set(name, entry);
     }
   }
   return Array.from(tagMap.entries()).map(([tag, data]) => ({
@@ -369,14 +405,4 @@ function computeTagAverages(
     score: data.sum / data.count,
     count: data.count,
   }));
-}
-
-function getISO8601Week(date: Date): number {
-  const d = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-  );
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }

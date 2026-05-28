@@ -17,9 +17,7 @@ import TextField from "@mui/material/TextField";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
-import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
-import { ShareModal } from "@/components/ShareModal";
 
 interface ExamSection {
   id: string;
@@ -47,12 +45,19 @@ interface Exam {
   tags?: string[];
 }
 
-type TabId = "all" | "published" | "scheduled" | "draft";
+type TabId = "all" | "published" | "draft";
+
+interface AvailableQuestion {
+  id: string;
+  kind: string;
+  prompt: string;
+  points: number;
+}
 
 interface SectionDraft {
   title: string;
   weight: number;
-  questionIds: string;
+  selectedIds: Set<string>;
 }
 
 export default function ExamsPage() {
@@ -67,11 +72,14 @@ export default function ExamsPage() {
   const [composeDesc, setComposeDesc] = useState("");
   const [composeDuration, setComposeDuration] = useState(60);
   const [sections, setSections] = useState<SectionDraft[]>([
-    { title: "", weight: 1, questionIds: "" },
+    { title: "", weight: 60, selectedIds: new Set() },
   ]);
+  const [availableQuestions, setAvailableQuestions] = useState<
+    AvailableQuestion[]
+  >([]);
   const [composeError, setComposeError] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
-  const [shareExam, setShareExam] = useState<Exam | null>(null);
+
   const [starting, setStarting] = useState(false);
 
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
@@ -100,7 +108,6 @@ export default function ExamsPage() {
   const tabs: { id: TabId; label: string }[] = [
     { id: "all", label: "All" },
     { id: "published", label: "Active" },
-    { id: "scheduled", label: "Scheduled" },
     { id: "draft", label: "Drafts" },
   ];
 
@@ -124,6 +131,20 @@ export default function ExamsPage() {
     }
   }
 
+  function openCompose() {
+    setShowCompose(true);
+    if (!token) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (makeClient(token) as any)
+      .GET("/v1/questions", {
+        params: { query: { status: "live", limit: 200 } },
+      })
+      .then(({ data }: { data?: { questions: AvailableQuestion[] } }) => {
+        setAvailableQuestions(data?.questions ?? []);
+      })
+      .catch(console.error);
+  }
+
   async function handleCompose() {
     if (!token) return;
     setComposing(true);
@@ -132,14 +153,11 @@ export default function ExamsPage() {
       const body = {
         name: composeName,
         description: composeDesc || undefined,
-        durationMin: composeDuration,
+        duration: composeDuration,
         sections: sections.map((s, i) => ({
           title: s.title || `Section ${i + 1}`,
-          weight: s.weight,
-          questionIds: s.questionIds
-            .split(",")
-            .map((x) => x.trim())
-            .filter(Boolean),
+          weight: s.weight / 100,
+          questionIds: Array.from(s.selectedIds),
           items: null,
           tags: [],
           types: [],
@@ -256,11 +274,7 @@ export default function ExamsPage() {
 
         {isInstructor && (
           <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => setShowCompose(true)}
-            >
+            <Button fullWidth variant="outlined" onClick={openCompose}>
               Compose exam
             </Button>
           </Box>
@@ -312,13 +326,6 @@ export default function ExamsPage() {
                     Publish
                   </Button>
                 )}
-                <Button
-                  variant="outlined"
-                  startIcon={<ShareOutlinedIcon />}
-                  onClick={() => setShareExam(exam)}
-                >
-                  Share
-                </Button>
               </Stack>
             </Box>
 
@@ -353,7 +360,7 @@ export default function ExamsPage() {
                             {s.title}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {s.items} questions · {s.weight}pts
+                            {s.items} questions · {Math.round(s.weight * 100)}%
                           </Typography>
                         </Box>
                       </CardContent>
@@ -411,36 +418,143 @@ export default function ExamsPage() {
                 <Divider />
                 <Typography variant="subtitle2">Sections</Typography>
                 {sections.map((s, i) => (
-                  <Stack key={i} spacing={1}>
-                    <TextField
-                      label="Section title"
-                      value={s.title}
-                      onChange={(e) => {
-                        const ns = [...sections];
-                        ns[i].title = e.target.value;
-                        setSections(ns);
-                      }}
-                      fullWidth
-                      size="small"
-                    />
-                    <TextField
-                      label="Question IDs (comma-separated)"
-                      value={s.questionIds}
-                      onChange={(e) => {
-                        const ns = [...sections];
-                        ns[i].questionIds = e.target.value;
-                        setSections(ns);
-                      }}
-                      fullWidth
-                      size="small"
-                    />
-                  </Stack>
+                  <Box
+                    key={i}
+                    sx={{
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      p: 1.5,
+                    }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" spacing={1}>
+                        <TextField
+                          label="Section title"
+                          value={s.title}
+                          onChange={(e) => {
+                            const ns = [...sections];
+                            ns[i] = { ...ns[i], title: e.target.value };
+                            setSections(ns);
+                          }}
+                          fullWidth
+                          size="small"
+                        />
+                        <TextField
+                          label="Weight %"
+                          type="number"
+                          value={s.weight}
+                          onChange={(e) => {
+                            const ns = [...sections];
+                            ns[i] = {
+                              ...ns[i],
+                              weight: Number(e.target.value),
+                            };
+                            setSections(ns);
+                          }}
+                          size="small"
+                          sx={{ width: 100 }}
+                          slotProps={{ htmlInput: { min: 1, max: 100 } }}
+                        />
+                      </Stack>
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", mb: 0.75 }}
+                        >
+                          Questions ({s.selectedIds.size} selected)
+                        </Typography>
+                        <Box
+                          sx={{
+                            maxHeight: 180,
+                            overflowY: "auto",
+                            border: 1,
+                            borderColor: "divider",
+                            borderRadius: 1,
+                          }}
+                        >
+                          {availableQuestions.length === 0 ? (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ p: 1.5, display: "block" }}
+                            >
+                              No live questions available.
+                            </Typography>
+                          ) : (
+                            availableQuestions.map((q) => {
+                              const checked = s.selectedIds.has(q.id);
+                              return (
+                                <Box
+                                  key={q.id}
+                                  onClick={() => {
+                                    const ns = [...sections];
+                                    const ids = new Set(ns[i].selectedIds);
+                                    checked ? ids.delete(q.id) : ids.add(q.id);
+                                    ns[i] = { ...ns[i], selectedIds: ids };
+                                    setSections(ns);
+                                  }}
+                                  sx={{
+                                    px: 1.5,
+                                    py: 0.75,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    gap: 1,
+                                    alignItems: "flex-start",
+                                    borderBottom: 1,
+                                    borderColor: "divider",
+                                    bgcolor: checked
+                                      ? "action.selected"
+                                      : "transparent",
+                                    "&:last-child": { borderBottom: 0 },
+                                    "&:hover": {
+                                      bgcolor: checked
+                                        ? "action.selected"
+                                        : "action.hover",
+                                    },
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{
+                                      fontFamily: "monospace",
+                                      pt: 0.1,
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {q.kind.toUpperCase()}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ flex: 1, lineHeight: 1.4 }}
+                                  >
+                                    {q.prompt.length > 80
+                                      ? q.prompt.slice(0, 80) + "…"
+                                      : q.prompt}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ flexShrink: 0 }}
+                                  >
+                                    {q.points}pt
+                                  </Typography>
+                                </Box>
+                              );
+                            })
+                          )}
+                        </Box>
+                      </Box>
+                    </Stack>
+                  </Box>
                 ))}
                 <Button
                   onClick={() =>
                     setSections([
                       ...sections,
-                      { title: "", weight: 1, questionIds: "" },
+                      { title: "", weight: 40, selectedIds: new Set() },
                     ])
                   }
                   variant="outlined"
@@ -467,13 +581,6 @@ export default function ExamsPage() {
             </CardContent>
           </Card>
         </Box>
-      )}
-
-      {shareExam && (
-        <ShareModal
-          payload={{ kind: "exam", id: shareExam.id, title: shareExam.name }}
-          onClose={() => setShareExam(null)}
-        />
       )}
     </Box>
   );

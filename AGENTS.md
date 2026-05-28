@@ -29,6 +29,14 @@ This file is the canonical, machine-readable rundown of how to work in this repo
 See `docs/specs/2026-05-20-harus-platform-design.md` for the current architecture spec. It replaces `2026-05-19-question-exam-platform-design.md` (kept on disk as historical reference only).
 See `docs/plans/` for implementation plans, including `docs/plans/2026-05-20-design-gap-analysis.md` for the latest design ↔ spec gap audit.
 
+## Data model constraints
+
+- **MC options**: bare strings (`Vec<String>` in `McPayload`) — never `{text:"..."}` objects. Both the grading engine and frontend `McOptionsEditor` expect this format.
+- **Scheduled exams**: not supported. No `opens_at`/`closes_at` in `tb_exams` or the API.
+- **Auth**: email + password only (`POST /v1/auth/register`, `/v1/auth/login`). SSO/SAML not implemented.
+- **Quiz publish**: `PATCH /v1/quizzes/{id}` with `status: active` auto-promotes any draft questions to live.
+- **Code questions**: fall back to `pending_manual` grading unless `payload.exemplar` is set; exemplar match is exact (whitespace-trimmed).
+
 ## Module boundaries (api/src/)
 `engine/` and `assess/` may depend on `bank/` and `domain/`. Reverse is forbidden. `bank/` does not know that attempts exist.
 
@@ -78,6 +86,15 @@ curl -s <url> -H "..." -o /tmp/out.json && jq '.field' /tmp/out.json
 
 ### Temp files
 Use `.tmp/` at repo root (gitignored). Clean with `rm -rf .tmp/*.png .tmp/.playwright-cli` after a session.
+
+## Shell discipline
+
+- **cwd is always the repo root** — never prepend `cd api &&` or `cd web &&`. Use `make <target>` for everything; it sets the right cwd internally.
+- **Search**: `rg` not `grep -r`. **Find**: `fd` not `find`. If `rg` returns a path, `Read` the file — never pipe into `xargs rg`.
+- **Long output**: redirect to a file (`make check > /tmp/check.log 2>&1`) and `Read /tmp/check.log`. rtk truncates tool output; grepping truncated output silently misses lines.
+- **Migration checksum mismatch** (sqlfluff reformats a migration after sqlx recorded its checksum): fix with `make db-reset && make dev`, not manual `_sqlx_migrations` surgery.
+- **JS runtime**: `bun` not `node`. Playwright scripts: `bun .claude/scripts/<name>.js`.
+- **Verifier scripts**: write to `.claude/scripts/` so they can be reused across sessions.
 
 ## Agent operations
 `agents/` at the project root contains skill markdowns for agent-driven workflows:

@@ -558,11 +558,159 @@ fn build_mcp_manifest(strict: bool) -> Value {
     })
 }
 
+// ── invoke ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct InvokeBody {
+    pub tool: String,
+    pub params: Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InvokeResponse {
+    pub ok: bool,
+    pub tool: String,
+    pub result: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+pub async fn invoke(
+    State(state): State<AppState>,
+    auth: RequireAnyScope<AgentReadScopes>,
+    Json(body): Json<InvokeBody>,
+) -> Result<Json<InvokeResponse>, ApiError> {
+    match body.tool.as_str() {
+        "quiz.import" => invoke_quiz_import(&state, &auth.0.user.id, body.params).await,
+        other => Ok(Json(InvokeResponse {
+            ok: false,
+            tool: other.to_string(),
+            result: Value::Null,
+            error: Some(format!("unknown tool: {other}")),
+        })),
+    }
+}
+
+async fn invoke_quiz_import(
+    state: &AppState,
+    user_id: &Uuid,
+    params: Value,
+) -> Result<Json<InvokeResponse>, ApiError> {
+    use crate::domain::question::QuestionKind;
+
+    let source = params.get("source").and_then(|v| v.as_str()).unwrap_or("");
+    let parsed: Value = serde_json::from_str(source).map_err(|e| {
+        ApiError::Validation(vec![FieldError {
+            field: "source".into(),
+            message: format!("invalid JSON: {e}"),
+        }])
+    })?;
+
+    let title = parsed
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Imported quiz")
+        .to_string();
+    let course = parsed
+        .get("course")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let objectives: Vec<String> = parsed
+        .get("objectives")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let quiz_row = sqlx::query(
+        "INSERT INTO tb_quizzes (title, objectives, course, status, created_by)
+         VALUES ($1, $2, $3, 'draft', $4)
+         RETURNING id",
+    )
+    .bind(&title)
+    .bind(&objectives)
+    .bind(&course)
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let quiz_id: Uuid = quiz_row.get("id");
+
+    let questions = parsed
+        .get("questions")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let mut created = 0i32;
+    for (order_index, q) in questions.iter().enumerate() {
+        let kind_str = q.get("kind").and_then(|v| v.as_str()).unwrap_or("mc");
+        let kind: QuestionKind = kind_str.parse().unwrap_or(QuestionKind::Mc);
+        let prompt = q
+            .get("prompt")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let points: i32 = q.get("points").and_then(|v| v.as_i64()).unwrap_or(1) as i32;
+        let explanation = q
+            .get("explanation")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let default_payload = super::quizzes::default_payload_for_kind(kind);
+        let payload = q.get("payload").cloned().unwrap_or(default_payload);
+
+        let q_row = sqlx::query(
+            "INSERT INTO tb_questions (kind, prompt, payload, explanation, status, points, created_by)
+             VALUES ($1, $2, $3, $4, 'draft', $5, $6)
+             RETURNING id",
+        )
+        .bind(kind.as_str())
+        .bind(&prompt)
+        .bind(&payload)
+        .bind(&explanation)
+        .bind(points)
+        .bind(user_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        let q_id: Uuid = q_row.get("id");
+
+        sqlx::query(
+            "INSERT INTO tb_quiz_questions (quiz_id, question_id, order_index) VALUES ($1, $2, $3)",
+        )
+        .bind(quiz_id)
+        .bind(q_id)
+        .bind(order_index as i32)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        created += 1;
+    }
+
+    Ok(Json(InvokeResponse {
+        ok: true,
+        tool: "quiz.import".into(),
+        result: json!({
+            "quizId": quiz_id,
+            "title": title,
+            "questionsCreated": created,
+        }),
+        error: None,
+    }))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/agents/register", post(register))
         .route("/v1/agents/mcp.json", get(mcp_manifest))
         .route("/v1/agents/openapi.json", get(openapi_json))
         .route("/v1/agents/activity", get(activity))
+        .route("/v1/agents/invoke", post(invoke))
         .with_state(state)
 }

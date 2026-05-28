@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
 import { makeClient } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
@@ -14,6 +15,7 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
 interface QuizQuestion {
   id: string;
@@ -68,6 +70,7 @@ export default function AuthorStudioPage({
 }) {
   const { quizId } = use(params);
   const { token } = useAuth();
+  const router = useRouter();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -84,14 +87,16 @@ export default function AuthorStudioPage({
   const [editTag, setEditTag] = useState("");
   const [editQuestionDifficulty, setEditQuestionDifficulty] =
     useState("intermediate");
+  const [editPayload, setEditPayload] = useState<Record<string, unknown>>({});
 
   const [, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [showKindPicker, setShowKindPicker] = useState(false);
 
-  function load() {
+  function load(showSpinner = false) {
     if (!token) return;
-    setLoading(true);
+    if (showSpinner) setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (makeClient(token) as any)
       .GET(`/v1/quizzes/${quizId}`)
@@ -113,7 +118,7 @@ export default function AuthorStudioPage({
   }
 
   useEffect(() => {
-    load();
+    load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, quizId]);
 
@@ -126,6 +131,7 @@ export default function AuthorStudioPage({
       setEditPoints(selectedQ.points);
       setEditTag("");
       setEditQuestionDifficulty("intermediate");
+      setEditPayload((selectedQ.payload as Record<string, unknown>) ?? {});
     }
   }, [selectedQ]);
 
@@ -151,9 +157,13 @@ export default function AuthorStudioPage({
     }
   }
 
-  async function saveQuestion() {
+  async function saveQuestion(payloadOverride?: Record<string, unknown>) {
     if (!token || !selectedId) return;
     setSaving(true);
+    const tags = editTag
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (makeClient(token) as any).PATCH(`/v1/questions/${selectedId}`, {
@@ -161,6 +171,8 @@ export default function AuthorStudioPage({
           prompt: editPrompt,
           explanation: editExplanation || undefined,
           points: editPoints,
+          tags: tags.length > 0 ? tags : undefined,
+          payload: payloadOverride ?? editPayload,
         },
       });
       load();
@@ -171,15 +183,63 @@ export default function AuthorStudioPage({
     }
   }
 
-  async function addQuestion() {
+  async function addQuestion(kind: string) {
     if (!token) return;
+    setShowKindPicker(false);
     setSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (makeClient(token) as any).POST(`/v1/quizzes/${quizId}/questions`, {
-        body: { kind: "mc", prompt: "" },
-      });
+      const { data } = await (makeClient(token) as any).POST(
+        `/v1/quizzes/${quizId}/questions`,
+        { body: { kind, prompt: "" } },
+      );
       load();
+      if (data?.questionId) setSelectedId(data.questionId);
+    } catch {
+      // noop
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteQuestion(id: string) {
+    if (!token) return;
+    const remaining = quiz?.questions.filter((q) => q.id !== id) ?? [];
+    if (selectedId === id)
+      setSelectedId(remaining.length > 0 ? remaining[0].id : null);
+    setQuiz((q) =>
+      q ? { ...q, questions: q.questions.filter((qq) => qq.id !== id) } : q,
+    );
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (makeClient(token) as any).DELETE(
+        `/v1/quizzes/${quizId}/questions/${id}`,
+      );
+      load();
+    } catch (err) {
+      console.error("delete failed", err);
+      load();
+    }
+  }
+
+  async function changeKind(newKind: string) {
+    if (!token || !selectedId || !selectedQ) return;
+    if (newKind === selectedQ.kind) return;
+    setSaving(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = makeClient(token) as any;
+      const { data } = await client.POST(`/v1/quizzes/${quizId}/questions`, {
+        body: {
+          kind: newKind,
+          prompt: editPrompt,
+          points: editPoints,
+          explanation: editExplanation || undefined,
+        },
+      });
+      await client.POST(`/v1/questions/${selectedId}/archive`);
+      load();
+      if (data?.questionId) setSelectedId(data.questionId);
     } catch {
       // noop
     } finally {
@@ -210,8 +270,16 @@ export default function AuthorStudioPage({
 
   const outlineComplete =
     editTitle.trim().length > 0 && (quiz?.questions.length ?? 0) > 0;
-  const questionsNeedingReview =
-    quiz?.questions.filter((q) => !q.points || !q.prompt).length ?? 0;
+  const incompleteQuestions =
+    quiz?.questions
+      .map((q, idx) => {
+        const issues: string[] = [];
+        if (!q.prompt?.trim()) issues.push("no prompt");
+        if (!q.points) issues.push("0 pts");
+        return issues.length > 0 ? { idx: idx + 1, id: q.id, issues } : null;
+      })
+      .filter(Boolean) ?? [];
+  const questionsNeedingReview = incompleteQuestions.length;
   const totalPoints =
     quiz?.questions.reduce((sum, q) => sum + (q.points || 0), 0) ?? 0;
   const minutesAgo = getMinutesAgo(quiz?.updated_at ?? "");
@@ -262,13 +330,29 @@ export default function AuthorStudioPage({
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <Button variant="outlined" size="small">
+          <Button
+            variant="outlined"
+            size="small"
+            disabled
+            title="Not yet available"
+          >
             Import
           </Button>
-          <Button variant="outlined" size="small">
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => router.push(`/quizzes/${quizId}/preview`)}
+          >
             Preview
           </Button>
-          <Button variant="outlined" size="small" onClick={saveMetadata}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={async () => {
+              await saveMetadata();
+              router.push("/author");
+            }}
+          >
             Save draft
           </Button>
           <Button
@@ -428,7 +512,11 @@ export default function AuthorStudioPage({
             ) : (
               <>
                 <span>✗</span>
-                <span>{questionsNeedingReview} questions need review</span>
+                <span>
+                  {incompleteQuestions
+                    .map((q) => `Q${q!.idx} (${q!.issues.join(", ")})`)
+                    .join(" · ")}
+                </span>
               </>
             )}
           </Box>
@@ -481,12 +569,51 @@ export default function AuthorStudioPage({
               size="small"
               variant="outlined"
               startIcon={<AddOutlinedIcon sx={{ fontSize: 12 }} />}
-              onClick={addQuestion}
+              onClick={() => setShowKindPicker((v) => !v)}
               sx={{ minWidth: 0 }}
             >
               Add
             </Button>
           </Box>
+
+          {showKindPicker && (
+            <Box
+              sx={{
+                px: 2,
+                py: 1.5,
+                borderBottom: 1,
+                borderColor: "divider",
+                bgcolor: "action.hover",
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  fontFamily: "monospace",
+                  display: "block",
+                  mb: 1,
+                  fontSize: 10,
+                  letterSpacing: 1,
+                }}
+              >
+                Choose type
+              </Typography>
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                {(["mc", "tf", "short", "essay", "code"] as const).map((k) => (
+                  <Button
+                    key={k}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => addQuestion(k)}
+                    sx={{ minWidth: 0, fontSize: 11, px: 1.25, py: 0.5 }}
+                  >
+                    {kindLabel(k)}
+                  </Button>
+                ))}
+              </Stack>
+            </Box>
+          )}
 
           <Box sx={{ flex: 1, overflow: "auto" }}>
             {quiz.questions.length === 0 ? (
@@ -503,17 +630,16 @@ export default function AuthorStudioPage({
             ) : (
               quiz.questions.map((q, idx) => {
                 const sel = selectedId === q.id;
+                const incomplete = !q.prompt?.trim() || !q.points;
                 return (
                   <Box
                     key={q.id}
-                    component="button"
                     onClick={() => setSelectedId(q.id)}
                     sx={{
                       width: "100%",
                       px: 2,
                       py: 1.5,
                       bgcolor: sel ? "primary.50" : "transparent",
-                      border: "none",
                       borderLeft: `2px solid`,
                       borderLeftColor: sel ? "primary.main" : "transparent",
                       borderBottom: 1,
@@ -521,18 +647,44 @@ export default function AuthorStudioPage({
                       textAlign: "left",
                       cursor: "pointer",
                       display: "grid",
-                      gridTemplateColumns: "28px 1fr 40px",
+                      gridTemplateColumns: "28px 1fr 40px 28px",
                       gap: 1,
                       alignItems: "start",
+                      "&:hover .delete-btn": { opacity: 1 },
                     }}
                   >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ fontFamily: "monospace", pt: 0.25 }}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 0.5,
+                      }}
                     >
-                      Q{idx + 1}
-                    </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontFamily: "monospace", pt: 0.25 }}
+                      >
+                        Q{idx + 1}
+                      </Typography>
+                      {incomplete && (
+                        <Box
+                          sx={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            bgcolor: "warning.main",
+                          }}
+                          title={[
+                            !q.prompt?.trim() ? "no prompt" : null,
+                            !q.points ? "0 pts" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                        />
+                      )}
+                    </Box>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography
                         variant="body2"
@@ -572,6 +724,30 @@ export default function AuthorStudioPage({
                     >
                       {q.points}pt
                     </Typography>
+                    <Box
+                      component="button"
+                      type="button"
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteQuestion(q.id);
+                      }}
+                      sx={{
+                        opacity: 0,
+                        transition: "opacity 0.15s",
+                        border: "none",
+                        bgcolor: "transparent",
+                        cursor: "pointer",
+                        color: "error.main",
+                        p: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pt: 0.25,
+                      }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 15 }} />
+                    </Box>
                   </Box>
                 );
               })
@@ -597,6 +773,8 @@ export default function AuthorStudioPage({
             <Button
               variant="outlined"
               size="small"
+              disabled
+              title="Not yet available"
               startIcon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 12 }} />}
             >
               Generate questions
@@ -637,9 +815,23 @@ export default function AuthorStudioPage({
                     Editing Q
                     {quiz.questions.findIndex((q) => q.id === selectedId) + 1}
                   </Typography>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                    {kindLabel(selectedQ.kind)}
-                  </Typography>
+                  <select
+                    value={selectedQ.kind}
+                    onChange={(e) => changeKind(e.target.value)}
+                    style={{
+                      ...inlineInput,
+                      width: "auto",
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                    title="Change question type (creates a new question)"
+                  >
+                    <option value="mc">MC</option>
+                    <option value="tf">T/F</option>
+                    <option value="short">Short</option>
+                    <option value="essay">Essay</option>
+                    <option value="code">Code</option>
+                  </select>
                 </Box>
               </Box>
 
@@ -655,7 +847,7 @@ export default function AuthorStudioPage({
                   <textarea
                     value={editPrompt}
                     onChange={(e) => setEditPrompt(e.target.value)}
-                    onBlur={saveQuestion}
+                    onBlur={() => saveQuestion()}
                     rows={3}
                     style={{
                       ...inlineInput,
@@ -668,7 +860,24 @@ export default function AuthorStudioPage({
                 </Box>
 
                 {selectedQ.kind === "mc" && (
-                  <McOptionsEditor payload={selectedQ.payload} />
+                  <McOptionsEditor
+                    payload={editPayload}
+                    onChange={(p) => {
+                      setEditPayload(p);
+                      saveQuestion(p);
+                    }}
+                    onTextChange={(p) => setEditPayload(p)}
+                    onTextBlur={(p) => saveQuestion(p)}
+                  />
+                )}
+                {selectedQ.kind === "tf" && (
+                  <TfOptionsEditor
+                    payload={editPayload}
+                    onChange={(p) => {
+                      setEditPayload(p);
+                      saveQuestion(p);
+                    }}
+                  />
                 )}
 
                 <Box
@@ -695,9 +904,11 @@ export default function AuthorStudioPage({
                       min={0}
                       value={editPoints}
                       onChange={(e) =>
-                        setEditPoints(parseInt(e.target.value) || 0)
+                        setEditPoints(
+                          Math.max(0, parseInt(e.target.value) || 0),
+                        )
                       }
-                      onBlur={saveQuestion}
+                      onBlur={() => saveQuestion()}
                       style={inlineInput}
                     />
                   </Box>
@@ -711,8 +922,9 @@ export default function AuthorStudioPage({
                     </Typography>
                     <input
                       value={editTag}
+                      placeholder="tag1, tag2"
                       onChange={(e) => setEditTag(e.target.value)}
-                      onBlur={saveQuestion}
+                      onBlur={() => saveQuestion()}
                       style={inlineInput}
                     />
                   </Box>
@@ -729,7 +941,7 @@ export default function AuthorStudioPage({
                       onChange={(e) =>
                         setEditQuestionDifficulty(e.target.value)
                       }
-                      onBlur={saveQuestion}
+                      onBlur={() => saveQuestion()}
                       style={inlineInput}
                     >
                       <option value="intro">Intro</option>
@@ -750,7 +962,7 @@ export default function AuthorStudioPage({
                   <textarea
                     value={editExplanation}
                     onChange={(e) => setEditExplanation(e.target.value)}
-                    onBlur={saveQuestion}
+                    onBlur={() => saveQuestion()}
                     rows={2}
                     style={{
                       ...inlineInput,
@@ -868,12 +1080,28 @@ export default function AuthorStudioPage({
   );
 }
 
-function McOptionsEditor({ payload }: { payload: unknown }) {
+function McOptionsEditor({
+  payload,
+  onChange,
+  onTextChange,
+  onTextBlur,
+}: {
+  payload: unknown;
+  onChange: (p: Record<string, unknown>) => void;
+  onTextChange: (p: Record<string, unknown>) => void;
+  onTextBlur: (p: Record<string, unknown>) => void;
+}) {
   const p = payload as {
-    options?: { text: string; correct_index?: number }[];
+    options?: string[];
     correct_index?: number;
   } | null;
   if (!p?.options) return null;
+
+  function updateText(i: number, text: string) {
+    const options = p!.options!.map((o, j) => (j === i ? text : o));
+    return { ...p, options };
+  }
+
   return (
     <Box sx={{ mb: 2.25 }}>
       <Typography
@@ -881,7 +1109,7 @@ function McOptionsEditor({ payload }: { payload: unknown }) {
         color="text.secondary"
         sx={monoLabel as React.CSSProperties}
       >
-        Options · mark the correct answer
+        Options · click row to mark correct
       </Typography>
       <Stack spacing={1}>
         {p.options.map((o, i) => (
@@ -892,15 +1120,17 @@ function McOptionsEditor({ payload }: { payload: unknown }) {
               gridTemplateColumns: "30px 1fr",
               gap: 1.25,
               alignItems: "center",
-              p: "10px 12px",
-              bgcolor: "action.hover",
+              p: "6px 12px 6px 10px",
+              bgcolor: i === p.correct_index ? "primary.50" : "action.hover",
               border: 1,
               borderColor: i === p.correct_index ? "primary.main" : "divider",
               borderRadius: 0.5,
+              cursor: "pointer",
+              "&:hover": { borderColor: "primary.light" },
             }}
+            onClick={() => onChange({ ...p, correct_index: i })}
           >
             <Box
-              component="button"
               sx={{
                 width: 22,
                 height: 22,
@@ -909,18 +1139,88 @@ function McOptionsEditor({ payload }: { payload: unknown }) {
                 border: 1,
                 borderColor:
                   i === p.correct_index ? "primary.main" : "action.disabled",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                flexShrink: 0,
               }}
             >
               {i === p.correct_index && (
                 <CheckOutlinedIcon sx={{ fontSize: 12, color: "#fff" }} />
               )}
             </Box>
-            <Typography variant="body2" color="text.secondary">
-              {o.text}
+            <input
+              value={o}
+              placeholder={`Option ${i + 1}`}
+              onChange={(e) => onTextChange(updateText(i, e.target.value))}
+              onBlur={(e) => onTextBlur(updateText(i, e.target.value))}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontSize: 13.5,
+                color: "inherit",
+                fontFamily: "inherit",
+                width: "100%",
+                cursor: "text",
+              }}
+            />
+          </Box>
+        ))}
+      </Stack>
+    </Box>
+  );
+}
+
+function TfOptionsEditor({
+  payload,
+  onChange,
+}: {
+  payload: unknown;
+  onChange: (p: Record<string, unknown>) => void;
+}) {
+  const p = payload as { correct?: boolean } | null;
+  const correct = p?.correct ?? true;
+  return (
+    <Box sx={{ mb: 2.25 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={monoLabel as React.CSSProperties}
+      >
+        Correct answer
+      </Typography>
+      <Stack direction="row" spacing={1}>
+        {([true, false] as const).map((val) => (
+          <Box
+            key={String(val)}
+            component="button"
+            type="button"
+            onClick={() => onChange({ correct: val })}
+            sx={{
+              flex: 1,
+              py: 1.5,
+              border: 1,
+              borderColor: correct === val ? "primary.main" : "divider",
+              borderRadius: 0.5,
+              bgcolor: correct === val ? "primary.50" : "action.hover",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1,
+              "&:hover": { borderColor: "primary.light" },
+            }}
+          >
+            {correct === val && (
+              <CheckOutlinedIcon sx={{ fontSize: 14, color: "primary.main" }} />
+            )}
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: correct === val ? 600 : 400 }}
+            >
+              {val ? "True" : "False"}
             </Typography>
           </Box>
         ))}

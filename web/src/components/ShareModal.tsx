@@ -40,7 +40,7 @@ export function ShareModal({ payload, onClose, bearerToken }: Props) {
       const { data } = await (client as any).POST("/v1/shares", {
         body: {
           kind: payload.kind,
-          targetId: payload.id,
+          id: payload.id,
           visibility: "public",
           includeExplanation: true,
           includeAttribution: true,
