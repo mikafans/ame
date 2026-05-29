@@ -75,11 +75,11 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
         </Typography>
       </Stack>
 
-      <Card variant="outlined" sx={{ minHeight: 240 }}>
-        <CardContent sx={{ p: 3 }}>
+      <Card variant="outlined" sx={{ minHeight: 240, borderRadius: 2 }}>
+        <CardContent sx={{ p: 3.5 }}>
           <Typography
             variant="h6"
-            sx={{ fontWeight: 600, mb: snippet ? 2 : 0 }}
+            sx={{ fontWeight: 400, lineHeight: 1.5, mb: snippet ? 2 : 0 }}
           >
             {question.prompt}
           </Typography>
@@ -108,13 +108,13 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
                   <Typography
                     variant="caption"
                     color="text.secondary"
-                    sx={{ textTransform: "uppercase", letterSpacing: 1 }}
+                    sx={{ letterSpacing: 0.5 }}
                   >
                     Answer
                   </Typography>
                   <Typography
                     variant="body1"
-                    sx={{ fontWeight: 600, mb: back.explanation ? 2 : 0 }}
+                    sx={{ fontWeight: 500, mb: back.explanation ? 2 : 0 }}
                   >
                     {back.answer}
                   </Typography>
@@ -126,7 +126,7 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
                   <Typography
                     variant="caption"
                     color="text.secondary"
-                    sx={{ textTransform: "uppercase", letterSpacing: 1 }}
+                    sx={{ letterSpacing: 0.5 }}
                   >
                     Explanation
                   </Typography>
@@ -150,7 +150,7 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
         {!revealed ? (
           <Button
             variant="contained"
-            size="large"
+            disableElevation
             onClick={() => setRevealed(true)}
           >
             Show answer (Space)
@@ -160,7 +160,6 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
             <Button
               variant="outlined"
               color="error"
-              size="large"
               onClick={() => onRate(false)}
             >
               Missed it (1)
@@ -168,7 +167,7 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
             <Button
               variant="contained"
               color="success"
-              size="large"
+              disableElevation
               onClick={() => onRate(true)}
             >
               Got it (2)
