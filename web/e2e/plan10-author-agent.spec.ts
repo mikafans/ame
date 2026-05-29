@@ -145,7 +145,12 @@ test.describe("instructor flows", () => {
       page.getByRole("heading", { name: "Compose exam" }),
     ).toBeVisible({ timeout: 5000 });
     await expect(page.getByLabel("Name")).toBeVisible();
-    await expect(page.getByText("Sections")).toBeVisible();
+    // The Sections sub-form — target the dialog-unique "Add section" button
+    // rather than the word "Sections", which now also appears in the exam
+    // detail panel behind the modal.
+    await expect(
+      page.getByRole("button", { name: "Add section" }),
+    ).toBeVisible();
   });
 });
 
