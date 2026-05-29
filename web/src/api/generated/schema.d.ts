@@ -387,7 +387,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** GET /v1/sessions — the caller's finished attempt history, newest first. */
+        get: operations["list_my_sessions"];
         put?: never;
         post: operations["create_session"];
         delete?: never;
@@ -810,6 +811,11 @@ export interface components {
             codeSnippet?: unknown;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
+            /**
+             * @description Grading language for code questions (from the question payload), so the
+             *     client submits a `Code` response whose language matches the grader.
+             */
+            language?: string | null;
             optionOrder?: number[] | null;
             options?: unknown[] | null;
             /** Format: int32 */
@@ -876,6 +882,9 @@ export interface components {
         };
         ListKeysResponse: {
             keys: components["schemas"]["KeySummary"][];
+        };
+        ListMySessionsResponse: {
+            sessions: components["schemas"]["SessionSummary"][];
         };
         ListQuizzesResponse: {
             quizzes: components["schemas"]["QuizSummary"][];
@@ -1098,6 +1107,8 @@ export interface components {
             median: number;
         };
         QuizSummary: {
+            /** @description True when the requesting user has at least one finished session for this quiz. */
+            completed: boolean;
             course?: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -1207,6 +1218,36 @@ export interface components {
         };
         /** @enum {string} */
         SessionStatus: "in_progress" | "finished" | "abandoned";
+        /** @description One row in a learner's attempt history. */
+        SessionSummary: {
+            /**
+             * Format: int64
+             * @description 1-based position of this attempt within its quiz/exam (chronological).
+             */
+            attemptNumber: number;
+            /** Format: uuid */
+            examId?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: double */
+            pointsAwarded?: number | null;
+            /** Format: uuid */
+            quizId?: string | null;
+            quizTitle?: string | null;
+            /** Format: date-time */
+            startedAt: string;
+            status: string;
+            /**
+             * Format: int64
+             * @description Total finished attempts the learner has for the same quiz/exam.
+             */
+            totalAttempts: number;
+        };
         ShortPayload: {
             accepted: string[];
             judge: components["schemas"]["Judge"];
@@ -2385,6 +2426,38 @@ export interface operations {
             };
             /** @description Quiz not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_my_sessions: {
+        parameters: {
+            query?: {
+                /** @description Filter by quiz */
+                quizId?: string;
+                /** @description Filter by exam */
+                examId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attempt history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMySessionsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

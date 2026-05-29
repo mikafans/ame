@@ -82,6 +82,12 @@ async fn make_bearer(pool: &PgPool) -> String {
 }
 
 async fn make_live_mc_question(pool: &PgPool) -> Uuid {
+    make_live_mc_question_with_tag(pool, "rust").await
+}
+
+/// Insert a live MC question (correct_index = 1) tagged `tag`. Use a unique
+/// tag to make tag-filtered practice planning deterministic on a shared DB.
+async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
     let author_id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
@@ -105,10 +111,11 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
     .unwrap()
     .get("id");
     let tag_id: Uuid = sqlx::query(
-        "INSERT INTO tb_tags (name) VALUES ('rust') \
+        "INSERT INTO tb_tags (name) VALUES ($1) \
          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name \
          RETURNING id",
     )
+    .bind(tag)
     .fetch_one(pool)
     .await
     .unwrap()
@@ -223,6 +230,141 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
         .await
         .unwrap();
     assert_eq!(late.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn list_my_sessions_numbers_finished_attempts_newest_first() {
+    if skip_if_no_db() {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let bearer = make_bearer(&pool).await;
+    // Unique tag → only our questions are selectable, so planning is
+    // deterministic on a shared DB. Two questions because the practice planner
+    // won't re-serve a just-answered question on the second attempt. Both have
+    // correct_index = 1, so a correct answer is always worth 2 points.
+    let tag = format!("history-{}", Uuid::now_v7());
+    make_live_mc_question_with_tag(&pool, &tag).await;
+    make_live_mc_question_with_tag(&pool, &tag).await;
+    let base_url = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    // Run two full practice attempts (start → answer → finish).
+    for _ in 0..2 {
+        let created: Value = client
+            .post(format!("{base_url}/v1/sessions"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+            .json(&json!({
+                "tags": [tag],
+                "types": ["mc"],
+                "count": 1,
+                "duration": 30,
+                "mode": "practice"
+            }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        let session_id = created["sessionId"].as_str().unwrap();
+        // Answer whichever question was actually served.
+        let served_qid = created["questions"][0]["id"].as_str().unwrap();
+        let selected_position = created["questions"][0]["option_order"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|value| value.as_u64() == Some(1))
+            .unwrap();
+        client
+            .post(format!("{base_url}/v1/sessions/{session_id}/answer"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+            .json(&json!({
+                "questionId": served_qid,
+                "response": { "selected_position": selected_position },
+                "timeToAnswerMs": 800
+            }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+        client
+            .post(format!("{base_url}/v1/sessions/{session_id}/finish"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+    }
+
+    let history: Value = client
+        .get(format!("{base_url}/v1/sessions"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    let sessions = history["sessions"].as_array().unwrap();
+    assert_eq!(sessions.len(), 2, "two finished attempts expected");
+    // Newest first, but attempt numbers are chronological.
+    assert_eq!(sessions[0]["attemptNumber"], 2);
+    assert_eq!(sessions[0]["totalAttempts"], 2);
+    assert_eq!(sessions[1]["attemptNumber"], 1);
+    assert_eq!(sessions[1]["totalAttempts"], 2);
+    // Score is surfaced from the stored result.
+    assert_eq!(sessions[0]["pointsAwarded"], 2.0);
+    assert_eq!(sessions[0]["maxPoints"], 2.0);
+}
+
+#[tokio::test]
+async fn list_my_sessions_excludes_in_progress() {
+    if skip_if_no_db() {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let bearer = make_bearer(&pool).await;
+    let base_url = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    // Start a session but never finish it.
+    client
+        .post(format!("{base_url}/v1/sessions"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .json(&json!({ "count": 1, "mode": "practice" }))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    let history: Value = client
+        .get(format!("{base_url}/v1/sessions"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        history["sessions"].as_array().unwrap().len(),
+        0,
+        "in-progress sessions must not appear in history"
+    );
 }
 
 #[tokio::test]

@@ -45,6 +45,8 @@ pub struct QuizSummary {
     pub course: Option<String>,
     pub question_count: i64,
     pub created_by: Uuid,
+    /// True when the requesting user has at least one finished session for this quiz.
+    pub completed: bool,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
     #[schema(value_type = String, format = DateTime)]
@@ -95,14 +97,18 @@ fn default_limit() -> i64 {
 )]
 async fn list_quizzes(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuizReadScopes>,
+    auth: RequireAnyScope<QuizReadScopes>,
     Query(q): Query<ListQuizzesQuery>,
 ) -> Result<Json<ListQuizzesResponse>, ApiError> {
     let rows = sqlx::query(
         "SELECT q.id, q.title, q.status, q.objectives, q.course, q.created_by,
                 q.created_at, q.updated_at,
                 COUNT(*) OVER() AS total,
-                COUNT(qq.question_id) AS question_count
+                COUNT(qq.question_id) AS question_count,
+                EXISTS(
+                    SELECT 1 FROM tb_sessions s
+                    WHERE s.quiz_id = q.id AND s.user_id = $4 AND s.status = 'finished'
+                ) AS completed
          FROM tb_quizzes q
          LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
          WHERE q.status = $1
@@ -113,6 +119,7 @@ async fn list_quizzes(
     .bind(&q.status)
     .bind(q.limit)
     .bind(q.offset)
+    .bind(auth.0.user.id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -128,6 +135,7 @@ async fn list_quizzes(
             course: r.get("course"),
             question_count: r.get("question_count"),
             created_by: r.get("created_by"),
+            completed: r.get("completed"),
             created_at: r.get("created_at"),
             updated_at: r.get("updated_at"),
         })

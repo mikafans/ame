@@ -98,6 +98,11 @@ test.describe("Learner role", () => {
     await expect(page.locator("text=/%|correct|score/i").first()).toBeVisible({
       timeout: 8000,
     });
+    // Attempt numbering is populated from GET /v1/sessions (history). This is
+    // the learner's first finished attempt of this quiz.
+    await expect(page.getByText(/Attempt 1 of 1/i)).toBeVisible({
+      timeout: 8000,
+    });
   });
 
   test("progress page renders stats", async ({ page }) => {

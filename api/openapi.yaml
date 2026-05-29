@@ -882,6 +882,37 @@ paths:
       security:
       - bearer_auth: []
   /v1/sessions:
+    get:
+      tags:
+      - crate::http::sessions
+      summary: GET /v1/sessions — the caller's finished attempt history, newest first.
+      operationId: list_my_sessions
+      parameters:
+      - name: quizId
+        in: query
+        description: Filter by quiz
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: examId
+        in: query
+        description: Filter by exam
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Attempt history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMySessionsResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer_auth: []
     post:
       tags:
       - crate::http::sessions
@@ -1931,6 +1962,13 @@ components:
           - 'null'
         kind:
           $ref: '#/components/schemas/QuestionKind'
+        language:
+          type:
+          - string
+          - 'null'
+          description: |-
+            Grading language for code questions (from the question payload), so the
+            client submits a `Code` response whose language matches the grader.
         optionOrder:
           type:
           - array
@@ -2096,6 +2134,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/KeySummary'
+    ListMySessionsResponse:
+      type: object
+      required:
+      - sessions
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionSummary'
     ListQuizzesResponse:
       type: object
       required:
@@ -2645,9 +2692,13 @@ components:
       - objectives
       - questionCount
       - createdBy
+      - completed
       - createdAt
       - updatedAt
       properties:
+        completed:
+          type: boolean
+          description: True when the requesting user has at least one finished session for this quiz.
         course:
           type:
           - string
@@ -2906,6 +2957,64 @@ components:
       - in_progress
       - finished
       - abandoned
+    SessionSummary:
+      type: object
+      description: One row in a learner's attempt history.
+      required:
+      - id
+      - kind
+      - status
+      - startedAt
+      - attemptNumber
+      - totalAttempts
+      properties:
+        attemptNumber:
+          type: integer
+          format: int64
+          description: 1-based position of this attempt within its quiz/exam (chronological).
+        examId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        finishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        maxPoints:
+          type:
+          - number
+          - 'null'
+          format: double
+        pointsAwarded:
+          type:
+          - number
+          - 'null'
+          format: double
+        quizId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        quizTitle:
+          type:
+          - string
+          - 'null'
+        startedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        totalAttempts:
+          type: integer
+          format: int64
+          description: Total finished attempts the learner has for the same quiz/exam.
     ShortPayload:
       type: object
       required:
