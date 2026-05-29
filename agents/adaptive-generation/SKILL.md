@@ -6,7 +6,7 @@ Handles `pool_insufficient` gracefully by reducing question count and retrying.
 ## Prerequisites
 
 - API key with scopes: `quiz.read`, `quiz.write`, `stats.read`
-- Base URL: your Harus instance (e.g. `https://harus.example.com/v1`)
+- Base URL: your AME instance (e.g. `https://ame.example.com/v1`)
 
 ## Loop
 
@@ -67,12 +67,12 @@ Content-Type: application/json
 
 Response includes `embedUrl` — paste into a course page or LMS for anonymous preview.
 
-## MCP tool discovery
+## Tool discovery
 
 The full tool list is available at:
 
 ```http
-GET /v1/agents/mcp.json
+GET /v1/agents/skill.json
 ```
 
-Use `?strict=1` to get a standard MCP manifest without Harus-specific fields (`method`, `path`, `scope`).
+Use `?strict=1` to drop the ame-specific fields (`method`, `path`, `scope`).

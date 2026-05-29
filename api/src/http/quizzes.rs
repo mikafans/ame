@@ -288,12 +288,23 @@ async fn patch_quiz(
     Path(id): Path<Uuid>,
     Json(body): Json<QuizPatch>,
 ) -> Result<Json<PatchQuizResponse>, ApiError> {
+    Ok(Json(apply_quiz_patch(&state.pool, id, body).await?))
+}
+
+/// Apply a quiz patch: existence check, publish gating + draft-question
+/// auto-promotion, then the metadata update. Shared by `PATCH /v1/quizzes/{id}`
+/// and the agent `quiz.update` run-tool so publish semantics never drift.
+pub(crate) async fn apply_quiz_patch(
+    pool: &sqlx::PgPool,
+    id: Uuid,
+    body: QuizPatch,
+) -> Result<PatchQuizResponse, ApiError> {
     // Verify quiz exists and is owned by caller (instructors can edit any, agents only their own)
     let quiz_row = sqlx::query(
         "SELECT id, title, status, objectives, created_by FROM tb_quizzes WHERE id = $1",
     )
     .bind(id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?
     .ok_or(ApiError::NotFound { resource: "quiz" })?;
@@ -314,7 +325,7 @@ async fn patch_quiz(
         let q_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM tb_quiz_questions WHERE quiz_id = $1")
                 .bind(id)
-                .fetch_one(&state.pool)
+                .fetch_one(pool)
                 .await
                 .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -333,7 +344,7 @@ async fn patch_quiz(
              ) AND status = 'draft'",
         )
         .bind(id)
-        .execute(&state.pool)
+        .execute(pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
     }
@@ -361,17 +372,17 @@ async fn patch_quiz(
     .bind(body.title)
     .bind(body.objectives)
     .bind(body.status)
-    .fetch_one(&state.pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok(Json(PatchQuizResponse {
+    Ok(PatchQuizResponse {
         id: updated.get("id"),
         title: updated.get("title"),
         status: updated.get("status"),
         objectives: updated.get::<Vec<String>, _>("objectives"),
         warnings,
-    }))
+    })
 }
 
 // ── create ───────────────────────────────────────────────────────────────────

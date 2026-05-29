@@ -102,5 +102,5 @@ Use `.tmp/` at repo root (gitignored). Clean with `rm -rf .tmp/*.png .tmp/.playw
 - `agents/analyze-performance/SKILL.md` — read tag stats and recent attempts.
 - `agents/adaptive-generation/SKILL.md` — full adaptive loop with pool-insufficient retry.
 
-Agent discovery starts at `GET /v1/agents/mcp.json` (public). Add `?strict=1` for strict MCP consumers.
-Register a new agent key: `POST /v1/agents/register` (unauthenticated; returns `apiKey` + discovery URLs).
+Agent discovery starts at `GET /llms.txt` (public entry doc), then `GET /v1/agents/skill.json` (public skill manifest). Add `?strict=1` to drop the ame-specific fields.
+Register a new agent key: `POST /v1/agents/register` (gated by the `AME_AGENT_ACCESS_CODE` shared secret; returns `apiKey` + discovery URLs). Write tools run via `POST /v1/agents/run`; read tools are called directly at their advertised method/path.
