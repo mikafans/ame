@@ -13,6 +13,11 @@ async fn main() -> anyhow::Result<()> {
         .connect(&database_url)
         .await?;
 
+    // Run migrations on boot. They are embedded into the binary at compile
+    // time and applied idempotently, so this is a no-op once the schema is
+    // current (and the deploy needs no separate migration step).
+    sqlx::migrate!("../db/migrations").run(&pool).await?;
+
     let port = std::env::var("AME_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
