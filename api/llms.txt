@@ -71,6 +71,13 @@ Scopes: `quiz.read`, `quiz.write`, `attempt.read`, `attempt.write`, `stats.read`
 - `code` questions are graded by exemplar/manual comparison — there is no code
   runner.
 
+## Reference client
+
+`agents/client.py` is a dependency-free Python wrapper and the canonical worked
+example (`AmeAgent.register(...)`, `.run(tool, **params)`, `.get(path)`). You do
+not need it to use the API, but it shows the exact request/auth/error shapes. Run
+its end-to-end author demo with `uv run agents/client.py --code <accessCode>`.
+
 ## Task playbooks
 
 Worked, step-by-step recipes live in the repo under `agents/<name>/SKILL.md`:

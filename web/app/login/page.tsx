@@ -265,7 +265,7 @@ export default function LoginPage() {
             }}
           >
             {`curl -X POST $API/v1/agents/register \\
-  -d '{"access_code":"…","scopes":["quiz.read"]}'`}
+  -d '{"accessCode":"…","scopes":["quiz.read"]}'`}
           </Box>
           <Typography
             sx={{
@@ -275,7 +275,7 @@ export default function LoginPage() {
               lineHeight: 1.5,
             }}
           >
-            Returns an API key plus the OpenAPI 3.1 schema and MCP manifest
+            Returns an API key plus the OpenAPI 3.1 schema and skill manifest
             URLs. Requires an access code from the operator and at least one
             scope.
           </Typography>
@@ -289,7 +289,7 @@ export default function LoginPage() {
             mt: 2.5,
           }}
         >
-          OpenAPI 3.1 · MCP · FERPA · GDPR
+          OpenAPI 3.1 · Agents · FERPA · GDPR
         </Typography>
       </Box>
 
@@ -323,6 +323,7 @@ export default function LoginPage() {
 
           <Box
             component="form"
+            method="post"
             onSubmit={handleSubmit}
             sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
@@ -431,8 +432,8 @@ export default function LoginPage() {
                 variant="outlined"
                 sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
               />
-              returns a key, schema &amp; MCP manifest. Needs an operator access
-              code and a scope list.
+              returns a key, schema &amp; skill manifest. Needs an operator
+              access code and a scope list.
             </Typography>
           </Box>
         </Box>

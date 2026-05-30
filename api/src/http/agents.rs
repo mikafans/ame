@@ -42,7 +42,7 @@ pub struct RegisterBody {
     pub scopes: Vec<String>,
     /// Shared secret matching the server's `AME_AGENT_ACCESS_CODE` env var.
     /// Required; registration is disabled when the env var is unset.
-    #[serde(rename = "access_code")]
+    /// Wire name is `accessCode` (camelCase, per the struct-level rename).
     pub access_code: Option<String>,
 }
 
@@ -523,7 +523,7 @@ fn build_skill_manifest(strict: bool) -> Value {
         tool(
             "agents.register",
             "Register a new agent user and receive an API key.",
-            json!({"type":"object","required":["scopes","access_code"],"properties":{"label":{"type":"string"},"scopes":{"type":"array","items":{"type":"string"}},"access_code":{"type":"string","description":"shared secret matching the server's AME_AGENT_ACCESS_CODE env var"}}}),
+            json!({"type":"object","required":["scopes","accessCode"],"properties":{"label":{"type":"string"},"scopes":{"type":"array","items":{"type":"string"}},"accessCode":{"type":"string","description":"shared secret matching the server's AME_AGENT_ACCESS_CODE env var"}}}),
             "POST",
             "/v1/agents/register",
             None,
