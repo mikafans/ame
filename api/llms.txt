@@ -1,0 +1,84 @@
+# AME
+
+> A quiz/exam learning platform with a first-class agent surface. Agents can
+> author question banks, assemble quizzes and exams, publish them, and read
+> learner stats — all over plain HTTP + JSON. This file is the entry point;
+> read it first.
+
+This is NOT an MCP server. There is no JSON-RPC. You call a normal REST API
+with a bearer token, plus one convenience dispatcher (`/v1/agents/run`) for
+composite and write operations.
+
+## Getting a key
+
+Registration is gated by a shared access code (the operator sets
+`AME_AGENT_ACCESS_CODE`; if unset, registration is disabled).
+
+```
+POST /v1/agents/register
+{ "label": "my-agent", "scopes": ["quiz.read", "quiz.write"], "accessCode": "<code>" }
+-> 201 { "apiKey": "<id>_<secret>", "userId", "openapiUrl", "skillManifestUrl" }
+```
+
+Send the key on every request: `Authorization: Bearer <apiKey>`.
+
+Scopes: `quiz.read`, `quiz.write`, `attempt.read`, `attempt.write`, `stats.read`,
+`feedback.write`, `plan.write`. `admin` cannot be requested here.
+
+## Discovery
+
+- `GET /v1/agents/skill.json` — machine-readable tool list. Each tool carries an
+  `input_schema` and the REST `method`/`path` it maps to. Add `?strict=1` to drop
+  the method/path/scope hints. Top-level `run` block lists the runnable tools.
+- `GET /v1/agents/openapi.json` — full OpenAPI schema (scope: `quiz.read`).
+- `GET /v1/agents/activity` — your own call log, newest first (scope: `quiz.read`).
+
+## Two ways to act
+
+1. **Reads + simple writes** — call the REST endpoint directly at the
+   method/path from `skill.json` (e.g. `GET /v1/quizzes`, `GET /v1/questions`).
+2. **Composite / write tools** — POST to the dispatcher:
+
+   ```
+   POST /v1/agents/run
+   { "tool": "<name>", "params": { ... } }
+   ```
+
+   Runnable tools (each requires `quiz.write`):
+   - `quiz.import`     — create a draft quiz + draft questions from JSON.
+     `params: { source: "<json string>" }` where the JSON has
+     `{ title, course?, objectives?, questions: [{ kind, prompt, payload, points?, explanation? }] }`.
+   - `question.create` — batch-create bank questions.
+     `params: { questions: [{ kind, prompt, payload, points?, tags? }] }`.
+   - `question.promote`— promote one draft question to live. `params: { id }`.
+   - `quiz.update`     — patch metadata / publish. `params: { id, title?, status?, objectives? }`.
+
+## Authoring a quiz end to end
+
+1. `POST /v1/agents/run` `quiz.import` → returns `quizId` (quiz is `draft`).
+2. `POST /v1/agents/run` `quiz.update` `{ id: quizId, status: "active" }`.
+   Publishing auto-promotes the quiz's draft questions to live. A quiz needs at
+   least one question before it can go active; archived quizzes cannot be
+   re-activated.
+
+## Data-model rules (violating these returns 422 or silently mis-grades)
+
+- Multiple-choice options are **bare strings**: `payload.options: ["a", "b"]`.
+  Never `[{ "text": "a" }]`. The grader and the UI both require bare strings.
+- Question `kind` is one of `mc`, `tf`, `short`, `essay`, `code`.
+- No scheduled exams: there are no `opens_at` / `closes_at` fields.
+- Auth is email + password only. No SSO/SAML.
+- `code` questions are graded by exemplar/manual comparison — there is no code
+  runner.
+
+## Reference client
+
+`agents/client.py` is a dependency-free Python wrapper and the canonical worked
+example (`AmeAgent.register(...)`, `.run(tool, **params)`, `.get(path)`). You do
+not need it to use the API, but it shows the exact request/auth/error shapes. Run
+its end-to-end author demo with `uv run agents/client.py --code <accessCode>`.
+
+## Task playbooks
+
+Worked, step-by-step recipes live in the repo under `agents/<name>/SKILL.md`:
+`generate-questions`, `adaptive-generation`, `analyze-performance`.

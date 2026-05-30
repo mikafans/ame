@@ -4,7 +4,7 @@
 #
 #   docker build -f web/Dockerfile -t ame-web:dev .
 
-ARG BUN_VERSION=1.1
+ARG BUN_VERSION=1.2
 ARG NODE_VERSION=22
 
 # ── deps ───────────────────────────────────────────────────────────────────
@@ -41,13 +41,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN useradd --system --create-home --uid 1000 next
-
+# The node base image already ships a non-root `node` user at UID 1000.
 # Next.js "standalone" output: a self-contained server.js plus minimal deps.
-COPY --from=builder --chown=next:next /build/.next/standalone ./
-COPY --from=builder --chown=next:next /build/.next/static ./.next/static
-COPY --from=builder --chown=next:next /build/public ./public
+COPY --from=builder --chown=node:node /build/.next/standalone ./
+COPY --from=builder --chown=node:node /build/.next/static ./.next/static
+COPY --from=builder --chown=node:node /build/public ./public
 
-USER next
+USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

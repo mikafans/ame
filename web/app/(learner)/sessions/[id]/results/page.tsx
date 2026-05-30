@@ -33,6 +33,7 @@ interface Answer {
 interface ResultData {
   id: string;
   quiz_id?: string;
+  exam_id?: string;
   quiz_title: string | null;
   course: string | null;
   attempt_number: number | null;
@@ -41,6 +42,18 @@ interface ResultData {
   total: number;
   feedback?: string;
   answers: Answer[];
+}
+
+interface SessionSummary {
+  id: string;
+  quizId?: string;
+  examId?: string;
+  pointsAwarded?: number;
+  maxPoints?: number;
+  startedAt: string;
+  finishedAt?: string;
+  attemptNumber: number;
+  totalAttempts: number;
 }
 
 interface CohortHistogramBucket {
@@ -66,6 +79,7 @@ export default function ResultsPage({
   const router = useRouter();
   const [data, setData] = useState<ResultData | null>(null);
   const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
+  const [history, setHistory] = useState<SessionSummary[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -86,6 +100,7 @@ export default function ResultsPage({
         setData({
           id: session.id,
           quiz_id: session.quiz_id,
+          exam_id: session.exam_id,
           quiz_title: session.quiz_title ?? null,
           course: session.course_title ?? null,
           attempt_number: null,
@@ -148,6 +163,37 @@ export default function ResultsPage({
             })
             .catch(() => {});
         }
+        // Attempt history for this quiz/exam — populates "Attempt N of M"
+        // and the list of previous attempts.
+        const histQuery = session.quiz_id
+          ? `quizId=${session.quiz_id}`
+          : session.exam_id
+            ? `examId=${session.exam_id}`
+            : null;
+        if (histQuery) {
+          fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/sessions?${histQuery}`,
+            { credentials: "include" },
+          )
+            .then((r) => (r.ok ? r.json() : null))
+            .then((h: { sessions?: SessionSummary[] } | null) => {
+              const sessions = h?.sessions ?? [];
+              setHistory(sessions);
+              const mine = sessions.find((s) => s.id === session.id);
+              if (mine) {
+                setData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        attempt_number: mine.attemptNumber,
+                        total_attempts: mine.totalAttempts,
+                      }
+                    : prev,
+                );
+              }
+            })
+            .catch(() => {});
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -182,9 +228,15 @@ export default function ResultsPage({
 
   return (
     <Box sx={{ p: 4, maxWidth: 800, mx: "auto" }}>
-      <Typography variant="h5" sx={{ fontWeight: 500, mb: 3 }}>
+      <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
         Quiz Results — {data.quiz_title || "Results"}
       </Typography>
+      {data.attempt_number != null && data.total_attempts != null && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Attempt {data.attempt_number} of {data.total_attempts}
+        </Typography>
+      )}
+      {data.attempt_number == null && <Box sx={{ mb: 3 }} />}
 
       {/* Score card */}
       <Card variant="outlined" sx={{ mb: 3 }}>
@@ -268,9 +320,53 @@ export default function ResultsPage({
                   )}
                 </Stack>
               </Box>
-              <Typography variant="caption" color="text.secondary">
-                Your answer: {a.given || "—"}
-              </Typography>
+              {a.type === "code" ? (
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mb: 0.5 }}
+                  >
+                    Your submission
+                  </Typography>
+                  {a.given ? (
+                    <Box
+                      component="pre"
+                      sx={{
+                        m: 0,
+                        p: 1.5,
+                        borderRadius: 1,
+                        bgcolor: "action.hover",
+                        fontFamily: "monospace",
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        overflowX: "auto",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {a.given}
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      No answer submitted
+                    </Typography>
+                  )}
+                  {a.gradeStatus === "pending_manual" && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mt: 0.5, fontStyle: "italic" }}
+                    >
+                      Awaiting manual review — code isn’t auto-graded.
+                    </Typography>
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  Your answer: {a.given || "—"}
+                </Typography>
+              )}
               {a.explanation && (
                 <>
                   <Divider sx={{ my: 1 }} />
@@ -283,6 +379,69 @@ export default function ResultsPage({
           </Card>
         ))}
       </Stack>
+
+      {/* Attempt history */}
+      {history.length > 1 && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+            All attempts
+          </Typography>
+          <Stack spacing={1}>
+            {history.map((s) => {
+              const pct =
+                s.maxPoints && s.maxPoints > 0
+                  ? Math.round(((s.pointsAwarded ?? 0) / s.maxPoints) * 100)
+                  : null;
+              const isCurrent = s.id === data.id;
+              return (
+                <Card
+                  key={s.id}
+                  variant="outlined"
+                  sx={{
+                    ...(isCurrent && { borderColor: "primary.main" }),
+                    cursor: isCurrent ? "default" : "pointer",
+                  }}
+                  onClick={
+                    isCurrent
+                      ? undefined
+                      : () => router.push(`/sessions/${s.id}/results`)
+                  }
+                >
+                  <CardContent
+                    sx={{
+                      py: "12px !important",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        Attempt {s.attemptNumber}
+                        {isCurrent && " (this one)"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(
+                          s.finishedAt ?? s.startedAt,
+                        ).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={pct != null ? `${pct}%` : "—"}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </Stack>
+        </Box>
+      )}
 
       {/* Footer */}
       <Stack direction="row" spacing={2} sx={{ justifyContent: "center" }}>

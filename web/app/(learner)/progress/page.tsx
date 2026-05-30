@@ -13,7 +13,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import ToggleButton from "@mui/material/ToggleButton";
 import { formatScore, formatDuration } from "@/utils/format";
 
-type WindowType = "4w" | "12w" | "all";
+type WindowType = "4w" | "all";
 
 interface StatsResponse {
   avg_score: number;
@@ -50,7 +50,7 @@ interface TagAvg {
 
 export default function ProgressPage() {
   const { user } = useAuth();
-  const [win, setWin] = useState<WindowType>("12w");
+  const [win, setWin] = useState<WindowType>("4w");
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [tagNames, setTagNames] = useState<Record<string, string>>({});
@@ -59,8 +59,7 @@ export default function ProgressPage() {
 
   useEffect(() => {
     setStatsLoading(true);
-    const apiWindow =
-      win === "4w" ? "last30d" : win === "12w" ? "last90d" : "all";
+    const apiWindow = win === "4w" ? "last30d" : "all";
     api
       .GET(
         "/v1/me/stats" as never,
@@ -144,7 +143,6 @@ export default function ProgressPage() {
           size="small"
         >
           <ToggleButton value="4w">4w</ToggleButton>
-          <ToggleButton value="12w">12w</ToggleButton>
           <ToggleButton value="all">All</ToggleButton>
         </ToggleButtonGroup>
       </Box>
@@ -218,7 +216,7 @@ export default function ProgressPage() {
               By subject
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Average score, last N weeks
+              Average score, {win === "4w" ? "last 4 weeks" : "all time"}
             </Typography>
             <Box
               sx={{
@@ -343,8 +341,7 @@ function BarChart({ data }: { data: TagAvg[] }) {
 
 function filterByWindow(attempts: Attempt[], win: WindowType): Attempt[] {
   if (win === "all") return attempts;
-  const weeks = win === "4w" ? 4 : 12;
-  const cutoff = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 4 * 7 * 24 * 60 * 60 * 1000;
   return attempts.filter((a) => new Date(a.created_at).getTime() >= cutoff);
 }
 

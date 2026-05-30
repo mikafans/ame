@@ -5,7 +5,7 @@ Generate targeted questions for a learner's weakest topics and import them as a 
 ## Prerequisites
 
 - API key with scopes: `quiz.read`, `quiz.write`, `stats.read`
-- Base URL: your Harus instance (e.g. `https://harus.example.com/v1`)
+- Base URL: your AME instance (e.g. `https://ame.example.com/v1`)
 
 ## Steps
 

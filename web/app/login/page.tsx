@@ -252,26 +252,32 @@ export default function LoginPage() {
           >
             For agents &amp; integrations
           </Typography>
-          <Typography
-            component="span"
+          <Box
+            component="pre"
             sx={{
+              m: 0,
               fontFamily: "monospace",
-              fontSize: 12,
+              fontSize: 11.5,
               color: agentCodeColor,
+              lineHeight: 1.6,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
             }}
           >
-            POST /v1/agents/register
-          </Typography>
+            {`curl -X POST $API/v1/agents/register \\
+  -d '{"accessCode":"…","scopes":["quiz.read"]}'`}
+          </Box>
           <Typography
             sx={{
               fontSize: 11,
               color: agentTextColor,
-              mt: 0.5,
+              mt: 0.75,
               lineHeight: 1.5,
             }}
           >
-            Returns an API key, OpenAPI 3.1 schema, and MCP manifest in one
-            call. No account needed.
+            Returns an API key plus the OpenAPI 3.1 schema and skill manifest
+            URLs. Requires an access code from the operator and at least one
+            scope.
           </Typography>
         </Box>
 
@@ -283,7 +289,7 @@ export default function LoginPage() {
             mt: 2.5,
           }}
         >
-          OpenAPI 3.1 · MCP · FERPA · GDPR
+          OpenAPI 3.1 · Agents · FERPA · GDPR
         </Typography>
       </Box>
 
@@ -317,6 +323,7 @@ export default function LoginPage() {
 
           <Box
             component="form"
+            method="post"
             onSubmit={handleSubmit}
             sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
@@ -425,7 +432,8 @@ export default function LoginPage() {
                 variant="outlined"
                 sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
               />
-              returns a key, schema &amp; MCP manifest — no account needed.
+              returns a key, schema &amp; skill manifest. Needs an operator
+              access code and a scope list.
             </Typography>
           </Box>
         </Box>

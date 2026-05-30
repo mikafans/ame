@@ -122,6 +122,7 @@ pub fn router(pool: PgPool) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
+        .route("/llms.txt", get(agents::llms_txt))
         .merge(openapi::router(state.clone()))
         .merge(public_limited)
         .merge(logged)

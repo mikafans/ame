@@ -1,7 +1,7 @@
 "use client";
 
-import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 
@@ -24,12 +24,44 @@ export function CodeRenderer({
 }: Props) {
   const current = value || starter;
 
+  const INDENT = "  ";
+
+  // Tab/Shift+Tab indent inside the editor instead of moving focus. This traps
+  // Tab while focused — acceptable for a code field; Esc still blurs it.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Tab" || disabled) return;
+    e.preventDefault();
+    const ta = e.target as HTMLTextAreaElement;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+
+    if (e.shiftKey) {
+      const lineStart = current.lastIndexOf("\n", start - 1) + 1;
+      const removed =
+        current.slice(lineStart).match(/^ {1,2}/)?.[0].length ?? 0;
+      if (removed === 0) return;
+      const next =
+        current.slice(0, lineStart) + current.slice(lineStart + removed);
+      onChange(next);
+      requestAnimationFrame(() => {
+        const caret = Math.max(lineStart, start - removed);
+        ta.selectionStart = ta.selectionEnd = caret;
+      });
+    } else {
+      const next = current.slice(0, start) + INDENT + current.slice(end);
+      onChange(next);
+      requestAnimationFrame(() => {
+        ta.selectionStart = ta.selectionEnd = start + INDENT.length;
+      });
+    }
+  }
+
   return (
-    <div
-      style={{
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
+    <Box
+      sx={{
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 1.5,
         overflow: "hidden",
       }}
     >
@@ -42,86 +74,43 @@ export function CodeRenderer({
           borderColor: "divider",
           bgcolor: "action.hover",
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
+          gap: 1,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <CodeOutlinedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontFamily: "monospace", letterSpacing: 0.8 }}
-          >
-            {filename} · {language}
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 0.75 }}>
-          <Button size="small" variant="text">
-            Run tests
-          </Button>
-          <Button size="small" variant="text">
-            Reset
-          </Button>
-        </Box>
+        <CodeOutlinedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ fontFamily: "monospace", letterSpacing: 0.8 }}
+        >
+          {filename} · {language}
+        </Typography>
       </Box>
 
-      {/* Code textarea */}
-      <textarea
+      {/* Code editor */}
+      <TextField
+        fullWidth
+        multiline
+        minRows={10}
         value={current}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
+        placeholder="Write your solution here…"
         spellCheck={false}
-        rows={10}
-        style={{
-          width: "100%",
-          background: "transparent",
-          color: "var(--text)",
-          fontFamily: "var(--mono)",
-          fontSize: 13.5,
-          lineHeight: 1.6,
-          padding: "16px 18px",
-          border: "none",
-          outline: "none",
-          resize: "vertical",
-          minHeight: 220,
-          boxSizing: "border-box",
+        variant="standard"
+        slotProps={{ input: { disableUnderline: true } }}
+        sx={{
+          "& .MuiInputBase-root": {
+            fontFamily: "monospace",
+            fontSize: 13.5,
+            lineHeight: 1.6,
+            p: "16px 18px",
+            alignItems: "flex-start",
+          },
         }}
       />
-
-      {/* Test output */}
-      <div
-        style={{
-          padding: "10px 14px",
-          borderTop: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 11,
-            color: "var(--muted)",
-            marginBottom: 4,
-            letterSpacing: 0.8,
-          }}
-        >
-          ◇ Test runner output
-        </div>
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 12,
-            color: "var(--text-2)",
-          }}
-        >
-          <span style={{ color: "var(--accent)" }}>✓</span> case 1: small graph
-          — passed {"  "}
-          <span style={{ color: "var(--accent)" }}>✓</span> case 2: disconnected
-          — passed {"  "}
-          <span style={{ color: "var(--red)" }}>✗</span> case 3: cycle — failed
-        </div>
-      </div>
-    </div>
+    </Box>
   );
 }

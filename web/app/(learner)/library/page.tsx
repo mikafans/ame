@@ -17,6 +17,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
 import { formatMinutes } from "@/utils/format";
 
@@ -33,21 +34,18 @@ interface Quiz {
   questionCount?: number;
   durationMin?: number;
   attemptLimit?: number;
+  completed?: boolean;
   createdAt: string;
 }
 
-type TabId = "all" | "drafts";
+type TabId = "all" | "completed" | "drafts";
 
 export default function LibraryPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("all");
-  const [allQuizzes, setAllQuizzes] = useState<
-    Record<TabId, { quizzes: Quiz[]; total: number }>
-  >({
-    all: { quizzes: [], total: 0 },
-    drafts: { quizzes: [], total: 0 },
-  });
+  const [activeQuizzes, setActiveQuizzes] = useState<Quiz[]>([]);
+  const [draftQuizzes, setDraftQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
@@ -56,26 +54,22 @@ export default function LibraryPage() {
     setLoading(true);
     const client = api;
 
-    const fetchStatus = async (
-      status: string,
-    ): Promise<{ quizzes: Quiz[]; total: number }> => {
+    const fetchStatus = async (status: string): Promise<Quiz[]> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (client as any).GET("/v1/quizzes", {
         params: { query: { status } },
       });
-      const quizzes = Array.isArray(data?.quizzes) ? data.quizzes : [];
-      return { quizzes, total: data?.total ?? quizzes.length };
+      return Array.isArray(data?.quizzes) ? data.quizzes : [];
     };
 
     const isInst = user?.role === "instructor" || user?.role === "admin";
     Promise.all([
       fetchStatus("active"),
-      isInst
-        ? fetchStatus("draft")
-        : Promise.resolve({ quizzes: [], total: 0 }),
+      isInst ? fetchStatus("draft") : Promise.resolve([]),
     ])
       .then(([active, drafts]) => {
-        setAllQuizzes({ all: active, drafts });
+        setActiveQuizzes(active);
+        setDraftQuizzes(drafts);
       })
       .finally(() => setLoading(false));
   }, [user?.role]);
@@ -122,8 +116,18 @@ export default function LibraryPage() {
     );
   }
 
-  const { quizzes } = allQuizzes[tab];
-  const featuredQuiz = allQuizzes.all.quizzes[0] ?? null;
+  const pendingQuizzes = activeQuizzes.filter((q) => !q.completed);
+  const completedQuizzes = activeQuizzes.filter((q) => q.completed);
+  // "All quizzes" lists everything (completed ones carry a badge + Retake);
+  // "Completed" is just a filtered view of the same set.
+  const quizzes =
+    tab === "completed"
+      ? completedQuizzes
+      : tab === "drafts"
+        ? draftQuizzes
+        : activeQuizzes;
+  // "Up next" highlights the first quiz the learner hasn't finished yet.
+  const featuredQuiz = pendingQuizzes[0] ?? null;
 
   return (
     <Box sx={{ p: 4 }}>
@@ -253,13 +257,20 @@ export default function LibraryPage() {
       >
         <Tab
           value="all"
-          label={`All quizzes (${allQuizzes.all.total})`}
+          label={`All quizzes (${activeQuizzes.length})`}
           sx={{ textTransform: "none" }}
         />
-        {allQuizzes.drafts.total > 0 && (
+        {completedQuizzes.length > 0 && (
+          <Tab
+            value="completed"
+            label={`Completed (${completedQuizzes.length})`}
+            sx={{ textTransform: "none" }}
+          />
+        )}
+        {draftQuizzes.length > 0 && (
           <Tab
             value="drafts"
-            label={`Drafts (${allQuizzes.drafts.total})`}
+            label={`Drafts (${draftQuizzes.length})`}
             sx={{ textTransform: "none" }}
           />
         )}
@@ -312,6 +323,14 @@ export default function LibraryPage() {
                           variant="outlined"
                         />
                       )}
+                      {quiz.completed && (
+                        <Chip
+                          label="Completed"
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                        />
+                      )}
                     </Box>
                     {quiz.description && (
                       <Typography
@@ -341,15 +360,30 @@ export default function LibraryPage() {
                     </Stack>
                   </Box>
                   <Stack direction="row" spacing={1}>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      startIcon={<PlayArrowOutlinedIcon />}
-                      disabled={starting === quiz.id}
-                      onClick={() => startQuiz(quiz.id)}
-                    >
-                      {starting === quiz.id ? "Starting…" : "Start"}
-                    </Button>
+                    {quiz.status === "draft" ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<EditOutlinedIcon />}
+                        onClick={() => router.push(`/author/${quiz.id}`)}
+                      >
+                        Edit
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<PlayArrowOutlinedIcon />}
+                        disabled={starting === quiz.id}
+                        onClick={() => startQuiz(quiz.id)}
+                      >
+                        {starting === quiz.id
+                          ? "Starting…"
+                          : quiz.completed
+                            ? "Retake"
+                            : "Start"}
+                      </Button>
+                    )}
                   </Stack>
                 </Box>
               </CardContent>

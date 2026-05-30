@@ -2,6 +2,18 @@
 
 import { useState, useCallback } from "react";
 import { api } from "@/api/client";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import IconButton from "@mui/material/IconButton";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 
 export type ShareKind = "quiz" | "exam" | "item";
 
@@ -66,238 +78,104 @@ export function ShareModal({ payload, onClose }: Props) {
     : null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.65)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          width: 480,
-          maxWidth: "calc(100vw - 32px)",
-          padding: 24,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ pr: 6 }}>
+        Share
+        <IconButton
+          onClick={onClose}
+          sx={{ position: "absolute", right: 8, top: 8 }}
         >
-          <span style={{ fontWeight: 600, color: "var(--text)" }}>Share</span>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--muted)",
-              cursor: "pointer",
-              fontSize: 18,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Title */}
-        <div
-          style={{
-            color: "var(--text-2)",
-            fontSize: 13,
-            marginBottom: 20,
-            lineHeight: 1.4,
-          }}
-        >
+          <CloseOutlinedIcon />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {payload.title}
-        </div>
+        </Typography>
 
-        {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            marginBottom: 16,
-            borderBottom: "1px solid var(--border)",
-            paddingBottom: 0,
+        <Tabs
+          value={tab}
+          onChange={(_, v) => {
+            setTab(v);
+            createShare();
           }}
+          sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
         >
-          {(["link", "embed"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                setTab(t);
-                createShare();
-              }}
-              style={{
-                padding: "6px 14px",
-                background: "none",
-                border: "none",
-                borderBottom:
-                  tab === t
-                    ? "2px solid var(--accent)"
-                    : "2px solid transparent",
-                color: tab === t ? "var(--accent)" : "var(--muted)",
-                cursor: "pointer",
-                fontFamily: "var(--mono)",
-                fontSize: 12,
-                textTransform: "uppercase",
-                letterSpacing: 0.8,
-                marginBottom: -1,
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+          <Tab value="link" label="Link" sx={{ textTransform: "none" }} />
+          <Tab value="embed" label="Embed" sx={{ textTransform: "none" }} />
+        </Tabs>
 
-        {/* Content */}
         {tab === "link" && (
-          <div>
+          <Box>
             {loading && (
-              <div
-                style={{
-                  color: "var(--muted)",
-                  fontSize: 13,
-                  marginBottom: 12,
-                }}
-              >
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Creating link…
-              </div>
+              </Typography>
             )}
             {!loading && !shareUrl && (
-              <button
+              <Button
+                variant="contained"
+                disableElevation
                 onClick={createShare}
-                style={{
-                  padding: "8px 16px",
-                  background: "var(--accent)",
-                  color: "#000",
-                  border: "none",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  marginBottom: 12,
-                }}
               >
                 Generate link
-              </button>
+              </Button>
             )}
             {shareUrl && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  readOnly
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  fullWidth
+                  size="small"
                   value={shareUrl}
-                  style={{
-                    flex: 1,
-                    padding: "8px 12px",
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    color: "var(--text)",
-                    fontSize: 13,
-                    fontFamily: "var(--mono)",
-                  }}
+                  slotProps={{ input: { readOnly: true } }}
                 />
-                <button
+                <Button
+                  variant="outlined"
                   onClick={() => copy(shareUrl)}
-                  style={{
-                    padding: "8px 14px",
-                    background: copied
-                      ? "var(--accent-dim)"
-                      : "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    color: copied ? "var(--accent)" : "var(--text-2)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontFamily: "var(--mono)",
-                    whiteSpace: "nowrap",
-                  }}
+                  sx={{ whiteSpace: "nowrap" }}
                 >
                   {copied ? "Copied!" : "Copy"}
-                </button>
-              </div>
+                </Button>
+              </Stack>
             )}
-          </div>
+          </Box>
         )}
 
         {tab === "embed" && (
-          <div>
+          <Box>
             {!shareUrl && (
-              <button
+              <Button
+                variant="contained"
+                disableElevation
                 onClick={createShare}
-                style={{
-                  padding: "8px 16px",
-                  background: "var(--accent)",
-                  color: "#000",
-                  border: "none",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  marginBottom: 12,
-                }}
               >
                 Generate embed
-              </button>
+              </Button>
             )}
             {embedCode && (
-              <div>
-                <textarea
-                  readOnly
+              <Stack spacing={1}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={3}
                   value={embedCode}
-                  rows={3}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    color: "var(--text)",
-                    fontSize: 12,
-                    fontFamily: "var(--mono)",
-                    resize: "none",
-                    boxSizing: "border-box",
+                  slotProps={{ input: { readOnly: true } }}
+                  sx={{
+                    "& textarea": { fontFamily: "monospace", fontSize: 12 },
                   }}
                 />
-                <button
+                <Button
+                  variant="outlined"
                   onClick={() => copy(embedCode)}
-                  style={{
-                    marginTop: 8,
-                    padding: "6px 14px",
-                    background: copied
-                      ? "var(--accent-dim)"
-                      : "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 4,
-                    color: copied ? "var(--accent)" : "var(--text-2)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontFamily: "var(--mono)",
-                  }}
+                  sx={{ alignSelf: "flex-start" }}
                 >
                   {copied ? "Copied!" : "Copy embed code"}
-                </button>
-              </div>
+                </Button>
+              </Stack>
             )}
-          </div>
+          </Box>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

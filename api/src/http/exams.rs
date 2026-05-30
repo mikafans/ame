@@ -1,5 +1,6 @@
 //! Exam composition and retrieval HTTP routes.
 
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use axum::{
@@ -87,8 +88,16 @@ pub struct GetExamResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExamListItem {
+    #[serde(flatten)]
+    pub exam: Exam,
+    pub sections: Vec<ExamSection>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListExamsResponse {
-    pub exams: Vec<Exam>,
+    pub exams: Vec<ExamListItem>,
 }
 
 // ── handlers ─────────────────────────────────────────────────────────────────
@@ -220,7 +229,18 @@ pub async fn list_exams(
     let exams = rows
         .into_iter()
         .map(row_to_exam)
-        .collect::<Result<_, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let exam_ids: Vec<Uuid> = exams.iter().map(|e| e.id).collect();
+    let mut sections_by_exam = load_sections_grouped(&state.pool, &exam_ids).await?;
+
+    let exams = exams
+        .into_iter()
+        .map(|exam| {
+            let sections = sections_by_exam.remove(&exam.id).unwrap_or_default();
+            ExamListItem { exam, sections }
+        })
+        .collect();
     Ok(Json(ListExamsResponse { exams }))
 }
 
@@ -430,6 +450,19 @@ async fn insert_section(
     Ok(())
 }
 
+fn row_to_section(row: &sqlx::postgres::PgRow) -> ExamSection {
+    ExamSection {
+        id: row.get("id"),
+        exam_id: row.get("exam_id"),
+        title: row.get("title"),
+        order_index: row.get("order_index"),
+        weight: row.get("weight"),
+        question_ids: row.get("question_ids"),
+        mix: row.get("mix"),
+        items_count: row.get("items_count"),
+    }
+}
+
 async fn load_sections(pool: &PgPool, exam_id: Uuid) -> Result<Vec<ExamSection>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, exam_id, title, order_index, weight, question_ids, mix, items_count \
@@ -440,20 +473,28 @@ async fn load_sections(pool: &PgPool, exam_id: Uuid) -> Result<Vec<ExamSection>,
     .await
     .map_err(internal)?;
 
-    rows.into_iter()
-        .map(|row| {
-            Ok(ExamSection {
-                id: row.get("id"),
-                exam_id: row.get("exam_id"),
-                title: row.get("title"),
-                order_index: row.get("order_index"),
-                weight: row.get("weight"),
-                question_ids: row.get("question_ids"),
-                mix: row.get("mix"),
-                items_count: row.get("items_count"),
-            })
-        })
-        .collect()
+    Ok(rows.iter().map(row_to_section).collect())
+}
+
+async fn load_sections_grouped(
+    pool: &PgPool,
+    exam_ids: &[Uuid],
+) -> Result<HashMap<Uuid, Vec<ExamSection>>, ApiError> {
+    let rows = sqlx::query(
+        "SELECT id, exam_id, title, order_index, weight, question_ids, mix, items_count \
+         FROM tb_exam_sections WHERE exam_id = ANY($1) ORDER BY order_index ASC",
+    )
+    .bind(exam_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(internal)?;
+
+    let mut grouped: HashMap<Uuid, Vec<ExamSection>> = HashMap::new();
+    for row in &rows {
+        let section = row_to_section(row);
+        grouped.entry(section.exam_id).or_default().push(section);
+    }
+    Ok(grouped)
 }
 
 fn row_to_exam(row: sqlx::postgres::PgRow) -> Result<Exam, ApiError> {

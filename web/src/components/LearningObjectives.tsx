@@ -1,5 +1,9 @@
 "use client";
 
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+
 interface Props {
   items: string[];
   kicker?: string;
@@ -19,152 +23,128 @@ export function LearningObjectives({
 
   if (compact) {
     return (
-      <div>
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            letterSpacing: 1.3,
+      <Box>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: "block",
+            letterSpacing: 1,
             textTransform: "uppercase",
-            color: "var(--muted)",
-            marginBottom: 8,
+            mb: 1,
           }}
         >
           {kicker}
-        </div>
-        <ul
-          style={{
+        </Typography>
+        <Box
+          component="ul"
+          sx={{
             listStyle: "none",
-            padding: 0,
-            margin: 0,
+            p: 0,
+            m: 0,
             display: "flex",
             flexDirection: "column",
-            gap: 8,
+            gap: 1,
           }}
         >
           {items.map((it, i) => (
-            <li
+            <Box
+              component="li"
               key={i}
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-                fontSize: 12.5,
-                color: "var(--text-2)",
-                lineHeight: 1.5,
-              }}
+              sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
             >
-              <span style={{ color: "var(--accent)", flexShrink: 0 }}>✓</span>
-              <span style={{ flex: 1 }}>{it}</span>
-            </li>
+              <CheckCircleOutlineIcon
+                sx={{
+                  fontSize: 16,
+                  color: "primary.main",
+                  mt: "2px",
+                  flexShrink: 0,
+                }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {it}
+              </Typography>
+            </Box>
           ))}
-        </ul>
+        </Box>
         {overLimit && (
-          <span
-            style={{
-              display: "inline-block",
-              marginTop: 8,
-              padding: "2px 8px",
-              background: "var(--amber-dim)",
-              color: "var(--amber)",
-              border: "1px solid var(--amber)",
-              borderRadius: 4,
-              fontSize: 11,
-              fontFamily: "var(--mono)",
-            }}
+          <Typography
+            variant="caption"
+            color="warning.main"
+            sx={{ display: "inline-block", mt: 1 }}
           >
             {items.length} objectives — consider splitting
-          </span>
+          </Typography>
         )}
-      </div>
+      </Box>
     );
   }
 
   return (
-    <div
-      style={{
-        padding: "18px 20px",
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius)",
+    <Box
+      sx={{
+        p: 2.5,
+        bgcolor: "action.hover",
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 2,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 12,
-        }}
-      >
-        <span style={{ color: "var(--accent)" }}>✦</span>
-        <span
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10.5,
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            color: "var(--muted)",
-          }}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ letterSpacing: 1, textTransform: "uppercase" }}
         >
           {kicker}
-        </span>
+        </Typography>
         {overLimit && (
-          <span
-            style={{
-              marginLeft: "auto",
-              padding: "2px 8px",
-              background: "var(--amber-dim)",
-              color: "var(--amber)",
-              border: "1px solid var(--amber)",
-              borderRadius: 4,
-              fontSize: 11,
-              fontFamily: "var(--mono)",
-            }}
+          <Typography
+            variant="caption"
+            color="warning.main"
+            sx={{ ml: "auto" }}
           >
             {items.length} objectives
-          </span>
+          </Typography>
         )}
-      </div>
-      <ul
-        style={{
+      </Box>
+      <Box
+        component="ul"
+        sx={{
           listStyle: "none",
-          padding: 0,
-          margin: 0,
+          p: 0,
+          m: 0,
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 10,
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+          gap: 1.25,
         }}
       >
         {items.map((it, i) => (
-          <li
+          <Box
+            component="li"
             key={i}
-            style={{
+            sx={{
               display: "flex",
-              gap: 10,
+              gap: 1.25,
               alignItems: "flex-start",
-              paddingLeft: accentBars ? 10 : 0,
-              borderLeft: accentBars ? "2px solid var(--accent)" : "none",
-              fontSize: 13,
-              lineHeight: 1.5,
+              pl: accentBars ? 1.25 : 0,
+              borderLeft: accentBars ? 2 : 0,
+              borderColor: "primary.main",
             }}
           >
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-                letterSpacing: 0.5,
-                paddingTop: 2,
-                flexShrink: 0,
-              }}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontFamily: "monospace", pt: "2px", flexShrink: 0 }}
             >
               {String(i + 1).padStart(2, "0")}
-            </span>
-            <span style={{ flex: 1, color: "var(--text-2)" }}>{it}</span>
-          </li>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {it}
+            </Typography>
+          </Box>
         ))}
-      </ul>
-    </div>
+      </Box>
+    </Box>
   );
 }

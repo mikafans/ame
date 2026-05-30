@@ -4,7 +4,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, patch, post},
@@ -84,6 +84,10 @@ pub struct GetSessionQuestion {
     pub explanation: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_snippet: Option<serde_json::Value>,
+    /// Grading language for code questions (from the question payload), so the
+    /// client submits a `Code` response whose language matches the grader.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<Vec<serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -291,6 +295,10 @@ async fn hydrate_session_questions(
                         .map(|opt| serde_json::json!({"text": opt}))
                         .collect()
                 });
+            let language = payload
+                .get("language")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
             Ok(GetSessionQuestion {
                 question_id: item.question_id,
                 kind,
@@ -298,6 +306,7 @@ async fn hydrate_session_questions(
                 points: row.get("points"),
                 explanation: row.get("explanation"),
                 code_snippet: row.get("code_snippet"),
+                language,
                 options,
                 option_order: item.option_order.clone(),
             })
@@ -1163,9 +1172,152 @@ pub async fn grade_attempt(
     Ok(Json(row_to_attempt(updated)?))
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListMySessionsQuery {
+    #[serde(default)]
+    pub quiz_id: Option<Uuid>,
+    #[serde(default)]
+    pub exam_id: Option<Uuid>,
+}
+
+/// One row in a learner's attempt history.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummary {
+    pub id: Uuid,
+    pub kind: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quiz_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exam_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quiz_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub points_awarded: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_points: Option<f64>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub started_at: OffsetDateTime,
+    #[serde(
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub finished_at: Option<OffsetDateTime>,
+    /// 1-based position of this attempt within its quiz/exam (chronological).
+    pub attempt_number: i64,
+    /// Total finished attempts the learner has for the same quiz/exam.
+    pub total_attempts: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListMySessionsResponse {
+    pub sessions: Vec<SessionSummary>,
+}
+
+/// GET /v1/sessions — the caller's finished attempt history, newest first.
+#[utoipa::path(
+    get,
+    path = "/v1/sessions",
+    params(
+        ("quizId" = Option<Uuid>, Query, description = "Filter by quiz"),
+        ("examId" = Option<Uuid>, Query, description = "Filter by exam"),
+    ),
+    responses(
+        (status = 200, description = "Attempt history", body = ListMySessionsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_my_sessions(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Query(q): Query<ListMySessionsQuery>,
+) -> Result<Json<ListMySessionsResponse>, ApiError> {
+    // Finished sessions only — in-progress/abandoned ones aren't "results".
+    // Oldest first so we can number attempts chronologically, then reverse.
+    let rows = sqlx::query(
+        "SELECT s.id, s.kind, s.status, s.quiz_id, s.exam_id, s.result, \
+                s.started_at, s.finished_at, q.title AS quiz_title \
+         FROM tb_sessions s \
+         LEFT JOIN tb_quizzes q ON q.id = s.quiz_id \
+         WHERE s.user_id = $1 AND s.status = 'finished' \
+           AND ($2::uuid IS NULL OR s.quiz_id = $2) \
+           AND ($3::uuid IS NULL OR s.exam_id = $3) \
+         ORDER BY s.started_at ASC",
+    )
+    .bind(user.user.id)
+    .bind(q.quiz_id)
+    .bind(q.exam_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    // Number attempts per quiz/exam, and count totals per group.
+    let mut seen: HashMap<Uuid, i64> = HashMap::new();
+    let mut totals: HashMap<Uuid, i64> = HashMap::new();
+    let mut summaries: Vec<SessionSummary> = rows
+        .into_iter()
+        .map(|r| {
+            let quiz_id: Option<Uuid> = r.get("quiz_id");
+            let exam_id: Option<Uuid> = r.get("exam_id");
+            // Group by whichever owns the attempt; quiz takes precedence.
+            let group = quiz_id.or(exam_id).unwrap_or(Uuid::nil());
+            let n = seen.entry(group).or_insert(0);
+            *n += 1;
+            let attempt_number = *n;
+            *totals.entry(group).or_insert(0) += 1;
+
+            let result: Option<serde_json::Value> = r.get("result");
+            let points_awarded = result
+                .as_ref()
+                .and_then(|v| v.get("points_awarded"))
+                .and_then(|v| v.as_f64());
+            let max_points = result
+                .as_ref()
+                .and_then(|v| v.get("max_points"))
+                .and_then(|v| v.as_f64());
+
+            (
+                group,
+                SessionSummary {
+                    id: r.get("id"),
+                    kind: r.get("kind"),
+                    status: r.get("status"),
+                    quiz_id,
+                    exam_id,
+                    quiz_title: r.try_get("quiz_title").ok(),
+                    points_awarded,
+                    max_points,
+                    started_at: r.get("started_at"),
+                    finished_at: r.get("finished_at"),
+                    attempt_number,
+                    total_attempts: 0, // backfilled below
+                },
+            )
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|(group, mut s)| {
+            s.total_attempts = *totals.get(&group).unwrap_or(&0);
+            s
+        })
+        .collect();
+
+    // Newest first for display.
+    summaries.reverse();
+    Ok(Json(ListMySessionsResponse {
+        sessions: summaries,
+    }))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/v1/sessions", post(create_session))
+        .route("/v1/sessions", post(create_session).get(list_my_sessions))
         .route("/v1/sessions/{id}", get(get_session).patch(patch_session))
         .route("/v1/sessions/{id}/answer", post(answer))
         .route("/v1/sessions/{id}/answers", patch(autosave_answers))

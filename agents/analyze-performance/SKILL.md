@@ -5,7 +5,7 @@ Read a learner's tag-level stats and recent attempt history to surface learning 
 ## Prerequisites
 
 - API key with scopes: `stats.read`, `attempt.read`
-- Base URL: your Harus instance (e.g. `https://harus.example.com/v1`)
+- Base URL: your AME instance (e.g. `https://ame.example.com/v1`)
 
 ## Steps
 

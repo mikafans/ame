@@ -24,7 +24,7 @@ Copy `.env.example` to `.env` if you need to override defaults.
 
 ```bash
 make check          # fmt-check + lint + unit tests (pre-commit gate)
-make validate       # check + e2e (pre-PR gate)
+make ci             # check + DB-backed tests + db-reset + e2e (full gate)
 make test-db        # DB-backed integration tests (requires `make db-up`)
 make db-reset       # wipe DB data, recreate, migrate (fixes migration checksum conflicts)
 make openapi        # regenerate api/openapi.yaml + web TypeScript schema
@@ -39,6 +39,21 @@ make e2e            # auto-starts API + seeds + runs Playwright suite
 ```
 
 For interactive visual audits use `bunx @playwright/cli` — see `AGENTS.md` for the auth cookie pattern.
+
+## Deploy
+
+`docker-compose.prod.yml` is a production-shaped stack (Postgres + API + web) for
+smoke deploys, demos, and CI integration testing — not a substitute for the k8s
+manifests. The API runs its migrations on boot, so no separate migration step is
+needed.
+
+```bash
+cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
+make docker-build      # build api + web images
+make docker-up         # start the stack (-d)
+make docker-logs       # tail logs
+make docker-down       # stop the stack
+```
 
 ## Local database
 

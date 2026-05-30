@@ -27,6 +27,7 @@ interface SessionQuestion {
   prompt: string;
   points: number;
   codeSnippet?: { language: string; body: string };
+  language?: string;
   options?: Array<{ text: string }>;
   optionOrder?: number[];
 }
@@ -126,6 +127,14 @@ export default function ActiveQuizPage({
             body,
             word_count: body.trim().split(/\s+/).filter(Boolean).length,
           };
+        } else if (q.kind === "code") {
+          // Must match the grader's Code { source, language } shape, and the
+          // language must equal the question's grading language or the answer
+          // is rejected (and not saved).
+          response = {
+            source: String(val ?? ""),
+            language: q.language ?? q.codeSnippet?.language ?? "python",
+          };
         } else {
           response = { answer: String(val ?? "") };
         }
@@ -210,6 +219,24 @@ export default function ActiveQuizPage({
       console.error(err);
     }
   }, [id, router]);
+
+  // Enter advances to the next question (or submits on the last one). In
+  // multiline fields (essay/code) plain Enter inserts a newline, so advancing
+  // there requires Ctrl/Cmd+Enter.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Enter" || e.shiftKey || !session) return;
+      const target = e.target as HTMLElement | null;
+      const isTextarea = target?.tagName === "TEXTAREA";
+      if (isTextarea && !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const last = session.questions.length - 1;
+      if (idx < last) setIdx((i) => Math.min(last, i + 1));
+      else handleFinish();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [idx, session, handleFinish]);
 
   if (!session) {
     return (
@@ -341,6 +368,13 @@ export default function ActiveQuizPage({
         >
           Previous
         </Button>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ alignSelf: "center", display: { xs: "none", sm: "block" } }}
+        >
+          Press Enter to continue
+        </Typography>
         {idx < questions.length - 1 ? (
           <Button
             endIcon={<ArrowForwardOutlinedIcon />}
@@ -415,6 +449,7 @@ function QuestionInput({
         value={String(value ?? "")}
         onChange={onChange}
         disabled={disabled}
+        language={question.language ?? question.codeSnippet?.language}
       />
     );
   }

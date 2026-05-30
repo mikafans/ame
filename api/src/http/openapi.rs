@@ -49,8 +49,8 @@ use crate::{
         },
         sessions::{
             AnswerSessionBody, AnswerSessionResponse, CreateSessionBody, CreateSessionResponse,
-            FinishSessionResponse, GetSessionResponse, GradeAttemptBody, PendingAttemptRow,
-            SessionQuestion,
+            FinishSessionResponse, GetSessionResponse, GradeAttemptBody, ListMySessionsResponse,
+            PendingAttemptRow, SessionQuestion, SessionSummary,
         },
         stats::{
             DistributionBucket, ExamStatsResponse, ItemStats, MeStatsResponse, QuizStatsResponse,
@@ -97,6 +97,7 @@ impl Modify for SecurityAddon {
         crate::http::questions::promote_question,
         crate::http::questions::archive_question,
         crate::http::sessions::create_session,
+        crate::http::sessions::list_my_sessions,
         crate::http::sessions::get_session,
         crate::http::sessions::patch_session,
         crate::http::sessions::answer,
@@ -153,6 +154,8 @@ impl Modify for SecurityAddon {
         AnswerSessionBody,
         AnswerSessionResponse,
         FinishSessionResponse,
+        SessionSummary,
+        ListMySessionsResponse,
         PendingAttemptRow,
         GradeAttemptBody,
         CreateTagBody,

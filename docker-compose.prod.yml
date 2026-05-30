@@ -14,24 +14,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-ame}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # postgres:18 expects the mount at the parent dir (data lives in a subdir).
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ame}"]
       interval: 5s
       timeout: 3s
       retries: 20
-
-  migrate:
-    image: ghcr.io/launchbadge/sqlx-cli:latest
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ame}
-    volumes:
-      - ./db/migrations:/migrations:ro
-    command: ["sqlx", "migrate", "run", "--source", "/migrations"]
-    restart: "no"
 
   api:
     build:
@@ -39,18 +28,18 @@ services:
       dockerfile: api/Dockerfile
     image: ame-api:latest
     restart: unless-stopped
+    # The api runs embedded migrations on boot (sqlx::migrate!), so no separate
+    # migration service is needed.
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ame}
       RUST_LOG: ${RUST_LOG:-ame_api=info,tower_http=info,sqlx=warn}
     ports:
       - "${API_PORT:-8080}:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5

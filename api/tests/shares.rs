@@ -83,12 +83,12 @@ async fn serve_lazy() -> String {
 // ── MCP manifest ──────────────────────────────────────────────────────────────
 
 #[tokio::test]
-async fn mcp_manifest_contains_all_share_tools() {
+async fn skill_manifest_contains_all_share_tools() {
     let base = serve_lazy().await;
     let client = reqwest::Client::new();
 
     let manifest: Value = client
-        .get(format!("{base}/v1/agents/mcp.json"))
+        .get(format!("{base}/v1/agents/skill.json"))
         .send()
         .await
         .unwrap()
@@ -131,18 +131,18 @@ async fn mcp_manifest_contains_all_share_tools() {
     for expected in &all_expected {
         assert!(
             tool_names.contains(expected),
-            "MCP manifest missing tool: {expected}. Got: {tool_names:?}"
+            "skill manifest missing tool: {expected}. Got: {tool_names:?}"
         );
     }
 }
 
 #[tokio::test]
-async fn mcp_manifest_strict_drops_harus_fields() {
+async fn skill_manifest_strict_drops_ame_fields() {
     let base = serve_lazy().await;
     let client = reqwest::Client::new();
 
     let manifest: Value = client
-        .get(format!("{base}/v1/agents/mcp.json?strict=1"))
+        .get(format!("{base}/v1/agents/skill.json?strict=1"))
         .send()
         .await
         .unwrap()

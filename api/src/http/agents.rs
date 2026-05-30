@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 use crate::{
     auth::{
+        extractor::AuthenticatedUser,
         scope::{RequireAnyScope, ScopeOneOf},
         token::{generate_secret, hash_secret},
     },
@@ -41,7 +42,7 @@ pub struct RegisterBody {
     pub scopes: Vec<String>,
     /// Shared secret matching the server's `AME_AGENT_ACCESS_CODE` env var.
     /// Required; registration is disabled when the env var is unset.
-    #[serde(rename = "access_code")]
+    /// Wire name is `accessCode` (camelCase, per the struct-level rename).
     pub access_code: Option<String>,
 }
 
@@ -51,7 +52,7 @@ pub struct RegisterResponse {
     pub api_key: String,
     pub user_id: Uuid,
     pub openapi_url: String,
-    pub mcp_manifest_url: String,
+    pub skill_manifest_url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -164,18 +165,37 @@ pub async fn register(
             api_key: format!("{token_id}_{secret}"),
             user_id,
             openapi_url: "/v1/agents/openapi.json".to_string(),
-            mcp_manifest_url: "/v1/agents/mcp.json".to_string(),
+            skill_manifest_url: "/v1/agents/skill.json".to_string(),
         }),
     ))
 }
 
-/// GET /v1/agents/mcp.json — MCP manifest (public).
-pub async fn mcp_manifest(
+/// GET /v1/agents/skill.json — agent skill manifest (public).
+///
+/// Lists the callable tools, their input schemas, and the REST method/path each
+/// maps to. This is a plain JSON descriptor, *not* the MCP protocol — composite
+/// and write tools are executed via `POST /v1/agents/run`; plain reads are
+/// called directly at their advertised method/path.
+pub async fn skill_manifest(
     State(_state): State<AppState>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Json<Value> {
     let strict = params.get("strict").map(|v| v == "1").unwrap_or(false);
-    Json(build_mcp_manifest(strict))
+    Json(build_skill_manifest(strict))
+}
+
+/// GET /llms.txt — agent entry doc (public, llmstxt.org convention).
+///
+/// Served from the repo-tracked `api/llms.txt` so the doc and the binary never
+/// drift. This is the first thing an agent should read.
+pub async fn llms_txt() -> impl IntoResponse {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        include_str!("../../llms.txt"),
+    )
 }
 
 /// GET /v1/agents/openapi.json — serves the OpenAPI snapshot (requires quiz.read).
@@ -286,7 +306,7 @@ fn id_only() -> Value {
     })
 }
 
-fn build_mcp_manifest(strict: bool) -> Value {
+fn build_skill_manifest(strict: bool) -> Value {
     let tools: Vec<Value> = vec![
         // Quiz
         tool(
@@ -503,7 +523,7 @@ fn build_mcp_manifest(strict: bool) -> Value {
         tool(
             "agents.register",
             "Register a new agent user and receive an API key.",
-            json!({"type":"object","required":["scopes"],"properties":{"label":{"type":"string"},"scopes":{"type":"array","items":{"type":"string"}}}}),
+            json!({"type":"object","required":["scopes","accessCode"],"properties":{"label":{"type":"string"},"scopes":{"type":"array","items":{"type":"string"}},"accessCode":{"type":"string","description":"shared secret matching the server's AME_AGENT_ACCESS_CODE env var"}}}),
             "POST",
             "/v1/agents/register",
             None,
@@ -578,9 +598,17 @@ fn build_mcp_manifest(strict: bool) -> Value {
 
     json!({
         "schema_version": "v1",
-        "name": "harus",
-        "description": "Read and write quizzes, exams, attempts, and study plans on Harus.",
+        "name": "ame",
+        "description": "Read and write quizzes, exams, attempts, and study plans on AME.",
         "auth": { "type": "bearer", "format": "hk_<env>_<id>" },
+        "entrypoint": "/llms.txt",
+        "run": {
+            "endpoint": "/v1/agents/run",
+            "method": "POST",
+            "body": { "tool": "<tool name>", "params": { "...": "..." } },
+            "runnable_tools": ["quiz.import", "quiz.update", "question.create", "question.promote"],
+            "description": "Execute a composite or write tool. Plain read tools are NOT routed here — call them directly at their advertised method/path.",
+        },
         "tools": tools,
     })
 }
@@ -588,13 +616,14 @@ fn build_mcp_manifest(strict: bool) -> Value {
 // ── invoke ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
-pub struct InvokeBody {
+pub struct RunBody {
     pub tool: String,
+    #[serde(default)]
     pub params: Value,
 }
 
 #[derive(Debug, Serialize)]
-pub struct InvokeResponse {
+pub struct RunResponse {
     pub ok: bool,
     pub tool: String,
     pub result: Value,
@@ -602,27 +631,80 @@ pub struct InvokeResponse {
     pub error: Option<String>,
 }
 
-pub async fn invoke(
+/// POST /v1/agents/run — execute a named composite or write tool.
+///
+/// The endpoint accepts any authenticated token; the **per-tool** scope is
+/// enforced here (see [`require_scope`]). This is the key fix over the old
+/// `invoke`: that handler carried a single read-or-admin guard for the whole
+/// endpoint, so a read-only token could drive write tools. Now each tool
+/// declares the scope it needs and the dispatcher checks the caller's token.
+///
+/// Only composite/write tools are routed here. Plain read tools advertised in
+/// the skill manifest are called directly at their method/path.
+pub async fn run(
     State(state): State<AppState>,
-    auth: RequireAnyScope<AgentReadScopes>,
-    Json(body): Json<InvokeBody>,
-) -> Result<Json<InvokeResponse>, ApiError> {
+    auth: AuthenticatedUser,
+    Json(body): Json<RunBody>,
+) -> Result<Json<RunResponse>, ApiError> {
+    let user_id = auth.user.id;
     match body.tool.as_str() {
-        "quiz.import" => invoke_quiz_import(&state, &auth.0.user.id, body.params).await,
-        other => Ok(Json(InvokeResponse {
+        "quiz.import" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_quiz_import(&state, &user_id, body.params).await
+        }
+        "quiz.update" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_quiz_update(&state, body.params).await
+        }
+        "question.create" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_question_create(&state, &user_id, body.params).await
+        }
+        "question.promote" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_question_promote(&state, body.params).await
+        }
+        other => Ok(Json(RunResponse {
             ok: false,
             tool: other.to_string(),
             result: Value::Null,
-            error: Some(format!("unknown tool: {other}")),
+            error: Some(format!(
+                "unknown or non-runnable tool: {other}. Runnable tools: quiz.import, quiz.update, \
+                 question.create, question.promote. Read tools are called directly at their \
+                 method/path — see /v1/agents/skill.json."
+            )),
         })),
     }
 }
 
-async fn invoke_quiz_import(
+/// Per-tool scope gate: the caller's token must carry `needed` (or `admin`).
+fn require_scope(auth: &AuthenticatedUser, needed: Scope) -> Result<(), ApiError> {
+    if auth.token_scopes.contains(&needed) || auth.token_scopes.contains(&Scope::Admin) {
+        Ok(())
+    } else {
+        Err(ApiError::ScopeRequired(needed.as_str()))
+    }
+}
+
+/// Parse a required UUID `id` field from a tool's params.
+fn parse_id(params: &Value) -> Result<Uuid, ApiError> {
+    params
+        .get("id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            ApiError::Validation(vec![FieldError {
+                field: "id".into(),
+                message: "missing or invalid id (expected a UUID string)".into(),
+            }])
+        })
+}
+
+async fn run_quiz_import(
     state: &AppState,
     user_id: &Uuid,
     params: Value,
-) -> Result<Json<InvokeResponse>, ApiError> {
+) -> Result<Json<RunResponse>, ApiError> {
     use crate::domain::question::QuestionKind;
 
     let source = params.get("source").and_then(|v| v.as_str()).unwrap_or("");
@@ -720,7 +802,7 @@ async fn invoke_quiz_import(
         created += 1;
     }
 
-    Ok(Json(InvokeResponse {
+    Ok(Json(RunResponse {
         ok: true,
         tool: "quiz.import".into(),
         result: json!({
@@ -732,12 +814,86 @@ async fn invoke_quiz_import(
     }))
 }
 
+/// `quiz.update` — patch quiz metadata / publish. Reuses the same publish
+/// gating + draft-question auto-promotion as `PATCH /v1/quizzes/{id}`.
+async fn run_quiz_update(state: &AppState, params: Value) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let patch: super::quizzes::QuizPatch = serde_json::from_value(params).map_err(|e| {
+        ApiError::Validation(vec![FieldError {
+            field: "params".into(),
+            message: format!("invalid quiz patch: {e}"),
+        }])
+    })?;
+    let updated = super::quizzes::apply_quiz_patch(&state.pool, id, patch).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "quiz.update".into(),
+        result: serde_json::to_value(updated).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+/// `question.create` — batch-create questions in the bank. Reuses the same
+/// repo path as `POST /v1/questions`.
+async fn run_question_create(
+    state: &AppState,
+    user_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    use crate::bank::questions as repo;
+
+    let questions: Vec<repo::QuestionInsert> = params
+        .get("questions")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "questions".into(),
+                message: format!("invalid questions array: {e}"),
+            }])
+        })?
+        .unwrap_or_default();
+
+    if questions.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "questions".into(),
+            message: "must contain at least one question".into(),
+        }]));
+    }
+
+    let created = repo::create_questions(&state.pool, *user_id, questions).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.create".into(),
+        result: json!({ "created": created.len(), "questions": created }),
+        error: None,
+    }))
+}
+
+/// `question.promote` — promote a draft question to live.
+async fn run_question_promote(
+    state: &AppState,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    use crate::bank::questions as repo;
+
+    let id = parse_id(&params)?;
+    let promoted = repo::promote_question(&state.pool, id).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.promote".into(),
+        result: serde_json::to_value(promoted).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     // /v1/agents/register is mounted (with rate limiting) in `http::mod::router`.
     Router::new()
-        .route("/v1/agents/mcp.json", get(mcp_manifest))
+        .route("/v1/agents/skill.json", get(skill_manifest))
         .route("/v1/agents/openapi.json", get(openapi_json))
         .route("/v1/agents/activity", get(activity))
-        .route("/v1/agents/invoke", post(invoke))
+        .route("/v1/agents/run", post(run))
         .with_state(state)
 }

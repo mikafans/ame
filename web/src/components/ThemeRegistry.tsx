@@ -34,8 +34,31 @@ function buildTheme(mode: ColorMode) {
         background: { default: "#0d1117", paper: "#161b22" },
       }),
     },
-    typography: { fontFamily: "Roboto, sans-serif", fontSize: 14 },
+    typography: {
+      fontFamily: "Roboto, sans-serif",
+      fontSize: 14,
+      button: { textTransform: "none", fontWeight: 500, letterSpacing: 0 },
+    },
     shape: { borderRadius: 8 },
+    components: {
+      // Comfortable, consistent buttons platform-wide: no shouty all-caps,
+      // flat surfaces, and a little more breathing room than MUI's defaults.
+      MuiButton: {
+        defaultProps: { disableElevation: true },
+        styleOverrides: {
+          root: { borderRadius: 8 },
+          sizeSmall: { padding: "5px 14px", minHeight: 34 },
+          sizeMedium: { padding: "8px 20px", minHeight: 42 },
+          sizeLarge: { padding: "11px 26px", minHeight: 50, fontSize: 15 },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          sizeSmall: { padding: 7 },
+          sizeMedium: { padding: 9 },
+        },
+      },
+    },
   });
 }
 

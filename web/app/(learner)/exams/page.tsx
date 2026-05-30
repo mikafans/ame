@@ -23,7 +23,7 @@ interface ExamSection {
   id: string;
   title: string;
   weight: number;
-  items: number;
+  itemsCount: number;
   mix?: string;
   quizId?: string;
 }
@@ -71,6 +71,7 @@ export default function ExamsPage() {
   const [composeName, setComposeName] = useState("");
   const [composeDesc, setComposeDesc] = useState("");
   const [composeDuration, setComposeDuration] = useState(60);
+  const [composePassing, setComposePassing] = useState<number | "">("");
   const [sections, setSections] = useState<SectionDraft[]>([
     { title: "", weight: 60, selectedIds: new Set() },
   ]);
@@ -113,6 +114,10 @@ export default function ExamsPage() {
   const filtered =
     tab === "all" ? exams : exams.filter((e) => e.status === tab);
   const exam = exams.find((e) => e.id === selected) ?? null;
+  const examQuestionCount =
+    exam?.sections && exam.sections.length > 0
+      ? exam.sections.reduce((sum, s) => sum + (s.itemsCount ?? 0), 0)
+      : null;
 
   async function startExam() {
     if (!selected) return;
@@ -151,6 +156,7 @@ export default function ExamsPage() {
         name: composeName,
         description: composeDesc || undefined,
         duration: composeDuration,
+        passingPoints: composePassing === "" ? undefined : composePassing,
         sections: sections.map((s, i) => ({
           title: s.title || `Section ${i + 1}`,
           weight: s.weight / 100,
@@ -279,32 +285,183 @@ export default function ExamsPage() {
         {!exam ? (
           <Typography color="text.secondary">Select an exam.</Typography>
         ) : (
-          <Stack spacing={2}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-              }}
-            >
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                  {exam.name}
-                </Typography>
-                {exam.description && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 0.5 }}
-                  >
-                    {exam.description}
-                  </Typography>
+          <Stack spacing={3} sx={{ maxWidth: 820 }}>
+            <Box>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ mb: 1, flexWrap: "wrap", alignItems: "center" }}
+              >
+                <Chip
+                  label={exam.status === "published" ? "Active" : exam.status}
+                  size="small"
+                  color={exam.status === "published" ? "success" : "default"}
+                  variant="outlined"
+                />
+                {exam.course && (
+                  <Chip label={exam.course} size="small" variant="outlined" />
                 )}
+                {exam.method && (
+                  <Chip
+                    label={`Composed: ${exam.method}`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
+              <Typography variant="h4" sx={{ fontWeight: 500 }}>
+                {exam.name}
+              </Typography>
+              {exam.description && (
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  sx={{ mt: 1, lineHeight: 1.6 }}
+                >
+                  {exam.description}
+                </Typography>
+              )}
+            </Box>
+
+            {/* At-a-glance metrics */}
+            <Card variant="outlined">
+              <CardContent>
+                <Stack
+                  direction="row"
+                  divider={<Divider orientation="vertical" flexItem />}
+                  spacing={3}
+                  sx={{ flexWrap: "wrap", rowGap: 2 }}
+                >
+                  {[
+                    {
+                      label: "Questions",
+                      value:
+                        examQuestionCount != null ? examQuestionCount : "—",
+                    },
+                    {
+                      label: "Duration",
+                      value: exam.durationMin ? `${exam.durationMin} min` : "—",
+                    },
+                    {
+                      label: "Total points",
+                      value: exam.totalPoints || "—",
+                    },
+                    {
+                      label: "Pass mark",
+                      value:
+                        exam.passingPoints != null
+                          ? `${exam.passingPoints} pts`
+                          : "—",
+                    },
+                    {
+                      label: "Sections",
+                      value: exam.sections?.length ?? "—",
+                    },
+                  ].map((m) => (
+                    <Box key={m.label} sx={{ minWidth: 84 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {m.label}
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {m.value}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+
+            {exam.objectives.length > 0 && (
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  What you&apos;ll be assessed on
+                </Typography>
+                <LearningObjectives items={exam.objectives} />
               </Box>
-              <Stack direction="row" spacing={1}>
+            )}
+
+            {exam.sections && exam.sections.length > 0 && (
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Exam format
+                </Typography>
+                <Stack spacing={1.25}>
+                  {exam.sections.map((s, i) => (
+                    <Card key={s.id} variant="outlined">
+                      <CardContent sx={{ pb: "16px !important" }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "baseline",
+                            mb: 1,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {i + 1}. {s.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {s.itemsCount} questions
+                            {s.mix ? ` · ${s.mix}` : ""} ·{" "}
+                            {Math.round(s.weight * 100)}%
+                          </Typography>
+                        </Box>
+                        {/* Weight bar */}
+                        <Box
+                          sx={{
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: "action.hover",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: `${Math.round(s.weight * 100)}%`,
+                              height: "100%",
+                              bgcolor: "primary.main",
+                            }}
+                          />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {exam.tags && exam.tags.length > 0 && (
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                {exam.tags.map((t) => (
+                  <Chip key={t} label={t} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            )}
+
+            {exam.status === "published" && (
+              <Alert severity="info" variant="outlined">
+                {exam.durationMin
+                  ? `This is a timed exam — once you start, you have ${exam.durationMin} minutes to complete all sections.`
+                  : "Once you start, complete all sections in one sitting."}
+              </Alert>
+            )}
+
+            {(exam.status === "published" ||
+              (isInstructor && exam.status !== "published")) && (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 1,
+                  pt: 2,
+                  borderTop: 1,
+                  borderColor: "divider",
+                }}
+              >
                 {exam.status === "published" && (
                   <Button
                     variant="contained"
+                    size="large"
                     disabled={starting}
                     onClick={startExam}
                   >
@@ -319,47 +476,6 @@ export default function ExamsPage() {
                     Publish
                   </Button>
                 )}
-              </Stack>
-            </Box>
-
-            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-              <Chip label={exam.status} variant="outlined" />
-              {exam.course && <Chip label={exam.course} variant="outlined" />}
-              {exam.durationMin && (
-                <Chip label={`${exam.durationMin} min`} variant="outlined" />
-              )}
-            </Stack>
-
-            {exam.objectives.length > 0 && (
-              <LearningObjectives items={exam.objectives} />
-            )}
-
-            {exam.sections && exam.sections.length > 0 && (
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Sections
-                </Typography>
-                <Stack spacing={1}>
-                  {exam.sections.map((s) => (
-                    <Card key={s.id} variant="outlined">
-                      <CardContent sx={{ pb: "12px !important" }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {s.title}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {s.items} questions · {Math.round(s.weight * 100)}%
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
               </Box>
             )}
           </Stack>
@@ -407,6 +523,19 @@ export default function ExamsPage() {
                   onChange={(e) => setComposeDuration(Number(e.target.value))}
                   fullWidth
                   size="small"
+                />
+                <TextField
+                  label="Passing points (optional)"
+                  type="number"
+                  value={composePassing}
+                  onChange={(e) =>
+                    setComposePassing(
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  fullWidth
+                  size="small"
+                  helperText="Minimum points to pass. Leave blank for none."
                 />
                 <Divider />
                 <Typography variant="subtitle2">Sections</Typography>
