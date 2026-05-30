@@ -113,6 +113,55 @@ async fn test_cross_owner_agent_visibility() {
         .await
         .unwrap();
 
-    // Should be 200, currently 404
     assert_eq!(res.status(), StatusCode::OK);
+
+    // 4. Test: Unrelated user GET agent's private quiz should 404
+    let stranger_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'Stranger', 'user')",
+    )
+    .bind(stranger_id)
+    .bind(format!("stranger-{}@example.com", stranger_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let stranger_token_id = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(stranger_token_id)
+        .bind(stranger_id)
+        .bind("stranger-key")
+        .bind(&hash)
+        .bind(vec!["quiz.read".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let stranger_auth = format!("{stranger_token_id}_{secret}");
+
+    let res = client
+        .get(format!("{base_url}/v1/quizzes/{qid}"))
+        .header("Authorization", format!("Bearer {stranger_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 5. Test: Agent creates a session for its own private quiz
+    let res = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header("Authorization", format!("Bearer {agent_auth}"))
+        .json(&json!({"quizId": qid}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    // 6. Test: Owner creates a session for agent's private quiz
+    let res = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header("Authorization", format!("Bearer {owner_auth}"))
+        .json(&json!({"quizId": qid}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
 }

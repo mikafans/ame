@@ -102,30 +102,32 @@ fn default_limit() -> i64 {
 )]
 async fn list_quizzes(
     State(state): State<AppState>,
-    auth: RequireAnyScope<QuizReadScopes>,
+    auth: AuthenticatedUser,
     Query(q): Query<ListQuizzesQuery>,
 ) -> Result<Json<ListQuizzesResponse>, ApiError> {
     let rows = sqlx::query(
         r#"
         SELECT q.id, q.title, q.status, q.visibility, q.objectives, q.course, q.created_by,
-                q.created_at, q.updated_at,
-                COUNT(*) OVER() AS total,
-                COUNT(qq.question_id) AS question_count,
-                EXISTS(
-                    SELECT 1 FROM tb_sessions s
-                    WHERE s.quiz_id = q.id AND s.user_id = $4 AND s.status = 'finished'
-                ) AS completed
-         FROM tb_quizzes q
-         LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
-         WHERE q.status = $1 AND (q.visibility = 'public' OR q.created_by = $4 OR EXISTS(SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $4))
-         GROUP BY q.id
-         ORDER BY q.created_at DESC
-         LIMIT $2 OFFSET $3"#,
+               q.created_at, q.updated_at,
+               COUNT(*) OVER() AS total,
+               COUNT(qq.question_id) AS question_count,
+               EXISTS(
+                   SELECT 1 FROM tb_sessions s
+                   WHERE s.quiz_id = q.id AND s.user_id = $4 AND s.status = 'finished'
+               ) AS completed
+        FROM tb_quizzes q
+        LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
+        WHERE q.status = $1 AND (q.visibility = 'public' OR q.created_by = $4 OR EXISTS(SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND (u.id = $4 OR u.owner_user_id = $4)))
+        GROUP BY q.id
+        ORDER BY q.created_at DESC
+        LIMIT $2 OFFSET $3
+        "#,
     )
     .bind(&q.status)
     .bind(q.limit)
     .bind(q.offset)
-    .bind(auth.0.user.id)
+    .bind(auth.owner_id)
+
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -228,7 +230,8 @@ async fn get_quiz(
             "SELECT EXISTS(SELECT 1 FROM tb_users WHERE id = $1 AND (id = $2 OR owner_user_id = $2))"
         )
         .bind(created_by)
-        .bind(auth.owner_id())
+        .bind(auth.owner_id)
+
         .fetch_one(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -351,6 +354,9 @@ pub(crate) async fn apply_quiz_patch(
 
     // Publish gating
     if body.status.as_deref() == Some("active") {
+        // TODO: P4 — plan-gate public publishing
+        // TODO: P6 — audit log entry for public publishing
+
         let current_status: String = quiz_row.get("status");
         if current_status == "archived" {
             return Err(ApiError::Validation(vec![FieldError {
@@ -947,7 +953,7 @@ async fn explore(
     )
     .bind(q.limit)
     .bind(q.offset)
-    .bind(auth.owner_id())
+    .bind(auth.owner_id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
