@@ -740,6 +740,9 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        ExamListItem: components["schemas"]["Exam"] & {
+            sections: components["schemas"]["ExamSection"][];
+        };
         /** @enum {string} */
         ExamMethod: "manual" | "agent";
         /**
@@ -878,7 +881,7 @@ export interface components {
             total: number;
         };
         ListExamsResponse: {
-            exams: components["schemas"]["Exam"][];
+            exams: components["schemas"]["ExamListItem"][];
         };
         ListKeysResponse: {
             keys: components["schemas"]["KeySummary"][];
@@ -1840,14 +1843,19 @@ export interface operations {
             path: {
                 tag: string | null;
                 status: null | components["schemas"]["QuestionStatus"];
-                min_rating: number | null;
-                max_rating: number | null;
+                minRating: number | null;
+                maxRating: number | null;
                 limit: number | null;
                 offset: number | null;
                 search: string | null;
                 kind: string | null;
                 page: number | null;
-                page_size: number | null;
+                pageSize: number | null;
+                /**
+                 * @description Keyset cursor from a prior response's `nextCursor`; when set, `page` is
+                 *     ignored and the next rows after the cursor are returned.
+                 */
+                cursor: string | null;
             };
             cookie?: never;
         };

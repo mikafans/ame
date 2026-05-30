@@ -41,6 +41,7 @@ impl ScopeOneOf for WriteQuestionScopes {
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
 pub struct ListQuestionsQuery {
     #[serde(default)]
     pub tag: Option<String>,
@@ -62,6 +63,10 @@ pub struct ListQuestionsQuery {
     pub page: Option<i64>,
     #[serde(default)]
     pub page_size: Option<i64>,
+    /// Keyset cursor from a prior response's `nextCursor`; when set, `page` is
+    /// ignored and the next rows after the cursor are returned.
+    #[serde(default)]
+    pub cursor: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -75,9 +80,13 @@ pub struct QuestionListResponse {
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionBankListResponse {
     pub questions: Vec<repo::QuestionRow>,
     pub total: i64,
+    /// Cursor to fetch the next page via `?cursor=`; null when there are no
+    /// more rows or the query used an ordering that doesn't support keyset.
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize, ToSchema)]
@@ -105,11 +114,31 @@ pub async fn list_questions(
     _user: AuthenticatedUser,
     Query(q): Query<ListQuestionsQuery>,
 ) -> Result<Response, ApiError> {
-    // If using new pagination params (page/page_size/search/kind), use list_questions_paged
-    if q.page.is_some() || q.page_size.is_some() || q.search.is_some() || q.kind.is_some() {
+    // If using new pagination params (page/pageSize/search/kind/cursor), use
+    // list_questions_paged.
+    if q.page.is_some()
+        || q.page_size.is_some()
+        || q.search.is_some()
+        || q.kind.is_some()
+        || q.cursor.is_some()
+    {
+        // A keyset cursor seeks past a position, so it supersedes page/offset.
+        let after = match q.cursor.as_deref() {
+            Some(c) => Some(repo::decode_cursor(c).ok_or_else(|| {
+                ApiError::Validation(vec![FieldError {
+                    field: "cursor".into(),
+                    message: "malformed cursor".into(),
+                }])
+            })?),
+            None => None,
+        };
         let page = q.page.unwrap_or(1).max(1);
         let page_size = q.page_size.unwrap_or(25).clamp(1, 200);
-        let offset = (page - 1) * page_size;
+        let offset = if after.is_some() {
+            0
+        } else {
+            (page - 1) * page_size
+        };
 
         let filter = repo::QuestionFilter {
             tag: q.tag,
@@ -122,10 +151,11 @@ pub async fn list_questions(
             kind: q.kind,
         };
 
-        let (rows, total) = repo::list_questions_paged(&state.pool, &filter).await?;
+        let paged = repo::list_questions_paged(&state.pool, &filter, after).await?;
         return Ok(Json(QuestionBankListResponse {
-            questions: rows,
-            total,
+            questions: paged.rows,
+            total: paged.total,
+            next_cursor: paged.next_cursor,
         })
         .into_response());
     }

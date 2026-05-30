@@ -102,7 +102,7 @@ export default function QuestionsPage() {
     try {
       const query: Record<string, unknown> = {
         page,
-        page_size: pageSize,
+        pageSize,
       };
       if (debouncedSearch) query.search = debouncedSearch;
       if (kind !== "all") query.kind = kind;

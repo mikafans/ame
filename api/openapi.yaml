@@ -385,7 +385,7 @@ paths:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/QuestionStatus'
-      - name: min_rating
+      - name: minRating
         in: path
         required: true
         schema:
@@ -393,7 +393,7 @@ paths:
           - number
           - 'null'
           format: double
-      - name: max_rating
+      - name: maxRating
         in: path
         required: true
         schema:
@@ -439,7 +439,7 @@ paths:
           - integer
           - 'null'
           format: int64
-      - name: page_size
+      - name: pageSize
         in: path
         required: true
         schema:
@@ -447,6 +447,16 @@ paths:
           - integer
           - 'null'
           format: int64
+      - name: cursor
+        in: path
+        description: |-
+          Keyset cursor from a prior response's `nextCursor`; when set, `page` is
+          ignored and the next rows after the cursor are returned.
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
       responses:
         '200':
           description: Filtered list of questions
@@ -1775,6 +1785,17 @@ components:
         updatedAt:
           type: string
           format: date-time
+    ExamListItem:
+      allOf:
+      - $ref: '#/components/schemas/Exam'
+      - type: object
+        required:
+        - sections
+        properties:
+          sections:
+            type: array
+            items:
+              $ref: '#/components/schemas/ExamSection'
     ExamMethod:
       type: string
       enum:
@@ -2124,7 +2145,7 @@ components:
         exams:
           type: array
           items:
-            $ref: '#/components/schemas/Exam'
+            $ref: '#/components/schemas/ExamListItem'
     ListKeysResponse:
       type: object
       required:
