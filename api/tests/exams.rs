@@ -44,15 +44,13 @@ async fn make_bearer(pool: &PgPool) -> String {
     let token_id = Uuid::now_v7();
     let secret = "exam_secret_abc";
     let hash = hash_secret(secret);
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
-    )
-    .bind(user_id)
-    .bind(format!("exam-user-{user_id}"))
-    .bind(format!("exam-{user_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(user_id)
+        .bind(format!("exam-user-{user_id}"))
+        .bind(format!("exam-{user_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
     )
@@ -63,15 +61,13 @@ async fn make_bearer(pool: &PgPool) -> String {
 
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
     let author = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
-    )
-    .bind(author)
-    .bind(format!("author-{author}"))
-    .bind(format!("author-{author}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(author)
+        .bind(format!("author-{author}"))
+        .bind(format!("author-{author}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     let payload = match kind {
         "mc" => json!({ "options": ["a", "b", "c"], "correct_index": 0 }),
         "tf" => json!({ "correct": true }),

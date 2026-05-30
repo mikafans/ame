@@ -57,15 +57,13 @@ async fn make_bearer(pool: &PgPool) -> String {
     let secret = "session_secret_123";
     let hash = hash_secret(secret);
 
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
-    )
-    .bind(user_id)
-    .bind(format!("session-user-{user_id}"))
-    .bind(format!("session-{user_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(user_id)
+        .bind(format!("session-user-{user_id}"))
+        .bind(format!("session-{user_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
          VALUES ($1, $2, 'session token', $3, $4)",
@@ -89,15 +87,13 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
 /// tag to make tag-filtered practice planning deterministic on a shared DB.
 async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
     let author_id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
-    )
-    .bind(author_id)
-    .bind(format!("author-{author_id}"))
-    .bind(format!("author-{author_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(author_id)
+        .bind(format!("author-{author_id}"))
+        .bind(format!("author-{author_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
 
     let question_id: Uuid = sqlx::query(
         "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \

@@ -44,15 +44,13 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
     let token_id = Uuid::now_v7();
     let secret = format!("secret_{}", token_id.simple());
     let hash = hash_secret(&secret);
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
-    )
-    .bind(user_id)
-    .bind(format!("test-user-{user_id}"))
-    .bind(format!("share-{user_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(user_id)
+        .bind(format!("test-user-{user_id}"))
+        .bind(format!("share-{user_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     let scopes_vec: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
