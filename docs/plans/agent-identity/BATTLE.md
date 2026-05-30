@@ -23,8 +23,8 @@ This is the coordination board. The machine-readable task list is
 - **P3 — DONE & staged.** AI-3.1 quiz visibility schema (`20260530170000`), AI-3.2
   visibility API surface (`PATCH`, `GET`, `explore`), AI-3.3 cross-owner attempts,
   AI-3.4 share-link demotion. `make check` green.
-- **P4 — AI-4.1 DONE & staged.** TB_USERS.PLAN column (`20260530180000`).
-- **Next gate: AI-4.2 Plan + quota model.**
+- **P4 — AI-4.1 & AI-4.2 DONE & staged.** TB_USERS.PLAN column (`20260530180000`), Quota model enforcement.
+- **Next gate: AI-4.3 Scope-ceiling on agent create.**
 
 **Two decisions are now load-bearing — do not regress them:**
 
