@@ -201,6 +201,100 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
+  /v1/me/agents:
+    get:
+      tags:
+      - me
+      summary: List agents owned by the current user.
+      operationId: list_agents
+      responses:
+        '200':
+          description: Agent list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAgentsResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+    post:
+      tags:
+      - me
+      summary: Create a new agent sub-account.
+      operationId: create_agent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentBody'
+        required: true
+      responses:
+        '201':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAgentResponse'
+        '401':
+          description: Unauthorized
+        '422':
+          description: Validation failed
+      security:
+      - bearer: []
+  /v1/me/agents/{id}:
+    delete:
+      tags:
+      - me
+      summary: Delete an agent sub-account.
+      operationId: delete_agent
+      parameters:
+      - name: id
+        in: path
+        description: Agent ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Agent deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Agent not found
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - me
+      summary: Update an agent's label.
+      operationId: update_agent
+      parameters:
+      - name: id
+        in: path
+        description: Agent ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAgentBody'
+        required: true
+      responses:
+        '204':
+          description: Agent updated
+        '401':
+          description: Unauthorized
+        '404':
+          description: Agent not found
+        '422':
+          description: Validation failed
+      security:
+      - bearer: []
   /v1/me/attempts:
     get:
       tags:
@@ -1153,6 +1247,31 @@ components:
         questionId:
           type: string
           format: uuid
+    AgentSummary:
+      type: object
+      required:
+      - id
+      - label
+      - scopes
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        lastUsedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        scopes:
+          type: array
+          items:
+            type: string
     AnswerSessionBody:
       type: object
       required:
@@ -1487,6 +1606,35 @@ components:
         count:
           type: integer
           format: int64
+    CreateAgentBody:
+      type: object
+      required:
+      - label
+      - scopes
+      properties:
+        focusTags:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        label:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    CreateAgentResponse:
+      type: object
+      required:
+      - apiKey
+      - id
+      properties:
+        apiKey:
+          type: string
+        id:
+          type: string
+          format: uuid
     CreateKeyBody:
       type: object
       required:
@@ -2124,6 +2272,15 @@ components:
           type: array
           items:
             type: string
+    ListAgentsResponse:
+      type: object
+      required:
+      - agents
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentSummary'
     ListAttemptsResponse:
       type: object
       required:
@@ -3134,6 +3291,27 @@ components:
       properties:
         correct:
           type: boolean
+    UpdateAgentBody:
+      type: object
+      properties:
+        currentGoal:
+          type:
+          - string
+          - 'null'
+        focusTags:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        label:
+          type:
+          - string
+          - 'null'
+        nextTarget:
+          type:
+          - string
+          - 'null'
     UpdateUserRoleBody:
       type: object
       required:
@@ -3160,6 +3338,11 @@ components:
           - 'null'
         id:
           type: string
+          format: uuid
+        owner_user_id:
+          type:
+          - string
+          - 'null'
           format: uuid
         role:
           $ref: '#/components/schemas/Role'

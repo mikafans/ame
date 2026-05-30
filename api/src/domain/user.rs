@@ -16,6 +16,7 @@ pub enum Role {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct User {
     pub id: Uuid,
+    pub owner_user_id: Option<Uuid>,
     pub email: Option<String>,
     pub display_name: String,
     pub role: Role,

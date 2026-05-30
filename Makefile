@@ -53,6 +53,7 @@ test-engine: ## Engine unit and integration-test compile gate
 test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test auth -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test me -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test sessions -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture

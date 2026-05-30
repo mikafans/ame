@@ -58,7 +58,7 @@ async fn make_bearer(pool: &PgPool) -> String {
     let hash = hash_secret(secret);
 
     sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
     )
     .bind(user_id)
     .bind(format!("session-user-{user_id}"))
@@ -90,7 +90,7 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
 async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
     let author_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
     )
     .bind(author_id)
     .bind(format!("author-{author_id}"))

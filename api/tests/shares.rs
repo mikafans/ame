@@ -45,7 +45,7 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
     let secret = format!("secret_{}", token_id.simple());
     let hash = hash_secret(&secret);
     sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
     )
     .bind(user_id)
     .bind(format!("test-user-{user_id}"))

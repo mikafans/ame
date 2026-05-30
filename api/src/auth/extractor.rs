@@ -12,6 +12,8 @@ use crate::{domain::error::ApiError, http::AppState};
 
 use super::token::{parse_bearer_token, parse_token_value, verify_token_secret};
 
+use uuid::Uuid;
+
 /// Authenticated request context produced by [`AuthenticatedUser::from_request_parts`].
 ///
 /// `token_scopes` holds the parsed [`Scope`] enum (not raw strings) so downstream
@@ -20,6 +22,19 @@ use super::token::{parse_bearer_token, parse_token_value, verify_token_secret};
 pub struct AuthenticatedUser {
     pub user: User,
     pub token_scopes: Vec<Scope>,
+    pub owner_id: Uuid,
+}
+
+impl AuthenticatedUser {
+    /// Returns the ID of the human owner this request acts on behalf of.
+    ///
+    /// For human users, this is their own ID. For agents, this is their
+    /// owner sub-account link (the human who created the agent).
+    /// Downstream code uses this for "my content" filters, quotas, and
+    /// shared truth (level/progress) reads.
+    pub fn owner_id(&self) -> Uuid {
+        self.owner_id
+    }
 }
 
 impl FromRequestParts<AppState> for AuthenticatedUser {
@@ -56,7 +71,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             r#"
             SELECT 
                 t.token_hash, t.scopes, t.revoked_at,
-                u.id as user_id, u.email, u.display_name, u.role, u.created_at
+                u.id as user_id, u.email, u.display_name, u.role, u.created_at, u.owner_user_id
             FROM tb_api_tokens t
             JOIN tb_users u ON t.user_id = u.id
             WHERE t.id = $1
@@ -102,11 +117,13 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
         let user = User {
             id: record.get("user_id"),
+            owner_user_id: record.get("owner_user_id"),
             email: record.get("email"),
             display_name: record.get("display_name"),
             role,
             created_at: record.get("created_at"),
         };
+        let owner_id = user.owner_user_id.unwrap_or(user.id);
 
         // The DB CHECK constraint on api_tokens.scopes restricts values to the
         // three known wire strings. We still parse defensively: a row that
@@ -119,6 +136,54 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid scope in api_tokens: {e}")))?;
 
-        Ok(AuthenticatedUser { user, token_scopes })
+        Ok(AuthenticatedUser {
+            user,
+            token_scopes,
+            owner_id,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::user::Role;
+    use time::OffsetDateTime;
+
+    #[test]
+    fn test_authenticated_user_owner_id_resolution() {
+        let user_id = Uuid::now_v7();
+        let agent_id = Uuid::now_v7();
+        let now = OffsetDateTime::now_utc();
+
+        // Human user: owner_id == user.id
+        let human = AuthenticatedUser {
+            user: User {
+                id: user_id,
+                owner_user_id: None,
+                email: Some("alice@example.com".into()),
+                display_name: "Alice".into(),
+                role: Role::User,
+                created_at: now,
+            },
+            token_scopes: vec![],
+            owner_id: user_id,
+        };
+        assert_eq!(human.owner_id(), user_id);
+
+        // Agent: owner_id == owner_user_id
+        let agent = AuthenticatedUser {
+            user: User {
+                id: agent_id,
+                owner_user_id: Some(user_id),
+                email: None,
+                display_name: "Agent 007".into(),
+                role: Role::Agent,
+                created_at: now,
+            },
+            token_scopes: vec![],
+            owner_id: user_id,
+        };
+        assert_eq!(agent.owner_id(), user_id);
     }
 }

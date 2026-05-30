@@ -7,6 +7,49 @@ This is the coordination board. The machine-readable task list is
 [`tasks.jsonl`](./tasks.jsonl); each task's full brief is in
 [`context/<id>.md`](./context/).
 
+## Current state (2026-05-30)
+
+- **Branch:** `refactor/agent-identity` (in-place, no worktree on the branch
+  itself; dispatched agents may use their own worktrees). One PR at the end.
+- **P0 — DONE & committed.** AI-0.1 role migration (`e47ee93`), AI-0.2 Role enum
+  collapse `{User,Admin,Agent}` + faucet delete (`f3b42cf`), AI-0.3 web de-gate
+  (`9d6931d`). `make check` green on each.
+- **P1 — DONE & staged.** AI-1.1 sub-account schema (`20260530150000`), AI-1.2
+  ownership resolution in auth, AI-1.3 `/v1/me/agents` CRUD + integration test
+  (`api/tests/me.rs`). `make check` green.
+- **Next gate: P2 agent profiles + P3 visibility + P4 quotas.** These can now
+  fan out in parallel.
+
+**Two decisions are now load-bearing — do not regress them:**
+
+1. **Authoring is for every authenticated user.** Author studio, exam compose,
+   grading, draft quizzes, and the Agent API page are NOT admin-gated. The
+   `agent` role is token-only and never loads the web UI. Do not reintroduce
+   `role === "admin"`/`isAdmin` gates on authoring surfaces.
+2. **Sharing is quiz-only, link-visibility** `{private,unlisted,public}` (canonical
+   URL, no opaque tokens). Answering requires an account; cross-owner attempts
+   roll up to the responder. `tb_share_links` is presentation/embed-only; the
+   anonymous-attempt path is removed.
+
+## Roles in this effort
+
+- **Haru** dispatches each task to an implementing agent (per the `agent` field).
+- **TL (Claude)** reviews every dispatched result, re-runs verification in the
+  **foreground**, gates the commit, and keeps `tasks.jsonl` + this board current.
+  TL does not implement P1+ directly unless asked.
+
+## TL review protocol (every handed-off task)
+
+1. Diff the agent's work against the task's `paths` — flag any edit outside them.
+2. Check it honors the two load-bearing decisions above and the global gotchas.
+3. **Re-run verification yourself, foreground:**
+   `make check > /tmp/<id>-check.log 2>&1; echo EXIT=$?` (and `make e2e` if the
+   task's `verify` calls for it). Never trust a sub-agent's "passed" claim; never
+   background-and-poll.
+4. Read the log tail to confirm tests actually ran (not an early bail).
+5. Only on green: set the task `done` in `tasks.jsonl`, then ask Haru before
+   committing. Commit is task-scoped with the task id in the body.
+
 ## How to claim and run a task
 
 1. **Pick a `todo` task whose `depends_on` are all `done`.** Read its `context`

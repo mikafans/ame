@@ -105,7 +105,7 @@ async fn test_auth_and_idempotency() {
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) \
-         VALUES ($1, 'Test User', $2, 'learner')",
+         VALUES ($1, 'Test User', $2, 'user')",
     )
     .bind(user_id)
     .bind(format!("auth-{user_id}@example.com"))
@@ -232,7 +232,7 @@ async fn revoked_token_returns_unauthorized() {
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) \
-         VALUES ($1, 'Revoked User', $2, 'learner')",
+         VALUES ($1, 'Revoked User', $2, 'user')",
     )
     .bind(user_id)
     .bind(format!("revoked-{user_id}@example.com"))

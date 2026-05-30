@@ -45,7 +45,7 @@ async fn make_bearer(pool: &PgPool) -> String {
     let secret = "exam_secret_abc";
     let hash = hash_secret(secret);
     sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
     )
     .bind(user_id)
     .bind(format!("exam-user-{user_id}"))
@@ -64,7 +64,7 @@ async fn make_bearer(pool: &PgPool) -> String {
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
     let author = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
+        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')",
     )
     .bind(author)
     .bind(format!("author-{author}"))

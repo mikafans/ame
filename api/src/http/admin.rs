@@ -43,7 +43,7 @@ pub async fn list_users(
     _admin: RequireScope<AdminScope>,
 ) -> Result<Json<ListUsersResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, email, display_name, role, created_at
+        "SELECT id, owner_user_id, email, display_name, role, created_at
          FROM tb_users
          ORDER BY created_at DESC
          LIMIT 500",
@@ -63,6 +63,7 @@ pub async fn list_users(
             };
             User {
                 id: r.get("id"),
+                owner_user_id: r.get("owner_user_id"),
                 email: r.get("email"),
                 display_name: r.get("display_name"),
                 role,

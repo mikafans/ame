@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -64,6 +64,48 @@ pub struct CreateKeyResponse {
 #[serde(rename_all = "camelCase")]
 pub struct RotateKeyResponse {
     pub api_key: String,
+}
+
+// ── agent shapes ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSummary {
+    pub id: Uuid,
+    pub label: String,
+    pub scopes: Vec<String>,
+    pub last_used_at: Option<OffsetDateTime>,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAgentsResponse {
+    pub agents: Vec<AgentSummary>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAgentBody {
+    pub label: String,
+    pub scopes: Vec<String>,
+    pub focus_tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAgentResponse {
+    pub api_key: String,
+    pub id: Uuid,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAgentBody {
+    pub label: Option<String>,
+    pub focus_tags: Option<Vec<String>>,
+    pub current_goal: Option<String>,
+    pub next_target: Option<String>,
 }
 
 // ── webhook shapes ────────────────────────────────────────────────────────────
@@ -256,6 +298,230 @@ pub async fn revoke_key(
 
     if affected.rows_affected() == 0 {
         return Err(ApiError::NotFound { resource: "key" });
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── agent handlers ────────────────────────────────────────────────────────────
+
+/// List agents owned by the current user.
+#[utoipa::path(
+    get,
+    path = "/v1/me/agents",
+    responses(
+        (status = 200, description = "Agent list", body = ListAgentsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn list_agents(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<ListAgentsResponse>, ApiError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT 
+            u.id, u.display_name as label, u.created_at,
+            t.scopes, t.last_used_at
+        FROM tb_users u
+        LEFT JOIN tb_api_tokens t ON t.user_id = u.id AND t.revoked_at IS NULL
+        WHERE u.owner_user_id = $1 AND u.role = 'agent'
+        ORDER BY u.created_at DESC
+        "#,
+    )
+    .bind(user.user.id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let agents = rows
+        .iter()
+        .map(|r| {
+            let scopes: Option<Vec<String>> = r.get("scopes");
+            AgentSummary {
+                id: r.get("id"),
+                label: r.get("label"),
+                scopes: scopes.unwrap_or_default(),
+                last_used_at: r.get("last_used_at"),
+                created_at: r.get("created_at"),
+            }
+        })
+        .collect();
+
+    Ok(Json(ListAgentsResponse { agents }))
+}
+
+/// Create a new agent sub-account.
+#[utoipa::path(
+    post,
+    path = "/v1/me/agents",
+    request_body = CreateAgentBody,
+    responses(
+        (status = 201, description = "Agent created", body = CreateAgentResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn create_agent(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Json(body): Json<CreateAgentBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    if body.label.trim().is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "label".into(),
+            message: "must not be empty".into(),
+        }]));
+    }
+
+    for s in &body.scopes {
+        if s.parse::<Scope>().is_err() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "scopes".into(),
+                message: format!("unknown scope: {s}"),
+            }]));
+        }
+    }
+
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let agent_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, $3, 'agent')",
+    )
+    .bind(agent_id)
+    .bind(user.user.id)
+    .bind(&body.label)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let token_id = Uuid::now_v7();
+    let secret = generate_secret();
+    let hash = hash_secret(&secret);
+
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(token_id)
+    .bind(agent_id)
+    .bind(&body.label)
+    .bind(&hash)
+    .bind(&body.scopes)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateAgentResponse {
+            api_key: format!("{token_id}_{secret}"),
+            id: agent_id,
+        }),
+    ))
+}
+
+/// Update an agent's label.
+#[utoipa::path(
+    patch,
+    path = "/v1/me/agents/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Agent ID"),
+    ),
+    request_body = UpdateAgentBody,
+    responses(
+        (status = 204, description = "Agent updated"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Agent not found"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn update_agent(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(agent_id): Path<Uuid>,
+    Json(body): Json<UpdateAgentBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    // Check ownership/existence even for empty patches
+    let owner_check = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent')",
+    )
+    .bind(agent_id)
+    .bind(user.user.id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if !owner_check {
+        return Err(ApiError::NotFound { resource: "agent" });
+    }
+
+    if let Some(label) = &body.label {
+        if label.trim().is_empty() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "label".into(),
+                message: "must not be empty".into(),
+            }]));
+        }
+
+        sqlx::query(
+            "UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3 AND role = 'agent'",
+        )
+        .bind(label)
+        .bind(agent_id)
+        .bind(user.user.id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Delete an agent sub-account.
+#[utoipa::path(
+    delete,
+    path = "/v1/me/agents/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Agent ID"),
+    ),
+    responses(
+        (status = 204, description = "Agent deleted"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Agent not found"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn delete_agent(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(agent_id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let affected =
+        sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
+            .bind(agent_id)
+            .bind(user.user.id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if affected.rows_affected() == 0 {
+        return Err(ApiError::NotFound { resource: "agent" });
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -791,6 +1057,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/me/keys", post(create_key))
         .route("/v1/me/keys/{id}/rotate", post(rotate_key))
         .route("/v1/me/keys/{id}", delete(revoke_key))
+        .route("/v1/me/agents", get(list_agents))
+        .route("/v1/me/agents", post(create_agent))
+        .route("/v1/me/agents/{id}", patch(update_agent))
+        .route("/v1/me/agents/{id}", delete(delete_agent))
         .route("/v1/me/webhooks", get(list_webhooks))
         .route("/v1/me/webhooks", post(create_webhook))
         .route("/v1/me/webhooks/{id}", delete(delete_webhook))

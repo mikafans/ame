@@ -101,6 +101,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List agents owned by the current user. */
+        get: operations["list_agents"];
+        put?: never;
+        /** Create a new agent sub-account. */
+        post: operations["create_agent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an agent sub-account. */
+        delete: operations["delete_agent"];
+        options?: never;
+        head?: never;
+        /** Update an agent's label. */
+        patch: operations["update_agent"];
+        trace?: never;
+    };
     "/v1/me/attempts": {
         parameters: {
             query?: never;
@@ -498,6 +534,16 @@ export interface components {
             /** Format: uuid */
             questionId: string;
         };
+        AgentSummary: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            scopes: string[];
+        };
         AnswerSessionBody: {
             /** Format: uuid */
             questionId: string;
@@ -626,6 +672,16 @@ export interface components {
         CountQuizzesResponse: {
             /** Format: int64 */
             count: number;
+        };
+        CreateAgentBody: {
+            focusTags?: string[] | null;
+            label: string;
+            scopes: string[];
+        };
+        CreateAgentResponse: {
+            apiKey: string;
+            /** Format: uuid */
+            id: string;
         };
         CreateKeyBody: {
             label: string;
@@ -874,6 +930,9 @@ export interface components {
             lastUsedAt?: string | null;
             name: string;
             scopes: string[];
+        };
+        ListAgentsResponse: {
+            agents: components["schemas"]["AgentSummary"][];
         };
         ListAttemptsResponse: {
             attempts: components["schemas"]["Attempt"][];
@@ -1290,6 +1349,12 @@ export interface components {
         TfPayload: {
             correct: boolean;
         };
+        UpdateAgentBody: {
+            currentGoal?: string | null;
+            focusTags?: string[] | null;
+            label?: string | null;
+            nextTarget?: string | null;
+        };
         UpdateUserRoleBody: {
             role: string;
         };
@@ -1300,6 +1365,8 @@ export interface components {
             email?: string | null;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            owner_user_id?: string | null;
             role: components["schemas"]["Role"];
         };
         WebhookSummary: {
@@ -1608,6 +1675,152 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentBody"];
+            };
+        };
+        responses: {
+            /** @description Agent created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateAgentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentBody"];
+            };
+        };
+        responses: {
+            /** @description Agent updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
