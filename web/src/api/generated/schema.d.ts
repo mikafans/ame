@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/explore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["explore"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -711,6 +727,7 @@ export interface components {
             duration?: number | null;
             objectives?: string[] | null;
             title: string;
+            visibility?: null | components["schemas"]["Visibility"];
         };
         CreateQuizResponse: {
             quiz: components["schemas"]["CreatedQuiz"];
@@ -758,6 +775,7 @@ export interface components {
             objectives: string[];
             status: string;
             title: string;
+            visibility: components["schemas"]["Visibility"];
         };
         DistributionBucket: {
             /** Format: int32 */
@@ -832,6 +850,11 @@ export interface components {
         };
         /** @enum {string} */
         ExamStatus: "draft" | "published" | "archived";
+        ExploreResponse: {
+            quizzes: components["schemas"]["QuizSummary"][];
+            /** Format: int64 */
+            total: number;
+        };
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
             session: components["schemas"]["Session"];
@@ -865,6 +888,7 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt: string;
+            visibility: components["schemas"]["Visibility"];
         };
         GetSessionQuestion: {
             codeSnippet?: unknown;
@@ -1015,6 +1039,7 @@ export interface components {
             objectives: string[];
             status: string;
             title: string;
+            visibility: components["schemas"]["Visibility"];
             warnings: string[];
         };
         PatchSessionBody: {
@@ -1145,6 +1170,7 @@ export interface components {
             objectives?: string[] | null;
             status?: string | null;
             title?: string | null;
+            visibility?: null | components["schemas"]["Visibility"];
         };
         QuizQuestion: {
             codeSnippet?: unknown;
@@ -1185,6 +1211,7 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt: string;
+            visibility: components["schemas"]["Visibility"];
         };
         /** @enum {string} */
         Role: "user" | "admin" | "agent";
@@ -1369,6 +1396,8 @@ export interface components {
             owner_user_id?: string | null;
             role: components["schemas"]["Role"];
         };
+        /** @enum {string} */
+        Visibility: "private" | "unlisted" | "public";
         WebhookSummary: {
             /** Format: date-time */
             createdAt: string;
@@ -1652,6 +1681,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    explore: {
+        parameters: {
+            query?: {
+                /** @description Page size (default: 50) */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public quiz list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExploreResponse"];
+                };
             };
         };
     };

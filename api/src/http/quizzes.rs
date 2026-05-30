@@ -13,10 +13,14 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::scope::{RequireAnyScope, ScopeOneOf},
+    auth::{
+        extractor::AuthenticatedUser,
+        scope::{RequireAnyScope, ScopeOneOf},
+    },
     domain::{
         error::{ApiError, FieldError},
         question::QuestionKind,
+        quiz::Visibility,
         user::Scope,
     },
     http::AppState,
@@ -40,6 +44,7 @@ pub struct QuizSummary {
     pub id: Uuid,
     pub title: String,
     pub status: String,
+    pub visibility: Visibility,
     pub objectives: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub course: Option<String>,
@@ -101,7 +106,8 @@ async fn list_quizzes(
     Query(q): Query<ListQuizzesQuery>,
 ) -> Result<Json<ListQuizzesResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT q.id, q.title, q.status, q.objectives, q.course, q.created_by,
+        r#"
+        SELECT q.id, q.title, q.status, q.visibility, q.objectives, q.course, q.created_by,
                 q.created_at, q.updated_at,
                 COUNT(*) OVER() AS total,
                 COUNT(qq.question_id) AS question_count,
@@ -111,10 +117,10 @@ async fn list_quizzes(
                 ) AS completed
          FROM tb_quizzes q
          LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
-         WHERE q.status = $1
+         WHERE q.status = $1 AND (q.visibility = 'public' OR q.created_by = $4)
          GROUP BY q.id
          ORDER BY q.created_at DESC
-         LIMIT $2 OFFSET $3",
+         LIMIT $2 OFFSET $3"#,
     )
     .bind(&q.status)
     .bind(q.limit)
@@ -125,21 +131,27 @@ async fn list_quizzes(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
-    let quizzes = rows
+    let quizzes: Vec<QuizSummary> = rows
         .into_iter()
-        .map(|r| QuizSummary {
-            id: r.get("id"),
-            title: r.get("title"),
-            status: r.get("status"),
-            objectives: r.get::<Vec<String>, _>("objectives"),
-            course: r.get("course"),
-            question_count: r.get("question_count"),
-            created_by: r.get("created_by"),
-            completed: r.get("completed"),
-            created_at: r.get("created_at"),
-            updated_at: r.get("updated_at"),
+        .map(|r| {
+            Ok(QuizSummary {
+                id: r.get("id"),
+                title: r.get("title"),
+                status: r.get("status"),
+                visibility: r
+                    .get::<String, _>("visibility")
+                    .parse()
+                    .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?,
+                objectives: r.get::<Vec<String>, _>("objectives"),
+                course: r.get("course"),
+                question_count: r.get("question_count"),
+                created_by: r.get("created_by"),
+                completed: r.get("completed"),
+                created_at: r.get("created_at"),
+                updated_at: r.get("updated_at"),
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ApiError>>()?;
 
     Ok(Json(ListQuizzesResponse { quizzes, total }))
 }
@@ -168,6 +180,7 @@ pub struct GetQuizResponse {
     pub id: Uuid,
     pub title: String,
     pub status: String,
+    pub visibility: Visibility,
     pub objectives: Vec<String>,
     pub created_by: Uuid,
     #[schema(value_type = String, format = DateTime)]
@@ -191,11 +204,11 @@ pub struct GetQuizResponse {
 )]
 async fn get_quiz(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuizReadScopes>,
+    auth: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetQuizResponse>, ApiError> {
     let quiz_row = sqlx::query(
-        "SELECT id, title, status, objectives, created_by, created_at, updated_at
+        "SELECT id, title, status, visibility, objectives, created_by, created_at, updated_at
          FROM tb_quizzes WHERE id = $1",
     )
     .bind(id)
@@ -203,6 +216,16 @@ async fn get_quiz(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?
     .ok_or(ApiError::NotFound { resource: "quiz" })?;
+
+    let visibility: Visibility = quiz_row
+        .get::<String, _>("visibility")
+        .parse()
+        .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?;
+    let created_by: Uuid = quiz_row.get("created_by");
+
+    if visibility == Visibility::Private && created_by != auth.owner_id() {
+        return Err(ApiError::NotFound { resource: "quiz" });
+    }
 
     let question_rows = sqlx::query(
         "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
@@ -236,8 +259,9 @@ async fn get_quiz(
         id: quiz_row.get("id"),
         title: quiz_row.get("title"),
         status: quiz_row.get("status"),
+        visibility,
         objectives: quiz_row.get::<Vec<String>, _>("objectives"),
-        created_by: quiz_row.get("created_by"),
+        created_by,
         created_at: quiz_row.get("created_at"),
         updated_at: quiz_row.get("updated_at"),
         questions,
@@ -255,6 +279,8 @@ pub struct QuizPatch {
     pub objectives: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<Visibility>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -263,6 +289,7 @@ pub struct PatchQuizResponse {
     pub id: Uuid,
     pub title: String,
     pub status: String,
+    pub visibility: Visibility,
     pub objectives: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -364,14 +391,16 @@ pub(crate) async fn apply_quiz_patch(
            title      = COALESCE($2, title),
            objectives = COALESCE($3, objectives),
            status     = COALESCE($4, status),
+           visibility = COALESCE($5, visibility),
            updated_at = now()
          WHERE id = $1
-         RETURNING id, title, status, objectives",
+         RETURNING id, title, status, visibility, objectives",
     )
     .bind(id)
     .bind(body.title)
     .bind(body.objectives)
     .bind(body.status)
+    .bind(body.visibility.map(|v| v.as_str()))
     .fetch_one(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -380,6 +409,10 @@ pub(crate) async fn apply_quiz_patch(
         id: updated.get("id"),
         title: updated.get("title"),
         status: updated.get("status"),
+        visibility: updated
+            .get::<String, _>("visibility")
+            .parse()
+            .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?,
         objectives: updated.get::<Vec<String>, _>("objectives"),
         warnings,
     })
@@ -399,6 +432,8 @@ pub struct CreateQuizBody {
     pub duration: Option<i32>,
     #[serde(default)]
     pub objectives: Option<Vec<String>>,
+    #[serde(default)]
+    pub visibility: Option<Visibility>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -414,6 +449,7 @@ pub struct CreatedQuiz {
     pub id: Uuid,
     pub title: String,
     pub status: String,
+    pub visibility: Visibility,
     pub objectives: Vec<String>,
     pub created_by: Uuid,
     #[schema(value_type = String, format = DateTime)]
@@ -441,16 +477,17 @@ async fn create_quiz(
     Json(body): Json<CreateQuizBody>,
 ) -> Result<(axum::http::StatusCode, Json<CreateQuizResponse>), ApiError> {
     let objectives = body.objectives.unwrap_or_default();
+    let visibility = body.visibility.unwrap_or(Visibility::Private);
 
     let result = sqlx::query(
-        "INSERT INTO tb_quizzes (title, objectives, course, status, created_by)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, title, status, objectives, created_by, created_at",
+        "INSERT INTO tb_quizzes (title, objectives, course, visibility, status, created_by)
+         VALUES ($1, $2, $3, $4, 'draft', $5)
+         RETURNING id, title, status, visibility, objectives, created_by, created_at",
     )
     .bind(&body.title)
     .bind(&objectives)
     .bind(&body.course)
-    .bind("draft")
+    .bind(visibility.as_str())
     .bind(auth.0.user.id)
     .fetch_one(&state.pool)
     .await
@@ -460,6 +497,10 @@ async fn create_quiz(
         id: result.get("id"),
         title: result.get("title"),
         status: result.get("status"),
+        visibility: result
+            .get::<String, _>("visibility")
+            .parse()
+            .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?,
         objectives: result.get::<Vec<String>, _>("objectives"),
         created_by: result.get("created_by"),
         created_at: result.get("created_at"),
@@ -840,11 +881,90 @@ async fn generate_quiz(
     }))
 }
 
+// ── explore ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExploreResponse {
+    pub quizzes: Vec<QuizSummary>,
+    pub total: i64,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/explore",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size (default: 50)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Public quiz list", body = ExploreResponse),
+    ),
+    security(("bearer" = [])),
+    tag = "quizzes"
+)]
+async fn explore(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Query(q): Query<ListQuizzesQuery>,
+) -> Result<Json<ExploreResponse>, ApiError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT q.id, q.title, q.status, q.visibility, q.objectives, q.course, q.created_by,
+               q.created_at, q.updated_at,
+               COUNT(*) OVER() AS total,
+               COUNT(qq.question_id) AS question_count,
+               EXISTS(
+                   SELECT 1 FROM tb_sessions s
+                   WHERE s.quiz_id = q.id AND s.user_id = $3 AND s.status = 'finished'
+               ) AS completed
+        FROM tb_quizzes q
+        LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
+        WHERE q.visibility = 'public'
+        GROUP BY q.id
+        ORDER BY q.created_at DESC
+        LIMIT $1 OFFSET $2
+        "#,
+    )
+    .bind(q.limit)
+    .bind(q.offset)
+    .bind(auth.owner_id())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+    let quizzes: Vec<QuizSummary> = rows
+        .into_iter()
+        .map(|r| {
+            Ok(QuizSummary {
+                id: r.get("id"),
+                title: r.get("title"),
+                status: r.get("status"),
+                visibility: r
+                    .get::<String, _>("visibility")
+                    .parse()
+                    .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?,
+                objectives: r.get::<Vec<String>, _>("objectives"),
+                course: r.get("course"),
+                question_count: r.get("question_count"),
+                created_by: r.get("created_by"),
+                completed: r.get("completed"),
+                created_at: r.get("created_at"),
+                updated_at: r.get("updated_at"),
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+
+    Ok(Json(ExploreResponse { quizzes, total }))
+}
+
 // ── router ────────────────────────────────────────────────────────────────────
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/quizzes", get(list_quizzes).post(create_quiz))
+        .route("/v1/explore", get(explore))
         .route("/v1/quizzes/count", get(count_quizzes))
         .route("/v1/quizzes/generate", post(generate_quiz))
         .route(
