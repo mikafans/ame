@@ -35,6 +35,7 @@ pub mod openapi;
 pub mod plans;
 pub mod questions;
 pub mod quizzes;
+pub mod quota;
 pub mod sessions;
 pub mod shares;
 pub mod stats;
