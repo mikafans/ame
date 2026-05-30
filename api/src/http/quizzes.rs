@@ -127,7 +127,6 @@ async fn list_quizzes(
     .bind(q.limit)
     .bind(q.offset)
     .bind(auth.owner_id)
-
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
