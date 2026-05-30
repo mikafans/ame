@@ -846,14 +846,21 @@ pub struct CountQuizzesResponse {
 )]
 async fn count_quizzes(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuizReadScopes>,
+    auth: RequireAnyScope<QuizReadScopes>,
     Query(_q): Query<CountQuizzesQuery>,
 ) -> Result<Json<CountQuizzesResponse>, ApiError> {
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_quizzes WHERE status = $1")
-        .bind("active")
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tb_quizzes q
+         WHERE q.status = $1
+           AND (q.visibility = 'public'
+                OR EXISTS(SELECT 1 FROM tb_users u
+                          WHERE u.id = q.created_by AND (u.id = $2 OR u.owner_user_id = $2)))",
+    )
+    .bind("active")
+    .bind(auth.0.owner_id())
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
     Ok(Json(CountQuizzesResponse { count }))
 }

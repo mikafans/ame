@@ -2,6 +2,7 @@ use ame_api::http::router;
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
+use sqlx::Row;
 use std::net::SocketAddr;
 use uuid::Uuid;
 
@@ -71,7 +72,11 @@ async fn test_cross_owner_agent_visibility() {
         .bind(agent_id)
         .bind("agent-key")
         .bind(&hash)
-        .bind(vec!["quiz.read".to_string(), "quiz.write".to_string()])
+        .bind(vec![
+            "quiz.read".to_string(),
+            "quiz.write".to_string(),
+            "attempt.write".to_string(),
+        ])
         .execute(&pool)
         .await
         .unwrap();
@@ -90,7 +95,35 @@ async fn test_cross_owner_agent_visibility() {
         panic!("Quiz creation failed ({status}): {body}");
     }
     let json: serde_json::Value = res.json().await.unwrap();
-    let qid = json["id"].as_str().unwrap().to_string();
+    let qid = json["quizId"].as_str().unwrap().to_string();
+    let quiz_uuid: Uuid = qid.parse().unwrap();
+
+    // A session can only be created on an active quiz with at least one live
+    // question (see build_quiz_plan), so give it one and activate it. It stays
+    // private — the access checks below are what we're exercising.
+    let question_id: Uuid = sqlx::query(
+        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
+         VALUES ('mc', 'What color?', $1, 'live', 2, $2) RETURNING id",
+    )
+    .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
+    .bind(agent_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .get("id");
+    sqlx::query(
+        "INSERT INTO tb_quiz_questions (quiz_id, question_id, order_index) VALUES ($1, $2, 0)",
+    )
+    .bind(quiz_uuid)
+    .bind(question_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE tb_quizzes SET status = 'active' WHERE id = $1")
+        .bind(quiz_uuid)
+        .execute(&pool)
+        .await
+        .unwrap();
 
     // 3. Test: Owner GET agent's private quiz should succeed
     let owner_token_id = Uuid::now_v7();
@@ -99,7 +132,7 @@ async fn test_cross_owner_agent_visibility() {
         .bind(owner_id)
         .bind("owner-key")
         .bind(&hash) // Same hash for simplicity
-        .bind(vec!["quiz.read".to_string()])
+        .bind(vec!["quiz.read".to_string(), "attempt.write".to_string()])
         .execute(&pool)
         .await
         .unwrap();

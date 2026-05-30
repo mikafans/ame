@@ -714,7 +714,7 @@ async fn run_memory_set(
     sqlx::query(
         r#"
         INSERT INTO tb_agent_profiles (agent_user_id, label, memory)
-        VALUES ($1, '', $2)
+        VALUES ($1, COALESCE((SELECT display_name FROM tb_users WHERE id = $1), ''), $2)
         ON CONFLICT (agent_user_id) DO UPDATE SET memory = $2, updated_at = now()
         "#,
     )
@@ -743,7 +743,7 @@ async fn run_memory_append(
     sqlx::query(
         r#"
         INSERT INTO tb_agent_profiles (agent_user_id, label, memory)
-        VALUES ($1, '', $2)
+        VALUES ($1, COALESCE((SELECT display_name FROM tb_users WHERE id = $1), ''), $2)
         ON CONFLICT (agent_user_id) DO UPDATE 
         SET memory = tb_agent_profiles.memory || $2, updated_at = now()
         "#,
@@ -774,7 +774,7 @@ async fn run_target_set(
     sqlx::query(
         r#"
         INSERT INTO tb_agent_profiles (agent_user_id, label, current_goal, next_target)
-        VALUES ($1, '', $2, $3)
+        VALUES ($1, COALESCE((SELECT display_name FROM tb_users WHERE id = $1), ''), $2, $3)
         ON CONFLICT (agent_user_id) DO UPDATE SET 
             current_goal = COALESCE($2, tb_agent_profiles.current_goal),
             next_target = COALESCE($3, tb_agent_profiles.next_target),
