@@ -20,7 +20,10 @@ This is the coordination board. The machine-readable task list is
 - **P2 — DONE & staged.** AI-2.1 agent profiles schema (`20260530160000`), AI-2.2
   behavioral tools (`profile.get`, `memory.*`, `target.set`), AI-2.3 updated
   reference client and docs. `make check` green.
-- **Next gate: P3 visibility + P4 quotas.** These can now fan out in parallel.
+- **P3 — DONE & staged.** AI-3.1 quiz visibility schema (`20260530170000`), AI-3.2
+  visibility API surface (`PATCH`, `GET`, `explore`), AI-3.3 cross-owner attempts,
+  AI-3.4 share-link demotion. `make check` green.
+- **Next gate: P4 quotas.** These can now fan out in parallel.
 
 **Two decisions are now load-bearing — do not regress them:**
 
