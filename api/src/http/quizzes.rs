@@ -324,11 +324,13 @@ pub struct PatchQuizResponse {
 )]
 async fn patch_quiz(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuizWriteScopes>,
+    auth: RequireAnyScope<QuizWriteScopes>,
     Path(id): Path<Uuid>,
     Json(body): Json<QuizPatch>,
 ) -> Result<Json<PatchQuizResponse>, ApiError> {
-    Ok(Json(apply_quiz_patch(&state.pool, id, body).await?))
+    Ok(Json(
+        apply_quiz_patch(&state.pool, id, auth.0.owner_id(), body).await?,
+    ))
 }
 
 /// Apply a quiz patch: existence check, publish gating + draft-question
@@ -337,11 +339,12 @@ async fn patch_quiz(
 pub(crate) async fn apply_quiz_patch(
     pool: &sqlx::PgPool,
     id: Uuid,
+    owner_id: Uuid,
     body: QuizPatch,
 ) -> Result<PatchQuizResponse, ApiError> {
-    // Verify quiz exists and is owned by caller (instructors can edit any, agents only their own)
+    // Verify quiz exists and is owned by caller
     let quiz_row = sqlx::query(
-        "SELECT id, title, status, objectives, created_by FROM tb_quizzes WHERE id = $1",
+        "SELECT id, title, status, visibility, objectives, created_by FROM tb_quizzes WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -351,9 +354,20 @@ pub(crate) async fn apply_quiz_patch(
 
     let mut warnings: Vec<String> = Vec::new();
 
+    // Check if we are transitioning to public
+    let current_visibility: String = quiz_row.get("visibility");
+    let new_visibility = body
+        .visibility
+        .map(|v| v.as_str().to_string())
+        .unwrap_or(current_visibility.clone());
+
+    if new_visibility == "public" && current_visibility != "public" {
+        crate::http::quota::check_quota(pool, owner_id, crate::http::quota::QuotaKind::PublicQuiz)
+            .await?;
+    }
+
     // Publish gating
     if body.status.as_deref() == Some("active") {
-        // TODO: P4 — plan-gate public publishing
         // TODO: P6 — audit log entry for public publishing
 
         let current_status: String = quiz_row.get("status");
@@ -500,7 +514,17 @@ async fn create_quiz(
     let objectives = body.objectives.unwrap_or_default();
     let visibility = body.visibility.unwrap_or(Visibility::Private);
 
-    // TODO: P3 — plan-gate public publishing
+    // Enforce quota for public publishing
+    if visibility == Visibility::Public {
+        crate::http::quota::check_quota(
+            &state.pool,
+            auth.owner_id(),
+            crate::http::quota::QuotaKind::PublicQuiz,
+        )
+        .await?;
+    }
+
+    // TODO: P4 — plan-gate public publishing
     // TODO: P6 — audit log entry for public publishing
 
     let result = sqlx::query(

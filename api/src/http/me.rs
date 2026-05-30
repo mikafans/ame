@@ -387,6 +387,13 @@ pub async fn create_agent(
         }
     }
 
+    crate::http::quota::check_quota(
+        &state.pool,
+        user.owner_id(),
+        crate::http::quota::QuotaKind::AgentCreation,
+    )
+    .await?;
+
     let mut tx = state
         .pool
         .begin()

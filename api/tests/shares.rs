@@ -35,7 +35,14 @@ async fn serve(pool: PgPool) -> String {
     let app = ame_api::http::router(pool);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr: SocketAddr = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
     format!("http://{addr}")
 }
 
@@ -199,14 +206,19 @@ async fn share_golden_path_create_get_revoke_404() {
     assert!(!share_id.is_empty());
 
     // 2. GET (public — no auth)
-    let view: Value = client
+    let resp = client
         .get(format!("{base}/v1/shares/{share_id}"))
         .send()
         .await
-        .unwrap()
-        .json()
-        .await
         .unwrap();
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap();
+        panic!("GET share failed ({status}): {body}");
+    }
+
+    let view: Value = resp.json().await.unwrap();
 
     assert_eq!(view["kind"].as_str().unwrap(), "quiz");
     assert_eq!(view["targetId"].as_str().unwrap(), target_id.to_string());

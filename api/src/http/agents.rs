@@ -600,7 +600,7 @@ pub async fn run(
         }
         "quiz.update" => {
             require_scope(&auth, Scope::QuizWrite)?;
-            run_quiz_update(&state, body.params).await
+            run_quiz_update(&state, auth.owner_id(), body.params).await
         }
         "question.create" => {
             require_scope(&auth, Scope::QuizWrite)?;
@@ -935,7 +935,11 @@ async fn run_quiz_import(
 
 /// `quiz.update` — patch quiz metadata / publish. Reuses the same publish
 /// gating + draft-question auto-promotion as `PATCH /v1/quizzes/{id}`.
-async fn run_quiz_update(state: &AppState, params: Value) -> Result<Json<RunResponse>, ApiError> {
+async fn run_quiz_update(
+    state: &AppState,
+    owner_id: Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
     let id = parse_id(&params)?;
     let patch: super::quizzes::QuizPatch = serde_json::from_value(params).map_err(|e| {
         ApiError::Validation(vec![FieldError {
@@ -943,7 +947,7 @@ async fn run_quiz_update(state: &AppState, params: Value) -> Result<Json<RunResp
             message: format!("invalid quiz patch: {e}"),
         }])
     })?;
-    let updated = super::quizzes::apply_quiz_patch(&state.pool, id, patch).await?;
+    let updated = super::quizzes::apply_quiz_patch(&state.pool, id, owner_id, patch).await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "quiz.update".into(),
@@ -1007,10 +1011,15 @@ async fn run_question_promote(
     }))
 }
 
-pub fn router(state: AppState) -> Router<AppState> {
+pub fn public_router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/agents/skill.json", get(skill_manifest))
         .route("/v1/agents/openapi.json", get(openapi_json))
+        .with_state(state)
+}
+
+pub fn logged_router(state: AppState) -> Router<AppState> {
+    Router::new()
         .route("/v1/agents/activity", get(activity))
         .route("/v1/agents/run", post(run))
         .with_state(state)

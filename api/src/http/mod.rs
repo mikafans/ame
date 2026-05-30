@@ -10,7 +10,10 @@ use axum::{
 use axum_prometheus::PrometheusMetricLayer;
 use serde_json::{Value, json};
 use sqlx::PgPool;
-use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
+use tower_governor::GovernorLayer;
+use tower_governor::errors::GovernorError;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::{KeyExtractor, PeerIpKeyExtractor};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::{DefaultOnResponse, TraceLayer};
@@ -21,6 +24,18 @@ use tracing::Level;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+}
+#[derive(Clone)]
+struct TokenKeyExtractor;
+impl KeyExtractor for TokenKeyExtractor {
+    type Key = String;
+    fn extract<T>(&self, req: &axum::http::Request<T>) -> Result<Self::Key, GovernorError> {
+        req.headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .ok_or(GovernorError::UnableToExtractKey)
+    }
 }
 
 pub mod activity;
@@ -53,6 +68,15 @@ pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
 
     // Routes wrapped with activity-log middleware (records all authenticated calls)
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(2)
+            .burst_size(20)
+            .key_extractor(TokenKeyExtractor)
+            .finish()
+            .expect("valid rate-limit config"),
+    );
+
     let logged = Router::new()
         .merge(tags::router(state.clone()))
         .merge(questions::router(state.clone()))
@@ -64,8 +88,11 @@ pub fn router(pool: PgPool) -> Router {
         .merge(messages::router(state.clone()))
         .merge(me::router(state.clone()))
         .merge(admin::router(state.clone()))
-        .merge(agents::router(state.clone()))
-        .merge(shares::router(state.clone()))
+        .merge(agents::logged_router(state.clone()))
+        .merge(shares::logged_router(state.clone()))
+        .layer(GovernorLayer {
+            config: governor_conf,
+        })
         .layer(middleware::from_fn_with_state(
             state.clone(),
             activity::activity_log_middleware,
@@ -78,10 +105,11 @@ pub fn router(pool: PgPool) -> Router {
     // Override with AME_RATELIMIT_BURST and AME_RATELIMIT_PERIOD_SECS.
     let burst = env_u32("AME_RATELIMIT_BURST", 10);
     let period_secs = env_u64("AME_RATELIMIT_PERIOD_SECS", 2);
-    let governor_conf = Arc::new(
+    let public_governor_conf = Arc::new(
         GovernorConfigBuilder::default()
             .per_second(period_secs)
             .burst_size(burst)
+            .key_extractor(PeerIpKeyExtractor)
             .finish()
             .expect("valid rate-limit config"),
     );
@@ -89,9 +117,15 @@ pub fn router(pool: PgPool) -> Router {
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/logout", post(auth::logout))
+        .merge(shares::public_router(state.clone()))
         .layer(GovernorLayer {
-            config: governor_conf,
+            config: public_governor_conf,
         })
+        .with_state(state.clone());
+
+    let public_unlimited = Router::new()
+        .merge(shares::embed_router(state.clone()))
+        .merge(agents::public_router(state.clone()))
         .with_state(state.clone());
 
     let cors = build_cors_layer();
@@ -125,6 +159,7 @@ pub fn router(pool: PgPool) -> Router {
         .route("/llms.txt", get(agents::llms_txt))
         .merge(openapi::router(state.clone()))
         .merge(public_limited)
+        .merge(public_unlimited)
         .merge(logged)
         .layer(cors)
         .layer(observability)

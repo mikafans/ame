@@ -34,6 +34,12 @@ pub enum ApiError {
     ScoringUnavailable,
     #[error("too many requests")]
     TooManyRequests,
+    #[error("quota exceeded")]
+    QuotaExceeded {
+        kind: String,
+        limit: i64,
+        usage: i64,
+    },
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -116,6 +122,12 @@ impl IntoResponse for ApiError {
                 "anonymous_attempt_rate_limited",
                 "rate limit exceeded for anonymous attempts".to_string(),
                 None,
+            ),
+            ApiError::QuotaExceeded { kind, limit, usage } => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "quota_exceeded",
+                format!("plan quota exceeded for {}", kind),
+                Some(json!({ "kind": kind, "limit": limit, "usage": usage })),
             ),
             ApiError::Internal(err) => {
                 let request_id = uuid::Uuid::now_v7().to_string();

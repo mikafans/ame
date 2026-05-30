@@ -44,12 +44,14 @@ pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Resu
     let usage: i64 = match kind {
         QuotaKind::PublicQuiz => sqlx::query_scalar(
             "SELECT COUNT(*) FROM tb_quizzes q 
-                 WHERE q.created_by = $1 AND q.visibility = 'public'",
+                 WHERE q.created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
+                 AND q.visibility = 'public'",
         )
         .bind(owner_id)
         .fetch_one(pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?,
+
         QuotaKind::AgentCreation => sqlx::query_scalar(
             "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent'",
         )
@@ -60,7 +62,15 @@ pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Resu
     };
 
     if usage >= limit {
-        return Err(ApiError::TooManyRequests);
+        let kind_str = match kind {
+            QuotaKind::PublicQuiz => "public_quiz",
+            QuotaKind::AgentCreation => "agent_creation",
+        };
+        return Err(ApiError::QuotaExceeded {
+            kind: kind_str.to_string(),
+            limit,
+            usage,
+        });
     }
 
     Ok(())
