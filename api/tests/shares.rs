@@ -119,7 +119,6 @@ async fn skill_manifest_contains_all_share_tools() {
         "session.finish",
         "attempt.get",
         "attempt.grade",
-        "agents.register",
         "agent.activity",
         "feedback.send",
         "plan.create",

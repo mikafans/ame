@@ -1128,7 +1128,7 @@ export interface components {
             updatedAt: string;
         };
         /** @enum {string} */
-        Role: "learner" | "instructor" | "admin" | "agent";
+        Role: "user" | "admin" | "agent";
         RotateKeyResponse: {
             apiKey: string;
         };
@@ -1337,8 +1337,8 @@ export interface operations {
                     "application/json": components["schemas"]["PendingAttemptRow"][];
                 };
             };
-            /** @description Not instructor or admin */
-            403: {
+            /** @description Agent role not allowed */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1371,8 +1371,8 @@ export interface operations {
                     "application/json": components["schemas"]["Attempt"];
                 };
             };
-            /** @description Not instructor or admin */
-            403: {
+            /** @description Agent role not allowed */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

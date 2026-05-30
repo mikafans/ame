@@ -90,8 +90,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
         let role: String = record.get("role");
         let role = match role.as_str() {
-            "learner" | "user" => crate::domain::user::Role::Learner,
-            "instructor" => crate::domain::user::Role::Instructor,
+            "user" => crate::domain::user::Role::User,
             "admin" => crate::domain::user::Role::Admin,
             "agent" => crate::domain::user::Role::Agent,
             _ => {

@@ -1046,7 +1046,7 @@ pub struct PendingAttemptRow {
     path = "/v1/attempts/pending",
     responses(
         (status = 200, description = "Pending manual attempts", body = Vec<PendingAttemptRow>),
-        (status = 403, description = "Not instructor or admin"),
+        (status = 401, description = "Agent role not allowed"),
     ),
     security(("bearer_auth" = []))
 )]
@@ -1054,8 +1054,8 @@ pub async fn list_pending_attempts(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<PendingAttemptRow>>, ApiError> {
-    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
-        return Err(ApiError::ScopeRequired("instructor"));
+    if matches!(user.user.role, Role::Agent) {
+        return Err(ApiError::Unauthorized);
     }
 
     let rows = sqlx::query(
@@ -1112,7 +1112,7 @@ pub struct GradeAttemptBody {
     request_body = GradeAttemptBody,
     responses(
         (status = 200, description = "Graded attempt", body = Attempt),
-        (status = 403, description = "Not instructor or admin"),
+        (status = 401, description = "Agent role not allowed"),
         (status = 404, description = "No such attempt"),
         (status = 409, description = "Attempt is not pending manual grading"),
         (status = 422, description = "Validation failed"),
@@ -1125,8 +1125,8 @@ pub async fn grade_attempt(
     Path(id): Path<Uuid>,
     Json(body): Json<GradeAttemptBody>,
 ) -> Result<Json<Attempt>, ApiError> {
-    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
-        return Err(ApiError::ScopeRequired("instructor"));
+    if matches!(user.user.role, Role::Agent) {
+        return Err(ApiError::Unauthorized);
     }
 
     if body.score < 0.0 || body.score > 1.0 {

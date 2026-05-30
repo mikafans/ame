@@ -89,14 +89,14 @@ pub async fn register(
         }]));
     }
 
-    // Validate role
+    // Validate role — only user and admin are valid for human registration
     let normalized_role = body.role.to_lowercase();
     match normalized_role.as_str() {
-        "learner" | "instructor" | "admin" | "agent" => {}
+        "user" | "admin" => {}
         _ => {
             return Err(ApiError::Validation(vec![FieldError {
                 field: "role".into(),
-                message: format!("unknown role: {}", body.role),
+                message: "must be 'user' or 'admin'".to_string(),
             }]));
         }
     }

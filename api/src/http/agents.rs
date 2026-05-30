@@ -1,9 +1,8 @@
-//! Agent-surface routes: register, MCP manifest, OpenAPI export, activity log.
+//! Agent-surface routes: MCP manifest, OpenAPI export, activity log.
 
 use axum::{
     Json, Router,
     extract::{Query, State},
-    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
 };
@@ -17,7 +16,6 @@ use crate::{
     auth::{
         extractor::AuthenticatedUser,
         scope::{RequireAnyScope, ScopeOneOf},
-        token::{generate_secret, hash_secret},
     },
     domain::{
         error::{ApiError, FieldError},
@@ -34,26 +32,6 @@ impl ScopeOneOf for AgentReadScopes {
 }
 
 // ── shapes ────────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RegisterBody {
-    pub label: Option<String>,
-    pub scopes: Vec<String>,
-    /// Shared secret matching the server's `AME_AGENT_ACCESS_CODE` env var.
-    /// Required; registration is disabled when the env var is unset.
-    /// Wire name is `accessCode` (camelCase, per the struct-level rename).
-    pub access_code: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RegisterResponse {
-    pub api_key: String,
-    pub user_id: Uuid,
-    pub openapi_url: String,
-    pub skill_manifest_url: String,
-}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,93 +60,6 @@ pub struct ActivityQuery {
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────
-
-/// POST /v1/agents/register — bootstrap for agent users.
-///
-/// Gated by a shared access code (`AME_AGENT_ACCESS_CODE` env var). If the env
-/// var is unset, registration is disabled entirely — operators must opt in.
-/// This replaces the previous unauthenticated-by-design behaviour, which was
-/// an open API-key faucet for any public deployment.
-pub async fn register(
-    State(state): State<AppState>,
-    Json(body): Json<RegisterBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    // Access code gate — fail-safe: no env var configured ⇒ deny.
-    let expected = std::env::var("AME_AGENT_ACCESS_CODE")
-        .ok()
-        .filter(|s| !s.is_empty());
-    let provided = body.access_code.as_deref().unwrap_or("");
-    match expected {
-        None => return Err(ApiError::Unauthorized),
-        Some(want) => {
-            use subtle::ConstantTimeEq;
-            if !bool::from(want.as_bytes().ct_eq(provided.as_bytes())) {
-                return Err(ApiError::Unauthorized);
-            }
-        }
-    }
-
-    if body.scopes.is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "scopes".into(),
-            message: "must include at least one scope".into(),
-        }]));
-    }
-    if body.scopes.contains(&"admin".to_string()) {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "scopes".into(),
-            message: "admin scope cannot be requested via /agents/register".into(),
-        }]));
-    }
-    for s in &body.scopes {
-        if s.parse::<Scope>().is_err() {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "scopes".into(),
-                message: format!("unknown scope: {s}"),
-            }]));
-        }
-    }
-
-    let label = body
-        .label
-        .filter(|l| !l.trim().is_empty())
-        .unwrap_or_else(|| "agent".to_string());
-    let user_id = Uuid::now_v7();
-    let display_name = format!("agent:{}", &user_id.to_string()[..8]);
-
-    sqlx::query("INSERT INTO tb_users (id, display_name, role) VALUES ($1, $2, 'agent')")
-        .bind(user_id)
-        .bind(&display_name)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let token_id = Uuid::now_v7();
-    let secret = generate_secret();
-    let hash = hash_secret(&secret);
-
-    sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(token_id)
-    .bind(user_id)
-    .bind(&label)
-    .bind(&hash)
-    .bind(&body.scopes)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(RegisterResponse {
-            api_key: format!("{token_id}_{secret}"),
-            user_id,
-            openapi_url: "/v1/agents/openapi.json".to_string(),
-            skill_manifest_url: "/v1/agents/skill.json".to_string(),
-        }),
-    ))
-}
 
 /// GET /v1/agents/skill.json — agent skill manifest (public).
 ///
@@ -520,15 +411,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             strict,
         ),
         // Agent surface
-        tool(
-            "agents.register",
-            "Register a new agent user and receive an API key.",
-            json!({"type":"object","required":["scopes","accessCode"],"properties":{"label":{"type":"string"},"scopes":{"type":"array","items":{"type":"string"}},"accessCode":{"type":"string","description":"shared secret matching the server's AME_AGENT_ACCESS_CODE env var"}}}),
-            "POST",
-            "/v1/agents/register",
-            None,
-            strict,
-        ),
         tool(
             "agent.activity",
             "Get paginated activity log for the calling agent.",
@@ -889,7 +771,6 @@ async fn run_question_promote(
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
-    // /v1/agents/register is mounted (with rate limiting) in `http::mod::router`.
     Router::new()
         .route("/v1/agents/skill.json", get(skill_manifest))
         .route("/v1/agents/openapi.json", get(openapi_json))

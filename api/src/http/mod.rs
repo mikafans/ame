@@ -70,8 +70,8 @@ pub fn router(pool: PgPool) -> Router {
             activity::activity_log_middleware,
         ));
 
-    // Public, rate-limited endpoints. Credential-stuffing and key-faucet
-    // surface: limit harder than the rest of the API.
+    // Public, rate-limited endpoints. Credential-stuffing surface: limit
+    // harder than the rest of the API.
     //
     // Defaults: 10 req burst, refill 1 per 2s (≈30 req/min sustained per IP).
     // Override with AME_RATELIMIT_BURST and AME_RATELIMIT_PERIOD_SECS.
@@ -88,7 +88,6 @@ pub fn router(pool: PgPool) -> Router {
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/logout", post(auth::logout))
-        .route("/v1/agents/register", post(agents::register))
         .layer(GovernorLayer {
             config: governor_conf,
         })

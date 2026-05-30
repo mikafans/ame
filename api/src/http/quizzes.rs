@@ -440,12 +440,6 @@ async fn create_quiz(
     auth: RequireAnyScope<QuizWriteScopes>,
     Json(body): Json<CreateQuizBody>,
 ) -> Result<(axum::http::StatusCode, Json<CreateQuizResponse>), ApiError> {
-    // Only instructor/admin may create; learner role is forbidden
-    use crate::domain::user::Role;
-    if auth.0.user.role == Role::Learner {
-        return Err(ApiError::ScopeRequired("quiz.write"));
-    }
-
     let objectives = body.objectives.unwrap_or_default();
 
     let result = sqlx::query(
@@ -525,11 +519,6 @@ async fn add_quiz_question(
     Path(quiz_id): Path<Uuid>,
     Json(body): Json<AddQuizQuestionBody>,
 ) -> Result<(axum::http::StatusCode, Json<AddQuizQuestionResponse>), ApiError> {
-    use crate::domain::user::Role;
-    if auth.0.user.role == Role::Learner {
-        return Err(ApiError::ScopeRequired("quiz.write"));
-    }
-
     // Verify quiz exists
     let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tb_quizzes WHERE id = $1)")
         .bind(quiz_id)
@@ -655,14 +644,9 @@ pub fn default_payload_for_kind(kind: QuestionKind) -> Value {
 )]
 async fn delete_quiz(
     State(state): State<AppState>,
-    auth: RequireAnyScope<QuizWriteScopes>,
+    _auth: RequireAnyScope<QuizWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<axum::http::StatusCode, ApiError> {
-    use crate::domain::user::Role;
-    if auth.0.user.role == Role::Learner {
-        return Err(ApiError::ScopeRequired("quiz.write"));
-    }
-
     let status: Option<String> = sqlx::query_scalar("SELECT status FROM tb_quizzes WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.pool)
@@ -724,14 +708,9 @@ async fn delete_quiz(
 )]
 async fn remove_quiz_question(
     State(state): State<AppState>,
-    auth: RequireAnyScope<QuizWriteScopes>,
+    _auth: RequireAnyScope<QuizWriteScopes>,
     Path((quiz_id, question_id)): Path<(Uuid, Uuid)>,
 ) -> Result<axum::http::StatusCode, ApiError> {
-    use crate::domain::user::Role;
-    if auth.0.user.role == Role::Learner {
-        return Err(ApiError::ScopeRequired("quiz.write"));
-    }
-
     let deleted =
         sqlx::query("DELETE FROM tb_quiz_questions WHERE quiz_id = $1 AND question_id = $2")
             .bind(quiz_id)

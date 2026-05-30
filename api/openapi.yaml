@@ -20,8 +20,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/PendingAttemptRow'
-        '403':
-          description: Not instructor or admin
+        '401':
+          description: Agent role not allowed
       security:
       - bearer_auth: []
   /v1/attempts/{id}/grade:
@@ -50,8 +50,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Attempt'
-        '403':
-          description: Not instructor or admin
+        '401':
+          description: Agent role not allowed
         '404':
           description: No such attempt
         '409':
@@ -2750,8 +2750,7 @@ components:
     Role:
       type: string
       enum:
-      - learner
-      - instructor
+      - user
       - admin
       - agent
     RotateKeyResponse:

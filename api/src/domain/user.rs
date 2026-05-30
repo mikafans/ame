@@ -8,8 +8,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
-    Learner,
-    Instructor,
+    User,
     Admin,
     Agent,
 }
