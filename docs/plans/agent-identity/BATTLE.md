@@ -14,11 +14,13 @@ This is the coordination board. The machine-readable task list is
 - **P0 — DONE & committed.** AI-0.1 role migration (`e47ee93`), AI-0.2 Role enum
   collapse `{User,Admin,Agent}` + faucet delete (`f3b42cf`), AI-0.3 web de-gate
   (`9d6931d`). `make check` green on each.
-- **P1 — DONE & staged.** AI-1.1 sub-account schema (`20260530150000`), AI-1.2
+- **P1 — DONE & committed.** AI-1.1 sub-account schema (`20260530150000`), AI-1.2
   ownership resolution in auth, AI-1.3 `/v1/me/agents` CRUD + integration test
   (`api/tests/me.rs`). `make check` green.
-- **Next gate: P2 agent profiles + P3 visibility + P4 quotas.** These can now
-  fan out in parallel.
+- **P2 — DONE & staged.** AI-2.1 agent profiles schema (`20260530160000`), AI-2.2
+  behavioral tools (`profile.get`, `memory.*`, `target.set`), AI-2.3 updated
+  reference client and docs. `make check` green.
+- **Next gate: P3 visibility + P4 quotas.** These can now fan out in parallel.
 
 **Two decisions are now load-bearing — do not regress them:**
 

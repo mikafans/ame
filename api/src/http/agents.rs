@@ -476,6 +476,43 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("quiz.read"),
             strict,
         ),
+        // Agent identity & behavioral tools
+        tool(
+            "profile.get",
+            "Get the agent's profile including label, focus, and memory, PLUS the owner's shared truth (level/ratings).",
+            json!({"type":"object"}),
+            "POST",
+            "/v1/agents/run",
+            Some("quiz.read"),
+            strict,
+        ),
+        tool(
+            "memory.set",
+            "Overwrite the agent's freeform JSON memory store.",
+            json!({"type":"object","required":["memory"],"properties":{"memory":{"type":"object"}}}),
+            "POST",
+            "/v1/agents/run",
+            Some("quiz.write"),
+            strict,
+        ),
+        tool(
+            "memory.append",
+            "Deep-merge a JSON object into the agent's existing memory.",
+            json!({"type":"object","required":["append"],"properties":{"append":{"type":"object"}}}),
+            "POST",
+            "/v1/agents/run",
+            Some("quiz.write"),
+            strict,
+        ),
+        tool(
+            "target.set",
+            "Update the agent's current goal or next specific target.",
+            json!({"type":"object","properties":{"currentGoal":{"type":"string"},"nextTarget":{"type":"string"}}}),
+            "POST",
+            "/v1/agents/run",
+            Some("quiz.write"),
+            strict,
+        ),
     ];
 
     json!({
@@ -488,7 +525,16 @@ fn build_skill_manifest(strict: bool) -> Value {
             "endpoint": "/v1/agents/run",
             "method": "POST",
             "body": { "tool": "<tool name>", "params": { "...": "..." } },
-            "runnable_tools": ["quiz.import", "quiz.update", "question.create", "question.promote"],
+            "runnable_tools": [
+                "profile.get",
+                "memory.set",
+                "memory.append",
+                "target.set",
+                "quiz.import",
+                "quiz.update",
+                "question.create",
+                "question.promote"
+            ],
             "description": "Execute a composite or write tool. Plain read tools are NOT routed here — call them directly at their advertised method/path.",
         },
         "tools": tools,
@@ -530,6 +576,24 @@ pub async fn run(
 ) -> Result<Json<RunResponse>, ApiError> {
     let user_id = auth.user.id;
     match body.tool.as_str() {
+        "profile.get" => {
+            // profile.get is logically a read, but we route it through run
+            // to simplify the "composite truth" assembly (agent row + owner level).
+            require_scope(&auth, Scope::QuizRead)?;
+            run_profile_get(&state, &auth).await
+        }
+        "memory.set" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_memory_set(&state, &user_id, body.params).await
+        }
+        "memory.append" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_memory_append(&state, &user_id, body.params).await
+        }
+        "target.set" => {
+            require_scope(&auth, Scope::QuizWrite)?;
+            run_target_set(&state, &user_id, body.params).await
+        }
         "quiz.import" => {
             require_scope(&auth, Scope::QuizWrite)?;
             run_quiz_import(&state, &user_id, body.params).await
@@ -551,12 +615,182 @@ pub async fn run(
             tool: other.to_string(),
             result: Value::Null,
             error: Some(format!(
-                "unknown or non-runnable tool: {other}. Runnable tools: quiz.import, quiz.update, \
-                 question.create, question.promote. Read tools are called directly at their \
-                 method/path — see /v1/agents/skill.json."
+                "unknown or non-runnable tool: {other}. Runnable tools: profile.get, memory.set, \
+                 memory.append, target.set, quiz.import, quiz.update, question.create, question.promote. \
+                 Read tools are called directly at their method/path — see /v1/agents/skill.json."
             )),
         })),
     }
+}
+
+/// `profile.get` — assembler for the agent's "who am I?" state.
+/// Returns the agent's own metadata PLUS the owner's shared truth (level, progress).
+async fn run_profile_get(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+) -> Result<Json<RunResponse>, ApiError> {
+    // 1. Fetch agent profile
+    let profile_row = sqlx::query(
+        "SELECT label, focus_tags, current_goal, next_target, memory
+         FROM tb_agent_profiles
+         WHERE agent_user_id = $1",
+    )
+    .bind(auth.user.id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    // 2. Fetch owner's shared truth (level/ratings)
+    // Shared truth ALWAYS uses owner_id, never agent user.id
+    let owner_id = auth.owner_id();
+    let ratings_rows = sqlx::query(
+        r#"
+        SELECT t.name as tag, r.rating, r.attempts_count
+        FROM tb_user_tag_ratings r
+        JOIN tb_tags t ON r.tag_id = t.id
+        WHERE r.user_id = $1
+        ORDER BY r.rating DESC
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let ratings: Vec<Value> = ratings_rows
+        .iter()
+        .map(|r| {
+            json!({
+                "tag": r.get::<String, _>("tag"),
+                "rating": r.get::<f64, _>("rating"),
+                "attempts": r.get::<i32, _>("attempts_count"),
+            })
+        })
+        .collect();
+
+    // 3. Assemble composite result
+    let profile = match profile_row {
+        Some(r) => json!({
+            "label": r.get::<String, _>("label"),
+            "focusTags": r.get::<Vec<String>, _>("focus_tags"),
+            "currentGoal": r.get::<Option<String>, _>("current_goal"),
+            "nextTarget": r.get::<Option<String>, _>("next_target"),
+            "memory": r.get::<Value, _>("memory"),
+        }),
+        None => json!({
+            "label": auth.user.display_name,
+            "focusTags": Vec::<String>::new(),
+            "currentGoal": Value::Null,
+            "nextTarget": Value::Null,
+            "memory": json!({}),
+        }),
+    };
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "profile.get".into(),
+        result: json!({
+            "agent": profile,
+            "owner": {
+                "id": owner_id,
+                "ratings": ratings,
+            }
+        }),
+        error: None,
+    }))
+}
+
+/// `memory.set` — overwrite the agent's freeform memory store.
+async fn run_memory_set(
+    state: &AppState,
+    agent_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let memory = params.get("memory").cloned().unwrap_or(json!({}));
+
+    sqlx::query(
+        r#"
+        INSERT INTO tb_agent_profiles (agent_user_id, label, memory)
+        VALUES ($1, '', $2)
+        ON CONFLICT (agent_user_id) DO UPDATE SET memory = $2, updated_at = now()
+        "#,
+    )
+    .bind(agent_id)
+    .bind(&memory)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "memory.set".into(),
+        result: json!({ "status": "updated" }),
+        error: None,
+    }))
+}
+
+/// `memory.append` — deep-merge a JSON object into the agent's memory.
+async fn run_memory_append(
+    state: &AppState,
+    agent_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let delta = params.get("append").cloned().unwrap_or(json!({}));
+
+    sqlx::query(
+        r#"
+        INSERT INTO tb_agent_profiles (agent_user_id, label, memory)
+        VALUES ($1, '', $2)
+        ON CONFLICT (agent_user_id) DO UPDATE 
+        SET memory = tb_agent_profiles.memory || $2, updated_at = now()
+        "#,
+    )
+    .bind(agent_id)
+    .bind(&delta)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "memory.append".into(),
+        result: json!({ "status": "appended" }),
+        error: None,
+    }))
+}
+
+/// `target.set` — update current goal and/or next target.
+async fn run_target_set(
+    state: &AppState,
+    agent_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let goal = params.get("currentGoal").and_then(|v| v.as_str());
+    let target = params.get("nextTarget").and_then(|v| v.as_str());
+
+    sqlx::query(
+        r#"
+        INSERT INTO tb_agent_profiles (agent_user_id, label, current_goal, next_target)
+        VALUES ($1, '', $2, $3)
+        ON CONFLICT (agent_user_id) DO UPDATE SET 
+            current_goal = COALESCE($2, tb_agent_profiles.current_goal),
+            next_target = COALESCE($3, tb_agent_profiles.next_target),
+            updated_at = now()
+        "#,
+    )
+    .bind(agent_id)
+    .bind(goal)
+    .bind(target)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "target.set".into(),
+        result: json!({ "status": "updated" }),
+        error: None,
+    }))
 }
 
 /// Per-tool scope gate: the caller's token must carry `needed` (or `admin`).

@@ -9,15 +9,14 @@ The agent surface is plain HTTP + JSON (NOT MCP) — see ``GET /llms.txt``. You 
 not need this file to use it; it is a dependency-free convenience wrapper and the
 canonical worked example. Copy it, import it, or run it directly:
 
-    # run the end-to-end author demo against a dev stack
-    uv run agents/client.py --api http://localhost:28080 --code devsmoke
+    # create an agent via an owner token
+    uv run agents/client.py --api http://localhost:28080 --token <owner-token>
 
     # or use it as a library
     from client import AmeAgent
-    agent = AmeAgent.register("http://localhost:28080", ["quiz.read", "quiz.write"], "devsmoke")
-    quiz = agent.run("quiz.import", source=json.dumps({...}))
-    agent.run("quiz.update", id=quiz["quizId"], status="active")
-    quizzes = agent.get("/v1/quizzes")["quizzes"]
+    agent = AmeAgent(base_url="http://localhost:28080", api_key="<agent-key>")
+    profile = agent.run("profile.get")
+    print(f"I am {profile['agent']['label']}, owner ratings: {profile['owner']['ratings']}")
 
 Two ways to act (mirrors llms.txt):
   - reads + simple writes -> call REST directly:  agent.get(path) / agent.request(...)
@@ -49,27 +48,33 @@ class AmeAgent:
 
     # ── bootstrap ────────────────────────────────────────────────────────────
     @classmethod
-    def register(
+    def create(
         cls,
         base_url: str,
-        scopes: list[str],
-        access_code: str,
+        owner_token: str,
         label: str = "agent",
+        scopes: list[str] = None,
     ) -> "AmeAgent":
-        """POST /v1/agents/register and return a ready-to-use client.
+        """POST /v1/me/agents as an owner and return a ready-to-use client.
 
-        The minted ``userId`` is available as ``.user_id`` afterwards.
+        The minted ``agentId`` is available as ``.agent_id`` afterwards.
         """
-        agent = cls(base_url)
-        body = {"label": label, "scopes": scopes, "accessCode": access_code}
-        resp = agent.request("POST", "/v1/agents/register", body)
-        agent.api_key = resp["apiKey"]
-        agent.user_id = resp["userId"]
+        if scopes is None:
+            scopes = ["quiz.read", "quiz.write"]
+        
+        # Internal client for the owner call
+        owner = cls(base_url, owner_token)
+        body = {"label": label, "scopes": scopes}
+        resp = owner.request("POST", "/v1/me/agents", body)
+        
+        # New agent client
+        agent = cls(base_url, resp["apiKey"])
+        agent.agent_id = resp["id"]
         return agent
 
     # ── verbs ────────────────────────────────────────────────────────────────
     def run(self, tool: str, **params):
-        """Invoke a runnable write/composite tool via POST /v1/agents/run.
+        """Invoke a runnable tool via POST /v1/agents/run.
 
         Raises AgentError if the dispatcher reports ok=false.
         """
@@ -118,12 +123,25 @@ class AmeAgent:
 
 
 # ── runnable demo / smoke test ────────────────────────────────────────────────
-def _demo(api: str, code: str, title: str) -> None:
-    """Author a quiz end to end and confirm it lands in the library."""
-    print(f"register write agent @ {api}")
-    agent = AmeAgent.register(api, ["quiz.read", "quiz.write"], code, label="client-demo")
-    print(f"  userId={agent.user_id}")
+def _demo(api: str, token: str, title: str) -> None:
+    """Create an agent, use behavioral tools, and author a quiz."""
+    print(f"create agent @ {api}")
+    agent = AmeAgent.create(api, token, label="client-demo")
+    print(f"  agentId={agent.agent_id}")
 
+    print("testing behavioral tools...")
+    profile = agent.run("profile.get")
+    print(f"  profile.get -> agent={profile['agent']['label']}, ratings_count={len(profile['owner']['ratings'])}")
+
+    agent.run("memory.set", memory={"last_run": "today"})
+    agent.run("memory.append", append={"nested": {"key": 123}})
+    agent.run("target.set", currentGoal="Demonstrate Phase 2", nextTarget="Phase 3")
+    
+    refetched = agent.run("profile.get")
+    print(f"  updated memory: {refetched['agent']['memory']}")
+    print(f"  updated goal: {refetched['agent']['currentGoal']}")
+
+    print(f"authoring quiz: {title}")
     source = json.dumps(
         {
             "title": title,
@@ -155,7 +173,7 @@ def _demo(api: str, code: str, title: str) -> None:
     match = next((q for q in listed if q["id"] == qid), None)
     assert match, f"quiz {qid} not visible in /v1/quizzes"
     print(f"  library shows: {match['title']!r} ({match['status']}, {match['questionCount']} questions)")
-    print(f"\nPUBLISHED_QUIZ_ID={qid}\nRESULT: OK")
+    print(f"\nRESULT: OK")
 
 
 if __name__ == "__main__":
@@ -163,7 +181,12 @@ if __name__ == "__main__":
 
     ap = argparse.ArgumentParser(description="AME agent reference client demo")
     ap.add_argument("--api", default="http://localhost:28080")
-    ap.add_argument("--code", default="devsmoke", help="AME_AGENT_ACCESS_CODE")
-    ap.add_argument("--title", default="Kubernetes Basics (client demo)")
+    ap.add_argument("--token", help="Owner token to create the agent")
+    ap.add_argument("--title", default="Kubernetes Basics (Phase 2 demo)")
     args = ap.parse_args()
-    _demo(args.api, args.code, args.title)
+
+    if not args.token:
+        print("Error: --token <owner-token> is required to run the demo.")
+        exit(1)
+
+    _demo(args.api, args.token, args.title)
