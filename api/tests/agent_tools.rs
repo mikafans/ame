@@ -55,9 +55,10 @@ async fn test_agent_behavioral_tools() {
         .unwrap();
 
     let tag_id = Uuid::now_v7();
+    let tag_name = format!("rust-{}", tag_id);
     sqlx::query("INSERT INTO tb_tags (id, name) VALUES ($1, $2)")
         .bind(tag_id)
-        .bind("rust")
+        .bind(&tag_name)
         .execute(&pool)
         .await
         .unwrap();
@@ -88,7 +89,7 @@ async fn test_agent_behavioral_tools() {
     )
     .bind(agent_id)
     .bind("Agent Rust")
-    .bind(vec!["rust"])
+    .bind(vec![tag_name.clone()])
     .execute(&pool)
     .await
     .unwrap();
@@ -129,7 +130,7 @@ async fn test_agent_behavioral_tools() {
     assert_eq!(result["owner"]["id"], owner_id.to_string());
 
     let ratings = result["owner"]["ratings"].as_array().unwrap();
-    let rust_rating = ratings.iter().find(|r| r["tag"] == "rust").unwrap();
+    let rust_rating = ratings.iter().find(|r| r["tag"] == tag_name).unwrap();
     assert_eq!(rust_rating["rating"], 1550.5);
 
     // 4. Test memory.set and memory.append

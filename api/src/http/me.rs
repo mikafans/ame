@@ -420,6 +420,16 @@ pub async fn create_agent(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
+    sqlx::query(
+        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)",
+    )
+    .bind(agent_id)
+    .bind(&body.label)
+    .bind(body.focus_tags.unwrap_or_default())
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
     tx.commit()
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;

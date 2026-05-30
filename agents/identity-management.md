@@ -57,7 +57,7 @@ Overwrite the agent's freeform JSON memory store.
 
 ### memory.append
 
-Deep-merge a JSON object into the agent's existing memory.
+Top-level shallow merge a JSON object into the agent's existing memory.
 
 **Request:**
 ```json

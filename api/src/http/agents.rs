@@ -497,7 +497,7 @@ fn build_skill_manifest(strict: bool) -> Value {
         ),
         tool(
             "memory.append",
-            "Deep-merge a JSON object into the agent's existing memory.",
+            "Top-level shallow merge a JSON object into the agent's existing memory.",
             json!({"type":"object","required":["append"],"properties":{"append":{"type":"object"}}}),
             "POST",
             "/v1/agents/run",
@@ -629,11 +629,14 @@ async fn run_profile_get(
     state: &AppState,
     auth: &AuthenticatedUser,
 ) -> Result<Json<RunResponse>, ApiError> {
-    // 1. Fetch agent profile
+    // 1. Fetch agent profile (label sourced from tb_users)
     let profile_row = sqlx::query(
-        "SELECT label, focus_tags, current_goal, next_target, memory
-         FROM tb_agent_profiles
-         WHERE agent_user_id = $1",
+        r#"
+        SELECT u.display_name as label, p.focus_tags, p.current_goal, p.next_target, p.memory
+        FROM tb_users u
+        LEFT JOIN tb_agent_profiles p ON u.id = p.agent_user_id
+        WHERE u.id = $1
+        "#,
     )
     .bind(auth.user.id)
     .fetch_optional(&state.pool)
@@ -672,10 +675,10 @@ async fn run_profile_get(
     let profile = match profile_row {
         Some(r) => json!({
             "label": r.get::<String, _>("label"),
-            "focusTags": r.get::<Vec<String>, _>("focus_tags"),
+            "focusTags": r.get::<Option<Vec<String>>, _>("focus_tags").unwrap_or_default(),
             "currentGoal": r.get::<Option<String>, _>("current_goal"),
             "nextTarget": r.get::<Option<String>, _>("next_target"),
-            "memory": r.get::<Value, _>("memory"),
+            "memory": r.get::<Option<Value>, _>("memory").unwrap_or_else(|| json!({})),
         }),
         None => json!({
             "label": auth.user.display_name,
@@ -729,7 +732,7 @@ async fn run_memory_set(
     }))
 }
 
-/// `memory.append` — deep-merge a JSON object into the agent's memory.
+/// `memory.append` — top-level shallow merge a JSON object into the agent's memory.
 async fn run_memory_append(
     state: &AppState,
     agent_id: &Uuid,

@@ -134,6 +134,7 @@ def _demo(api: str, token: str, title: str) -> None:
     print(f"  profile.get -> agent={profile['agent']['label']}, ratings_count={len(profile['owner']['ratings'])}")
 
     agent.run("memory.set", memory={"last_run": "today"})
+    # Top-level shallow merge
     agent.run("memory.append", append={"nested": {"key": 123}})
     agent.run("target.set", currentGoal="Demonstrate Phase 2", nextTarget="Phase 3")
     
