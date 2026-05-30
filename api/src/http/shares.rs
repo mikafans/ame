@@ -9,14 +9,13 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Path, State},
+    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use sqlx::Row;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -80,19 +79,6 @@ pub struct ShareView {
     pub created_at: OffsetDateTime,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct EmbedQuery {
-    pub interactive: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnonymousAnswerBody {
-    pub question_id: Uuid,
-    pub response: Value,
-    pub is_correct: Option<bool>,
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 fn kind_to_plural(kind: &str) -> &'static str {
@@ -102,38 +88,6 @@ fn kind_to_plural(kind: &str) -> &'static str {
         "item" => "items",
         _ => "items",
     }
-}
-
-/// Extract a client IP string from forwarding headers, falling back to "unknown".
-fn extract_ip(headers: &HeaderMap) -> String {
-    headers
-        .get("x-forwarded-for")
-        .or_else(|| headers.get("x-real-ip"))
-        .and_then(|h| h.to_str().ok())
-        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string())
-}
-
-fn hash_ip(ip: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(ip.as_bytes());
-    hex::encode(hasher.finalize())
-}
-
-async fn check_and_count_anon(
-    pool: &sqlx::PgPool,
-    share_id: Uuid,
-    ip_hash: &str,
-) -> Result<i64, ApiError> {
-    sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_anonymous_attempts
-         WHERE share_id = $1 AND ip_hash = $2 AND ts >= now() - interval '10 minutes'",
-    )
-    .bind(share_id)
-    .bind(ip_hash)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────
@@ -151,17 +105,34 @@ pub async fn create_share(
         }]));
     }
     let visibility = body.visibility.as_deref().unwrap_or("public").to_string();
-    if !["public", "cohort"].contains(&visibility.as_str()) {
+    if !["public", "unlisted", "cohort"].contains(&visibility.as_str()) {
         return Err(ApiError::Validation(vec![FieldError {
             field: "visibility".into(),
-            message: "must be public or cohort".into(),
+            message: "must be public, unlisted, or cohort".into(),
         }]));
     }
     let include_explanation = body.include_explanation.unwrap_or(false);
     let include_score = body.include_score.unwrap_or(false);
     let include_attribution = body.include_attribution.unwrap_or(true);
 
-    // Natural-tuple dedup: return existing non-revoked share with same params
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    // Auto-promote private quiz to unlisted if creating a share
+    if body.kind == "quiz" {
+        sqlx::query(
+            "UPDATE tb_quizzes SET visibility = 'unlisted' WHERE id = $1 AND visibility = 'private'",
+        )
+        .bind(body.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    }
+
+    // Natural-tuple dedup
     let existing = sqlx::query(
         "SELECT id FROM tb_share_links
          WHERE created_by_user_id = $1
@@ -181,7 +152,7 @@ pub async fn create_share(
     .bind(include_explanation)
     .bind(include_score)
     .bind(include_attribution)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -203,11 +174,15 @@ pub async fn create_share(
         .bind(include_explanation)
         .bind(include_score)
         .bind(include_attribution)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
         id
     };
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     let plural = kind_to_plural(&body.kind);
     Ok((
@@ -225,7 +200,7 @@ pub async fn create_share(
     ))
 }
 
-/// GET /v1/shares/{id} — public resolution with privacy rules applied.
+/// GET /v1/shares/{id} — public resolution.
 pub async fn get_share(
     State(state): State<AppState>,
     Path(share_id): Path<Uuid>,
@@ -294,13 +269,11 @@ pub async fn revoke_share(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Inner embed logic used by kind-specific wrappers.
+/// Inner embed logic — read-only presentation.
 async fn embed_inner(
     pool: &sqlx::PgPool,
     kind: &'static str,
     target_id: Uuid,
-    headers: &HeaderMap,
-    interactive: bool,
 ) -> Result<Json<Value>, ApiError> {
     let share_row = sqlx::query(
         "SELECT id, include_explanation, include_score, include_attribution
@@ -315,160 +288,43 @@ async fn embed_inner(
     .map_err(|e| ApiError::Internal(e.into()))?
     .ok_or(ApiError::NotFound { resource: "embed" })?;
 
-    let share_id: Uuid = share_row.get("id");
-    let include_explanation: bool = share_row.get("include_explanation");
-    let include_score: bool = share_row.get("include_score");
-    let include_attribution: bool = share_row.get("include_attribution");
-
-    if interactive {
-        let ip_hash = hash_ip(&extract_ip(headers));
-        let count = check_and_count_anon(pool, share_id, &ip_hash).await?;
-        if count >= 30 {
-            return Err(ApiError::TooManyRequests);
-        }
-    }
-
     Ok(Json(json!({
-        "shareId": share_id,
+        "shareId": share_row.get::<Uuid, _>("id"),
         "kind": kind,
         "targetId": target_id,
-        "interactive": interactive,
-        "includeExplanation": include_explanation,
-        "includeScore": include_score,
-        "includeAttribution": include_attribution,
+        "includeExplanation": share_row.get::<bool, _>("include_explanation"),
+        "includeScore": share_row.get::<bool, _>("include_score"),
+        "includeAttribution": share_row.get::<bool, _>("include_attribution"),
     })))
 }
 
 pub async fn embed_quiz(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(q): Query<EmbedQuery>,
-    headers: HeaderMap,
 ) -> Result<Json<Value>, ApiError> {
-    embed_inner(
-        &state.pool,
-        "quiz",
-        id,
-        &headers,
-        q.interactive.as_deref() == Some("1"),
-    )
-    .await
+    embed_inner(&state.pool, "quiz", id).await
 }
 
 pub async fn embed_exam(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(q): Query<EmbedQuery>,
-    headers: HeaderMap,
 ) -> Result<Json<Value>, ApiError> {
-    embed_inner(
-        &state.pool,
-        "exam",
-        id,
-        &headers,
-        q.interactive.as_deref() == Some("1"),
-    )
-    .await
+    embed_inner(&state.pool, "exam", id).await
 }
 
 pub async fn embed_item(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(q): Query<EmbedQuery>,
-    headers: HeaderMap,
 ) -> Result<Json<Value>, ApiError> {
-    embed_inner(
-        &state.pool,
-        "item",
-        id,
-        &headers,
-        q.interactive.as_deref() == Some("1"),
-    )
-    .await
-}
-
-/// Inner anonymous attempt logic used by kind-specific wrappers.
-async fn embed_attempt_inner(
-    pool: &sqlx::PgPool,
-    kind: &'static str,
-    target_id: Uuid,
-    headers: &HeaderMap,
-    body: AnonymousAnswerBody,
-) -> Result<Json<Value>, ApiError> {
-    let share_row = sqlx::query(
-        "SELECT id FROM tb_share_links
-         WHERE kind = $1 AND target_id = $2 AND revoked_at IS NULL
-         ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(kind)
-    .bind(target_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?
-    .ok_or(ApiError::NotFound { resource: "embed" })?;
-
-    let share_id: Uuid = share_row.get("id");
-    let ip_hash = hash_ip(&extract_ip(headers));
-    let count = check_and_count_anon(pool, share_id, &ip_hash).await?;
-    if count >= 30 {
-        return Err(ApiError::TooManyRequests);
-    }
-
-    let attempt_id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_anonymous_attempts (id, share_id, question_id, ip_hash, response, is_correct)
-         VALUES ($1, $2, $3, $4, $5, $6)",
-    )
-    .bind(attempt_id)
-    .bind(share_id)
-    .bind(body.question_id)
-    .bind(&ip_hash)
-    .bind(&body.response)
-    .bind(body.is_correct)
-    .execute(pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok(Json(json!({ "attemptId": attempt_id })))
-}
-
-pub async fn embed_attempt_quiz(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    headers: HeaderMap,
-    Json(body): Json<AnonymousAnswerBody>,
-) -> Result<Json<Value>, ApiError> {
-    embed_attempt_inner(&state.pool, "quiz", id, &headers, body).await
-}
-
-pub async fn embed_attempt_exam(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    headers: HeaderMap,
-    Json(body): Json<AnonymousAnswerBody>,
-) -> Result<Json<Value>, ApiError> {
-    embed_attempt_inner(&state.pool, "exam", id, &headers, body).await
-}
-
-pub async fn embed_attempt_item(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-    headers: HeaderMap,
-    Json(body): Json<AnonymousAnswerBody>,
-) -> Result<Json<Value>, ApiError> {
-    embed_attempt_inner(&state.pool, "item", id, &headers, body).await
+    embed_inner(&state.pool, "item", id).await
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/shares", post(create_share))
         .route("/v1/shares/{id}", get(get_share).delete(revoke_share))
-        // Embed routes declared BEFORE plain resource routes so the longer path wins
         .route("/v1/quizzes/{id}/embed", get(embed_quiz))
         .route("/v1/exams/{id}/embed", get(embed_exam))
         .route("/v1/items/{id}/embed", get(embed_item))
-        .route("/v1/quizzes/{id}/embed/attempt", post(embed_attempt_quiz))
-        .route("/v1/exams/{id}/embed/attempt", post(embed_attempt_exam))
-        .route("/v1/items/{id}/embed/attempt", post(embed_attempt_item))
         .with_state(state)
 }
