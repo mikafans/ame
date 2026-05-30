@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -41,7 +40,6 @@ interface Quiz {
 type TabId = "all" | "completed" | "drafts";
 
 export default function LibraryPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("all");
   const [activeQuizzes, setActiveQuizzes] = useState<Quiz[]>([]);
@@ -62,17 +60,13 @@ export default function LibraryPage() {
       return Array.isArray(data?.quizzes) ? data.quizzes : [];
     };
 
-    const isInst = user?.role === "instructor" || user?.role === "admin";
-    Promise.all([
-      fetchStatus("active"),
-      isInst ? fetchStatus("draft") : Promise.resolve([]),
-    ])
+    Promise.all([fetchStatus("active"), fetchStatus("draft")])
       .then(([active, drafts]) => {
         setActiveQuizzes(active);
         setDraftQuizzes(drafts);
       })
       .finally(() => setLoading(false));
-  }, [user?.role]);
+  }, []);
 
   async function startQuiz(quizId: string) {
     setStarting(quizId);
@@ -98,8 +92,6 @@ export default function LibraryPage() {
       setStarting(null);
     }
   }
-
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   if (loading) {
     return (
@@ -142,21 +134,19 @@ export default function LibraryPage() {
         <Typography variant="h4" sx={{ fontWeight: 500 }}>
           Library
         </Typography>
-        {isInstructor && (
-          <Button
-            variant="outlined"
-            startIcon={<AddOutlinedIcon />}
-            onClick={async () => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { data } = await (api as any).POST("/v1/quizzes", {
-                body: { title: "Untitled quiz" },
-              });
-              if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
-            }}
-          >
-            New quiz
-          </Button>
-        )}
+        <Button
+          variant="outlined"
+          startIcon={<AddOutlinedIcon />}
+          onClick={async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data } = await (api as any).POST("/v1/quizzes", {
+              body: { title: "Untitled quiz" },
+            });
+            if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
+          }}
+        >
+          New quiz
+        </Button>
       </Box>
 
       {featuredQuiz && (

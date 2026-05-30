@@ -48,17 +48,15 @@ const ICON_MAP: Record<string, React.ReactElement> = {
 interface SidebarProps {
   route: string;
   setRoute: (route: string) => void;
-  showAgent?: boolean;
 }
 
-export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
+export function Sidebar({ route, setRoute }: SidebarProps) {
   const { user, logout: logoutContext } = useAuth();
   const { mode, toggle } = useColorMode();
 
   async function handleLogout() {
     await logoutContext();
   }
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   const items = [
     { id: "library", label: "Library", icon: "library", section: "Learn" },
@@ -78,27 +76,19 @@ export function Sidebar({ route, setRoute, showAgent = false }: SidebarProps) {
     },
     { id: "results", label: "Last results", icon: "results", section: "Learn" },
     { id: "dashboard", label: "Progress", icon: "dashboard", section: "Learn" },
-    ...(isInstructor
-      ? [
-          {
-            id: "author",
-            label: "Author studio",
-            icon: "author",
-            section: "Teach",
-          },
-          { id: "grading", label: "Grading", icon: "grade", section: "Teach" },
-        ]
-      : []),
-    ...(showAgent && isInstructor
-      ? [
-          {
-            id: "agent",
-            label: "Agent API",
-            icon: "agent",
-            section: "Integrate",
-          },
-        ]
-      : []),
+    {
+      id: "author",
+      label: "Author studio",
+      icon: "author",
+      section: "Teach",
+    },
+    { id: "grading", label: "Grading", icon: "grade", section: "Teach" },
+    {
+      id: "agent",
+      label: "Agent API",
+      icon: "agent",
+      section: "Integrate",
+    },
   ];
 
   const sections = ["Learn", "Teach", "Integrate"];

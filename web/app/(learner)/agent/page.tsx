@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -61,18 +60,7 @@ const SAMPLE_IMPORT = JSON.stringify(
 );
 
 export default function AgentPage() {
-  const { user } = useAuth();
   const [tab, setTab] = useState<TabId>("keys");
-
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
-
-  if (!isInstructor) {
-    return (
-      <Box sx={{ p: "48px 36px", color: "text.secondary", fontSize: 14 }}>
-        Agent integration is available to instructors and admins only.
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ p: "28px 36px 56px" }}>
@@ -144,10 +132,10 @@ export default function AgentPage() {
             color="text.secondary"
             sx={{ lineHeight: 1.55, mb: 2.75, maxWidth: 540 }}
           >
-            Every screen a learner or instructor sees is backed by the same REST
-            surface that agents use. A grading agent reads a learner&apos;s
-            attempt with one call; an authoring agent imports a new quiz with
-            another. No scraping, no duplicate state.
+            Every screen you see is backed by the same REST surface that agents
+            use. A grading agent reads an attempt with one call; an authoring
+            agent imports a new quiz with another. No scraping, no duplicate
+            state.
           </Typography>
           <Stack direction="row" spacing={2.75}>
             <KV2 k="Endpoints" v="34" />

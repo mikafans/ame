@@ -19,8 +19,6 @@ export default function LearnerLayout({
     if (!loading && !user) router.push("/login");
   }, [loading, user, router]);
 
-  const role = user?.role ?? "learner";
-
   const getRouteId = () => {
     if (pathname.startsWith("/library")) return "library";
     if (pathname.startsWith("/exams")) return "exams";
@@ -53,11 +51,7 @@ export default function LearnerLayout({
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      <Sidebar
-        route={getRouteId()}
-        setRoute={handleRouteChange}
-        showAgent={role !== "learner"}
-      />
+      <Sidebar route={getRouteId()} setRoute={handleRouteChange} />
       <Box component="main" sx={{ flex: 1, overflowY: "auto" }}>
         {children}
       </Box>

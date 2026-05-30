@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -61,7 +60,6 @@ interface SectionDraft {
 }
 
 export default function ExamsPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -82,8 +80,6 @@ export default function ExamsPage() {
   const [composing, setComposing] = useState(false);
 
   const [starting, setStarting] = useState(false);
-
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
   function load() {
     setLoading(true);
@@ -271,13 +267,11 @@ export default function ExamsPage() {
           )}
         </Box>
 
-        {isInstructor && (
-          <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
-            <Button fullWidth variant="outlined" onClick={openCompose}>
-              Compose exam
-            </Button>
-          </Box>
-        )}
+        <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
+          <Button fullWidth variant="outlined" onClick={openCompose}>
+            Compose exam
+          </Button>
+        </Box>
       </Box>
 
       {/* Right: exam detail */}
@@ -446,8 +440,7 @@ export default function ExamsPage() {
               </Alert>
             )}
 
-            {(exam.status === "published" ||
-              (isInstructor && exam.status !== "published")) && (
+            {(exam.status === "published" || exam.status !== "published") && (
               <Box
                 sx={{
                   display: "flex",
@@ -468,7 +461,7 @@ export default function ExamsPage() {
                     {starting ? "Starting…" : "Start exam"}
                   </Button>
                 )}
-                {isInstructor && exam.status !== "published" && (
+                {exam.status !== "published" && (
                   <Button
                     variant="outlined"
                     onClick={() => handlePublish(exam.id)}
