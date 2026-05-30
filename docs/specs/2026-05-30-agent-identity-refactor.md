@@ -29,7 +29,13 @@ user. Breaking schema/API changes are acceptable; no backward-compat shims.
 4. **Split memory.** *Shared truth* (level, progress) lives on the owner and is
    read by any of their agents. *Per-agent* config/memory (focus, goal, next
    target, freeform notes) lives per agent.
-5. **Visibility.** Quizzes and questions gain `{private, unlisted, public}`.
+5. **Visibility (quizzes only).** `tb_quizzes` gains `{private, unlisted, public}`.
+   Questions and exams get **no** visibility column: questions ride inside
+   whatever quiz exposes them, and exam sharing is deferred. The column is the
+   **source of truth** for access; existing share-links are demoted to
+   presentation config. Public/unlisted quizzes are viewable anonymously, but
+   **answering requires an account** (attempts are identity-bound and roll up to
+   the responder's own stats).
 6. **Tiers.** `plan ∈ {free, premium}` on human accounts; agents inherit the
    owner's plan. Admin toggles premium manually — no payment integration yet.
 7. **Quotas + limits.** Per-token throughput limiting + per-owner plan quotas.
@@ -74,13 +80,18 @@ CREATE TABLE tb_agent_profiles (
 
 ### Visibility
 ```sql
-ALTER TABLE tb_quizzes   ADD COLUMN visibility text NOT NULL DEFAULT 'private'
+ALTER TABLE tb_quizzes ADD COLUMN visibility text NOT NULL DEFAULT 'private'
   CHECK (visibility IN ('private', 'unlisted', 'public'));
-ALTER TABLE tb_questions ADD COLUMN visibility text NOT NULL DEFAULT 'private'
-  CHECK (visibility IN ('private', 'unlisted', 'public'));
-CREATE INDEX idx_quizzes_public   ON tb_quizzes   (created_at DESC) WHERE visibility = 'public';
-CREATE INDEX idx_questions_public ON tb_questions (created_at DESC) WHERE visibility = 'public';
+CREATE INDEX idx_quizzes_public ON tb_quizzes (created_at DESC) WHERE visibility = 'public';
 ```
+`private` = owner + owner's agents only. `unlisted` = anyone with the link/id
+(not in public listings). `public` = discoverable in public listings. Only
+quizzes are shareable — questions inherit exposure from their containing quiz,
+exams are not shareable yet. The existing `tb_share_links.visibility` column is
+**no longer an access gate** — share-links only carry presentation flags
+(`include_score`, `include_explanation`, `include_attribution`). The
+anonymous-attempt path (`tb_anonymous_attempts`, `POST /v1/quizzes/{id}/embed/attempt`)
+is **removed**; embed views stay read-only.
 
 ### `tb_audit_log` (new)
 ```sql
@@ -113,9 +124,43 @@ CREATE INDEX idx_audit_log_created ON tb_audit_log (created_at DESC);
 - existing `quiz.import`, `quiz.update`, `question.create`, `question.promote`
   remain; created content is owned by the agent and rolls up to the owner.
 
-### Visibility / listing
-- List endpoints filter `WHERE visibility = 'public' OR created_by IN (me + my agents)`.
-- Publishing to `public` is gated by plan + writes an audit entry.
+### Visibility / listing / sharing
+
+**Sharing model = link visibility, not invites.** The whole sharing system is
+the `{private, unlisted, public}` column — there is no per-user invitation /
+access-list machinery (no invites table, no email delivery). This is the
+"anyone with the link" model (Google Docs / YouTube unlisted / GitHub gist):
+lowest friction for "share a quiz with friends" and zero new infrastructure.
+Per-recipient private sharing (cohorts/classrooms) stays out of scope.
+
+- **Primary share path:** set `visibility = 'unlisted'` and send the canonical
+  `/quizzes/{id}` URL. "Revoke" = set back to `private`. **No opaque per-link
+  tokens** — UUIDv7 ids are unguessable enough (YAGNI until a link leaks).
+- `tb_share_links` is **not** the sharing mechanism — it is only the embed/OG
+  presentation layer (cards on external sites, iframe embeds). Secondary.
+- `PATCH /v1/quizzes/{id}` accepts `visibility`. Publishing to `public` is
+  plan-gated + writes an audit entry; `unlisted` is always allowed.
+- Owner-scoped quiz list filters
+  `WHERE visibility = 'public' OR created_by IN (me + my agents)`.
+- `GET /v1/explore` (new, public) → paginated `visibility = 'public'` quizzes.
+- `GET /v1/quizzes/{id}` resolves an `unlisted`/`public` quiz for **any**
+  caller (incl. anonymous) as **read-only** — prompt/options for preview, never
+  another user's attempts/scores. `private` → 404 for non-owners.
+- Share-links keep `POST /v1/shares` but only set presentation flags; they no
+  longer grant access. Creating a share auto-promotes a `private` target to
+  `unlisted` (the act of sharing is the intent to expose by link).
+
+### Cross-owner attempts (account-required)
+- Taking someone else's `public`/`unlisted` quiz goes through the **normal
+  authenticated session flow** — `POST /v1/sessions {quizId}` works for any
+  caller whose token can read the quiz (public/unlisted), not just the owner.
+- The resulting `tb_session` + attempts belong to the **responder**; stats roll
+  up to the responder, never the author.
+- **Anonymous answering is gated**: the embed/preview renders, but the answer
+  control requires login → the frontend redirects new visitors to signup, then
+  resumes the session. The `embed/attempt` write endpoints are deleted.
+- Authors get aggregate counts only (how many sessions on their public content),
+  never individual responders' identities or scores.
 
 ### Export
 - `GET /v1/me/export` → zip/JSON of the owner's quizzes, questions, attempts,
@@ -158,12 +203,16 @@ CREATE INDEX idx_audit_log_created ON tb_audit_log (created_at DESC);
 0. Role collapse migration + delete `AME_AGENT_ACCESS_CODE` faucet + `/v1/agents/register`.
 1. Agent sub-accounts: `owner_user_id`, `POST /v1/me/agents`, act-as-owner resolution.
 2. `tb_agent_profiles` + `profile.get` / `memory.*` / `target.set` tools.
-3. Visibility columns + listing filters + moderation hook.
+3. Quiz `visibility` column + listing filter + `/v1/explore` + cross-owner
+   authenticated attempts + demote share-links to presentation + delete
+   anonymous-attempt path + moderation hook.
 4. `plan` column + quota/limit re-keying + gates.
 5. Data export.
 6. Admin panel + audit log.
 7. Frontend: drop instructor route-group + `roles/instructor.spec.ts`; add Agents
-   page, visibility controls, account/plan page, admin UI.
+   page, visibility controls (incl. a public Explore view + share-link dialog),
+   signup-to-answer redirect on public/unlisted content, account/plan page,
+   admin UI.
 
 ## Security considerations
 
@@ -173,8 +222,17 @@ CREATE INDEX idx_audit_log_created ON tb_audit_log (created_at DESC);
 - Export is expensive — throttle and audit it.
 - Agents must not escalate beyond the owner's plan/scope ceiling.
 - `tb_users_agent_shape` CHECK prevents agents with passwords or nested agents.
+- Public/unlisted resolution must never leak other responders' attempts, scores,
+  or identities — authors see aggregate counts only.
+- Cross-owner attempts run as the responder's own session; a public quiz can
+  never write to or read the author's progress rows.
+- Dropping the anonymous-attempt path removes an unauthenticated write surface;
+  all answer writes are now token-bound and quota-counted.
 
 ## Out of scope (later)
 
-Payment/Stripe integration, spaced repetition, federation/sharing between
-distinct owners, per-agent rate plans distinct from the owner.
+Payment/Stripe integration, spaced repetition, per-agent rate plans distinct
+from the owner, and — for sharing specifically — per-recipient private sharing
+(cohorts/invites/email delivery), question-level visibility (public question
+bank), exam sharing, and opaque rotating share-link tokens. All are additive
+later; none are needed for "share a quiz with friends."
