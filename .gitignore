@@ -49,3 +49,6 @@ __pycache__/
 # Web tooling artifacts
 .fastembed_cache
 test-results
+
+# K8s deploy secrets (real values; commit only the .example files)
+deploy/k8s/overlays/*/secret.env

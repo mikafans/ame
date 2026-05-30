@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Common labels applied to every resource (and selectors).
+commonLabels:
+  app.kubernetes.io/part-of: ame
+
+resources:
+  - postgres.yaml
+  - api.yaml
+  - web.yaml
+  - ingress.yaml
+
+# Locally-built, side-loaded images (no registry). Overlays may pin a tag.
+images:
+  - name: ame-api
+    newName: ame-api
+    newTag: latest
+  - name: ame-web
+    newName: ame-web
+    newTag: latest
