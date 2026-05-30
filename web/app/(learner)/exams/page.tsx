@@ -23,7 +23,7 @@ interface ExamSection {
   id: string;
   title: string;
   weight: number;
-  items: number;
+  itemsCount: number;
   mix?: string;
   quizId?: string;
 }
@@ -71,6 +71,7 @@ export default function ExamsPage() {
   const [composeName, setComposeName] = useState("");
   const [composeDesc, setComposeDesc] = useState("");
   const [composeDuration, setComposeDuration] = useState(60);
+  const [composePassing, setComposePassing] = useState<number | "">("");
   const [sections, setSections] = useState<SectionDraft[]>([
     { title: "", weight: 60, selectedIds: new Set() },
   ]);
@@ -115,7 +116,7 @@ export default function ExamsPage() {
   const exam = exams.find((e) => e.id === selected) ?? null;
   const examQuestionCount =
     exam?.sections && exam.sections.length > 0
-      ? exam.sections.reduce((sum, s) => sum + (s.items ?? 0), 0)
+      ? exam.sections.reduce((sum, s) => sum + (s.itemsCount ?? 0), 0)
       : null;
 
   async function startExam() {
@@ -155,6 +156,7 @@ export default function ExamsPage() {
         name: composeName,
         description: composeDesc || undefined,
         duration: composeDuration,
+        passingPoints: composePassing === "" ? undefined : composePassing,
         sections: sections.map((s, i) => ({
           title: s.title || `Section ${i + 1}`,
           weight: s.weight / 100,
@@ -399,7 +401,7 @@ export default function ExamsPage() {
                             {i + 1}. {s.title}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {s.items} questions
+                            {s.itemsCount} questions
                             {s.mix ? ` · ${s.mix}` : ""} ·{" "}
                             {Math.round(s.weight * 100)}%
                           </Typography>
@@ -521,6 +523,19 @@ export default function ExamsPage() {
                   onChange={(e) => setComposeDuration(Number(e.target.value))}
                   fullWidth
                   size="small"
+                />
+                <TextField
+                  label="Passing points (optional)"
+                  type="number"
+                  value={composePassing}
+                  onChange={(e) =>
+                    setComposePassing(
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  fullWidth
+                  size="small"
+                  helperText="Minimum points to pass. Leave blank for none."
                 />
                 <Divider />
                 <Typography variant="subtitle2">Sections</Typography>
