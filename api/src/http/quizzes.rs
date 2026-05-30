@@ -117,7 +117,7 @@ async fn list_quizzes(
                 ) AS completed
          FROM tb_quizzes q
          LEFT JOIN tb_quiz_questions qq ON qq.quiz_id = q.id
-         WHERE q.status = $1 AND (q.visibility = 'public' OR q.created_by = $4)
+         WHERE q.status = $1 AND (q.visibility = 'public' OR q.created_by = $4 OR EXISTS(SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $4))
          GROUP BY q.id
          ORDER BY q.created_at DESC
          LIMIT $2 OFFSET $3"#,
@@ -223,8 +223,19 @@ async fn get_quiz(
         .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?;
     let created_by: Uuid = quiz_row.get("created_by");
 
-    if visibility == Visibility::Private && created_by != auth.owner_id() {
-        return Err(ApiError::NotFound { resource: "quiz" });
+    if visibility == Visibility::Private {
+        let is_owned = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM tb_users WHERE id = $1 AND (id = $2 OR owner_user_id = $2))"
+        )
+        .bind(created_by)
+        .bind(auth.owner_id())
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        if !is_owned {
+            return Err(ApiError::NotFound { resource: "quiz" });
+        }
     }
 
     let question_rows = sqlx::query(
@@ -473,11 +484,19 @@ pub struct CreatedQuiz {
 )]
 async fn create_quiz(
     State(state): State<AppState>,
-    auth: RequireAnyScope<QuizWriteScopes>,
+    auth: AuthenticatedUser,
     Json(body): Json<CreateQuizBody>,
 ) -> Result<(axum::http::StatusCode, Json<CreateQuizResponse>), ApiError> {
+    if !auth.token_scopes.contains(&Scope::QuizWrite) && !auth.token_scopes.contains(&Scope::Admin)
+    {
+        return Err(ApiError::ScopeRequired("quiz.write"));
+    }
+
     let objectives = body.objectives.unwrap_or_default();
     let visibility = body.visibility.unwrap_or(Visibility::Private);
+
+    // TODO: P3 — plan-gate public publishing
+    // TODO: P6 — audit log entry for public publishing
 
     let result = sqlx::query(
         "INSERT INTO tb_quizzes (title, objectives, course, visibility, status, created_by)
@@ -488,7 +507,7 @@ async fn create_quiz(
     .bind(&objectives)
     .bind(&body.course)
     .bind(visibility.as_str())
-    .bind(auth.0.user.id)
+    .bind(auth.user.id)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;

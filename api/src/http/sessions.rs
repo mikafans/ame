@@ -182,8 +182,19 @@ pub async fn create_session(
             .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?;
         let created_by: Uuid = row.get("created_by");
 
-        if visibility == Visibility::Private && created_by != auth.owner_id() {
-            return Err(ApiError::NotFound { resource: "quiz" });
+        if visibility == Visibility::Private {
+            let is_owned = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(SELECT 1 FROM tb_users WHERE id = $1 AND (id = $2 OR owner_user_id = $2))"
+            )
+            .bind(created_by)
+            .bind(auth.owner_id())
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            if !is_owned {
+                return Err(ApiError::NotFound { resource: "quiz" });
+            }
         }
     }
 
