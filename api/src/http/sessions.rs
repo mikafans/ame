@@ -25,6 +25,7 @@ use crate::{
         attempt::{Attempt, AttemptResponse},
         error::{ApiError, FieldError},
         question::{McPayload, QuestionKind},
+        quiz::Visibility,
         session::{QuestionPlan, Session, SessionKind, SessionStatus},
         user::{Role, Scope},
     },
@@ -156,15 +157,42 @@ struct PlannedQuestion {
 )]
 pub async fn create_session(
     State(state): State<AppState>,
-    user: RequireAnyScope<SessionWriteScopes>,
+    auth: AuthenticatedUser,
     Json(body): Json<CreateSessionBody>,
 ) -> Result<impl IntoResponse, ApiError> {
+    // Auth scope check
+    if !auth.token_scopes.contains(&Scope::AttemptWrite)
+        && !auth.token_scopes.contains(&Scope::Admin)
+    {
+        return Err(ApiError::ScopeRequired("attempt.write"));
+    }
+
+    // Visibility check
+    if let Some(quiz_id) = body.quiz_id {
+        let row = sqlx::query("SELECT visibility, created_by FROM tb_quizzes WHERE id = $1")
+            .bind(quiz_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?
+            .ok_or(ApiError::NotFound { resource: "quiz" })?;
+
+        let visibility: Visibility = row
+            .get::<String, _>("visibility")
+            .parse()
+            .map_err(|e: String| ApiError::Internal(anyhow::anyhow!(e)))?;
+        let created_by: Uuid = row.get("created_by");
+
+        if visibility == Visibility::Private && created_by != auth.owner_id() {
+            return Err(ApiError::NotFound { resource: "quiz" });
+        }
+    }
+
     let CreatePlan {
         kind,
         filter,
         questions,
         affects_rating: ar_override,
-    } = build_plan(&state.pool, user.0.user.id, &body).await?;
+    } = build_plan(&state.pool, auth.user.id, &body).await?;
     let question_plan = QuestionPlan {
         items: questions
             .iter()
@@ -178,7 +206,7 @@ pub async fn create_session(
     };
     let started_at = OffsetDateTime::now_utc();
     let session = start_session(StartSessionInput {
-        user_id: user.0.user.id,
+        user_id: auth.user.id,
         kind,
         quiz_id: body.quiz_id,
         exam_id: body.exam_id,
