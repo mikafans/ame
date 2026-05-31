@@ -134,14 +134,7 @@ export default function QuestionsPage() {
       });
 
       if (data?.questions) {
-        // The API Question response omits `tags`; default it so the table and
-        // preview (which render tag chips) never dereference undefined.
-        setQuestions(
-          (data.questions as Question[]).map((q) => ({
-            ...q,
-            tags: q.tags ?? [],
-          })),
-        );
+        setQuestions(data.questions as Question[]);
         setTotal(data.total ?? 0);
       } else {
         setQuestions([]);

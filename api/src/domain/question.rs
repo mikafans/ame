@@ -99,6 +99,8 @@ pub struct Question {
     pub id: Uuid,
     pub kind: QuestionKind,
     pub prompt: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
     pub version: i32,
     pub status: QuestionStatus,
     pub points: i32,

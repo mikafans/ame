@@ -1043,6 +1043,7 @@ export interface components {
             rating: number;
             source?: string | null;
             status: components["schemas"]["QuestionStatus"];
+            tags?: string[];
             /** Format: date-time */
             updatedAt: string;
             /** Format: int32 */

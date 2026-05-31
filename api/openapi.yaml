@@ -2408,6 +2408,10 @@ components:
           - 'null'
         status:
           $ref: '#/components/schemas/QuestionStatus'
+        tags:
+          type: array
+          items:
+            type: string
         updatedAt:
           type: string
           format: date-time

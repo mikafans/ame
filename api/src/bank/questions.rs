@@ -43,7 +43,8 @@ pub async fn list_questions(
     let kind_str = filter.kind.map(|k| k.as_str().to_string());
 
     let rows = sqlx::query(
-        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at
+        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+                COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
            AND ($2::text IS NULL OR q.kind = $2)
@@ -90,7 +91,8 @@ pub async fn list_questions_paged(
 
     let rows = sqlx::query(
         "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
-                COUNT(*) OVER() as total
+                COUNT(*) OVER() as total,
+                COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
            AND ($2::text IS NULL OR q.kind = $2)
@@ -141,8 +143,9 @@ pub async fn list_questions_paged(
 
 pub async fn get_question(pool: &PgPool, id: Uuid) -> Result<Option<Question>, ApiError> {
     let row = sqlx::query(
-        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at
-         FROM tb_questions WHERE id = $1"
+        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+                COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
+         FROM tb_questions q WHERE q.id = $1"
     )
     .bind(id)
     .fetch_optional(pool)
@@ -170,6 +173,7 @@ fn row_to_question(row: sqlx::postgres::PgRow) -> Result<Question, ApiError> {
         kind: QuestionKind::from_str(&kind_str)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
         prompt: row.get("prompt"),
+        tags: row.get("tags"),
         version: row.get("version"),
         status: QuestionStatus::from_str(&status_str)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
@@ -289,7 +293,7 @@ pub async fn create_questions(
                 .map_err(internal)?;
         }
 
-        let q_row = sqlx::query("SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at FROM tb_questions WHERE id = $1")
+        let q_row = sqlx::query("SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags FROM tb_questions q WHERE q.id = $1")
             .bind(id)
             .fetch_one(&mut *tx)
             .await
