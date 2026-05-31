@@ -377,6 +377,107 @@ paths:
           description: No such assessment or question
       security:
       - bearer_auth: []
+  /v1/assessments/{id}/sections:
+    post:
+      tags:
+      - assessments
+      operationId: create_assessment_section
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSectionBody'
+        required: true
+      responses:
+        '201':
+          description: Section created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSectionDetail'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Assessment not found
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/assessments/{id}/sections/{section_id}:
+    delete:
+      tags:
+      - assessments
+      operationId: delete_assessment_section
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: section_id
+        in: path
+        description: Section ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Section deleted successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such assessment or section
+      security:
+      - bearer_auth: []
+    patch:
+      tags:
+      - assessments
+      operationId: patch_assessment_section
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: section_id
+        in: path
+        description: Section ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSectionBody'
+        required: true
+      responses:
+        '200':
+          description: Section updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSectionDetail'
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such assessment or section
+      security:
+      - bearer_auth: []
   /v1/attempts/pending:
     get:
       tags:
@@ -1173,6 +1274,12 @@ components:
           - 'null'
           format: uuid
           description: Link an existing bank question by ID.
+        sectionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Target section ID (defaults to first section if absent).
     AddAssessmentQuestionResponse:
       type: object
       required:
@@ -1895,6 +2002,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Question'
+    CreateSectionBody:
+      type: object
+      required:
+      - title
+      properties:
+        mix: {}
+        title:
+          type: string
+        weight:
+          type:
+          - number
+          - 'null'
+          format: double
     CreateSessionBody:
       type: object
       properties:
@@ -2938,6 +3058,19 @@ components:
           oneOf:
           - type: 'null'
           - $ref: '#/components/schemas/AssessmentVisibility'
+    UpdateSectionBody:
+      type: object
+      properties:
+        mix: {}
+        title:
+          type:
+          - string
+          - 'null'
+        weight:
+          type:
+          - number
+          - 'null'
+          format: double
     User:
       type: object
       required:

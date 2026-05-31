@@ -184,6 +184,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/assessments/{id}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_assessment_section"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}/sections/{section_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_assessment_section"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_assessment_section"];
+        trace?: never;
+    };
     "/v1/attempts/pending": {
         parameters: {
             query?: never;
@@ -574,6 +606,11 @@ export interface components {
              * @description Link an existing bank question by ID.
              */
             questionId?: string | null;
+            /**
+             * Format: uuid
+             * @description Target section ID (defaults to first section if absent).
+             */
+            sectionId?: string | null;
         };
         AddAssessmentQuestionResponse: {
             /** Format: int32 */
@@ -849,6 +886,12 @@ export interface components {
         };
         CreateQuestionsResponse: {
             questions: components["schemas"]["Question"][];
+        };
+        CreateSectionBody: {
+            mix?: unknown;
+            title: string;
+            /** Format: double */
+            weight?: number | null;
         };
         CreateSessionBody: {
             /** Format: uuid */
@@ -1250,6 +1293,12 @@ export interface components {
             status?: null | components["schemas"]["AssessmentStatus"];
             title?: string | null;
             visibility?: null | components["schemas"]["AssessmentVisibility"];
+        };
+        UpdateSectionBody: {
+            mix?: unknown;
+            title?: string | null;
+            /** Format: double */
+            weight?: number | null;
         };
         User: {
             /** Format: date-time */
@@ -1811,6 +1860,134 @@ export interface operations {
                 content?: never;
             };
             /** @description No such assessment or question */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_assessment_section: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSectionBody"];
+            };
+        };
+        responses: {
+            /** @description Section created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSectionDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_assessment_section: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+                /** @description Section ID */
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Section deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or section */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_assessment_section: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+                /** @description Section ID */
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSectionBody"];
+            };
+        };
+        responses: {
+            /** @description Section updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSectionDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or section */
             404: {
                 headers: {
                     [name: string]: unknown;

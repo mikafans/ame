@@ -17,7 +17,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{delete, get, patch, post},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -51,7 +51,15 @@ pub fn router(state: AppState) -> Router<AppState> {
         )
         .route(
             "/v1/assessments/{id}/questions/{question_id}",
-            axum::routing::delete(remove_assessment_question),
+            delete(remove_assessment_question),
+        )
+        .route(
+            "/v1/assessments/{id}/sections",
+            post(create_assessment_section),
+        )
+        .route(
+            "/v1/assessments/{id}/sections/{section_id}",
+            patch(patch_assessment_section).delete(delete_assessment_section),
         )
         .with_state(state)
 }
@@ -130,6 +138,30 @@ pub struct AddAssessmentQuestionBody {
     pub prompt: Option<String>,
     #[serde(default)]
     pub points_override: Option<i32>,
+    /// Target section ID (defaults to first section if absent).
+    #[serde(default)]
+    pub section_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSectionBody {
+    pub title: String,
+    #[serde(default)]
+    pub weight: Option<f64>,
+    #[serde(default)]
+    pub mix: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSectionBody {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub weight: Option<f64>,
+    #[serde(default)]
+    pub mix: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -649,21 +681,40 @@ pub async fn add_assessment_question(
     Path(assessment_id): Path<Uuid>,
     Json(body): Json<AddAssessmentQuestionBody>,
 ) -> Result<(StatusCode, Json<AddAssessmentQuestionResponse>), ApiError> {
-    // Find the first section (owner check implicit: section exists only for owned assessments)
-    let section_id: Uuid = sqlx::query_scalar(
-        "SELECT s.id FROM tb_assessment_sections s
-         JOIN tb_assessments a ON a.id = s.assessment_id
-         WHERE s.assessment_id = $1 AND a.created_by = $2
-         ORDER BY s.order_index ASC LIMIT 1",
-    )
-    .bind(assessment_id)
-    .bind(auth.user.id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
-    .ok_or(ApiError::NotFound {
-        resource: "assessment",
-    })?;
+    // Resolve target section: use provided section_id or default to first section
+    let section_id: Uuid = if let Some(sid) = body.section_id {
+        // Validate that the section belongs to this assessment and is owned by the user
+        sqlx::query_scalar(
+            "SELECT s.id FROM tb_assessment_sections s
+             JOIN tb_assessments a ON a.id = s.assessment_id
+             WHERE s.id = $1 AND s.assessment_id = $2 AND a.created_by = $3",
+        )
+        .bind(sid)
+        .bind(assessment_id)
+        .bind(auth.user.id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+        .ok_or(ApiError::NotFound {
+            resource: "assessment_section",
+        })?
+    } else {
+        // Find the first section (owner check implicit: section exists only for owned assessments)
+        sqlx::query_scalar(
+            "SELECT s.id FROM tb_assessment_sections s
+             JOIN tb_assessments a ON a.id = s.assessment_id
+             WHERE s.assessment_id = $1 AND a.created_by = $2
+             ORDER BY s.order_index ASC LIMIT 1",
+        )
+        .bind(assessment_id)
+        .bind(auth.user.id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+        .ok_or(ApiError::NotFound {
+            resource: "assessment",
+        })?
+    };
 
     // Resolve the question ID
     let question_id = if let Some(qid) = body.question_id {
@@ -770,6 +821,213 @@ pub fn default_payload_for_kind(kind: QuestionKind) -> serde_json::Value {
 }
 
 #[utoipa::path(
+    post,
+    path = "/v1/assessments/{id}/sections",
+    params(("id" = Uuid, Path, description = "Assessment ID")),
+    request_body = CreateSectionBody,
+    responses(
+        (status = 201, description = "Section created successfully", body = AssessmentSectionDetail),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Assessment not found"),
+        (status = 422, description = "Validation failed"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn create_assessment_section(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(assessment_id): Path<Uuid>,
+    Json(body): Json<CreateSectionBody>,
+) -> Result<(StatusCode, Json<AssessmentSectionDetail>), ApiError> {
+    // Verify ownership
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM tb_assessments WHERE id = $1 AND created_by = $2)",
+    )
+    .bind(assessment_id)
+    .bind(auth.user.id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    if !exists {
+        return Err(ApiError::NotFound {
+            resource: "assessment",
+        });
+    }
+
+    // Compute next order_index
+    let next_order: i32 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(order_index) + 1, 0) FROM tb_assessment_sections WHERE assessment_id = $1",
+    )
+    .bind(assessment_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    let section_id = Uuid::new_v4();
+    let weight = body.weight.unwrap_or(1.0);
+
+    sqlx::query(
+        "INSERT INTO tb_assessment_sections (id, assessment_id, title, order_index, weight, mix, items_count) \
+         VALUES ($1, $2, $3, $4, $5, $6, 0)",
+    )
+    .bind(section_id)
+    .bind(assessment_id)
+    .bind(&body.title)
+    .bind(next_order)
+    .bind(weight)
+    .bind(&body.mix)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(AssessmentSectionDetail {
+            id: section_id,
+            title: body.title,
+            order_index: next_order,
+            weight,
+            mix: body.mix,
+            items_count: 0,
+            questions: vec![],
+        }),
+    ))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v1/assessments/{id}/sections/{section_id}",
+    params(
+        ("id" = Uuid, Path, description = "Assessment ID"),
+        ("section_id" = Uuid, Path, description = "Section ID"),
+    ),
+    request_body = UpdateSectionBody,
+    responses(
+        (status = 200, description = "Section updated successfully", body = AssessmentSectionDetail),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such assessment or section"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn patch_assessment_section(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path((assessment_id, section_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<UpdateSectionBody>,
+) -> Result<Json<AssessmentSectionDetail>, ApiError> {
+    // Update scoped to owner via assessment join
+    let sec_row = sqlx::query(
+        "UPDATE tb_assessment_sections sec
+            SET title  = COALESCE($1, sec.title),
+                weight = COALESCE($2, sec.weight),
+                mix    = COALESCE($3, sec.mix)
+           FROM tb_assessments a
+          WHERE sec.id = $4 AND sec.assessment_id = $5
+            AND a.id = sec.assessment_id AND a.created_by = $6
+          RETURNING sec.id, sec.title, sec.order_index, sec.weight, sec.mix, sec.items_count",
+    )
+    .bind(&body.title)
+    .bind(body.weight)
+    .bind(&body.mix)
+    .bind(section_id)
+    .bind(assessment_id)
+    .bind(auth.user.id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+    .ok_or(ApiError::NotFound {
+        resource: "assessment_section",
+    })?;
+
+    let sec_id: Uuid = sec_row.get("id");
+
+    // Fetch questions for this section
+    let item_rows = sqlx::query(
+        "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
+                COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
+         FROM tb_assessment_items ai
+         JOIN tb_questions q ON q.id = ai.question_id
+         WHERE ai.section_id = $1
+         ORDER BY ai.order_index ASC",
+    )
+    .bind(sec_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    let questions = item_rows
+        .into_iter()
+        .map(|r| AssessmentQuestion {
+            id: r.get("id"),
+            kind: r.get("kind"),
+            prompt: r.get("prompt"),
+            code_snippet: r.get("code_snippet"),
+            payload: r.get("payload"),
+            explanation: r.get("explanation"),
+            points: r.get("points"),
+            status: r.get("status"),
+            order_index: r.get("order_index"),
+        })
+        .collect();
+
+    Ok(Json(AssessmentSectionDetail {
+        id: sec_id,
+        title: sec_row.get("title"),
+        order_index: sec_row.get("order_index"),
+        weight: sec_row.get("weight"),
+        mix: sec_row.get("mix"),
+        items_count: sec_row.get("items_count"),
+        questions,
+    }))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/v1/assessments/{id}/sections/{section_id}",
+    params(
+        ("id" = Uuid, Path, description = "Assessment ID"),
+        ("section_id" = Uuid, Path, description = "Section ID"),
+    ),
+    responses(
+        (status = 204, description = "Section deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such assessment or section"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn delete_assessment_section(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path((assessment_id, section_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    // Delete scoped to owner via assessment join
+    let deleted = sqlx::query(
+        "DELETE FROM tb_assessment_sections sec
+         USING tb_assessments a
+         WHERE sec.id = $1 AND sec.assessment_id = $2
+           AND a.id = sec.assessment_id AND a.created_by = $3",
+    )
+    .bind(section_id)
+    .bind(assessment_id)
+    .bind(auth.user.id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    if deleted.rows_affected() == 0 {
+        return Err(ApiError::NotFound {
+            resource: "assessment_section",
+        });
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
     delete,
     path = "/v1/assessments/{id}/questions/{question_id}",
     params(
@@ -789,20 +1047,23 @@ pub async fn remove_assessment_question(
     auth: AuthenticatedUser,
     Path((assessment_id, question_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    // Find the first section, scoped to owner
+    // Find the section where this question actually lives, scoped to owner
     let section_id: Uuid = sqlx::query_scalar(
-        "SELECT s.id FROM tb_assessment_sections s
-         JOIN tb_assessments a ON a.id = s.assessment_id
-         WHERE s.assessment_id = $1 AND a.created_by = $2
-         ORDER BY s.order_index ASC LIMIT 1",
+        "SELECT ai.section_id
+          FROM tb_assessment_items ai
+          JOIN tb_assessment_sections s ON s.id = ai.section_id
+          JOIN tb_assessments a ON a.id = s.assessment_id
+         WHERE s.assessment_id = $1 AND a.created_by = $2 AND ai.question_id = $3
+         ORDER BY ai.order_index ASC LIMIT 1",
     )
     .bind(assessment_id)
     .bind(auth.user.id)
+    .bind(question_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
     .ok_or(ApiError::NotFound {
-        resource: "assessment",
+        resource: "assessment_question",
     })?;
 
     let deleted =
@@ -813,17 +1074,15 @@ pub async fn remove_assessment_question(
             .await
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
-    if deleted.rows_affected() == 0 {
-        return Err(ApiError::NotFound {
-            resource: "assessment_question",
-        });
-    }
-
-    sqlx::query("UPDATE tb_assessment_sections SET items_count = items_count - 1 WHERE id = $1")
+    if deleted.rows_affected() > 0 {
+        sqlx::query(
+            "UPDATE tb_assessment_sections SET items_count = items_count - 1 WHERE id = $1",
+        )
         .bind(section_id)
         .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    }
 
     // Delete the inline question if it's a draft not used by any other section
     sqlx::query(

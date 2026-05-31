@@ -36,7 +36,8 @@ use crate::{
         assessments::{
             AddAssessmentQuestionBody, AddAssessmentQuestionResponse, AssessmentDetail,
             AssessmentQuestion, AssessmentSectionDetail, AssessmentSummary,
-            CountAssessmentsResponse, GenerateAssessmentResponse, ListAssessmentsResponse,
+            CountAssessmentsResponse, CreateSectionBody, GenerateAssessmentResponse,
+            ListAssessmentsResponse, UpdateSectionBody,
         },
         auth::{AuthResponse, LoginBody, RegisterBody, UserInfo},
         me::{
@@ -75,6 +76,9 @@ use crate::{
         crate::http::assessments::delete_assessment,
         crate::http::assessments::add_assessment_question,
         crate::http::assessments::remove_assessment_question,
+        crate::http::assessments::create_assessment_section,
+        crate::http::assessments::patch_assessment_section,
+        crate::http::assessments::delete_assessment_section,
         crate::http::assessments::count_assessments,
         crate::http::assessments::generate_assessment,
         crate::http::assessments::explore,
@@ -127,6 +131,8 @@ use crate::{
         UpdateAssessmentRequest,
         AddAssessmentQuestionBody,
         AddAssessmentQuestionResponse,
+        CreateSectionBody,
+        UpdateSectionBody,
         ListAssessmentsResponse,
         CountAssessmentsResponse,
         GenerateAssessmentResponse,
