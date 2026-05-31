@@ -2042,20 +2042,10 @@ components:
           - integer
           - 'null'
           format: int64
-        examId:
-          type:
-          - string
-          - 'null'
-          format: uuid
         mode:
           type:
           - string
           - 'null'
-        quizId:
-          type:
-          - string
-          - 'null'
-          format: uuid
         tags:
           type: array
           items:
@@ -2778,11 +2768,6 @@ components:
           - string
           - 'null'
           format: date-time
-        exam_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
         filter:
           type: object
         finished_at:
@@ -2797,11 +2782,6 @@ components:
           $ref: '#/components/schemas/SessionKind'
         question_plan:
           $ref: '#/components/schemas/QuestionPlan'
-        quiz_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
         quiz_title:
           type:
           - string
@@ -2896,11 +2876,6 @@ components:
         attemptNumber:
           type: integer
           format: int64
-        examId:
-          type:
-          - string
-          - 'null'
-          format: uuid
         finishedAt:
           type:
           - string
@@ -2921,11 +2896,6 @@ components:
           - number
           - 'null'
           format: double
-        quizId:
-          type:
-          - string
-          - 'null'
-          format: uuid
         quizTitle:
           type:
           - string

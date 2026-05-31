@@ -115,10 +115,6 @@ pub struct Session {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assessment_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quiz_id: Option<Uuid>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exam_id: Option<Uuid>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub filter: Option<serde_json::Value>,
     pub question_plan: QuestionPlan,

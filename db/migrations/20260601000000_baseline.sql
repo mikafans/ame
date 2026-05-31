@@ -607,9 +607,9 @@ ALTER TABLE tb_attempts ADD COLUMN correct_answer JSONB;
 --   tb_assessments.visibility = 'public'             → all authenticated users
 --   Sessions and attempts are always user-bound (user_id).
 
--- ── tb_sessions: remove legacy quiz_id ────────────────────────────────────────
+-- ── tb_sessions: remove legacy quiz_id and exam_id ──────────────────────────
 
--- 1. Drop legacy check constraint that references quiz_id
+-- 1. Drop legacy check constraint that references quiz_id and exam_id
 ALTER TABLE tb_sessions
     DROP CONSTRAINT IF EXISTS tb_sessions_kind_link;
 
@@ -621,11 +621,19 @@ ALTER TABLE tb_sessions
 ALTER TABLE tb_sessions
     DROP COLUMN IF EXISTS quiz_id;
 
--- 4. Fix the kind column default (was 'quiz', now 'assessment')
+-- 4. Drop FK from exam_id → tb_exams
+ALTER TABLE tb_sessions
+    DROP CONSTRAINT IF EXISTS tb_sessions_exam_id_fkey;
+
+-- 5. Drop the exam_id column
+ALTER TABLE tb_sessions
+    DROP COLUMN IF EXISTS exam_id;
+
+-- 6. Fix the kind column default (was 'quiz', now 'assessment')
 ALTER TABLE tb_sessions
     ALTER COLUMN kind SET DEFAULT 'assessment';
 
--- 5. Clean status check constraint (no more quiz_id reference)
+-- 7. Clean status check constraint (no more quiz_id/exam_id reference)
 ALTER TABLE tb_sessions
     DROP CONSTRAINT IF EXISTS tb_sessions_status_check;
 
@@ -658,11 +666,6 @@ CREATE INDEX IF NOT EXISTS idx_sessions_assessment_finished
 -- Supports: GET /v1/sessions (list_my_sessions) ordered by started_at
 CREATE INDEX IF NOT EXISTS idx_sessions_user_status_started
     ON tb_sessions (user_id, status, started_at DESC);
-
--- Supports: exam session lookups
-CREATE INDEX IF NOT EXISTS idx_sessions_exam_id
-    ON tb_sessions (exam_id)
-    WHERE exam_id IS NOT NULL;
 
 -- ── Indexes: assessments ───────────────────────────────────────────────────────
 

@@ -33,8 +33,6 @@ interface Answer {
 
 interface ResultData {
   id: string;
-  quiz_id?: string;
-  exam_id?: string;
   quiz_title: string | null;
   course: string | null;
   attempt_number: number | null;
@@ -47,8 +45,6 @@ interface ResultData {
 
 interface SessionSummary {
   id: string;
-  quizId?: string;
-  examId?: string;
   pointsAwarded?: number;
   maxPoints?: number;
   startedAt: string;
@@ -100,8 +96,6 @@ export default function ResultsPage({
         const result = session.result ?? {};
         setData({
           id: session.id,
-          quiz_id: session.quiz_id,
-          exam_id: session.exam_id,
           quiz_title: session.quiz_title ?? null,
           course: session.course_title ?? null,
           attempt_number: null,
@@ -192,10 +186,9 @@ export default function ResultsPage({
             };
           }),
         });
-        if (session.assessment_id || session.quiz_id) {
-          const statsId = session.assessment_id || session.quiz_id;
+        if (session.assessment_id) {
           fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?assessmentId=${statsId}`,
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?assessmentId=${session.assessment_id}`,
             { credentials: "include" },
           )
             .then((r) => (r.ok ? r.json() : null))
@@ -204,15 +197,11 @@ export default function ResultsPage({
             })
             .catch(() => {});
         }
-        // Attempt history for this quiz/exam — populates "Attempt N of M"
+        // Attempt history for this assessment — populates "Attempt N of M"
         // and the list of previous attempts.
         const histQuery = session.assessment_id
           ? `assessmentId=${session.assessment_id}`
-          : session.quiz_id
-            ? `quizId=${session.quiz_id}`
-            : session.exam_id
-              ? `examId=${session.exam_id}`
-              : null;
+          : null;
         if (histQuery) {
           fetch(
             `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/sessions?${histQuery}`,

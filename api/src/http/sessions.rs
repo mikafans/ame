@@ -49,10 +49,6 @@ pub struct CreateSessionBody {
     #[serde(default)]
     pub assessment_id: Option<Uuid>,
     #[serde(default)]
-    pub quiz_id: Option<Uuid>,
-    #[serde(default)]
-    pub exam_id: Option<Uuid>,
-    #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
     pub types: Vec<QuestionKind>,
@@ -167,7 +163,7 @@ pub async fn create_session(
         )));
     }
 
-    if let Some(assessment_id) = body.assessment_id.or(body.quiz_id).or(body.exam_id) {
+    if let Some(assessment_id) = body.assessment_id {
         let _row = sqlx::query("SELECT status, created_by FROM tb_assessments WHERE id = $1")
             .bind(assessment_id)
             .fetch_optional(&state.pool)
@@ -200,9 +196,7 @@ pub async fn create_session(
     let session = start_session(StartSessionInput {
         user_id: auth.user.id,
         kind,
-        assessment_id: body.assessment_id.or(body.quiz_id).or(body.exam_id),
-        quiz_id: body.quiz_id,
-        exam_id: body.exam_id,
+        assessment_id: body.assessment_id,
         filter,
         question_plan,
         affects_rating: ar_override.unwrap_or(kind != SessionKind::Exam),
@@ -482,7 +476,7 @@ async fn build_plan(
     user_id: Uuid,
     body: &CreateSessionBody,
 ) -> Result<CreatePlan, ApiError> {
-    if let Some(assessment_id) = body.assessment_id.or(body.quiz_id).or(body.exam_id) {
+    if let Some(assessment_id) = body.assessment_id {
         return build_assessment_plan(pool, assessment_id).await;
     }
 
@@ -706,8 +700,6 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
         kind: SessionKind::from_str(&kind_str)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid session kind: {e}")))?,
         assessment_id: row.get("assessment_id"),
-        quiz_id: None,
-        exam_id: None,
         filter: row.get("filter"),
         question_plan: serde_json::from_value(question_plan).map_err(anyhow::Error::from)?,
         status: SessionStatus::from_str(&status_str)
@@ -1120,10 +1112,6 @@ pub async fn grade_attempt(
 pub struct ListMySessionsQuery {
     #[serde(default)]
     pub assessment_id: Option<Uuid>,
-    #[serde(default)]
-    pub quiz_id: Option<Uuid>,
-    #[serde(default)]
-    pub exam_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -1134,10 +1122,6 @@ pub struct SessionSummary {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assessment_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub quiz_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub exam_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quiz_title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1226,8 +1210,6 @@ pub async fn list_my_sessions(
                     kind: r.get("kind"),
                     status: r.get("status"),
                     assessment_id,
-                    quiz_id: None,
-                    exam_id: None,
                     quiz_title: r.try_get("assessment_title").ok(),
                     points_awarded,
                     max_points,

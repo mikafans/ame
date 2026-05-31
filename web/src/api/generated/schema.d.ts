@@ -901,11 +901,7 @@ export interface components {
             diff?: string | null;
             /** Format: int64 */
             duration?: number | null;
-            /** Format: uuid */
-            examId?: string | null;
             mode?: string | null;
-            /** Format: uuid */
-            quizId?: string | null;
             tags?: string[];
             types?: components["schemas"]["QuestionKind"][];
         };
@@ -1182,8 +1178,6 @@ export interface components {
             course_title?: string | null;
             /** Format: date-time */
             deadline_at?: string | null;
-            /** Format: uuid */
-            exam_id?: string | null;
             filter?: Record<string, never>;
             /** Format: date-time */
             finished_at?: string | null;
@@ -1191,8 +1185,6 @@ export interface components {
             id: string;
             kind: components["schemas"]["SessionKind"];
             question_plan: components["schemas"]["QuestionPlan"];
-            /** Format: uuid */
-            quiz_id?: string | null;
             quiz_title?: string | null;
             rating_snapshot: Record<string, never>;
             result?: Record<string, never>;
@@ -1231,8 +1223,6 @@ export interface components {
             assessmentId?: string | null;
             /** Format: int64 */
             attemptNumber: number;
-            /** Format: uuid */
-            examId?: string | null;
             /** Format: date-time */
             finishedAt?: string | null;
             /** Format: uuid */
@@ -1242,8 +1232,6 @@ export interface components {
             maxPoints?: number | null;
             /** Format: double */
             pointsAwarded?: number | null;
-            /** Format: uuid */
-            quizId?: string | null;
             quizTitle?: string | null;
             /** Format: date-time */
             startedAt: string;
