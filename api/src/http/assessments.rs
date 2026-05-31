@@ -925,13 +925,51 @@ pub struct GenerateAssessmentResponse {
     tag = "assessments"
 )]
 pub async fn generate_assessment(
-    _auth: AuthenticatedUser,
-    Json(_body): Json<GenerateAssessmentBody>,
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Json(body): Json<GenerateAssessmentBody>,
 ) -> Result<Json<GenerateAssessmentResponse>, ApiError> {
+    use crate::engine::planner::{self, QuizPlanRequest};
+
+    let objectives = body.objectives.clone().unwrap_or_default();
+
+    // Select live bank questions whose tags match the objectives.
+    let req = QuizPlanRequest {
+        tags: objectives.clone(),
+        tags_mode: Default::default(),
+        difficulty_min: None,
+        difficulty_max: None,
+        count: body.question_count.max(1) as usize,
+        exclude_recent_hours: 0,
+    };
+    let plan = planner::plan_quiz(&state.pool, auth.user.id, &req).await?;
+
+    let mut candidates = Vec::new();
+    for item in &plan.question_plan.items {
+        if let Some(q) = crate::bank::questions::get_question(&state.pool, item.question_id).await?
+        {
+            if let Some(types) = &body.types
+                && !types.is_empty()
+                && !types.contains(&q.kind)
+            {
+                continue;
+            }
+            candidates.push(serde_json::to_value(q).unwrap_or(serde_json::Value::Null));
+        }
+    }
+
+    let mut warnings = Vec::new();
+    if let Some(w) = plan.warning {
+        warnings.push(format!(
+            "requested {} questions but only {} matched ({})",
+            w.requested, w.planned, w.reason
+        ));
+    }
+
     Ok(Json(GenerateAssessmentResponse {
-        candidates: vec![],
-        objectives: vec![],
-        warnings: vec!["assessment.generate is not yet implemented".into()],
+        candidates,
+        objectives,
+        warnings,
     }))
 }
 

@@ -365,6 +365,10 @@ pub async fn run(
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_question_create(&state, &user_id, body.params).await
         }
+        "question.promote" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_question_promote(&state, body.params).await
+        }
         other => Ok(Json(RunResponse {
             ok: false,
             tool: other.to_string(),
@@ -447,6 +451,20 @@ async fn run_question_create(
         ok: true,
         tool: "question.create".into(),
         result: json!({ "created": created.len(), "questions": created }),
+        error: None,
+    }))
+}
+
+async fn run_question_promote(
+    state: &AppState,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let question = crate::bank::questions::promote_question(&state.pool, id).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.promote".into(),
+        result: serde_json::to_value(question).unwrap_or(Value::Null),
         error: None,
     }))
 }
