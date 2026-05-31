@@ -108,7 +108,16 @@ pub async fn export_data(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    // TODO: P6 — write audit log entry for data export
+    crate::audit::audit(
+        state.pool.clone(),
+        Some(auth.user.id),
+        "data.export",
+        None,
+        None,
+        serde_json::json!({
+            "plan": "premium",
+        }),
+    );
 
     Ok(Json(ExportResponse {
         quizzes,

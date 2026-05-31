@@ -35,7 +35,10 @@ use crate::{
     engine::planner::{StudyPlan, StudyPlanItem, StudyPlanWeek},
     http::{
         AppState,
-        admin::{ListUsersResponse, UpdateUserRoleBody},
+        admin::{
+            AuditLogEntry, ListAuditLogsResponse, ListUsersResponse, ModerateBody,
+            PatchUserAdminBody, UpdateUserRoleBody,
+        },
         me::{
             AgentSummary, CohortStatsBucket, CohortStatsQuery, CohortStatsResponse,
             CreateAgentBody, CreateAgentResponse, CreateKeyBody, CreateKeyResponse,
@@ -133,6 +136,12 @@ impl Modify for SecurityAddon {
         crate::http::exams::list_exams,
         crate::http::exams::get_exam,
         crate::http::exams::patch_exam_status,
+        crate::http::admin::list_users,
+        crate::http::admin::patch_user_admin,
+        crate::http::admin::update_user_role,
+        crate::http::admin::deactivate_user,
+        crate::http::admin::list_audit_logs,
+        crate::http::admin::moderate_quiz,
     ),
     components(schemas(
         Tag,
@@ -182,6 +191,10 @@ impl Modify for SecurityAddon {
         User,
         ListUsersResponse,
         UpdateUserRoleBody,
+        PatchUserAdminBody,
+        AuditLogEntry,
+        ListAuditLogsResponse,
+        ModerateBody,
         KeySummary,
         ListKeysResponse,
         CreateKeyBody,

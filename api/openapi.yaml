@@ -6,6 +6,128 @@ info:
     name: ''
   version: 0.1.0
 paths:
+  /v1/admin/audit:
+    get:
+      tags:
+      - admin
+      summary: GET /v1/admin/audit — retrieve append-only audit trail logs
+      operationId: list_audit_logs
+      responses:
+        '200':
+          description: Audit trail successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAuditLogsResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
+  /v1/admin/moderate:
+    post:
+      tags:
+      - admin
+      summary: POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private)
+      operationId: moderate_quiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerateBody'
+        required: true
+      responses:
+        '204':
+          description: Public content moderated and unpublished successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+        '404':
+          description: Content not found
+      security:
+      - bearer: []
+  /v1/admin/users:
+    get:
+      tags:
+      - admin
+      summary: GET /v1/admin/users — list all users
+      operationId: list_users
+      responses:
+        '200':
+          description: User list successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListUsersResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
+  /v1/admin/users/{id}:
+    patch:
+      tags:
+      - admin
+      summary: PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user
+      operationId: patch_user_admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchUserAdminBody'
+        required: true
+      responses:
+        '204':
+          description: User successfully updated
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+        '404':
+          description: User not found
+      security:
+      - bearer: []
+  /v1/admin/users/{id}/deactivate:
+    post:
+      tags:
+      - admin
+      summary: POST /v1/admin/users/{id}/deactivate — deactivate/disable a user
+      operationId: deactivate_user
+      responses:
+        '204':
+          description: User successfully deactivated
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
+  /v1/admin/users/{id}/role:
+    post:
+      tags:
+      - admin
+      summary: POST /v1/admin/users/{id}/role — update user role
+      operationId: update_user_role
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleBody'
+        required: true
+      responses:
+        '204':
+          description: User role successfully updated
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+        '404':
+          description: User not found
+      security:
+      - bearer: []
   /v1/attempts/pending:
     get:
       tags:
@@ -1478,6 +1600,37 @@ components:
             type: string
           source:
             type: string
+    AuditLogEntry:
+      type: object
+      required:
+      - id
+      - action
+      - metadata
+      - createdAt
+      properties:
+        action:
+          type: string
+        actorUserId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        metadata: {}
+        targetId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        targetType:
+          type:
+          - string
+          - 'null'
     CodePayload:
       type: object
       required:
@@ -2384,6 +2537,15 @@ components:
         total:
           type: integer
           format: int64
+    ListAuditLogsResponse:
+      type: object
+      required:
+      - logs
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntry'
     ListExamsResponse:
       type: object
       required:
@@ -2524,6 +2686,14 @@ components:
         mastered_topics_total:
           type: integer
           format: int64
+    ModerateBody:
+      type: object
+      required:
+      - quizId
+      properties:
+        quizId:
+          type: string
+          format: uuid
     Normalize:
       type: string
       description: |-
@@ -2584,6 +2754,17 @@ components:
       properties:
         status:
           $ref: '#/components/schemas/SessionStatus'
+    PatchUserAdminBody:
+      type: object
+      properties:
+        disabled:
+          type:
+          - boolean
+          - 'null'
+        plan:
+          type:
+          - string
+          - 'null'
     PendingAttemptRow:
       type: object
       required:

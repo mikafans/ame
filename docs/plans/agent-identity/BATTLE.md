@@ -25,7 +25,8 @@ This is the coordination board. The machine-readable task list is
   AI-3.4 share-link demotion. `make check` green.
 - **P4 — DONE & committed.** AI-4.1 plan column schema, AI-4.2 quota model/throttling, AI-4.3 agent scope-ceiling. `make check` green on each.
 - **P5 — DONE & committed.** AI-5.1 GET /v1/me/export premium-gated, throttled, and audited. `make check` + `test-db` green.
-- **Next gate: Phase 6 (Audit) + Phase 7 (Frontend).** These can now fan out.
+- **P6 — DONE & staged.** AI-6.1 tb_audit_log table, AI-6.2 Admin routes & Audit Log. `make check` + `test-db` green.
+- **Next gate: Phase 7 (Frontend).** This can now start.
 
 **Two decisions are now load-bearing — do not regress them:**
 

@@ -391,7 +391,19 @@ pub(crate) async fn apply_quiz_patch(
 
     // Publish gating
     if body.status.as_deref() == Some("active") {
-        // TODO: P6 — audit log entry for public publishing
+        if new_visibility == "public" {
+            crate::audit::audit(
+                pool.clone(),
+                Some(auth.user.id),
+                "quiz.publish",
+                Some("quiz"),
+                Some(id),
+                serde_json::json!({
+                    "title": quiz_row.get::<String, _>("title"),
+                    "visibility": new_visibility,
+                }),
+            );
+        }
 
         let current_status: String = quiz_row.get("status");
         if current_status == "archived" {
@@ -562,8 +574,6 @@ async fn create_quiz(
         }
     }
 
-    // TODO: P6 — audit log entry for public publishing
-
     let result = sqlx::query(
         "INSERT INTO tb_quizzes (title, objectives, course, visibility, status, created_by)
          VALUES ($1, $2, $3, $4, 'draft', $5)
@@ -577,6 +587,20 @@ async fn create_quiz(
     .fetch_one(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if visibility == Visibility::Public {
+        crate::audit::audit(
+            state.pool.clone(),
+            Some(auth.user.id),
+            "quiz.publish",
+            Some("quiz"),
+            Some(result.get("id")),
+            serde_json::json!({
+                "title": result.get::<String, _>("title"),
+                "visibility": "public",
+            }),
+        );
+    }
 
     let quiz = CreatedQuiz {
         id: result.get("id"),
