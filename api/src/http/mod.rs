@@ -64,6 +64,7 @@ pub mod admin;
 pub mod agents;
 pub mod assessments;
 pub mod auth;
+pub mod explore;
 pub mod export;
 pub mod idempotency;
 pub mod me;
@@ -113,6 +114,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(assessments::router(state.clone()))
         .merge(stats::router(state.clone()))
         .merge(messages::router(state.clone()))
+        .merge(explore::router(state.clone()))
         .merge(me::router(state.clone()))
         .merge(admin::router(state.clone()))
         .merge(agents::logged_router(state.clone()))
