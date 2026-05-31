@@ -214,6 +214,7 @@ fn parse_status(s: &str) -> Result<AssessmentStatus, String> {
 fn parse_visibility(s: &str) -> AssessmentVisibility {
     match s {
         "public" => AssessmentVisibility::Public,
+        "unlisted" => AssessmentVisibility::Unlisted,
         _ => AssessmentVisibility::Private,
     }
 }
@@ -435,10 +436,10 @@ pub async fn get_assessment(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AssessmentDetail>, ApiError> {
-    // Visibility check: public OR owner
+    // Visibility check: public/unlisted OR owner
     let row = sqlx::query(
         "SELECT * FROM tb_assessments WHERE id = $1 \
-         AND (visibility = 'public' OR created_by = $2)",
+         AND (visibility IN ('public', 'unlisted') OR created_by = $2)",
     )
     .bind(id)
     .bind(user.user.id)

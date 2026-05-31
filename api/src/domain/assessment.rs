@@ -45,6 +45,7 @@ pub enum AssessmentVisibility {
     Public,
     #[default]
     Private,
+    Unlisted,
 }
 
 impl std::fmt::Display for AssessmentVisibility {
@@ -52,6 +53,7 @@ impl std::fmt::Display for AssessmentVisibility {
         match self {
             AssessmentVisibility::Public => write!(f, "public"),
             AssessmentVisibility::Private => write!(f, "private"),
+            AssessmentVisibility::Unlisted => write!(f, "unlisted"),
         }
     }
 }

@@ -346,37 +346,6 @@ CREATE TABLE tb_activity_log (
 );
 CREATE INDEX tb_activity_log_agent ON tb_activity_log(agent_id, ts DESC);
 
--- ─── tb_share_links ─────────────────────────────────────────────────────────
-
-CREATE TABLE tb_share_links (
-  id                  uuid        PRIMARY KEY DEFAULT uuid_generate_v7(),
-  kind                text        NOT NULL,
-  target_id           uuid        NOT NULL,
-  created_by_user_id  uuid        NOT NULL REFERENCES tb_users(id),
-  visibility          text        NOT NULL DEFAULT 'public',
-  include_explanation boolean     NOT NULL DEFAULT FALSE,
-  include_score       boolean     NOT NULL DEFAULT FALSE,
-  include_attribution boolean     NOT NULL DEFAULT TRUE,
-  og_image_url        text,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  revoked_at          timestamptz,
-  CONSTRAINT tb_share_links_kind_check       CHECK (kind       IN ('quiz', 'exam', 'item')),
-  CONSTRAINT tb_share_links_visibility_check CHECK (visibility IN ('public', 'cohort'))
-);
-CREATE INDEX tb_share_links_target  ON tb_share_links(target_id, kind);
-CREATE INDEX tb_share_links_creator ON tb_share_links(created_by_user_id, created_at DESC);
-
-CREATE TABLE tb_anonymous_attempts (
-  id          uuid        PRIMARY KEY DEFAULT uuid_generate_v7(),
-  share_id    uuid        NOT NULL REFERENCES tb_share_links(id) ON DELETE CASCADE,
-  question_id uuid        NOT NULL REFERENCES tb_questions(id),
-  ts          timestamptz NOT NULL DEFAULT now(),
-  ip_hash     text        NOT NULL,
-  response    jsonb       NOT NULL,
-  is_correct  boolean
-);
-CREATE INDEX tb_anonymous_attempts_share ON tb_anonymous_attempts(share_id, ts DESC);
-
 -- ─── tb_cohorts ─────────────────────────────────────────────────────────────
 
 CREATE TABLE tb_cohorts (
@@ -481,7 +450,6 @@ ALTER TABLE tb_quizzes ADD COLUMN visibility text NOT NULL DEFAULT 'private'
 CREATE INDEX idx_quizzes_public ON tb_quizzes (created_at DESC)
   WHERE visibility = 'public';
 
-DROP TABLE IF EXISTS tb_anonymous_attempts CASCADE;
 -- AI-4.1: Add plan column to tb_users
 -- Default is 'free', constraint to {free, premium}.
 

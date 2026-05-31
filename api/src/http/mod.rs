@@ -73,7 +73,6 @@ pub mod plans;
 pub mod questions;
 pub mod quota;
 pub mod sessions;
-pub mod shares;
 pub mod stats;
 pub mod tags;
 
@@ -82,9 +81,6 @@ pub mod tags;
 /// `/healthz` is intentionally outside any middleware so a misconfigured DB
 /// cannot mask a healthy process. Question/tag routes live under their own
 /// modules and bring their own scope guards + idempotency wiring.
-///
-/// Embed routes are declared inside `shares::router` before the plain resource
-/// routes so the longer `/embed` path wins in Axum's router.
 pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
 
@@ -120,7 +116,6 @@ pub fn router(pool: PgPool) -> Router {
         .merge(me::router(state.clone()))
         .merge(admin::router(state.clone()))
         .merge(agents::logged_router(state.clone()))
-        .merge(shares::logged_router(state.clone()))
         .route(
             "/v1/me/export",
             axum::routing::get(export::export_data).layer(GovernorLayer {
@@ -154,14 +149,12 @@ pub fn router(pool: PgPool) -> Router {
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/logout", post(auth::logout))
-        .merge(shares::public_router(state.clone()))
         .layer(GovernorLayer {
             config: public_governor_conf,
         })
         .with_state(state.clone());
 
     let public_unlimited = Router::new()
-        .merge(shares::embed_router(state.clone()))
         .merge(agents::public_router(state.clone()))
         .with_state(state.clone());
 

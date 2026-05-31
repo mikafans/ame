@@ -41,9 +41,6 @@ fn derive_tool_name(method: &str, path: &str) -> String {
         ("POST", "/v1/messages") => "feedback.send",
         ("POST", "/v1/plans") => "plan.create",
         ("GET", "/v1/plans/:id") | ("GET", "/v1/plans/{id}") => "plan.get",
-        ("POST", "/v1/shares") => "share.create",
-        ("GET", "/v1/shares/:id") | ("GET", "/v1/shares/{id}") => "share.get",
-        ("DELETE", "/v1/shares/:id") | ("DELETE", "/v1/shares/{id}") => "share.revoke",
         ("GET", "/v1/agents/activity") => "agent.activity",
         _ => return format!("{method} {path}"),
     }

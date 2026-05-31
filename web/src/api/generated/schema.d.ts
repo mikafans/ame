@@ -760,7 +760,7 @@ export interface components {
             visibility: string;
         };
         /** @enum {string} */
-        AssessmentVisibility: "public" | "private";
+        AssessmentVisibility: "public" | "private" | "unlisted";
         Attempt: {
             correct_answer?: Record<string, never>;
             /** Format: date-time */
