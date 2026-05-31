@@ -87,7 +87,7 @@ pub fn start_session(input: StartSessionInput) -> Result<Session, ApiError> {
         deadline_at,
         started_at: input.now,
         finished_at: None,
-        quiz_title: None,
+        assessment_title: None,
         course_title: None,
     })
 }
@@ -338,7 +338,7 @@ mod tests {
             deadline_at: None,
             started_at: now(),
             finished_at: None,
-            quiz_title: None,
+            assessment_title: None,
             course_title: None,
         };
 

@@ -33,7 +33,7 @@ interface Answer {
 
 interface ResultData {
   id: string;
-  quiz_title: string | null;
+  assessment_title: string | null;
   course: string | null;
   attempt_number: number | null;
   total_attempts: number | null;
@@ -96,7 +96,7 @@ export default function ResultsPage({
         const result = session.result ?? {};
         setData({
           id: session.id,
-          quiz_title: session.quiz_title ?? null,
+          assessment_title: session.assessment_title ?? null,
           course: session.course_title ?? null,
           attempt_number: null,
           total_attempts: null,
@@ -261,7 +261,7 @@ export default function ResultsPage({
   return (
     <Box sx={{ p: 4, maxWidth: 800, mx: "auto" }}>
       <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
-        Quiz Results — {data.quiz_title || "Results"}
+        Quiz Results — {data.assessment_title || "Results"}
       </Typography>
       {data.attempt_number != null && data.total_attempts != null && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>

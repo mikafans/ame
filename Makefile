@@ -167,7 +167,7 @@ db-migrate: ## Run pending sqlx migrations
 db-shell: ## Open interactive pgcli session to local Postgres
 	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
 
-db-seed: ## Seed demo users, tags, questions, quizzes, and exams (requires API running)
+db-seed: ## Seed demo users, tags, questions, assessments, and exams (requires API running)
 	uv run scripts/seed.py --api http://localhost:$(API_PORT)
 
 simulate: ## Run all three role simulation scripts against local API (requires make dev + make db-seed)

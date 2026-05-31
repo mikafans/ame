@@ -1,18 +1,18 @@
 /**
  * UI/UX spec alignment — comprehensive learner surface contract test.
  *
- * Exercises: Library, quiz preview, active session (MCQ), results, progress
+ * Exercises: Library, assessment preview, active session (MCQ), results, progress
  * dashboard, question bank, exams. This test is intentionally a large single
  * flow so it can verify the session round-trip end-to-end with screenshots.
  *
- * Uses shared helpers for login, cookie, MCQ quiz lookup, and session finish.
+ * Uses shared helpers for login, cookie, MCQ assessment lookup, and session finish.
  */
 import { expect, test, type Page } from "@playwright/test";
 import {
   API_URL,
   loginAs,
   setAuthCookie,
-  firstMcqQuizId,
+  firstMcqAssessmentId,
   finishSession,
 } from "./helpers";
 
@@ -57,7 +57,7 @@ test.describe("UI/UX spec alignment", () => {
       page.getByRole("heading", { name: "Assessments" }),
     ).toBeVisible();
     await expect(page.getByRole("tab", { name: /All \(\d+\)/ })).toBeVisible();
-    // "Up next" highlights the first unfinished quiz; it is absent once the
+    // "Up next" highlights the first unfinished assessment; it is absent once the
     // learner has completed everything. Assert its detail fields only when shown.
     const upNext = page.getByText("Up next");
     if (await upNext.isVisible().catch(() => false)) {
@@ -68,9 +68,9 @@ test.describe("UI/UX spec alignment", () => {
     }
     await screenshot(page, "library");
 
-    // --- Quiz preview (use a quiz with MCQ questions for the session test) ---
-    const quizId = await firstMcqQuizId(request, token);
-    await page.goto(`/assessments/${quizId}/preview`);
+    // --- Assessment preview (use a assessment with MCQ questions for the session test) ---
+    const assessmentId = await firstMcqAssessmentId(request, token);
+    await page.goto(`/assessments/${assessmentId}/preview`);
     await expect(page.getByText("Assessments")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Back to assessments" }),
@@ -80,7 +80,7 @@ test.describe("UI/UX spec alignment", () => {
     ).toBeVisible();
     await expect(page.getByText(/questions/i).first()).toBeVisible();
     await expect(page.getByText(/pts/i).first()).toBeVisible();
-    await screenshot(page, "quiz-preview");
+    await screenshot(page, "assessment-preview");
 
     // --- Active session: navigate to an MCQ question ---
     await page.getByRole("button", { name: "Start assessment" }).click();

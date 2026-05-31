@@ -733,6 +733,19 @@ export interface components {
             /** Format: double */
             weight: number;
         };
+        AssessmentStatsParams: {
+            /** Format: uuid */
+            cohortId?: string | null;
+            window?: string | null;
+        };
+        AssessmentStatsResponse: {
+            /** Format: double */
+            avg: number;
+            distribution: components["schemas"]["DistributionBucket"][];
+            items: components["schemas"]["ItemStats"][];
+            /** Format: double */
+            median: number;
+        };
         /** @enum {string} */
         AssessmentStatus: "draft" | "active" | "archived";
         AssessmentSummary: {
@@ -1134,19 +1147,6 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
-        QuizStatsParams: {
-            /** Format: uuid */
-            cohortId?: string | null;
-            window?: string | null;
-        };
-        QuizStatsResponse: {
-            /** Format: double */
-            avg: number;
-            distribution: components["schemas"]["DistributionBucket"][];
-            items: components["schemas"]["ItemStats"][];
-            /** Format: double */
-            median: number;
-        };
         RegisterBody: {
             email: string;
             name: string;
@@ -1175,6 +1175,7 @@ export interface components {
             affects_rating: boolean;
             /** Format: uuid */
             assessment_id?: string | null;
+            assessment_title?: string | null;
             course_title?: string | null;
             /** Format: date-time */
             deadline_at?: string | null;
@@ -1185,7 +1186,6 @@ export interface components {
             id: string;
             kind: components["schemas"]["SessionKind"];
             question_plan: components["schemas"]["QuestionPlan"];
-            quiz_title?: string | null;
             rating_snapshot: Record<string, never>;
             result?: Record<string, never>;
             /** Format: date-time */
@@ -1195,7 +1195,7 @@ export interface components {
             user_id: string;
         };
         /** @enum {string} */
-        SessionKind: "quiz" | "exam" | "practice";
+        SessionKind: "assessment" | "exam" | "practice";
         SessionQuestion: {
             /** Format: uuid */
             id: string;
@@ -1221,6 +1221,7 @@ export interface components {
         SessionSummary: {
             /** Format: uuid */
             assessmentId?: string | null;
+            assessmentTitle?: string | null;
             /** Format: int64 */
             attemptNumber: number;
             /** Format: date-time */
@@ -1232,7 +1233,6 @@ export interface components {
             maxPoints?: number | null;
             /** Format: double */
             pointsAwarded?: number | null;
-            quizTitle?: string | null;
             /** Format: date-time */
             startedAt: string;
             status: string;
@@ -2351,8 +2351,6 @@ export interface operations {
             query?: {
                 /** @description Assessment to compare against */
                 assessmentId?: string;
-                /** @description Quiz (legacy) to compare against */
-                quizId?: string;
             };
             header?: never;
             path?: never;
@@ -2707,10 +2705,8 @@ export interface operations {
     list_my_sessions: {
         parameters: {
             query?: {
-                /** @description Filter by assessment */
-                assessmentId?: string;
                 /** @description Filter by quiz (legacy) */
-                quizId?: string;
+                assessmentId?: string;
                 /** @description Filter by exam (legacy) */
                 examId?: string;
             };

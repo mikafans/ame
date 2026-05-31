@@ -1,7 +1,7 @@
 function LibraryScreen({ onOpen }) {
   const [filter, setFilter] = React.useState("all");
   const tabs = [
-    { id: "all", label: "All quizzes", count: 24 },
+    { id: "all", label: "All assessments", count: 24 },
     { id: "assigned", label: "Assigned to me", count: 4 },
     { id: "completed", label: "Completed", count: 11 },
     { id: "drafts", label: "Drafts", count: 3 },
@@ -13,7 +13,7 @@ function LibraryScreen({ onOpen }) {
         action={
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="ghost" icon={<Icon name="filter" size={14} />}>Filter</Button>
-            <Button variant="solid" icon={<Icon name="plus" size={14} />}>New quiz</Button>
+            <Button variant="solid" icon={<Icon name="plus" size={14} />}>New assessment</Button>
           </div>
         }>
         Library
@@ -38,7 +38,7 @@ function LibraryScreen({ onOpen }) {
         })}
       </div>
 
-      {/* Featured pinned quiz */}
+      {/* Featured pinned assessment */}
       <Card padding={0} style={{ marginBottom: 24, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr" }}>
           <div style={{ padding: "28px 32px", borderRight: "1px solid var(--border)" }}>
@@ -75,12 +75,12 @@ function LibraryScreen({ onOpen }) {
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-              <Button variant="primary" size="lg" onClick={() => onOpen("quiz")} icon={<Icon name="arrow" size={14} color="#0b1410" />}>
+              <Button variant="primary" size="lg" onClick={() => onOpen("assessment")} icon={<Icon name="arrow" size={14} color="#0b1410" />}>
                 Start attempt
               </Button>
               <Button variant="ghost" size="lg">Preview questions</Button>
               <ShareButton size="md" variant="ghost" payload={{
-                kind: "quiz",
+                kind: "assessment",
                 id: ACTIVE_QUIZ.id,
                 title: ACTIVE_QUIZ.title,
                 course: ACTIVE_QUIZ.course,
@@ -114,15 +114,15 @@ function LibraryScreen({ onOpen }) {
         </div>
       </Card>
 
-      {/* Grid of quizzes */}
+      {/* Grid of assessments */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))", gap: 16 }}>
-        {QUIZZES.map((q) => <QuizCard key={q.id} q={q} onOpen={onOpen} />)}
+        {QUIZZES.map((q) => <AssessmentCard key={q.id} q={q} onOpen={onOpen} />)}
       </div>
     </div>
   );
 }
 
-function QuizCard({ q, onOpen }) {
+function AssessmentCard({ q, onOpen }) {
   const accentColor = q.color === "amber" ? "var(--amber)" : q.color === "blue" ? "var(--blue)" : "var(--accent)";
   const { open } = useShare();
   return (
@@ -168,7 +168,7 @@ function QuizCard({ q, onOpen }) {
         </div>
         <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
           <button onClick={() => open({
-            kind: "quiz", id: q.id, title: q.title, course: q.course,
+            kind: "assessment", id: q.id, title: q.title, course: q.course,
             body: q.title + " — " + q.description, attribution: q.author,
           })} style={{
             background: "transparent", border: "none", cursor: "pointer",
@@ -178,7 +178,7 @@ function QuizCard({ q, onOpen }) {
           }}>
             <Icon name="upload" size={12} /> Share
           </button>
-          <button onClick={() => onOpen("quiz")} style={{
+          <button onClick={() => onOpen("assessment")} style={{
             background: "transparent", border: "none",
             color: "var(--accent)", fontWeight: 600, fontSize: 12,
             display: "inline-flex", alignItems: "center", gap: 4,

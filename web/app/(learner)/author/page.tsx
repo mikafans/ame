@@ -21,7 +21,7 @@ import DialogActions from "@mui/material/DialogActions";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
-interface Quiz {
+interface Assessment {
   id: string;
   title: string;
   status: string;
@@ -33,10 +33,12 @@ interface Quiz {
 export default function AuthorIndexPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [drafts, setDrafts] = useState<Quiz[] | null>(null);
+  const [drafts, setDrafts] = useState<Assessment[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [confirmQuiz, setConfirmQuiz] = useState<Quiz | null>(null);
+  const [confirmAssessment, setConfirmAssessment] = useState<Assessment | null>(
+    null,
+  );
 
   useEffect(() => {
     api
@@ -58,7 +60,7 @@ export default function AuthorIndexPage() {
   }, []);
 
   async function discardDraft(id: string) {
-    setConfirmQuiz(null);
+    setConfirmAssessment(null);
     setDeleting(id);
     setDrafts((d) => d?.filter((q) => q.id !== id) ?? d);
     try {
@@ -203,7 +205,7 @@ export default function AuthorIndexPage() {
                 </CardActionArea>
                 <Box
                   component="button"
-                  onClick={() => setConfirmQuiz(q)}
+                  onClick={() => setConfirmAssessment(q)}
                   disabled={deleting === q.id}
                   title="Discard draft"
                   sx={{
@@ -229,24 +231,26 @@ export default function AuthorIndexPage() {
       )}
 
       <Dialog
-        open={confirmQuiz !== null}
-        onClose={() => setConfirmQuiz(null)}
+        open={confirmAssessment !== null}
+        onClose={() => setConfirmAssessment(null)}
         maxWidth="xs"
         fullWidth
       >
         <DialogTitle>Discard draft?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            <strong>&ldquo;{confirmQuiz?.title}&rdquo;</strong> and all its
-            questions will be permanently deleted. This cannot be undone.
+            <strong>&ldquo;{confirmAssessment?.title}&rdquo;</strong> and all
+            its questions will be permanently deleted. This cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmQuiz(null)}>Cancel</Button>
+          <Button onClick={() => setConfirmAssessment(null)}>Cancel</Button>
           <Button
             color="error"
             variant="contained"
-            onClick={() => confirmQuiz && discardDraft(confirmQuiz.id)}
+            onClick={() =>
+              confirmAssessment && discardDraft(confirmAssessment.id)
+            }
           >
             Discard
           </Button>

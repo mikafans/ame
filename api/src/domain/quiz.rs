@@ -1,4 +1,4 @@
-//! Quiz domain types.
+//! Assessment domain types.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

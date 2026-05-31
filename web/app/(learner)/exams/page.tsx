@@ -25,7 +25,6 @@ interface ExamSection {
   weight: number;
   itemsCount: number;
   mix?: string;
-  quizId?: string;
 }
 
 interface Exam {

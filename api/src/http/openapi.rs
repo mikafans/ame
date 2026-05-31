@@ -52,7 +52,7 @@ use crate::{
             FinishSessionResponse, GetSessionQuestion, GetSessionResponse, ListMySessionsResponse,
             PatchSessionBody, PendingAttemptRow, SessionSummary,
         },
-        stats::{DistributionBucket, ItemStats, QuizStatsParams, QuizStatsResponse},
+        stats::{AssessmentStatsParams, AssessmentStatsResponse, DistributionBucket, ItemStats},
     },
 };
 
@@ -179,8 +179,8 @@ use crate::{
         PendingAttemptRow,
         DistributionBucket,
         ItemStats,
-        QuizStatsParams,
-        QuizStatsResponse,
+        AssessmentStatsParams,
+        AssessmentStatsResponse,
         ListAttemptsResponse,
         CohortStatsResponse,
         QuotaPlan
@@ -188,7 +188,7 @@ use crate::{
     info(
         title = "ame API",
         version = "0.1.0",
-        description = "Adaptive Mastery Engine — quiz & exam platform with agent identity."
+        description = "Adaptive Mastery Engine — assessment platform with agent identity."
     )
 )]
 pub struct ApiDoc;

@@ -17,12 +17,16 @@ use crate::{auth::token::parse_bearer_token, http::AppState};
 /// Mapping from (METHOD, matched-path-template) to MCP tool name.
 fn derive_tool_name(method: &str, path: &str) -> String {
     match (method, path) {
-        ("GET", "/v1/quizzes") => "quiz.list",
-        ("GET", "/v1/quizzes/:id") | ("GET", "/v1/quizzes/{id}") => "quiz.get",
-        ("POST", "/v1/quizzes") => "quiz.import",
-        ("PATCH", "/v1/quizzes/:id") | ("PATCH", "/v1/quizzes/{id}") => "quiz.update",
-        ("DELETE", "/v1/quizzes/:id") | ("DELETE", "/v1/quizzes/{id}") => "quiz.delete",
-        ("GET", "/v1/quizzes/:id/stats") | ("GET", "/v1/quizzes/{id}/stats") => "stats.cohort",
+        ("GET", "/v1/assessments") => "assessment.list",
+        ("GET", "/v1/assessments/:id") | ("GET", "/v1/assessments/{id}") => "assessment.get",
+        ("POST", "/v1/assessments") => "assessment.import",
+        ("PATCH", "/v1/assessments/:id") | ("PATCH", "/v1/assessments/{id}") => "assessment.update",
+        ("DELETE", "/v1/assessments/:id") | ("DELETE", "/v1/assessments/{id}") => {
+            "assessment.delete"
+        }
+        ("GET", "/v1/assessments/:id/stats") | ("GET", "/v1/assessments/{id}/stats") => {
+            "stats.cohort"
+        }
         ("GET", "/v1/exams") => "exam.list",
         ("GET", "/v1/exams/:id") | ("GET", "/v1/exams/{id}") => "exam.get",
         ("POST", "/v1/exams") => "exam.compose",

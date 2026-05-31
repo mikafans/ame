@@ -65,7 +65,7 @@ async fn test_me_agents_crud() {
         .bind(token_id)
         .bind(alice_id)
         .bind(&hash)
-        .bind(vec!["quiz.read", "quiz.write", "admin"]) // Admin for registration/creation
+        .bind(vec!["assessment.read", "assessment.write", "admin"]) // Admin for registration/creation
         .execute(&pool)
         .await
         .unwrap();
@@ -78,7 +78,7 @@ async fn test_me_agents_crud() {
         .header("Authorization", format!("Bearer {auth_header}"))
         .json(&json!({
             "label": "test-agent",
-            "scopes": ["quiz.read"]
+            "scopes": ["assessment.read"]
         }))
         .send()
         .await
@@ -159,7 +159,7 @@ async fn test_me_agents_crud() {
         .bind(bob_token_id)
         .bind(bob_id)
         .bind(&hash)
-        .bind(vec!["quiz.read"])
+        .bind(vec!["assessment.read"])
         .execute(&pool)
         .await
         .unwrap();

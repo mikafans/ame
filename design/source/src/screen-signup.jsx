@@ -27,12 +27,12 @@ function SignupScreen({ onEnter }) {
             fontFamily: "var(--serif)", fontSize: 56, lineHeight: 1.04,
             margin: 0, fontWeight: 500, letterSpacing: -1.2,
           }}>
-            Quizzes that learners and agents can both read.
+            Assessments that learners and agents can both read.
           </h1>
           <p style={{ color: "var(--text-2)", fontSize: 16, lineHeight: 1.55, marginTop: 22, maxWidth: 460 }}>
             Harus is an assessment platform built for two audiences at once. Students get a focused
             test-taking experience and a real progress dashboard. Authors and AI agents share the same
-            structured surface — every quiz, attempt, and rubric is addressable, importable, and
+            structured surface — every assessment, attempt, and rubric is addressable, importable, and
             queryable through a single API.
           </p>
 
@@ -108,8 +108,8 @@ function SignupScreen({ onEnter }) {
                   ))}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
-                  {role === "learner"     && "Take assigned quizzes and track your progress."}
-                  {role === "instructor"  && "Author quizzes, manage cohorts, and review attempts."}
+                  {role === "learner"     && "Take assigned assessments and track your progress."}
+                  {role === "instructor"  && "Author assessments, manage cohorts, and review attempts."}
                   {role === "agent"       && "Get an API key, an OpenAPI schema, and MCP tool descriptors."}
                 </div>
               </Field>

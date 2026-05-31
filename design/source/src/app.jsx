@@ -41,18 +41,18 @@ function App() {
       <main style={{ flex: 1, minWidth: 0 }}>
         {route === "library"   && (
           <>
-            <Topbar title="Library" subtitle="Browse, filter, and start any assigned quiz." breadcrumb={"Spring 2026 · 4 assigned"} />
+            <Topbar title="Library" subtitle="Browse, filter, and start any assigned assessment." breadcrumb={"Spring 2026 · 4 assigned"} />
             <LibraryScreen onOpen={go} />
           </>
         )}
         {route === "exams" && (
           <>
-            <Topbar title="Exams" subtitle="Composed assessments — bundled quizzes with weighted sections." breadcrumb={`Spring 2026 · ${EXAMS.length} exams`} />
-            <ExamsScreen onStartQuiz={() => go("quiz")} />
+            <Topbar title="Exams" subtitle="Composed assessments — bundled assessments with weighted sections." breadcrumb={`Spring 2026 · ${EXAMS.length} exams`} />
+            <ExamsScreen onStartAssessment={() => go("assessment")} />
           </>
         )}
-        {route === "quiz" && (
-          <QuizScreen onSubmit={() => go("results")} />
+        {route === "assessment" && (
+          <AssessmentScreen onSubmit={() => go("results")} />
         )}
         {route === "results" && (
           <>

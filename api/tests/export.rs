@@ -64,8 +64,8 @@ async fn test_export_premium_gate_and_rate_limit() {
         .bind("free-key")
         .bind(&hash)
         .bind(vec![
-            "quiz.read".to_string(),
-            "quiz.write".to_string(),
+            "assessment.read".to_string(),
+            "assessment.write".to_string(),
             "attempt.read".to_string(),
             "attempt.write".to_string(),
             "stats.read".to_string(),
@@ -108,8 +108,8 @@ async fn test_export_premium_gate_and_rate_limit() {
         .bind("prem-key")
         .bind(&hash)
         .bind(vec![
-            "quiz.read".to_string(),
-            "quiz.write".to_string(),
+            "assessment.read".to_string(),
+            "assessment.write".to_string(),
             "attempt.read".to_string(),
             "attempt.write".to_string(),
             "stats.read".to_string(),
@@ -124,9 +124,9 @@ async fn test_export_premium_gate_and_rate_limit() {
     let prem_auth = format!("{prem_token_id}_{secret}");
 
     // Seed some data for premium owner to export
-    let quiz_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_quizzes (id, title, objectives, course, visibility, status, created_by) VALUES ($1, 'Exportable Quiz', '{}', 'Test Course', 'private', 'draft', $2)")
-        .bind(quiz_id)
+    let assessment_id = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_assessments (id, title, objectives, course, visibility, status, created_by) VALUES ($1, 'Exportable Assessment', '{}', 'Test Course', 'private', 'draft', $2)")
+        .bind(assessment_id)
         .bind(prem_id)
         .execute(&pool)
         .await
@@ -142,9 +142,12 @@ async fn test_export_premium_gate_and_rate_limit() {
     assert_eq!(res.status(), StatusCode::OK);
 
     let export_bundle = res.json::<serde_json::Value>().await.unwrap();
-    assert!(export_bundle["quizzes"].is_array());
-    assert_eq!(export_bundle["quizzes"].as_array().unwrap().len(), 1);
-    assert_eq!(export_bundle["quizzes"][0]["id"], quiz_id.to_string());
+    assert!(export_bundle["assessments"].is_array());
+    assert_eq!(export_bundle["assessments"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        export_bundle["assessments"][0]["id"],
+        assessment_id.to_string()
+    );
     assert!(export_bundle["questions"].is_array());
     assert!(export_bundle["sessions"].is_array());
     assert!(export_bundle["attempts"].is_array());

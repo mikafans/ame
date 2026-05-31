@@ -1,5 +1,5 @@
 //! Assessment routes: list, get, patch, create, delete.
-//! Unified entity for quizzes (mode: practice) and exams (mode: graded).
+//! Unified entity for assessments (mode: practice) and exams (mode: graded).
 
 use crate::{
     auth::extractor::AuthenticatedUser,
@@ -1189,12 +1189,12 @@ pub async fn generate_assessment(
     auth: AuthenticatedUser,
     Json(body): Json<GenerateAssessmentBody>,
 ) -> Result<Json<GenerateAssessmentResponse>, ApiError> {
-    use crate::engine::planner::{self, QuizPlanRequest};
+    use crate::engine::planner::{self, AssessmentPlanRequest};
 
     let objectives = body.objectives.clone().unwrap_or_default();
 
     // Select live bank questions whose tags match the objectives.
-    let req = QuizPlanRequest {
+    let req = AssessmentPlanRequest {
         tags: objectives.clone(),
         tags_mode: Default::default(),
         difficulty_min: None,
@@ -1202,7 +1202,7 @@ pub async fn generate_assessment(
         count: body.question_count.max(1) as usize,
         exclude_recent_hours: 0,
     };
-    let plan = planner::plan_quiz(&state.pool, auth.user.id, &req).await?;
+    let plan = planner::plan_assessment(&state.pool, auth.user.id, &req).await?;
 
     let mut candidates = Vec::new();
     for item in &plan.question_plan.items {

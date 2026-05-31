@@ -65,8 +65,8 @@ async fn test_public_publish_scope_and_ceiling() {
         .bind("key")
         .bind(&hash)
         .bind(vec![
-            "quiz.read".to_string(),
-            "quiz.write".to_string(),
+            "assessment.read".to_string(),
+            "assessment.write".to_string(),
             "attempt.read".to_string(),
             "attempt.write".to_string(),
             "stats.read".to_string(),
@@ -80,11 +80,11 @@ async fn test_public_publish_scope_and_ceiling() {
         .unwrap();
     let auth = format!("{token_id}_{secret}");
 
-    // 2. Assert the Free human owner can successfully publish a public quiz within quota (limit is 5)
+    // 2. Assert the Free human owner can successfully publish a public assessment within quota (limit is 5)
     let res = client
-        .post(format!("{base_url}/v1/quizzes"))
+        .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"title": "Free User Public Quiz", "visibility": "public"}))
+        .json(&json!({"title": "Free User Public Assessment", "visibility": "public"}))
         .send()
         .await
         .unwrap();
@@ -96,7 +96,7 @@ async fn test_public_publish_scope_and_ceiling() {
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({
             "label": "My Public Agent",
-            "scopes": ["quiz.read", "public.publish"]
+            "scopes": ["assessment.read", "public.publish"]
         }))
         .send()
         .await
@@ -126,8 +126,8 @@ async fn test_public_publish_scope_and_ceiling() {
         .bind("prem-key")
         .bind(&hash)
         .bind(vec![
-            "quiz.read".to_string(),
-            "quiz.write".to_string(),
+            "assessment.read".to_string(),
+            "assessment.write".to_string(),
             "attempt.read".to_string(),
             "attempt.write".to_string(),
             "stats.read".to_string(),
@@ -147,7 +147,7 @@ async fn test_public_publish_scope_and_ceiling() {
         .header("Authorization", format!("Bearer {prem_auth}"))
         .json(&json!({
             "label": "My Prem Agent",
-            "scopes": ["quiz.read", "public.publish"]
+            "scopes": ["assessment.read", "public.publish"]
         }))
         .send()
         .await

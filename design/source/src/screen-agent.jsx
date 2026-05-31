@@ -19,7 +19,7 @@ function AgentScreen() {
       ts: new Date().toISOString().slice(11, 19) + "Z",
       ok: warnings.length === 0,
       body: {
-        quizId: "qz_" + Math.random().toString(36).slice(2, 6),
+        assessmentId: "qz_" + Math.random().toString(36).slice(2, 6),
         questionCount,
         warnings,
         url: "https://harus.app/q/qz_imported",
@@ -47,12 +47,12 @@ function AgentScreen() {
           <div style={{ padding: "26px 30px" }}>
             <Tag tone="accent">Two interfaces, one model</Tag>
             <h3 style={{ margin: "12px 0 8px", fontFamily: "var(--serif)", fontSize: 24, fontWeight: 500, letterSpacing: -0.3 }}>
-              Quizzes, attempts, and rubrics are first-class API objects.
+              Assessments, attempts, and rubrics are first-class API objects.
             </h3>
             <p style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.55, margin: 0, maxWidth: 540 }}>
               Every screen a learner or instructor sees is backed by the same REST surface that agents
               use. A grading agent reads a learner's attempt with one call; an authoring agent imports
-              a new quiz with another. No scraping, no duplicate state.
+              a new assessment with another. No scraping, no duplicate state.
             </p>
             <div style={{ marginTop: 22, display: "flex", gap: 22 }}>
               <KV2 k="Endpoints" v="34" />
@@ -68,11 +68,11 @@ function AgentScreen() {
             </div>
             <CodeBlock label="curl"
               lines={[
-                `curl https://api.harus.app/v1/quizzes \\`,
+                `curl https://api.harus.app/v1/assessments \\`,
                 `  -H "Authorization: Bearer hk_live_3fY9…ax2P" \\`,
                 `  -H "Content-Type: application/json"`,
                 ``,
-                `→ 200 OK · 24 quizzes`,
+                `→ 200 OK · 24 assessments`,
               ]}
               dim={[4]}
             />
@@ -168,11 +168,11 @@ function KeysSection() {
         </div>
         <p style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
           Send the key in an <code style={cd}>Authorization</code> header. Scopes are checked per
-          endpoint; a key with <code style={cd}>attempt.read</code> cannot create quizzes.
+          endpoint; a key with <code style={cd}>attempt.read</code> cannot create assessments.
         </p>
         <CodeBlock label="request" style={{ marginTop: 14 }}
           lines={[
-            `GET /v1/quizzes/qz_8sd1/stats`,
+            `GET /v1/assessments/qz_8sd1/stats`,
             `Authorization: Bearer hk_live_3fY9…ax2P`,
             `Accept: application/json`,
             `X-Cohort: spring-2026`,
@@ -183,7 +183,7 @@ function KeysSection() {
             Scope reference
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 12, color: "var(--text-2)" }}>
-            {["quiz.read", "quiz.write", "attempt.read", "stats.read", "feedback.write", "plan.write"].map((s) => (
+            {["assessment.read", "assessment.write", "attempt.read", "stats.read", "feedback.write", "plan.write"].map((s) => (
               <div key={s} style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <Icon name="check" size={11} color="var(--accent)" />
                 <code style={cd}>{s}</code>
@@ -274,7 +274,7 @@ function ImportSection({ text, setText, response, run }) {
       <Card padding={0}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--accent)" }}>quiz.import</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--accent)" }}>assessment.import</div>
             <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 500, marginTop: 2 }}>Try the import endpoint</div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Paste JSON or Markdown — validation runs locally and a mock response is returned.</div>
           </div>
@@ -299,7 +299,7 @@ function ImportSection({ text, setText, response, run }) {
         />
         <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", background: "var(--surface)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted)", letterSpacing: 0.5 }}>
-            POST /v1/quizzes · Authorization: Bearer hk_live_3fY9…
+            POST /v1/assessments · Authorization: Bearer hk_live_3fY9…
           </div>
           <Button variant="primary" onClick={run} icon={<Icon name="arrow" size={13} color="#0b1410" />}>
             Send request
@@ -331,7 +331,7 @@ function ImportSection({ text, setText, response, run }) {
               <div style={{ marginTop: 14, padding: 12, background: "var(--accent-dim)", border: "1px solid var(--accent-line)", borderRadius: 6, display: "flex", gap: 10, alignItems: "center" }}>
                 <Icon name="check" size={14} color="var(--accent)" />
                 <span style={{ fontSize: 12.5, color: "var(--text)" }}>
-                  Quiz created. Visit <code style={cd}>{response.body.url}</code> or assign via <code style={cd}>POST /v1/assignments</code>.
+                  Assessment created. Visit <code style={cd}>{response.body.url}</code> or assign via <code style={cd}>POST /v1/assignments</code>.
                 </span>
               </div>
             )}
@@ -353,10 +353,10 @@ function LogSection() {
     { t: "14:31:02", tool: "stats.cohort",  agent: "GraderBot",  status: "200", note: "qz_8sd1 · spring-2026 · 71 records" },
     { t: "14:30:51", tool: "attempt.get",   agent: "GraderBot",  status: "200", note: "att_9k4 · jordan.tahir@" },
     { t: "14:28:14", tool: "feedback.send", agent: "TA-Assist",  status: "201", note: "→ 14 learners · in-app" },
-    { t: "14:22:08", tool: "quiz.import",   agent: "TA-Assist",  status: "201", note: "qz_imported · BIO 110 · 12 Qs" },
+    { t: "14:22:08", tool: "assessment.import",   agent: "TA-Assist",  status: "201", note: "qz_imported · BIO 110 · 12 Qs" },
     { t: "14:14:42", tool: "plan.create",   agent: "TA-Assist",  status: "201", note: "jordan.tahir@ · 6-week" },
     { t: "13:59:30", tool: "stats.cohort",  agent: "GraderBot",  status: "200", note: "qz_3kf2 · all · 142 records" },
-    { t: "13:48:12", tool: "quiz.generate", agent: "Local dev",  status: "200", note: "from-pdf · 8 Qs · CHEM 220" },
+    { t: "13:48:12", tool: "assessment.generate", agent: "Local dev",  status: "200", note: "from-pdf · 8 Qs · CHEM 220" },
     { t: "13:36:55", tool: "attempt.get",   agent: "Local dev",  status: "403", note: "missing scope attempt.read" },
   ];
   return (

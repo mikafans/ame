@@ -28,9 +28,7 @@ interface SessionSummary {
   kind: "quiz" | "exam" | "practice";
   status: string;
   assessmentId?: string | null;
-  quizId?: string | null;
-  examId?: string | null;
-  quizTitle?: string | null;
+  assessmentTitle?: string | null;
   pointsAwarded?: number | null;
   maxPoints?: number | null;
   startedAt: string;
@@ -203,7 +201,7 @@ export default function ResultsHistoryPage() {
                   <TableRow key={s.id} hover>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {s.quizTitle || "Untitled Assessment"}
+                        {s.assessmentTitle || "Untitled Assessment"}
                       </Typography>
                     </TableCell>
                     <TableCell>

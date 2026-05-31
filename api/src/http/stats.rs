@@ -28,14 +28,14 @@ impl ScopeConstraint for StatsReadScope {
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct QuizStatsParams {
+pub struct AssessmentStatsParams {
     pub cohort_id: Option<Uuid>,
     pub window: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct QuizStatsResponse {
+pub struct AssessmentStatsResponse {
     pub avg: f64,
     pub median: f64,
     pub distribution: Vec<DistributionBucket>,
@@ -65,7 +65,7 @@ pub struct ItemStats {
         ("window" = Option<String>, Query, description = "'last30d' | 'all'"),
     ),
     responses(
-        (status = 200, description = "Assessment stats", body = QuizStatsResponse),
+        (status = 200, description = "Assessment stats", body = AssessmentStatsResponse),
         (status = 403, description = "Requires stats.read scope"),
         (status = 404, description = "Assessment not found"),
     ),
@@ -75,8 +75,8 @@ pub async fn assessment_stats(
     State(state): State<AppState>,
     _user: RequireScope<StatsReadScope>,
     Path(id): Path<Uuid>,
-    Query(params): Query<QuizStatsParams>,
-) -> Result<Json<QuizStatsResponse>, ApiError> {
+    Query(params): Query<AssessmentStatsParams>,
+) -> Result<Json<AssessmentStatsResponse>, ApiError> {
     // Verify assessment exists
     let exists: bool =
         sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1)")
@@ -188,7 +188,7 @@ pub async fn assessment_stats(
         })
         .collect();
 
-    Ok(Json(QuizStatsResponse {
+    Ok(Json(AssessmentStatsResponse {
         avg,
         median,
         distribution,

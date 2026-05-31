@@ -23,7 +23,7 @@ export default function LearnerLayout({
   const getRouteId = () => {
     if (pathname.startsWith("/library")) return "library";
     if (pathname.startsWith("/exams")) return "exams";
-    if (pathname.startsWith("/practice")) return "quiz";
+    if (pathname.startsWith("/practice")) return "assessment";
     if (pathname.startsWith("/flashcards")) return "flashcards";
     if (pathname.startsWith("/questions")) return "questions";
     if (pathname.startsWith("/results")) return "results";
@@ -38,7 +38,7 @@ export default function LearnerLayout({
     const routeMap: Record<string, string> = {
       library: "/library",
       exams: "/exams",
-      quiz: "/practice",
+      assessment: "/practice",
       flashcards: "/flashcards",
       questions: "/questions",
       results: "/results",

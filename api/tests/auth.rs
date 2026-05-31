@@ -118,7 +118,7 @@ async fn test_auth_and_idempotency() {
     .await
     .unwrap();
 
-    let scopes = vec!["quiz.read".to_string()];
+    let scopes = vec!["assessment.read".to_string()];
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test token', $3, $4)",
     )
@@ -150,9 +150,9 @@ async fn test_auth_and_idempotency() {
         .send()
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "quiz.write"
+    assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "assessment.write"
     let body: Value = res.json().await.unwrap();
-    assert_eq!(body["error"]["details"]["scope"], "quiz.write");
+    assert_eq!(body["error"]["details"]["scope"], "assessment.write");
 
     // Test 4: Idempotency
     let idem_key = "test-key-1";
@@ -252,7 +252,7 @@ async fn revoked_token_returns_unauthorized() {
 
     // revoked_at set at insert time — the secret hash is still valid, so any
     // 200 here would prove the extractor stopped checking revocation.
-    let scopes = vec!["quiz.read".to_string()];
+    let scopes = vec!["assessment.read".to_string()];
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
          VALUES ($1, $2, 'revoked token', $3, $4, now())",

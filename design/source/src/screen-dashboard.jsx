@@ -129,7 +129,7 @@ function DashboardScreen({ statsDepth }) {
               {[
                 { w: "Week 1", t: "Graph representations", d: "Read § 22.1, practice adjacency-list construction", h: "2.5h" },
                 { w: "Week 2", t: "Iterative DFS w/ visited", d: "Implement on 5 test graphs incl. cycles", h: "3.0h" },
-                { w: "Week 3", t: "Topological sort proofs", d: "Two proof exercises + practice quiz", h: "2.0h" },
+                { w: "Week 3", t: "Topological sort proofs", d: "Two proof exercises + practice assessment", h: "2.0h" },
                 { w: "Week 4", t: "Complexity practice",     d: "Drill big-O for 10 traversal variants", h: "1.5h" },
                 { w: "Week 5", t: "Comparative writing",     d: "Essay rewrites with rubric coaching", h: "2.5h" },
                 { w: "Week 6", t: "Mock midterm",            d: "Timed full-length attempt + review", h: "2.0h" },

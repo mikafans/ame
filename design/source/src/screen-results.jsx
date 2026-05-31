@@ -10,13 +10,13 @@ function ResultsScreen({ onContinue, onReview }) {
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="ghost" icon={<Icon name="download" size={14} />}>Export PDF</Button>
             <Button variant="solid" icon={<Icon name="upload" size={14} />} onClick={() => open({
-              kind: "quiz", id: r.quizId, title: r.quizTitle, course: r.course,
-              body: `I just attempted ${r.quizTitle}. Try it yourself.`,
+              kind: "assessment", id: r.assessmentId, title: r.assessmentTitle, course: r.course,
+              body: `I just attempted ${r.assessmentTitle}. Try it yourself.`,
               attribution: "shared from Harus",
-            })}>Share quiz</Button>
+            })}>Share assessment</Button>
           </div>
         }>
-        {r.quizTitle} — Results
+        {r.assessmentTitle} — Results
       </SectionLabel>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 18, marginBottom: 24 }}>
@@ -122,7 +122,7 @@ function ResultsScreen({ onContinue, onReview }) {
                   <button onClick={() => open({
                     kind: "item",
                     id: a.qid,
-                    title: `Q${i + 1} · ${r.quizTitle}`,
+                    title: `Q${i + 1} · ${r.assessmentTitle}`,
                     course: r.course,
                     body: ACTIVE_QUIZ.questions[i].prompt,
                     explanation: ACTIVE_QUIZ.questions[i].explanation || a.note,

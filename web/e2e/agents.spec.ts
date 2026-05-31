@@ -7,7 +7,7 @@
  * - Owner revokes an agent via DELETE /v1/me/agents/{id}
  * - Scope ceiling: free plan owner CANNOT grant public.publish to an agent (403)
  * - Scope ceiling: premium plan owner CAN grant public.publish to an agent (201)
- * - Agent can list quizzes and create questions (quiz.read + quiz.write)
+ * - Agent can list assessments and create questions (assessment.read + assessment.write)
  * - Agent can fetch user stats (stats.read)
  * - Agent can create and retrieve a study plan (plan.write + plan.read)
  * - MCP skill manifest is public and lists expected tool names
@@ -64,7 +64,7 @@ test.describe("agent management (owner API)", () => {
     expect(agents.length).toBeGreaterThan(0);
   });
 
-  test("agent can list quizzes", async ({ request }) => {
+  test("agent can list assessments", async ({ request }) => {
     const r = await request.get(`${API_URL}/v1/assessments`, {
       headers: { Authorization: `Bearer ${agentKey}` },
     });

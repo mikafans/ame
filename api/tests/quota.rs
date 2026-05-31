@@ -65,7 +65,7 @@ async fn test_quota_enforcement() {
         .bind(user_id)
         .bind("free-key")
         .bind(&hash)
-        .bind(vec!["quiz.read".to_string(), "quiz.write".to_string(), "admin".to_string()])
+        .bind(vec!["assessment.read".to_string(), "assessment.write".to_string(), "admin".to_string()])
         .execute(&pool)
         .await
         .unwrap();
@@ -75,7 +75,7 @@ async fn test_quota_enforcement() {
     let res = client
         .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"label": "Agent 1", "scopes": ["quiz.read"]}))
+        .json(&json!({"label": "Agent 1", "scopes": ["assessment.read"]}))
         .send()
         .await
         .unwrap();
@@ -84,7 +84,7 @@ async fn test_quota_enforcement() {
     let res2 = client
         .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"label": "Agent 2", "scopes": ["quiz.read"]}))
+        .json(&json!({"label": "Agent 2", "scopes": ["assessment.read"]}))
         .send()
         .await
         .unwrap();
@@ -94,51 +94,51 @@ async fn test_quota_enforcement() {
     assert_eq!(error_body["error"]["details"]["kind"], "agent_creation");
     assert_eq!(error_body["error"]["details"]["limit"], 1);
 
-    // 3. Test Public Quiz Quota (Free plan: 5 limit)
-    // Create 5 public quizzes (should succeed)
+    // 3. Test Public Assessment Quota (Free plan: 5 limit)
+    // Create 5 public assessments (should succeed)
     for i in 0..5 {
         let res = client
-            .post(format!("{base_url}/v1/quizzes"))
+            .post(format!("{base_url}/v1/assessments"))
             .header("Authorization", format!("Bearer {auth}"))
-            .json(&json!({"title": format!("Quiz {i}"), "visibility": "public"}))
+            .json(&json!({"title": format!("Assessment {i}"), "visibility": "public"}))
             .send()
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::CREATED);
     }
 
-    // 6th public quiz (should fail)
+    // 6th public assessment (should fail)
     let res = client
-        .post(format!("{base_url}/v1/quizzes"))
+        .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"title": "Quiz 6", "visibility": "public"}))
+        .json(&json!({"title": "Assessment 6", "visibility": "public"}))
         .send()
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
 
-    // Create private quiz (should succeed, doesn't consume quota)
+    // Create private assessment (should succeed, doesn't consume quota)
     let res = client
-        .post(format!("{base_url}/v1/quizzes"))
+        .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"title": "Private Quiz", "visibility": "private"}))
+        .json(&json!({"title": "Private Assessment", "visibility": "private"}))
         .send()
         .await
         .unwrap();
     let status = res.status();
     if !status.is_success() {
         let body = res.text().await.unwrap();
-        panic!("Private Quiz creation failed ({status}): {body}");
+        panic!("Private Assessment creation failed ({status}): {body}");
     }
 
-    let private_qid = res.json::<serde_json::Value>().await.unwrap()["quizId"]
+    let private_qid = res.json::<serde_json::Value>().await.unwrap()["assessmentId"]
         .as_str()
         .unwrap()
         .to_string();
 
-    // Patching private quiz to public (should fail due to quota)
+    // Patching private assessment to public (should fail due to quota)
     let res = client
-        .patch(format!("{base_url}/v1/quizzes/{private_qid}"))
+        .patch(format!("{base_url}/v1/assessments/{private_qid}"))
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({"visibility": "public"}))
         .send()
@@ -146,7 +146,7 @@ async fn test_quota_enforcement() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
 
-    // Test that Premium user has higher limits (up to 100 agents, 1000 public quizzes)
+    // Test that Premium user has higher limits (up to 100 agents, 1000 public assessments)
     // Create a premium user
     let prem_id = Uuid::now_v7();
     sqlx::query("INSERT INTO tb_users (id, email, display_name, role, plan) VALUES ($1, $2, 'Prem User', 'user', 'premium')")
@@ -162,7 +162,7 @@ async fn test_quota_enforcement() {
         .bind(prem_id)
         .bind("prem-key")
         .bind(&hash)
-        .bind(vec!["quiz.read".to_string(), "quiz.write".to_string(), "admin".to_string()])
+        .bind(vec!["assessment.read".to_string(), "assessment.write".to_string(), "admin".to_string()])
         .execute(&pool)
         .await
         .unwrap();
@@ -172,7 +172,7 @@ async fn test_quota_enforcement() {
     client
         .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {prem_auth}"))
-        .json(&json!({"label": "Agent 1", "scopes": ["quiz.read"]}))
+        .json(&json!({"label": "Agent 1", "scopes": ["assessment.read"]}))
         .send()
         .await
         .unwrap();
@@ -180,7 +180,7 @@ async fn test_quota_enforcement() {
     let res = client
         .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {prem_auth}"))
-        .json(&json!({"label": "Agent 2", "scopes": ["quiz.read"]}))
+        .json(&json!({"label": "Agent 2", "scopes": ["assessment.read"]}))
         .send()
         .await
         .unwrap();

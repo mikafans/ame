@@ -68,7 +68,7 @@ async fn test_cross_owner_agent_visibility() {
         .await
         .unwrap();
 
-    // 2. Agent creates a private quiz
+    // 2. Agent creates a private assessment
     let token_id = Uuid::now_v7();
     let secret = "agent-secret";
     let hash = ame_api::auth::token::hash_secret(secret);
@@ -78,8 +78,8 @@ async fn test_cross_owner_agent_visibility() {
         .bind("agent-key")
         .bind(&hash)
         .bind(vec![
-            "quiz.read".to_string(),
-            "quiz.write".to_string(),
+            "assessment.read".to_string(),
+            "assessment.write".to_string(),
             "attempt.write".to_string(),
         ])
         .execute(&pool)
@@ -88,23 +88,23 @@ async fn test_cross_owner_agent_visibility() {
     let agent_auth = format!("{token_id}_{secret}");
 
     let res = client
-        .post(format!("{base_url}/v1/quizzes"))
+        .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", format!("Bearer {agent_auth}"))
-        .json(&json!({"title": "Agent Quiz", "visibility": "private"}))
+        .json(&json!({"title": "Agent Assessment", "visibility": "private"}))
         .send()
         .await
         .unwrap();
     let status = res.status();
     if !status.is_success() {
         let body = res.text().await.unwrap();
-        panic!("Quiz creation failed ({status}): {body}");
+        panic!("Assessment creation failed ({status}): {body}");
     }
     let json: serde_json::Value = res.json().await.unwrap();
-    let qid = json["quizId"].as_str().unwrap().to_string();
-    let quiz_uuid: Uuid = qid.parse().unwrap();
+    let qid = json["assessmentId"].as_str().unwrap().to_string();
+    let assessment_uuid: Uuid = qid.parse().unwrap();
 
-    // A session can only be created on an active quiz with at least one live
-    // question (see build_quiz_plan), so give it one and activate it. It stays
+    // A session can only be created on an active assessment with at least one live
+    // question (see build_assessment_plan), so give it one and activate it. It stays
     // private — the access checks below are what we're exercising.
     let question_id: Uuid = sqlx::query(
         "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
@@ -117,27 +117,27 @@ async fn test_cross_owner_agent_visibility() {
     .unwrap()
     .get("id");
     sqlx::query(
-        "INSERT INTO tb_quiz_questions (quiz_id, question_id, order_index) VALUES ($1, $2, 0)",
+        "INSERT INTO tb_assessment_items (assessment_id, question_id, order_index) VALUES ($1, $2, 0)",
     )
-    .bind(quiz_uuid)
+    .bind(assessment_uuid)
     .bind(question_id)
     .execute(&pool)
     .await
     .unwrap();
-    sqlx::query("UPDATE tb_quizzes SET status = 'active' WHERE id = $1")
-        .bind(quiz_uuid)
+    sqlx::query("UPDATE tb_assessments SET status = 'active' WHERE id = $1")
+        .bind(assessment_uuid)
         .execute(&pool)
         .await
         .unwrap();
 
-    // 3. Test: Owner GET agent's private quiz should succeed
+    // 3. Test: Owner GET agent's private assessment should succeed
     let owner_token_id = Uuid::now_v7();
     sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
         .bind(owner_token_id)
         .bind(owner_id)
         .bind("owner-key")
         .bind(&hash) // Same hash for simplicity
-        .bind(vec!["quiz.read".to_string(), "attempt.write".to_string()])
+        .bind(vec!["assessment.read".to_string(), "attempt.write".to_string()])
         .execute(&pool)
         .await
         .unwrap();
@@ -145,7 +145,7 @@ async fn test_cross_owner_agent_visibility() {
     let owner_auth = format!("{owner_token_id}_{secret}");
 
     let res = client
-        .get(format!("{base_url}/v1/quizzes/{qid}"))
+        .get(format!("{base_url}/v1/assessments/{qid}"))
         .header("Authorization", format!("Bearer {owner_auth}"))
         .send()
         .await
@@ -153,7 +153,7 @@ async fn test_cross_owner_agent_visibility() {
 
     assert_eq!(res.status(), StatusCode::OK);
 
-    // 4. Test: Unrelated user GET agent's private quiz should 404
+    // 4. Test: Unrelated user GET agent's private assessment should 404
     let stranger_id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'Stranger', 'user')",
@@ -169,35 +169,35 @@ async fn test_cross_owner_agent_visibility() {
         .bind(stranger_id)
         .bind("stranger-key")
         .bind(&hash)
-        .bind(vec!["quiz.read".to_string()])
+        .bind(vec!["assessment.read".to_string()])
         .execute(&pool)
         .await
         .unwrap();
     let stranger_auth = format!("{stranger_token_id}_{secret}");
 
     let res = client
-        .get(format!("{base_url}/v1/quizzes/{qid}"))
+        .get(format!("{base_url}/v1/assessments/{qid}"))
         .header("Authorization", format!("Bearer {stranger_auth}"))
         .send()
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 
-    // 5. Test: Agent creates a session for its own private quiz
+    // 5. Test: Agent creates a session for its own private assessment
     let res = client
         .post(format!("{base_url}/v1/sessions"))
         .header("Authorization", format!("Bearer {agent_auth}"))
-        .json(&json!({"quizId": qid}))
+        .json(&json!({"assessmentId": qid}))
         .send()
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    // 6. Test: Owner creates a session for agent's private quiz
+    // 6. Test: Owner creates a session for agent's private assessment
     let res = client
         .post(format!("{base_url}/v1/sessions"))
         .header("Authorization", format!("Bearer {owner_auth}"))
-        .json(&json!({"quizId": qid}))
+        .json(&json!({"assessmentId": qid}))
         .send()
         .await
         .unwrap();

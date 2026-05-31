@@ -17,7 +17,7 @@ import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
-interface QuizQuestion {
+interface AssessmentQuestion {
   id: string;
   kind: string;
   prompt: string;
@@ -28,7 +28,7 @@ interface QuizQuestion {
   orderIndex: number;
 }
 
-interface Quiz {
+interface Assessment {
   id: string;
   title: string;
   status: string;
@@ -37,7 +37,7 @@ interface Quiz {
   duration?: number;
   difficulty?: string;
   attempts?: number;
-  questions: QuizQuestion[];
+  questions: AssessmentQuestion[];
   updated_at?: string;
 }
 
@@ -72,7 +72,7 @@ export default function AuthorStudioPage({
   const { id } = use(params);
   const { user } = useAuth();
   const router = useRouter();
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -101,7 +101,7 @@ export default function AuthorStudioPage({
       .GET("/v1/assessments/{id}", { params: { path: { id } } })
       .then(({ data }) => {
         if (data) {
-          const mappedQuiz: Quiz = {
+          const mappedAssessment: Assessment = {
             id: (data as any).id,
             title: (data as any).title,
             description: (data as any).description ?? undefined,
@@ -119,11 +119,11 @@ export default function AuthorStudioPage({
               orderIndex: q.orderIndex,
             })),
           };
-          setQuiz(mappedQuiz);
-          setEditTitle(mappedQuiz.title || "");
-          setEditCourse(mappedQuiz.course || "");
-          if (mappedQuiz.questions.length && !selectedId) {
-            setSelectedId(mappedQuiz.questions[0].id);
+          setAssessment(mappedAssessment);
+          setEditTitle(mappedAssessment.title || "");
+          setEditCourse(mappedAssessment.course || "");
+          if (mappedAssessment.questions.length && !selectedId) {
+            setSelectedId(mappedAssessment.questions[0].id);
           }
         }
       })
@@ -136,7 +136,8 @@ export default function AuthorStudioPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const selectedQ = quiz?.questions.find((q) => q.id === selectedId) ?? null;
+  const selectedQ =
+    assessment?.questions.find((q) => q.id === selectedId) ?? null;
 
   useEffect(() => {
     if (selectedQ) {
@@ -210,10 +211,11 @@ export default function AuthorStudioPage({
   }
 
   async function deleteQuestion(idToDelete: string) {
-    const remaining = quiz?.questions.filter((q) => q.id !== idToDelete) ?? [];
+    const remaining =
+      assessment?.questions.filter((q) => q.id !== idToDelete) ?? [];
     if (selectedId === idToDelete)
       setSelectedId(remaining.length > 0 ? remaining[0].id : null);
-    setQuiz((q) =>
+    setAssessment((q) =>
       q
         ? { ...q, questions: q.questions.filter((qq) => qq.id !== idToDelete) }
         : q,
@@ -274,9 +276,9 @@ export default function AuthorStudioPage({
   }
 
   const outlineComplete =
-    editTitle.trim().length > 0 && (quiz?.questions.length ?? 0) > 0;
+    editTitle.trim().length > 0 && (assessment?.questions.length ?? 0) > 0;
   const incompleteQuestions =
-    quiz?.questions
+    assessment?.questions
       .map((q, idx) => {
         const issues: string[] = [];
         if (!q.prompt?.trim()) issues.push("no prompt");
@@ -286,8 +288,8 @@ export default function AuthorStudioPage({
       .filter(Boolean) ?? [];
   const questionsNeedingReview = incompleteQuestions.length;
   const totalPoints =
-    quiz?.questions.reduce((sum, q) => sum + (q.points || 0), 0) ?? 0;
-  const minutesAgo = getMinutesAgo(quiz?.updated_at ?? "");
+    assessment?.questions.reduce((sum, q) => sum + (q.points || 0), 0) ?? 0;
+  const minutesAgo = getMinutesAgo(assessment?.updated_at ?? "");
 
   if (loading) {
     return (
@@ -297,10 +299,10 @@ export default function AuthorStudioPage({
     );
   }
 
-  if (!quiz) {
+  if (!assessment) {
     return (
       <Box sx={{ p: "48px 36px", color: "text.secondary", fontSize: 14 }}>
-        Quiz not found.
+        Assessment not found.
       </Box>
     );
   }
@@ -364,7 +366,7 @@ export default function AuthorStudioPage({
             variant="contained"
             size="small"
             onClick={publish}
-            disabled={quiz.status === "active" || publishing}
+            disabled={assessment.status === "active" || publishing}
             endIcon={<ArrowForwardOutlinedIcon sx={{ fontSize: 14 }} />}
           >
             {publishing ? "Publishing…" : "Publish"}
@@ -526,7 +528,7 @@ export default function AuthorStudioPage({
             )}
           </Box>
           <Typography variant="body2" color="text.secondary">
-            ≈ {quiz.questions.length} questions · {totalPoints} pts
+            ≈ {assessment.questions.length} questions · {totalPoints} pts
           </Typography>
           <Typography
             variant="caption"
@@ -621,7 +623,7 @@ export default function AuthorStudioPage({
           )}
 
           <Box sx={{ flex: 1, overflow: "auto" }}>
-            {quiz.questions.length === 0 ? (
+            {assessment.questions.length === 0 ? (
               <Box
                 sx={{
                   p: "24px 16px",
@@ -633,7 +635,7 @@ export default function AuthorStudioPage({
                 No questions yet.
               </Box>
             ) : (
-              quiz.questions.map((q, idx) => {
+              assessment.questions.map((q, idx) => {
                 const sel = selectedId === q.id;
                 const incomplete = !q.prompt?.trim() || !q.points;
                 return (
@@ -818,7 +820,9 @@ export default function AuthorStudioPage({
                     }}
                   >
                     Editing Q
-                    {quiz.questions.findIndex((q) => q.id === selectedId) + 1}
+                    {assessment.questions.findIndex(
+                      (q) => q.id === selectedId,
+                    ) + 1}
                   </Typography>
                   <select
                     value={selectedQ.kind}

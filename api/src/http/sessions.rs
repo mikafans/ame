@@ -244,7 +244,7 @@ pub async fn get_session(
             .await
             .map_err(internal)?;
         if let Some(r) = row {
-            session.quiz_title = r.try_get("title").ok();
+            session.assessment_title = r.try_get("title").ok();
             session.course_title = r.try_get("course").ok();
         }
     }
@@ -710,7 +710,7 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
         deadline_at: row.get("deadline_at"),
         started_at: row.get("started_at"),
         finished_at: row.get("finished_at"),
-        quiz_title: None,
+        assessment_title: None,
         course_title: None,
     })
 }
@@ -1123,7 +1123,7 @@ pub struct SessionSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assessment_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub quiz_title: Option<String>,
+    pub assessment_title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub points_awarded: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1152,7 +1152,7 @@ pub struct ListMySessionsResponse {
     path = "/v1/sessions",
     params(
         ("assessmentId" = Option<Uuid>, Query, description = "Filter by assessment"),
-        ("quizId" = Option<Uuid>, Query, description = "Filter by quiz (legacy)"),
+        ("assessmentId" = Option<Uuid>, Query, description = "Filter by quiz (legacy)"),
         ("examId" = Option<Uuid>, Query, description = "Filter by exam (legacy)"),
     ),
     responses(
@@ -1210,7 +1210,7 @@ pub async fn list_my_sessions(
                     kind: r.get("kind"),
                     status: r.get("status"),
                     assessment_id,
-                    quiz_title: r.try_get("assessment_title").ok(),
+                    assessment_title: r.try_get("assessment_title").ok(),
                     points_awarded,
                     max_points,
                     started_at: r.get("started_at"),

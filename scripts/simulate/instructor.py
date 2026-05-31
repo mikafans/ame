@@ -33,14 +33,14 @@ def main() -> None:
     token = r.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. Create a quiz
+    # 2. Create a assessment
     r = c.post(
-        "/v1/quizzes",
-        json={"title": f"Sim Quiz {int(time.time())}", "status": "draft"},
+        "/v1/assessments",
+        json={"title": f"Sim Assessment {int(time.time())}", "status": "draft"},
         headers=headers,
     )
-    step("create quiz", r.status_code in (200, 201), str(r.status_code))
-    quiz_id = r.json()["quizId"]
+    step("create assessment", r.status_code in (200, 201), str(r.status_code))
+    assessment_id = r.json()["assessmentId"]
 
     # 3. Create questions in the bank
     r = c.post(
@@ -76,25 +76,25 @@ def main() -> None:
     step("create questions", r.status_code in (200, 201), str(r.status_code))
     q_ids = [q["id"] for q in r.json()["questions"]]
 
-    # 3b. Promote questions to live (required before quiz can be published)
+    # 3b. Promote questions to live (required before assessment can be published)
     for qid in q_ids:
         r = c.post(f"/v1/questions/{qid}/promote", headers=headers)
         step("promote question to live", r.status_code == 200, str(r.status_code))
 
-    # 4. Add questions to quiz
+    # 4. Add questions to assessment
     for qid in q_ids:
         r = c.post(
-            f"/v1/quizzes/{quiz_id}/questions",
+            f"/v1/assessments/{assessment_id}/questions",
             json={"questionId": qid},
             headers=headers,
         )
-        step("add question to quiz", r.status_code in (200, 201, 204), str(r.status_code))
+        step("add question to assessment", r.status_code in (200, 201, 204), str(r.status_code))
 
-    # 5. Publish quiz
-    r = c.patch(f"/v1/quizzes/{quiz_id}", json={"status": "active"}, headers=headers)
-    step("publish quiz", r.status_code in (200, 204), str(r.status_code))
+    # 5. Publish assessment
+    r = c.patch(f"/v1/assessments/{assessment_id}", json={"status": "active"}, headers=headers)
+    step("publish assessment", r.status_code in (200, 204), str(r.status_code))
 
-    # 6. Compose exam from the quiz
+    # 6. Compose exam from the assessment
     r = c.post(
         "/v1/exams",
         json={
@@ -115,9 +115,9 @@ def main() -> None:
     )
     step("publish exam", r.status_code in (200, 204), str(r.status_code))
 
-    # 8. Quiz stats
-    r = c.get(f"/v1/quizzes/{quiz_id}/stats", headers=headers)
-    step("fetch quiz stats", r.status_code == 200, str(r.status_code))
+    # 8. Assessment stats
+    r = c.get(f"/v1/assessments/{assessment_id}/stats", headers=headers)
+    step("fetch assessment stats", r.status_code == 200, str(r.status_code))
 
     # 9. Pending essay queue
     r = c.get("/v1/attempts/pending", headers=headers)

@@ -61,7 +61,7 @@ async fn make_bearer(pool: &PgPool) -> String {
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
     )
-    .bind(token_id).bind(user_id).bind(hash).bind(vec!["quiz.write".to_string(), "attempt.write".to_string()])
+    .bind(token_id).bind(user_id).bind(hash).bind(vec!["assessment.write".to_string(), "attempt.write".to_string()])
     .execute(pool).await.unwrap();
     format!("{token_id}_{secret}")
 }

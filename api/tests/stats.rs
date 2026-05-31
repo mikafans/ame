@@ -94,11 +94,11 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
     .get("id")
 }
 
-async fn make_quiz(pool: &PgPool, owner_id: Uuid) -> Uuid {
+async fn make_assessment(pool: &PgPool, owner_id: Uuid) -> Uuid {
     sqlx::query(
-        "INSERT INTO tb_quizzes (title, status, created_by) VALUES ($1, 'active', $2) RETURNING id",
+        "INSERT INTO tb_assessments (title, status, created_by) VALUES ($1, 'active', $2) RETURNING id",
     )
-    .bind("Test Quiz")
+    .bind("Test Assessment")
     .bind(owner_id)
     .fetch_one(pool)
     .await
@@ -106,10 +106,10 @@ async fn make_quiz(pool: &PgPool, owner_id: Uuid) -> Uuid {
     .get("id")
 }
 
-async fn make_finished_session_for_quiz(
+async fn make_finished_session_for_assessment(
     pool: &PgPool,
     user_id: Uuid,
-    quiz_id: Uuid,
+    assessment_id: Uuid,
     question_id: Uuid,
     is_correct: bool,
 ) {
@@ -125,13 +125,13 @@ async fn make_finished_session_for_quiz(
         "pending_manual_count": 0
     });
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, kind, quiz_id, question_plan, status, affects_rating, \
+        "INSERT INTO tb_sessions (id, user_id, kind, assessment_id, question_plan, status, affects_rating, \
          rating_snapshot, result, finished_at) \
-         VALUES ($1, $2, 'quiz', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
+         VALUES ($1, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
     )
     .bind(session_id)
     .bind(user_id)
-    .bind(quiz_id)
+    .bind(assessment_id)
     .bind(question_plan)
     .bind(result)
     .execute(pool)
@@ -156,28 +156,28 @@ async fn make_finished_session_for_quiz(
     .unwrap();
 }
 
-// ── Task 1 & 6: quiz stats shape ────────────────────────────────────────────
+// ── Task 1 & 6: assessment stats shape ────────────────────────────────────────────
 
 #[tokio::test]
-async fn quiz_stats_returns_correct_shape() {
+async fn assessment_stats_returns_correct_shape() {
     if skip_if_no_db() {
         return;
     }
     let pool = setup_db().await;
     let (user_id, bearer) = make_user_with_scopes(&pool, &["stats.read"]).await;
     let q = make_live_question(&pool, "mc", user_id).await;
-    let quiz_id = make_quiz(&pool, user_id).await;
+    let assessment_id = make_assessment(&pool, user_id).await;
 
     // two sessions: one correct, one incorrect
     let (u2, _) = make_user_with_scopes(&pool, &["stats.read"]).await;
-    make_finished_session_for_quiz(&pool, user_id, quiz_id, q, true).await;
-    make_finished_session_for_quiz(&pool, u2, quiz_id, q, false).await;
+    make_finished_session_for_assessment(&pool, user_id, assessment_id, q, true).await;
+    make_finished_session_for_assessment(&pool, u2, assessment_id, q, false).await;
 
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
     let resp: Value = client
-        .get(format!("{base}/v1/quizzes/{quiz_id}/stats"))
+        .get(format!("{base}/v1/assessments/{assessment_id}/stats"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
@@ -197,7 +197,7 @@ async fn quiz_stats_returns_correct_shape() {
     assert!(resp["items"].is_array(), "items should be array");
 
     let items = resp["items"].as_array().unwrap();
-    assert_eq!(items.len(), 1, "one question in the quiz");
+    assert_eq!(items.len(), 1, "one question in the assessment");
     let item = &items[0];
     assert!(item["questionId"].is_string());
     assert!(item["correctRate"].is_number());
@@ -214,7 +214,7 @@ async fn exam_stats_returns_correct_shape() {
         return;
     }
     let pool = setup_db().await;
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["stats.read", "quiz.write"]).await;
+    let (user_id, bearer) = make_user_with_scopes(&pool, &["stats.read", "assessment.write"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -269,9 +269,12 @@ async fn stats_endpoints_require_stats_read_scope() {
     }
     let pool = setup_db().await;
     // token can create/read source objects, but intentionally lacks stats.read.
-    let (user_id, bearer) =
-        make_user_with_scopes(&pool, &["quiz.read", "quiz.write", "attempt.write"]).await;
-    let quiz_id = make_quiz(&pool, user_id).await;
+    let (user_id, bearer) = make_user_with_scopes(
+        &pool,
+        &["assessment.read", "assessment.write", "attempt.write"],
+    )
+    .await;
+    let assessment_id = make_assessment(&pool, user_id).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -294,13 +297,13 @@ async fn stats_endpoints_require_stats_read_scope() {
         .unwrap();
     let exam_id = composed["examId"].as_str().unwrap();
 
-    let quiz_resp = client
-        .get(format!("{base}/v1/quizzes/{quiz_id}/stats"))
+    let assessment_resp = client
+        .get(format!("{base}/v1/assessments/{assessment_id}/stats"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
         .unwrap();
-    assert_eq!(quiz_resp.status(), StatusCode::FORBIDDEN);
+    assert_eq!(assessment_resp.status(), StatusCode::FORBIDDEN);
 
     let exam_resp = client
         .get(format!("{base}/v1/exams/{exam_id}/stats"))
@@ -320,7 +323,7 @@ async fn post_message_in_app_creates_record() {
     }
     let pool = setup_db().await;
     let (from_id, bearer) = make_user_with_scopes(&pool, &["feedback.write"]).await;
-    let (to_id, _) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (to_id, _) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -363,7 +366,7 @@ async fn post_message_email_channel_queues_without_sending() {
     }
     let pool = setup_db().await;
     let (from_id, bearer) = make_user_with_scopes(&pool, &["feedback.write"]).await;
-    let (to_id, _) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (to_id, _) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -373,7 +376,7 @@ async fn post_message_email_channel_queues_without_sending() {
         .json(&json!({
             "userId": to_id,
             "channel": "email",
-            "body": "Check your quiz results."
+            "body": "Check your assessment results."
         }))
         .send()
         .await
@@ -404,7 +407,7 @@ async fn key_rotation_invalidates_old_token() {
         return;
     }
     let pool = setup_db().await;
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (user_id, bearer) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -464,7 +467,7 @@ async fn create_key_requires_admin_scope_for_admin_key() {
     }
     let pool = setup_db().await;
     // non-admin user without admin scope
-    let (_, bearer) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (_, bearer) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 

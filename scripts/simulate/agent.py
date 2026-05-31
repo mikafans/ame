@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["httpx"]
 # ///
-"""Agent role simulation — registers an agent, manages knowledge base, generates quiz, fetches stats, creates plan."""
+"""Agent role simulation — registers an agent, manages knowledge base, generates assessment, fetches stats, creates plan."""
 
 import sys
 import time
@@ -39,8 +39,8 @@ def main() -> None:
         json={
             "label": f"sim-agent-{int(time.time())}",
             "scopes": [
-                "quiz.read",
-                "quiz.write",
+                "assessment.read",
+                "assessment.write",
                 "stats.read",
                 "plan.write",
                 "plan.read",
@@ -112,9 +112,9 @@ def main() -> None:
     count = len(r.json()["questions"])
     step("at least 3 questions in bank", count >= 3, str(count))
 
-    # 5. Generate quiz from source text (endpoint may be stub)
+    # 5. Generate assessment from source text (endpoint may be stub)
     r = c.post(
-        "/v1/quizzes/generate",
+        "/v1/assessments/generate",
         json={
             "source": "Rust is a systems programming language that prevents segfaults and guarantees thread safety through its ownership system.",
             "questionCount": 3,
@@ -123,10 +123,10 @@ def main() -> None:
         },
         headers=agent_headers,
     )
-    step("generate quiz", r.status_code in (200, 201), str(r.status_code))
-    gen_quiz_id = r.json().get("id") or r.json().get("quizId")
+    step("generate assessment", r.status_code in (200, 201), str(r.status_code))
+    gen_assessment_id = r.json().get("id") or r.json().get("assessmentId")
     is_stub = any("not yet implemented" in w for w in r.json().get("warnings", []))
-    step("quiz id returned (or stub)", bool(gen_quiz_id) or is_stub, "stub" if is_stub else str(gen_quiz_id))
+    step("assessment id returned (or stub)", bool(gen_assessment_id) or is_stub, "stub" if is_stub else str(gen_assessment_id))
 
     # 6. Fetch user stats (instructor has attempt history)
     r = c.get("/v1/me/stats", headers=inst_headers)

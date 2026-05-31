@@ -102,7 +102,7 @@ test.describe("learner session flow (fresh user)", () => {
     });
   });
 
-  test("can start a quiz session", async ({ page, request }) => {
+  test("can start a assessment session", async ({ page, request }) => {
     const r = await request.get(
       `${API_URL}/v1/assessments?status=active&mode=practice`,
       {

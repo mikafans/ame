@@ -107,7 +107,7 @@ async fn test_agent_behavioral_tools() {
         .bind(agent_id)
         .bind("agent-key")
         .bind(&hash)
-        .bind(vec!["quiz.read", "quiz.write"])
+        .bind(vec!["assessment.read", "assessment.write"])
         .execute(&pool)
         .await
         .unwrap();
@@ -128,7 +128,9 @@ async fn test_agent_behavioral_tools() {
 
     assert_eq!(res.status(), StatusCode::OK);
     let body: serde_json::Value = res.json().await.unwrap();
-    assert!(body["ok"].as_bool().unwrap());
+    if !body["ok"].as_bool().unwrap_or(false) {
+        panic!("Tool run failed: {}", body["error"]);
+    }
 
     let result = &body["result"];
     assert_eq!(result["agent"]["label"], "Agent Rust");

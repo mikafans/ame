@@ -1,5 +1,5 @@
-function QuizScreen({ onSubmit }) {
-  const quiz = ACTIVE_QUIZ;
+function AssessmentScreen({ onSubmit }) {
+  const assessment = ACTIVE_QUIZ;
   const [stage, setStage] = React.useState("setup"); // setup | active
   const [idx, setIdx] = React.useState(0);
   const [answers, setAnswers] = React.useState({});
@@ -14,11 +14,11 @@ function QuizScreen({ onSubmit }) {
   }, [stage]);
 
   if (stage === "setup") {
-    return <QuizSetup onStart={(cfg) => { setConfig(cfg); setStage("active"); setTimeLeft(cfg.duration * 60); }} />;
+    return <AssessmentSetup onStart={(cfg) => { setConfig(cfg); setStage("active"); setTimeLeft(cfg.duration * 60); }} />;
   }
 
-  const cur = quiz.questions[idx];
-  const total = quiz.questions.length;
+  const cur = assessment.questions[idx];
+  const total = assessment.questions.length;
   const answered = Object.keys(answers).length;
 
   const setAns = (val) => setAnswers((a) => ({ ...a, [cur.id]: val }));
@@ -29,7 +29,7 @@ function QuizScreen({ onSubmit }) {
 
   return (
     <div style={{ minHeight: "calc(100vh)", display: "grid", gridTemplateColumns: "1fr 280px" }}>
-      {/* Main quiz body */}
+      {/* Main assessment body */}
       <div style={{ padding: "0 0 56px", borderRight: "1px solid var(--border)" }}>
         {/* sticky exam header */}
         <div style={{
@@ -41,9 +41,9 @@ function QuizScreen({ onSubmit }) {
         }}>
           <div>
             <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: 1.3, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>
-              Attempt 1 of 2 · {quiz.course}
+              Attempt 1 of 2 · {assessment.course}
             </div>
-            <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 500, letterSpacing: -0.2 }}>{quiz.title}</div>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 500, letterSpacing: -0.2 }}>{assessment.title}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{
@@ -132,7 +132,7 @@ function QuizScreen({ onSubmit }) {
           Question palette
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginBottom: 18 }}>
-          {quiz.questions.map((q, i) => {
+          {assessment.questions.map((q, i) => {
             const status = answers[q.id] !== undefined ? "answered" : "unanswered";
             const isCur = i === idx;
             const isFlag = flagged[q.id];
@@ -417,7 +417,7 @@ const DIFFICULTIES = [
   { id: "adv",   label: "Advanced",     pct: 25 },
 ];
 
-function QuizSetup({ onStart }) {
+function AssessmentSetup({ onStart }) {
   const [cats, setCats]       = React.useState(["algorithms"]);
   const [tags, setTags]       = React.useState(["graphs", "complexity"]);
   const [types, setTypes]     = React.useState(["mc", "short", "code"]);
@@ -425,7 +425,7 @@ function QuizSetup({ onStart }) {
   const [count, setCount]     = React.useState(12);
   const [duration, setDuration] = React.useState(25);
   const [mode, setMode]       = React.useState("practice"); // practice | timed | adaptive
-  const [source, setSource]   = React.useState("quiz"); // quiz | bank
+  const [source, setSource]   = React.useState("assessment"); // assessment | bank
   const [shuffle, setShuffle] = React.useState(true);
   const [explain, setExplain] = React.useState(true);
 
@@ -453,11 +453,11 @@ function QuizSetup({ onStart }) {
               Practice session · configure
             </div>
             <h1 style={{ margin: 0, fontFamily: "var(--serif)", fontSize: 30, fontWeight: 500, letterSpacing: -0.4 }}>
-              Compose your quiz
+              Compose your assessment
             </h1>
             <p style={{ color: "var(--text-2)", fontSize: 13.5, lineHeight: 1.55, margin: "8px 0 0", maxWidth: 620 }}>
               Pick categories, tags, and question types — Harus pulls a fresh mix from the question bank.
-              Pre-built quizzes from your assignments are also available below.
+              Pre-built assessments from your assignments are also available below.
             </p>
           </div>
           <Tag tone="ghost">{pool.toLocaleString()} items match</Tag>
@@ -622,7 +622,7 @@ function QuizSetup({ onStart }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {[
                 { id: "bank", label: "Item bank", sub: `Fresh selection from ${pool.toLocaleString()} items` },
-                { id: "quiz", label: "Specific quiz",  sub: "Pull from an existing quiz in your library" },
+                { id: "assessment", label: "Specific assessment",  sub: "Pull from an existing assessment in your library" },
               ].map((s) => {
                 const sel = source === s.id;
                 return (
@@ -639,7 +639,7 @@ function QuizSetup({ onStart }) {
               })}
             </div>
 
-            {source === "quiz" && (
+            {source === "assessment" && (
               <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: 6, background: "var(--surface)" }}>
                 {QUIZZES.slice(0, 3).map((q, i, arr) => (
                   <div key={q.id} style={{
@@ -828,4 +828,4 @@ function ToggleRow({ label, sub, value, onChange, dim }) {
   );
 }
 
-Object.assign(window, { QuizScreen });
+Object.assign(window, { AssessmentScreen });

@@ -145,18 +145,18 @@ export async function finishSession(
 }
 
 // ---------------------------------------------------------------------------
-// Quiz helpers
+// Assessment helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Return the id of the first active quiz that contains at least one MCQ
+ * Return the id of the first active assessment that contains at least one MCQ
  * AND has at least minQuestions total questions (default 5).
  *
- * The minimum count avoids matching small e2e test-fixture quizzes (e.g.,
- * visibility-spec quizzes with 1 question) and ensures the returned quiz
+ * The minimum count avoids matching small e2e test-fixture assessments (e.g.,
+ * visibility-spec assessments with 1 question) and ensures the returned assessment
  * has enough content for a meaningful session round-trip.
  */
-export async function firstMcqQuizId(
+export async function firstMcqAssessmentId(
   request: APIRequestContext,
   token: string,
   minQuestions = 5,
@@ -184,6 +184,6 @@ export async function firstMcqQuizId(
     }
   }
   throw new Error(
-    `No active quiz with MCQ questions and >= ${minQuestions} total questions found`,
+    `No active assessment with MCQ questions and >= ${minQuestions} total questions found`,
   );
 }

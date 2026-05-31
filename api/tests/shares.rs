@@ -163,7 +163,7 @@ async fn share_golden_path_create_get_revoke_404() {
         return;
     }
     let pool = setup_db().await;
-    let (_user_id, token) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (_user_id, token) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
@@ -175,7 +175,7 @@ async fn share_golden_path_create_get_revoke_404() {
         .post(format!("{base}/v1/shares"))
         .header(header::AUTHORIZATION, &bearer)
         .json(&json!({
-            "kind": "quiz",
+            "kind": "assessment",
             "id": target_id,
             "visibility": "public"
         }))
@@ -204,7 +204,7 @@ async fn share_golden_path_create_get_revoke_404() {
 
     let view: Value = resp.json().await.unwrap();
 
-    assert_eq!(view["kind"].as_str().unwrap(), "quiz");
+    assert_eq!(view["kind"].as_str().unwrap(), "assessment");
     assert_eq!(view["targetId"].as_str().unwrap(), target_id.to_string());
 
     // 3. Revoke
@@ -237,7 +237,7 @@ async fn share_tuple_dedup_returns_same_share_id() {
         return;
     }
     let pool = setup_db().await;
-    let (_user_id, token) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (_user_id, token) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
     let bearer = format!("Bearer {token}");
@@ -281,7 +281,7 @@ async fn embed_route_resolves_without_auth() {
         return;
     }
     let pool = setup_db().await;
-    let (_user_id, token) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (_user_id, token) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
     let bearer = format!("Bearer {token}");
@@ -291,26 +291,26 @@ async fn embed_route_resolves_without_auth() {
     client
         .post(format!("{base}/v1/shares"))
         .header(header::AUTHORIZATION, &bearer)
-        .json(&json!({ "kind": "quiz", "id": target_id }))
+        .json(&json!({ "kind": "assessment", "id": target_id }))
         .send()
         .await
         .unwrap();
 
-    // GET /v1/quizzes/{id}/embed — no auth, should hit embed handler not quiz handler
+    // GET /v1/assessments/{id}/embed — no auth, should hit embed handler not assessment handler
     let resp = client
-        .get(format!("{base}/v1/quizzes/{target_id}/embed"))
+        .get(format!("{base}/v1/assessments/{target_id}/embed"))
         .send()
         .await
         .unwrap();
 
-    // Should be 200 (embed handler found the share) not 401/403 (quiz handler would require auth)
+    // Should be 200 (embed handler found the share) not 401/403 (assessment handler would require auth)
     assert_eq!(
         resp.status(),
         StatusCode::OK,
         "embed route should be public"
     );
     let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["kind"].as_str().unwrap(), "quiz");
+    assert_eq!(body["kind"].as_str().unwrap(), "assessment");
 }
 
 // ── Revoke by non-owner ───────────────────────────────────────────────────────
@@ -321,8 +321,8 @@ async fn share_revoke_rejected_for_non_owner() {
         return;
     }
     let pool = setup_db().await;
-    let (_uid1, token1) = make_user_with_scopes(&pool, &["quiz.read"]).await;
-    let (_uid2, token2) = make_user_with_scopes(&pool, &["quiz.read"]).await;
+    let (_uid1, token1) = make_user_with_scopes(&pool, &["assessment.read"]).await;
+    let (_uid2, token2) = make_user_with_scopes(&pool, &["assessment.read"]).await;
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
     let target_id = Uuid::now_v7();

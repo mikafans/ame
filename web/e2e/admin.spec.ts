@@ -147,7 +147,7 @@ test.describe("admin API surface", () => {
     // Token may be revoked after the disable/re-enable cycle → 401 is expected.
     const r = await request.post(`${API_URL}/v1/admin/moderate`, {
       headers: { Authorization: `Bearer ${userToken}` },
-      data: { quizId: "00000000-0000-0000-0000-000000000000" },
+      data: { assessmentId: "00000000-0000-0000-0000-000000000000" },
     });
     expect([401, 403]).toContain(r.status());
   });

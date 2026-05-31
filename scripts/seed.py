@@ -3,7 +3,7 @@
 # dependencies = ["httpx>=0.27", "rich>=13"]
 # ///
 """
-Seed the ame database with demo users, tags, questions, quizzes, and exams.
+Seed the ame database with demo users, tags, questions, assessments, and exams.
 
 Usage:
     uv run scripts/seed.py
@@ -286,8 +286,8 @@ class SeedResult:
     users: list[dict] = field(default_factory=list)
     tags: list[dict] = field(default_factory=list)
     questions: list[dict] = field(default_factory=list)
-    quiz_id: str | None = None
-    quiz_python_id: str | None = None
+    assessment_id: str | None = None
+    assessment_python_id: str | None = None
     exam_id: str | None = None
     cohort_id: str | None = None
     attempts_seeded: int = 0
@@ -428,19 +428,19 @@ def _create_and_publish_assessment(
     return assessment_id
 
 
-def seed_quizzes(client: httpx.Client, auth: dict, result: SeedResult) -> None:
+def seed_assessments(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     console.rule("[bold]Assessments")
     if not result.questions:
         console.print("  [yellow]No questions — skipping[/yellow]")
         return
 
     # Main assessment: all question kinds, public
-    result.quiz_id = _create_and_publish_assessment(client, auth, QUIZ, result.questions, result)
+    result.assessment_id = _create_and_publish_assessment(client, auth, QUIZ, result.questions, result)
 
     # Python assessment: python + math questions only (short + code), public
     python_qs = [q for q in result.questions if q["kind"] in ("short", "code")]
     if python_qs:
-        result.quiz_python_id = _create_and_publish_assessment(client, auth, QUIZ_PYTHON, python_qs, result)
+        result.assessment_python_id = _create_and_publish_assessment(client, auth, QUIZ_PYTHON, python_qs, result)
 
     # Draft assessment (private) for Author studio
     draft_body = {
@@ -526,10 +526,10 @@ def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
 
 
 def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
-    """Have the learner take the main quiz so grading/results/progress pages show data."""
+    """Have the learner take the main assessment so grading/results/progress pages show data."""
     console.rule("[bold]Attempts")
-    if not result.quiz_id:
-        console.print("  [yellow]No quiz — skipping attempts[/yellow]")
+    if not result.assessment_id:
+        console.print("  [yellow]No assessment — skipping attempts[/yellow]")
         return
 
     learner = next((u for u in result.users if u["email"] == "learner@example.com"), None)
@@ -545,7 +545,7 @@ def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
         id_to_answer[q["id"]] = ans
 
     # Start a session
-    resp = client.post("/v1/sessions", json={"assessmentId": result.quiz_id}, headers=auth)
+    resp = client.post("/v1/sessions", json={"assessmentId": result.assessment_id}, headers=auth)
     if not resp.is_success:
         console.print(f"  [yellow]Could not start session:[/yellow] {resp.status_code} {resp.text[:200]}")
         return
@@ -686,8 +686,8 @@ def print_summary(result: SeedResult) -> None:
     table.add_row("Users", str(len(result.users)))
     table.add_row("Tags", str(len(result.tags)))
     table.add_row("Questions (live)", str(len(result.questions)))
-    table.add_row("Quiz (main)", result.quiz_id or "—")
-    table.add_row("Quiz (python)", result.quiz_python_id or "—")
+    table.add_row("Assessment (main)", result.assessment_id or "—")
+    table.add_row("Assessment (python)", result.assessment_python_id or "—")
     table.add_row("Exam", result.exam_id or "—")
     table.add_row("Cohort", result.cohort_id or "—")
     table.add_row("Attempts seeded", str(result.attempts_seeded))
@@ -730,7 +730,7 @@ def main() -> None:
 
         seed_tags(client, auth, result)
         seed_questions(client, auth, result)
-        seed_quizzes(client, auth, result)
+        seed_assessments(client, auth, result)
         seed_exam(client, auth, result)
         seed_cohort(client, admin_auth, result)
         seed_attempts(client, result)

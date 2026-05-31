@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ame API
-  description: Adaptive Mastery Engine — quiz & exam platform with agent identity.
+  description: Adaptive Mastery Engine — assessment platform with agent identity.
   license:
     name: ''
   version: 0.1.0
@@ -740,13 +740,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: quizId
-        in: query
-        description: Quiz (legacy) to compare against
-        required: false
-        schema:
-          type: string
-          format: uuid
       responses:
         '200':
           description: Cohort stats
@@ -1024,7 +1017,7 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: quizId
+      - name: assessmentId
         in: query
         description: Filter by quiz (legacy)
         required: false
@@ -1608,6 +1601,40 @@ components:
         title:
           type: string
         weight:
+          type: number
+          format: double
+    AssessmentStatsParams:
+      type: object
+      properties:
+        cohortId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        window:
+          type:
+          - string
+          - 'null'
+    AssessmentStatsResponse:
+      type: object
+      required:
+      - avg
+      - median
+      - distribution
+      - items
+      properties:
+        avg:
+          type: number
+          format: double
+        distribution:
+          type: array
+          items:
+            $ref: '#/components/schemas/DistributionBucket'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemStats'
+        median:
           type: number
           format: double
     AssessmentStatus:
@@ -2648,40 +2675,6 @@ components:
         version:
           type: integer
           format: int32
-    QuizStatsParams:
-      type: object
-      properties:
-        cohortId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        window:
-          type:
-          - string
-          - 'null'
-    QuizStatsResponse:
-      type: object
-      required:
-      - avg
-      - median
-      - distribution
-      - items
-      properties:
-        avg:
-          type: number
-          format: double
-        distribution:
-          type: array
-          items:
-            $ref: '#/components/schemas/DistributionBucket'
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ItemStats'
-        median:
-          type: number
-          format: double
     RegisterBody:
       type: object
       required:
@@ -2759,6 +2752,10 @@ components:
           - string
           - 'null'
           format: uuid
+        assessment_title:
+          type:
+          - string
+          - 'null'
         course_title:
           type:
           - string
@@ -2782,10 +2779,6 @@ components:
           $ref: '#/components/schemas/SessionKind'
         question_plan:
           $ref: '#/components/schemas/QuestionPlan'
-        quiz_title:
-          type:
-          - string
-          - 'null'
         rating_snapshot:
           type: object
         result:
@@ -2801,7 +2794,7 @@ components:
     SessionKind:
       type: string
       enum:
-      - quiz
+      - assessment
       - exam
       - practice
     SessionQuestion:
@@ -2873,6 +2866,10 @@ components:
           - string
           - 'null'
           format: uuid
+        assessmentTitle:
+          type:
+          - string
+          - 'null'
         attemptNumber:
           type: integer
           format: int64
@@ -2896,10 +2893,6 @@ components:
           - number
           - 'null'
           format: double
-        quizTitle:
-          type:
-          - string
-          - 'null'
         startedAt:
           type: string
           format: date-time

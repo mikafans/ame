@@ -58,24 +58,24 @@ def main() -> None:
     token = r.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. List quizzes
-    r = c.get("/v1/quizzes", params={"status": "active"}, headers=headers)
-    step("list quizzes", r.status_code == 200)
-    quizzes = r.json().get("quizzes", [])
-    step("at least one active quiz", len(quizzes) > 0, f"found {len(quizzes)}")
-    quiz_id = quizzes[0]["id"]
+    # 2. List assessments
+    r = c.get("/v1/assessments", params={"status": "active"}, headers=headers)
+    step("list assessments", r.status_code == 200)
+    assessments = r.json().get("assessments", [])
+    step("at least one active assessment", len(assessments) > 0, f"found {len(assessments)}")
+    assessment_id = assessments[0]["id"]
 
-    # 3. Start quiz session
-    r = c.post("/v1/sessions", json={"quizId": quiz_id}, headers=headers)
-    step("start quiz session", r.status_code == 201, str(r.status_code))
+    # 3. Start assessment session
+    r = c.post("/v1/sessions", json={"assessmentId": assessment_id}, headers=headers)
+    step("start assessment session", r.status_code == 201, str(r.status_code))
     session_id = r.json()["sessionId"]
     questions = r.json().get("questions", [])
     step("session has questions", len(questions) > 0, f"{len(questions)} questions")
 
     # 4. Answer all questions and finish
-    answer_all(c, session_id, questions, headers, "quiz")
+    answer_all(c, session_id, questions, headers, "assessment")
     r = c.post(f"/v1/sessions/{session_id}/finish", headers=headers)
-    step("finish quiz session", r.status_code == 200, str(r.status_code))
+    step("finish assessment session", r.status_code == 200, str(r.status_code))
 
     # 5. Fetch session results
     r = c.get(f"/v1/sessions/{session_id}", headers=headers)

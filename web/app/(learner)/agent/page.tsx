@@ -64,7 +64,7 @@ type TabId = "keys" | "tools" | "import" | "activity";
 
 const SAMPLE_IMPORT = JSON.stringify(
   {
-    title: "Sample quiz",
+    title: "Sample assessment",
     questions: [
       {
         kind: "mc",
@@ -143,7 +143,7 @@ export default function AgentPage() {
             variant="h5"
             sx={{ fontWeight: 500, mb: 1, letterSpacing: -0.3 }}
           >
-            Quizzes, attempts, and rubrics are first-class API objects.
+            Assessments, attempts, and rubrics are first-class API objects.
           </Typography>
           <Typography
             variant="body2"
@@ -152,8 +152,8 @@ export default function AgentPage() {
           >
             Every screen you see is backed by the same REST surface that agents
             use. A grading agent reads an attempt with one call; an authoring
-            agent imports a new quiz with another. No scraping, no duplicate
-            state.
+            agent imports a new assessment with another. No scraping, no
+            duplicate state.
           </Typography>
           <Stack direction="row" spacing={2.75}>
             <KV2 k="Endpoints" v="34" />
@@ -186,11 +186,11 @@ export default function AgentPage() {
           <CodeBlock
             label="curl"
             lines={[
-              `curl https://api.ame-platform.app/v1/quizzes \\`,
+              `curl https://api.ame-platform.app/v1/assessments \\`,
               `  -H "Authorization: Bearer hk_agent_3fY9…ax2P" \\`,
               `  -H "Content-Type: application/json"`,
               ``,
-              `→ 200 OK · 24 quizzes`,
+              `→ 200 OK · 24 assessments`,
             ]}
             dim={[4]}
           />
@@ -401,7 +401,7 @@ function KeysTab() {
     {
       value: "public.publish",
       label: "public.publish",
-      desc: "Publish quizzes publicly (Premium only)",
+      desc: "Publish assessments publicly (Premium only)",
     },
   ];
 
@@ -1303,7 +1303,7 @@ function ImportTab() {
         data,
         error,
         response: res,
-      } = await client.POST("/v1/quizzes", { body });
+      } = await client.POST("/v1/assessments", { body });
       const latencyMs = Date.now() - t0;
       setResponse({
         ok: !error,
@@ -1343,7 +1343,7 @@ function ImportTab() {
               color="primary.main"
               sx={{ fontFamily: "monospace", display: "block" }}
             >
-              quiz.import
+              assessment.import
             </Typography>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               Try the import endpoint
@@ -1392,7 +1392,7 @@ function ImportTab() {
             color="text.secondary"
             sx={{ fontFamily: "monospace" }}
           >
-            POST /v1/quizzes · Bearer hk_live_…
+            POST /v1/assessments · Bearer hk_live_…
           </Typography>
           <Button
             variant="contained"

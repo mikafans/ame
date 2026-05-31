@@ -12,7 +12,7 @@ use ame_api::{
         question::{Judge, McPayload, Normalize, QuestionKind, ShortPayload},
         session::PlanItem,
     },
-    engine::planner::{QuizPlanRequest, TagsMode, plan_quiz},
+    engine::planner::{AssessmentPlanRequest, TagsMode, plan_assessment},
 };
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -89,7 +89,7 @@ fn short_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
 }
 
 #[tokio::test]
-async fn quiz_planner_filters_live_questions_and_snapshots_mc_option_order() {
+async fn assessment_planner_filters_live_questions_and_snapshots_mc_option_order() {
     if skip_if_no_db() {
         return;
     }
@@ -116,10 +116,10 @@ async fn quiz_planner_filters_live_questions_and_snapshots_mc_option_order() {
         .await
         .unwrap();
 
-    let plan = plan_quiz(
+    let plan = plan_assessment(
         &pool,
         user_id,
-        &QuizPlanRequest {
+        &AssessmentPlanRequest {
             tags: vec!["Rust".to_string()],
             tags_mode: TagsMode::Any,
             difficulty_min: None,
@@ -147,7 +147,7 @@ async fn quiz_planner_filters_live_questions_and_snapshots_mc_option_order() {
 }
 
 #[tokio::test]
-async fn quiz_planner_excludes_recent_attempts_for_user() {
+async fn assessment_planner_excludes_recent_attempts_for_user() {
     if skip_if_no_db() {
         return;
     }
@@ -183,10 +183,10 @@ async fn quiz_planner_excludes_recent_attempts_for_user() {
     .await
     .unwrap();
 
-    let plan = plan_quiz(
+    let plan = plan_assessment(
         &pool,
         user_id,
-        &QuizPlanRequest {
+        &AssessmentPlanRequest {
             tags: vec!["rust".to_string()],
             tags_mode: TagsMode::All,
             difficulty_min: None,

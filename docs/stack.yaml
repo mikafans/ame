@@ -1,5 +1,5 @@
 project: ame-platform
-description: Quiz/exam SaaS — Rust API + Bun/Next.js frontend
+description: Assessment/exam SaaS — Rust API + Bun/Next.js frontend
 
 # --- Runtime ports ---
 ports:

@@ -14,7 +14,7 @@ pub enum Plan {
 
 #[derive(Debug, Clone, Copy)]
 pub enum QuotaKind {
-    PublicQuiz,
+    PublicAssessment,
     AgentCreation,
 }
 
@@ -64,15 +64,15 @@ pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Resu
 
     // 2. Define quota limits
     let limit = match (plan, kind) {
-        (Plan::Premium, QuotaKind::PublicQuiz) => 1000,
-        (Plan::Free, QuotaKind::PublicQuiz) => 5,
+        (Plan::Premium, QuotaKind::PublicAssessment) => 1000,
+        (Plan::Free, QuotaKind::PublicAssessment) => 5,
         (Plan::Premium, QuotaKind::AgentCreation) => 100,
         (Plan::Free, QuotaKind::AgentCreation) => 1,
     };
 
     // 3. Count current usage
     let usage: i64 = match kind {
-        QuotaKind::PublicQuiz => sqlx::query_scalar(
+        QuotaKind::PublicAssessment => sqlx::query_scalar(
             "SELECT COUNT(*) FROM tb_assessments a
                   WHERE a.created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
                   AND a.visibility = 'public'",
@@ -93,7 +93,7 @@ pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Resu
 
     if usage >= limit {
         let kind_str = match kind {
-            QuotaKind::PublicQuiz => "public_quiz",
+            QuotaKind::PublicAssessment => "public_assessment",
             QuotaKind::AgentCreation => "agent_creation",
         };
         return Err(ApiError::QuotaExceeded {

@@ -29,7 +29,7 @@ interface PreviewQuestion {
   orderIndex: number;
 }
 
-interface QuizDetail {
+interface AssessmentDetail {
   id: string;
   title: string;
   course?: string;
@@ -37,7 +37,7 @@ interface QuizDetail {
   questions: PreviewQuestion[];
 }
 
-export default function QuizPreviewPage({
+export default function AssessmentPreviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -45,7 +45,7 @@ export default function QuizPreviewPage({
   const { id } = use(params);
   const { user } = useAuth();
   const router = useRouter();
-  const [quiz, setQuiz] = useState<QuizDetail | null>(null);
+  const [assessment, setAssessment] = useState<AssessmentDetail | null>(null);
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
@@ -53,18 +53,18 @@ export default function QuizPreviewPage({
       .GET("/v1/assessments/{id}", { params: { path: { id } } })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data: d }: { data?: any }) => {
-        if (d) setQuiz(d);
+        if (d) setAssessment(d);
       })
       .catch(console.error);
   }, [id]);
 
   const handleStart = async () => {
-    if (!quiz) return;
+    if (!assessment) return;
     setStarting(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (api as any).POST("/v1/sessions", {
-        body: { assessmentId: id, count: quiz.questions.length },
+        body: { assessmentId: id, count: assessment.questions.length },
       });
       const sessionId = data?.sessionId ?? data?.session_id;
       if (sessionId) router.push(`/sessions/${sessionId}`);
@@ -73,7 +73,7 @@ export default function QuizPreviewPage({
     }
   };
 
-  if (!quiz) {
+  if (!assessment) {
     return (
       <Box
         sx={{
@@ -88,8 +88,8 @@ export default function QuizPreviewPage({
     );
   }
 
-  const totalPoints = quiz.questions.reduce((s, q) => s + q.points, 0);
-  const kindCounts = quiz.questions.reduce(
+  const totalPoints = assessment.questions.reduce((s, q) => s + q.points, 0);
+  const kindCounts = assessment.questions.reduce(
     (acc, q) => ({ ...acc, [q.kind]: (acc[q.kind] ?? 0) + 1 }),
     {} as Record<string, number>,
   );
@@ -97,7 +97,7 @@ export default function QuizPreviewPage({
     .map(([k, n]) => `${n} ${KIND_LABEL[k] ?? k}`)
     .join(" · ");
 
-  const sorted = [...quiz.questions].sort(
+  const sorted = [...assessment.questions].sort(
     (a, b) => a.orderIndex - b.orderIndex,
   );
 
@@ -131,26 +131,26 @@ export default function QuizPreviewPage({
             textTransform: "uppercase",
           }}
         >
-          {quiz.title}
+          {assessment.title}
         </Typography>
       </Box>
 
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        {quiz.course && (
+        {assessment.course && (
           <Chip
-            label={quiz.course}
+            label={assessment.course}
             size="small"
             variant="outlined"
-            sx={{ mb: 1.25, ...tagColor(quiz.course) }}
+            sx={{ mb: 1.25, ...tagColor(assessment.course) }}
           />
         )}
         <Typography variant="h4" sx={{ fontWeight: 500, mb: 2 }}>
-          {quiz.title}
+          {assessment.title}
         </Typography>
-        {quiz.objectives && quiz.objectives.length > 0 && (
+        {assessment.objectives && assessment.objectives.length > 0 && (
           <Box component="ul" sx={{ m: 0, pl: 2.25, color: "text.secondary" }}>
-            {quiz.objectives.map((obj, i) => (
+            {assessment.objectives.map((obj, i) => (
               <Typography
                 key={i}
                 component="li"
@@ -175,7 +175,7 @@ export default function QuizPreviewPage({
             textTransform: "uppercase",
           }}
         >
-          {quiz.questions.length} questions
+          {assessment.questions.length} questions
         </Typography>
         <Typography
           variant="caption"

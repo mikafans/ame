@@ -785,7 +785,6 @@ pub async fn list_attempts(
 #[serde(rename_all = "camelCase")]
 pub struct CohortStatsQuery {
     pub assessment_id: Option<Uuid>,
-    pub quiz_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -810,7 +809,6 @@ pub struct CohortStatsResponse {
     path = "/v1/me/cohort-stats",
     params(
         ("assessmentId" = Option<Uuid>, Query, description = "Assessment to compare against"),
-        ("quizId" = Option<Uuid>, Query, description = "Quiz (legacy) to compare against"),
     ),
     responses(
         (status = 200, description = "Cohort stats", body = CohortStatsResponse),
@@ -824,7 +822,7 @@ pub async fn get_cohort_stats(
     auth: AuthenticatedUser,
     Query(q): Query<CohortStatsQuery>,
 ) -> Result<Json<CohortStatsResponse>, ApiError> {
-    let assessment_id = q.assessment_id.or(q.quiz_id).ok_or_else(|| {
+    let assessment_id = q.assessment_id.ok_or_else(|| {
         ApiError::Validation(vec![FieldError {
             field: "assessmentId".into(),
             message: "required".into(),

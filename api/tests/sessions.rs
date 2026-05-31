@@ -76,7 +76,10 @@ async fn make_bearer(pool: &PgPool) -> String {
     .bind(token_id)
     .bind(user_id)
     .bind(hash)
-    .bind(vec!["attempt.write".to_string(), "quiz.write".to_string()])
+    .bind(vec![
+        "attempt.write".to_string(),
+        "assessment.write".to_string(),
+    ])
     .execute(pool)
     .await
     .unwrap();

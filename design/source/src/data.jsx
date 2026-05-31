@@ -104,7 +104,7 @@ const QUIZZES = [
   },
 ];
 
-// The active quiz the learner is taking
+// The active assessment the learner is taking
 const ACTIVE_QUIZ = {
   id: "qz_8sd1",
   title: "Algorithms — Graph Traversal",
@@ -166,8 +166,8 @@ const ACTIVE_QUIZ = {
 
 // Past results for review
 const LAST_ATTEMPT = {
-  quizId: "qz_8sd1",
-  quizTitle: "Algorithms — Graph Traversal",
+  assessmentId: "qz_8sd1",
+  assessmentTitle: "Algorithms — Graph Traversal",
   course: "CS 311",
   submitted: "Today, 14:22",
   duration: "31 min 04 sec",
@@ -219,7 +219,7 @@ const ITEM_ANALYSIS = [
   { q: "Q5", topic: "BFS vs DFS essay",    difficulty: 0.55, discrim: 0.44, correct: 45 },
 ];
 
-// EXAMS — composed assessments that bundle multiple quizzes
+// EXAMS — composed assessments that bundle multiple assessments
 const EXAMS = [
   {
     id: "ex_cs311_mid",
@@ -235,9 +235,9 @@ const EXAMS = [
     totalPoints: 60,
     passing: 65,
     sections: [
-      { id: "s1", quizId: "qz_8sd1", title: "Graph traversal",         weight: 30, items: 12, mix: "MC · short · code" },
-      { id: "s2", quizId: "qz_9tg4", title: "Linear algebra review",   weight: 20, items: 8,  mix: "MC · short" },
-      { id: "s3", quizId: "qz_2vh7", title: "Complexity short answer", weight: 10, items: 4,  mix: "short" },
+      { id: "s1", assessmentId: "qz_8sd1", title: "Graph traversal",         weight: 30, items: 12, mix: "MC · short · code" },
+      { id: "s2", assessmentId: "qz_9tg4", title: "Linear algebra review",   weight: 20, items: 8,  mix: "MC · short" },
+      { id: "s3", assessmentId: "qz_2vh7", title: "Complexity short answer", weight: 10, items: 4,  mix: "short" },
     ],
     assigned: 86,
     completed: 0,
@@ -265,9 +265,9 @@ const EXAMS = [
     totalPoints: 45,
     passing: 60,
     sections: [
-      { id: "s1", quizId: "qz_4mp9", title: "Stereochemistry",  weight: 20, items: 12, mix: "MC · short" },
-      { id: "s2", quizId: "qz_6kx2", title: "Membranes (xref)", weight: 15, items: 8,  mix: "MC · TF" },
-      { id: "s3", quizId: "qz_4mp9", title: "Synthesis problems", weight: 10, items: 4, mix: "essay · short" },
+      { id: "s1", assessmentId: "qz_4mp9", title: "Stereochemistry",  weight: 20, items: 12, mix: "MC · short" },
+      { id: "s2", assessmentId: "qz_6kx2", title: "Membranes (xref)", weight: 15, items: 8,  mix: "MC · TF" },
+      { id: "s3", assessmentId: "qz_4mp9", title: "Synthesis problems", weight: 10, items: 4, mix: "essay · short" },
     ],
     assigned: 203,
     completed: 142,
@@ -295,9 +295,9 @@ const EXAMS = [
     totalPoints: 100,
     passing: 70,
     sections: [
-      { id: "s1", quizId: "qz_3kf2", title: "Monetary policy",  weight: 35, items: 14, mix: "MC · short · essay" },
-      { id: "s2", quizId: "qz_3kf2", title: "Fiscal multipliers", weight: 25, items: 8, mix: "short · essay" },
-      { id: "s3", quizId: "qz_3kf2", title: "Case analysis",     weight: 40, items: 2, mix: "essay" },
+      { id: "s1", assessmentId: "qz_3kf2", title: "Monetary policy",  weight: 35, items: 14, mix: "MC · short · essay" },
+      { id: "s2", assessmentId: "qz_3kf2", title: "Fiscal multipliers", weight: 25, items: 8, mix: "short · essay" },
+      { id: "s3", assessmentId: "qz_3kf2", title: "Case analysis",     weight: 40, items: 2, mix: "essay" },
     ],
     assigned: 142,
     completed: 0,
@@ -325,9 +325,9 @@ const EXAMS = [
     totalPoints: 30,
     passing: 50,
     sections: [
-      { id: "s1", quizId: "qz_8sd1", title: "Algorithms baseline", weight: 12, items: 5, mix: "MC · code" },
-      { id: "s2", quizId: "qz_9tg4", title: "Math baseline",       weight: 10, items: 6, mix: "short" },
-      { id: "s3", quizId: "qz_6kx2", title: "Reasoning",           weight: 8,  items: 4, mix: "MC · short" },
+      { id: "s1", assessmentId: "qz_8sd1", title: "Algorithms baseline", weight: 12, items: 5, mix: "MC · code" },
+      { id: "s2", assessmentId: "qz_9tg4", title: "Math baseline",       weight: 10, items: 6, mix: "short" },
+      { id: "s3", assessmentId: "qz_6kx2", title: "Reasoning",           weight: 8,  items: 4, mix: "MC · short" },
     ],
     assigned: 412,
     completed: 287,
@@ -345,24 +345,24 @@ const EXAMS = [
 // MCP-style tool descriptors for the agent panel
 const AGENT_TOOLS = [
   {
-    name: "quiz.import",
-    desc: "Create a new quiz from JSON or Markdown source.",
+    name: "assessment.import",
+    desc: "Create a new assessment from JSON or Markdown source.",
     inputs: ["source: string", "format: 'json' | 'md'", "courseId?: string"],
-    returns: "{ quizId, questionCount, warnings[] }",
+    returns: "{ assessmentId, questionCount, warnings[] }",
     method: "POST",
-    path: "/v1/quizzes",
+    path: "/v1/assessments",
   },
   {
-    name: "quiz.generate",
-    desc: "Generate a quiz from a source document URL or text.",
+    name: "assessment.generate",
+    desc: "Generate a assessment from a source document URL or text.",
     inputs: ["source: string", "questionCount: int", "types?: string[]", "difficulty?: string"],
-    returns: "{ quizId, questions[] }",
+    returns: "{ assessmentId, questions[] }",
     method: "POST",
-    path: "/v1/quizzes/generate",
+    path: "/v1/assessments/generate",
   },
   {
     name: "attempt.get",
-    desc: "Fetch a single learner's answers and per-item scoring for a quiz attempt.",
+    desc: "Fetch a single learner's answers and per-item scoring for a assessment attempt.",
     inputs: ["attemptId: string"],
     returns: "{ user, score, answers[], rubric[] }",
     method: "GET",
@@ -370,24 +370,24 @@ const AGENT_TOOLS = [
   },
   {
     name: "stats.cohort",
-    desc: "Aggregate stats for a quiz across a cohort: averages, distribution, item analysis.",
-    inputs: ["quizId: string", "cohortId?: string", "window?: 'last30d' | 'all'"],
+    desc: "Aggregate stats for a assessment across a cohort: averages, distribution, item analysis.",
+    inputs: ["assessmentId: string", "cohortId?: string", "window?: 'last30d' | 'all'"],
     returns: "{ avg, median, distribution[], items[] }",
     method: "GET",
-    path: "/v1/quizzes/{id}/stats",
+    path: "/v1/assessments/{id}/stats",
   },
   {
     name: "feedback.send",
     desc: "Push a personalized reminder or feedback message to a learner.",
-    inputs: ["userId: string", "channel: 'in-app' | 'email'", "body: string", "linkQuizId?: string"],
+    inputs: ["userId: string", "channel: 'in-app' | 'email'", "body: string", "linkAssessmentId?: string"],
     returns: "{ messageId, queuedAt }",
     method: "POST",
     path: "/v1/messages",
   },
   {
     name: "exam.compose",
-    desc: "Compose an exam by ordering existing quizzes into weighted sections.",
-    inputs: ["title: string", "sections: { quizId, weight, items? }[]", "duration: int", "window?: { open, close }"],
+    desc: "Compose an exam by ordering existing assessments into weighted sections.",
+    inputs: ["title: string", "sections: { assessmentId, weight, items? }[]", "duration: int", "window?: { open, close }"],
     returns: "{ examId, totalPoints, sections[], warnings[] }",
     method: "POST",
     path: "/v1/exams",
@@ -419,8 +419,8 @@ const AGENT_TOOLS = [
 ];
 
 const API_KEYS = [
-  { id: "key_live_3f", label: "GraderBot — production", prefix: "hk_live_3fY9…ax2P", created: "Mar 12, 2026", lastUsed: "12 min ago", scopes: ["quiz.read", "attempt.read", "stats.read"] },
-  { id: "key_live_8a", label: "TA-Assist (MCP)",         prefix: "hk_live_8aQ2…m1Vk", created: "Jan 04, 2026", lastUsed: "2 hours ago",   scopes: ["quiz.write", "attempt.read", "feedback.write"] },
+  { id: "key_live_3f", label: "GraderBot — production", prefix: "hk_live_3fY9…ax2P", created: "Mar 12, 2026", lastUsed: "12 min ago", scopes: ["assessment.read", "attempt.read", "stats.read"] },
+  { id: "key_live_8a", label: "TA-Assist (MCP)",         prefix: "hk_live_8aQ2…m1Vk", created: "Jan 04, 2026", lastUsed: "2 hours ago",   scopes: ["assessment.write", "attempt.read", "feedback.write"] },
   { id: "key_test_z1", label: "Local dev",               prefix: "hk_test_z1Lo…7nKd", created: "Feb 22, 2026", lastUsed: "3 days ago",    scopes: ["*"] },
 ];
 
