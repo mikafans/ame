@@ -387,6 +387,30 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
+  /v1/me/export:
+    get:
+      tags:
+      - export
+      summary: GET /v1/me/export — export premium-only owner data bundle
+      description: |-
+        Returns quizzes, questions, sessions, attempts, and tag ratings owned by this user
+        and any of their agents. Premium plan required, throttled via governor, audited.
+      operationId: export_data
+      responses:
+        '200':
+          description: Owner data successfully exported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Premium required)
+        '429':
+          description: Too Many Requests (Throttled)
+      security:
+      - bearer: []
   /v1/me/stats:
     get:
       tags:
@@ -2066,6 +2090,20 @@ components:
         total:
           type: integer
           format: int64
+    ExportResponse:
+      type: object
+      required:
+      - quizzes
+      - questions
+      - sessions
+      - attempts
+      - tagRatings
+      properties:
+        attempts: {}
+        questions: {}
+        quizzes: {}
+        sessions: {}
+        tagRatings: {}
     FinishSessionResponse:
       type: object
       required:

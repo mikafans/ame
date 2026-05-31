@@ -43,6 +43,7 @@ pub mod admin;
 pub mod agents;
 pub mod auth;
 pub mod exams;
+pub mod export;
 pub mod idempotency;
 pub mod me;
 pub mod messages;
@@ -77,6 +78,15 @@ pub fn router(pool: PgPool) -> Router {
             .expect("valid rate-limit config"),
     );
 
+    let export_governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(60) // Refill rate: 1 per 60s
+            .burst_size(1) // Tighter burst size of 1
+            .key_extractor(TokenKeyExtractor)
+            .finish()
+            .expect("valid export rate-limit config"),
+    );
+
     let logged = Router::new()
         .merge(tags::router(state.clone()))
         .merge(questions::router(state.clone()))
@@ -90,6 +100,12 @@ pub fn router(pool: PgPool) -> Router {
         .merge(admin::router(state.clone()))
         .merge(agents::logged_router(state.clone()))
         .merge(shares::logged_router(state.clone()))
+        .route(
+            "/v1/me/export",
+            axum::routing::get(export::export_data).layer(GovernorLayer {
+                config: export_governor_conf,
+            }),
+        )
         .layer(GovernorLayer {
             config: governor_conf,
         })

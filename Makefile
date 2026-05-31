@@ -62,6 +62,7 @@ test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test quota -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test shares -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test export -- --nocapture
 
 test-bank: ## Bank integration tests only (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture

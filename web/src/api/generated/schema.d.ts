@@ -186,6 +186,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /v1/me/export — export premium-only owner data bundle
+         * @description Returns quizzes, questions, sessions, attempts, and tag ratings owned by this user
+         *     and any of their agents. Premium plan required, throttled via governor, audited.
+         */
+        get: operations["export_data"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/stats": {
         parameters: {
             query?: never;
@@ -854,6 +875,13 @@ export interface components {
             quizzes: components["schemas"]["QuizSummary"][];
             /** Format: int64 */
             total: number;
+        };
+        ExportResponse: {
+            attempts: unknown;
+            questions: unknown;
+            quizzes: unknown;
+            sessions: unknown;
+            tagRatings: unknown;
         };
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
@@ -1939,6 +1967,47 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    export_data: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owner data successfully exported */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Premium required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too Many Requests (Throttled) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

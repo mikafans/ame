@@ -23,10 +23,9 @@ This is the coordination board. The machine-readable task list is
 - **P3 — DONE & staged.** AI-3.1 quiz visibility schema (`20260530170000`), AI-3.2
   visibility API surface (`PATCH`, `GET`, `explore`), AI-3.3 cross-owner attempts,
   AI-3.4 share-link demotion. `make check` green.
-- **P4 — AI-4.1, AI-4.2, AI-4.3 DONE & staged.** TB_USERS.PLAN column,
-  Governor re-keyed to token ID, Quota model enforced, Agent scope-ceiling
-  validated in `POST /v1/me/agents`. `make check` green.
-- **Next gate: Phase 5 (Export) + Phase 6 (Audit).** These can now fan out in parallel.
+- **P4 — DONE & committed.** AI-4.1 plan column schema, AI-4.2 quota model/throttling, AI-4.3 agent scope-ceiling. `make check` green on each.
+- **P5 — DONE & committed.** AI-5.1 GET /v1/me/export premium-gated, throttled, and audited. `make check` + `test-db` green.
+- **Next gate: Phase 6 (Audit) + Phase 7 (Frontend).** These can now fan out.
 
 **Two decisions are now load-bearing — do not regress them:**
 
