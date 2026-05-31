@@ -344,10 +344,9 @@ export default function LoginPage() {
                 variant="outlined"
                 sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
               />
-              returns an API key scoped to your account. Create an account, then
-              manage agents from account settings. Scopes:{" "}
-              <code>assessment.read</code>, <code>attempt.write</code>,{" "}
-              <code>stats.read</code>…
+              Create an account, then generate API keys via{" "}
+              <b>Account Settings</b> to programmatically interact with
+              assessments, attempts, and stats.
             </Typography>
           </Box>
         </Box>

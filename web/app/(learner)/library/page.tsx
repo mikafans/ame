@@ -110,7 +110,9 @@ export default function LibraryPage() {
     if (visibilityFilter === "public")
       return list.filter((a) => a.visibility === "public");
     if (visibilityFilter === "mine")
-      return list.filter((a) => a.visibility === "private");
+      return list.filter(
+        (a) => a.visibility === "private" || a.status === "draft",
+      );
     return list;
   };
 
@@ -120,12 +122,13 @@ export default function LibraryPage() {
   const pending = filteredActive.filter((a) => !a.completed);
   const completed = filteredActive.filter((a) => a.completed);
 
+  const combined = [...filteredActive, ...filteredDrafts];
   const listed =
     tab === "completed"
       ? completed
       : tab === "drafts"
         ? filteredDrafts
-        : filteredActive;
+        : combined;
 
   const featuredAssessment = pending[0] ?? null;
 
