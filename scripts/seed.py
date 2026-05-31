@@ -29,8 +29,8 @@ console = Console()
 DEFAULT_API = os.environ.get("AME_API_URL", "http://localhost:8080")
 
 USERS = [
-    {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "learner"},
-    {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "instructor"},
+    {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "user"},
+    {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "user"},
     {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "admin"},
 ]
 
@@ -187,6 +187,7 @@ QUESTIONS = [
 QUIZ = {
     "title": "Algorithms and Data Structures — Fundamentals",
     "course": "Computer Science",
+    "visibility": "public",
     "objectives": [
         "Understand time complexity of common algorithms",
         "Distinguish between core data structures",
@@ -197,6 +198,7 @@ QUIZ = {
 QUIZ_PYTHON = {
     "title": "Python Essentials",
     "course": "Programming",
+    "visibility": "public",
     "difficulty": "beginner",
     "objectives": [
         "Use Python built-in functions correctly",
@@ -449,7 +451,7 @@ def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     result.cohort_id = cohort_id
     console.print(f"  Created cohort {cohort_id}")
 
-    learners = [u for u in result.users if u["role"] == "learner"]
+    learners = [u for u in result.users if u["email"] == "learner@example.com"]
     enrolled = sum(
         1 for u in learners
         if client.post(f"/v1/cohorts/{cohort_id}/members", json={"userId": u["id"]}, headers=auth).is_success
@@ -464,7 +466,7 @@ def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
         console.print("  [yellow]No quiz — skipping attempts[/yellow]")
         return
 
-    learner = next((u for u in result.users if u["role"] == "learner"), None)
+    learner = next((u for u in result.users if u["email"] == "learner@example.com"), None)
     if not learner:
         console.print("  [yellow]No learner user — skipping attempts[/yellow]")
         return
@@ -586,7 +588,7 @@ def main() -> None:
 
         seed_users(client, result)
 
-        instructor = next((u for u in result.users if u["role"] == "instructor"), None)
+        instructor = next((u for u in result.users if u["email"] == "instructor@example.com"), None)
         if not instructor:
             console.print("[red]No instructor user — cannot seed content[/red]")
             sys.exit(1)

@@ -48,7 +48,7 @@ export default function LoginPage() {
           : `${apiUrl}/v1/auth/login`;
       const body =
         tab === "signup"
-          ? { email, name: fullName, password }
+          ? { email, name: fullName, password, role: "user" }
           : { email, password };
       const response = await fetch(endpoint, {
         method: "POST",
@@ -206,8 +206,9 @@ export default function LoginPage() {
               wordBreak: "break-word",
             }}
           >
-            {`curl -X POST $API/v1/agents/register \\
-  -d '{"accessCode":"…","scopes":["quiz.read"]}'`}
+            {`curl -X POST $API/v1/me/agents \\
+  -H 'Authorization: Bearer <token>' \\
+  -d '{"label":"my-agent","scopes":["quiz.read"]}'`}
           </Box>
           <Typography
             sx={{
@@ -217,9 +218,8 @@ export default function LoginPage() {
               lineHeight: 1.5,
             }}
           >
-            Returns an API key plus the OpenAPI 3.1 schema and skill manifest
-            URLs. Requires an access code from the operator and at least one
-            scope.
+            Returns an API key scoped to your account. Sign in first, then
+            create agents via your account settings.
           </Typography>
         </Box>
 
@@ -339,13 +339,13 @@ export default function LoginPage() {
             </Typography>
             <Typography variant="caption" color="text.secondary">
               <Chip
-                label="POST /v1/agents/register"
+                label="POST /v1/me/agents"
                 size="small"
                 variant="outlined"
                 sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
               />
-              returns a key, schema &amp; skill manifest. Needs an operator
-              access code and a scope list.
+              returns an API key scoped to your account. Create an account, then
+              manage agents from account settings.
             </Typography>
           </Box>
         </Box>
