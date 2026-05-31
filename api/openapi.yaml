@@ -1811,13 +1811,13 @@ components:
       type: object
       required:
       - id
-      - secret
+      - apiKey
       properties:
+        apiKey:
+          type: string
         id:
           type: string
           format: uuid
-        secret:
-          type: string
     CreateAssessmentRequest:
       type: object
       required:

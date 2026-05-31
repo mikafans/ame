@@ -258,6 +258,33 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("assessment.write"),
             strict,
         ),
+        tool(
+            "question.update",
+            "Update a question in the bank.",
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"},"prompt":{"type":"string"},"payload":{"type":"object"},"explanation":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"status":{"type":"string","enum":["draft","live","archived"]}}}),
+            "PATCH",
+            "/v1/questions/{id}",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
+            "question.promote",
+            "Promote one draft question to live.",
+            id_only(),
+            "POST",
+            "/v1/questions/{id}/promote",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
+            "stats.user",
+            "Read the caller's aggregate learning statistics.",
+            json!({"type":"object","properties":{}}),
+            "GET",
+            "/v1/me/stats",
+            Some("stats.read"),
+            strict,
+        ),
         // Session & attempt
         tool(
             "session.create",

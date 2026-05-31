@@ -98,7 +98,7 @@ pub struct CreateAgentBody {
 #[serde(rename_all = "camelCase")]
 pub struct CreateAgentResponse {
     pub id: Uuid,
-    pub secret: String,
+    pub api_key: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -312,7 +312,7 @@ pub async fn list_agents(
     let rows = sqlx::query(
         "SELECT u.id, u.display_name, t.scopes, a.focus_tags, t.last_used_at, u.created_at
          FROM tb_users u
-         JOIN tb_agent_profiles a ON a.user_id = u.id
+         JOIN tb_agent_profiles a ON a.agent_user_id = u.id
          JOIN tb_api_tokens t ON t.user_id = u.id
          WHERE u.owner_user_id = $1 AND u.role = 'agent' AND t.revoked_at IS NULL",
     )
@@ -353,6 +353,20 @@ pub async fn create_agent(
     user: AuthenticatedUser,
     Json(body): Json<CreateAgentBody>,
 ) -> Result<(StatusCode, Json<CreateAgentResponse>), ApiError> {
+    // F3 scope ceiling: free plan may not grant public.publish
+    if body.scopes.iter().any(|s| s == "public.publish") {
+        let plan: String = sqlx::query_scalar("SELECT plan FROM tb_users WHERE id = $1")
+            .bind(user.user.id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        if plan != "premium" {
+            return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+                "public.publish",
+            )));
+        }
+    }
+
     // Check quota
     crate::http::quota::check_quota(
         &state.pool,
@@ -412,7 +426,7 @@ pub async fn create_agent(
         StatusCode::CREATED,
         Json(CreateAgentResponse {
             id: agent_id,
-            secret: format!("{}_{}", token_id, secret),
+            api_key: format!("{}_{}", token_id, secret),
         }),
     ))
 }
@@ -453,7 +467,7 @@ pub async fn update_agent(
     }
 
     if let Some(tags) = &body.focus_tags {
-        sqlx::query("UPDATE tb_agent_profiles SET focus_tags = $1 WHERE user_id = $2")
+        sqlx::query("UPDATE tb_agent_profiles SET focus_tags = $1 WHERE agent_user_id = $2")
             .bind(tags)
             .bind(id)
             .execute(&mut *tx)

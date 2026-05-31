@@ -339,7 +339,9 @@ function KeysTab() {
   // Create agent form state
   const [creating, setCreating] = useState(false);
   const [newAgentLabel, setNewAgentLabel] = useState("");
-  const [newAgentScopes, setNewAgentScopes] = useState<string[]>(["quiz.read"]);
+  const [newAgentScopes, setNewAgentScopes] = useState<string[]>([
+    "assessment.read",
+  ]);
   const [newAgentFocus, setNewAgentFocus] = useState("");
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
 
@@ -357,14 +359,14 @@ function KeysTab() {
 
   const ALL_SCOPES = [
     {
-      value: "quiz.read",
-      label: "quiz.read",
-      desc: "Read quizzes and questions",
+      value: "assessment.read",
+      label: "assessment.read",
+      desc: "Read assessments and questions",
     },
     {
-      value: "quiz.write",
-      label: "quiz.write",
-      desc: "Create, edit, and archive quizzes",
+      value: "assessment.write",
+      label: "assessment.write",
+      desc: "Create, edit, and archive assessments",
     },
     {
       value: "attempt.read",
@@ -434,11 +436,11 @@ function KeysTab() {
             .filter(Boolean),
         },
       });
-      if (data?.secret) {
-        setCreatedSecret(data.secret);
+      if (data?.apiKey) {
+        setCreatedSecret(data.apiKey);
         setNewAgentLabel("");
         setNewAgentFocus("");
-        setNewAgentScopes(["quiz.read"]);
+        setNewAgentScopes(["assessment.read"]);
         loadAgents();
       }
     } catch (err) {

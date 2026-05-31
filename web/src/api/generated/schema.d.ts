@@ -818,9 +818,9 @@ export interface components {
             scopes: string[];
         };
         CreateAgentResponse: {
+            apiKey: string;
             /** Format: uuid */
             id: string;
-            secret: string;
         };
         CreateAssessmentRequest: {
             affectsRating?: boolean;

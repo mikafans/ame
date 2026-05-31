@@ -16,10 +16,10 @@ test("agent-authored quiz renders and is answerable in the UI", async ({
 }) => {
   const token = await loginAs(request, "learner@example.com");
 
-  const listed = await request.get(`${API_URL}/v1/quizzes`, {
+  const listed = await request.get(`${API_URL}/v1/assessments`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const quizzes = (await listed.json()).quizzes as Array<{
+  const quizzes = (await listed.json()).assessments as Array<{
     id: string;
     title: string;
   }>;
@@ -29,7 +29,7 @@ test("agent-authored quiz renders and is answerable in the UI", async ({
   // Start a session the same way the library "Start" button does
   const started = await request.post(`${API_URL}/v1/sessions`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: { quizId: quiz!.id },
+    data: { assessmentId: quiz!.id },
   });
   const sessionId = (await started.json()).sessionId as string;
 

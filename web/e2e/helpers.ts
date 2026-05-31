@@ -161,13 +161,16 @@ export async function firstMcqQuizId(
   token: string,
   minQuestions = 5,
 ): Promise<string> {
-  const listResp = await request.get(`${API_URL}/v1/quizzes?status=active`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  expect(listResp.ok(), "list quizzes").toBeTruthy();
-  const { quizzes } = await listResp.json();
-  for (const q of quizzes as Array<{ id: string }>) {
-    const detail = await request.get(`${API_URL}/v1/quizzes/${q.id}`, {
+  const listResp = await request.get(
+    `${API_URL}/v1/assessments?status=active`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+  expect(listResp.ok(), "list assessments").toBeTruthy();
+  const { assessments } = await listResp.json();
+  for (const q of assessments as Array<{ id: string }>) {
+    const detail = await request.get(`${API_URL}/v1/assessments/${q.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!detail.ok()) continue;

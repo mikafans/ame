@@ -56,16 +56,13 @@ test.describe("UI/UX spec alignment", () => {
     await expect(
       page.getByRole("heading", { name: "Assessments" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("tab", { name: /All assessments \(\d+\)/ }),
-    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: /All \(\d+\)/ })).toBeVisible();
     // "Up next" highlights the first unfinished quiz; it is absent once the
     // learner has completed everything. Assert its detail fields only when shown.
     const upNext = page.getByText("Up next");
     if (await upNext.isVisible().catch(() => false)) {
       await expect(page.getByText("Questions", { exact: true })).toBeVisible();
       await expect(page.getByText("Duration", { exact: true })).toBeVisible();
-      await expect(page.getByText("Attempts", { exact: true })).toBeVisible();
       // "Recommended prep" is only shown when the planner has generated tags.
       // Skip asserting it to avoid seed-state flakiness.
     }

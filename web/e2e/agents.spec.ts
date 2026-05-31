@@ -39,8 +39,8 @@ test.describe("agent management (owner API)", () => {
       data: {
         label: `e2e-agent-${ts}`,
         scopes: [
-          "quiz.read",
-          "quiz.write",
+          "assessment.read",
+          "assessment.write",
           "stats.read",
           "plan.write",
           "plan.read",
@@ -65,7 +65,7 @@ test.describe("agent management (owner API)", () => {
   });
 
   test("agent can list quizzes", async ({ request }) => {
-    const r = await request.get(`${API_URL}/v1/quizzes`, {
+    const r = await request.get(`${API_URL}/v1/assessments`, {
       headers: { Authorization: `Bearer ${agentKey}` },
     });
     expect(r.status()).toBe(200);
@@ -182,7 +182,7 @@ test.describe("scope ceiling — public.publish", () => {
       headers: { Authorization: `Bearer ${freeOwnerToken}` },
       data: {
         label: `e2e-free-ceiling-${ts}`,
-        scopes: ["quiz.read", "public.publish"],
+        scopes: ["assessment.read", "public.publish"],
       },
     });
     expect(r.status()).toBe(403);
@@ -196,7 +196,7 @@ test.describe("scope ceiling — public.publish", () => {
       headers: { Authorization: `Bearer ${freeOwnerToken}` },
       data: {
         label: `e2e-free-ok-${ts}`,
-        scopes: ["quiz.read", "quiz.write"],
+        scopes: ["assessment.read", "assessment.write"],
       },
     });
     expect(r.status()).toBe(201);
@@ -210,7 +210,7 @@ test.describe("scope ceiling — public.publish", () => {
       headers: { Authorization: `Bearer ${premiumOwnerToken}` },
       data: {
         label: `e2e-prem-ceiling-${ts}`,
-        scopes: ["quiz.read", "public.publish"],
+        scopes: ["assessment.read", "public.publish"],
       },
     });
     expect(r.status()).toBe(201);
