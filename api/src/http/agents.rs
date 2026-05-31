@@ -600,7 +600,7 @@ pub async fn run(
         }
         "quiz.update" => {
             require_scope(&auth, Scope::QuizWrite)?;
-            run_quiz_update(&state, auth.owner_id(), body.params).await
+            run_quiz_update(&state, &auth, body.params).await
         }
         "question.create" => {
             require_scope(&auth, Scope::QuizWrite)?;
@@ -801,7 +801,9 @@ fn require_scope(auth: &AuthenticatedUser, needed: Scope) -> Result<(), ApiError
     if auth.token_scopes.contains(&needed) || auth.token_scopes.contains(&Scope::Admin) {
         Ok(())
     } else {
-        Err(ApiError::ScopeRequired(needed.as_str()))
+        Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            needed.as_str(),
+        )))
     }
 }
 
@@ -937,7 +939,7 @@ async fn run_quiz_import(
 /// gating + draft-question auto-promotion as `PATCH /v1/quizzes/{id}`.
 async fn run_quiz_update(
     state: &AppState,
-    owner_id: Uuid,
+    auth: &AuthenticatedUser,
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
     let id = parse_id(&params)?;
@@ -947,7 +949,7 @@ async fn run_quiz_update(
             message: format!("invalid quiz patch: {e}"),
         }])
     })?;
-    let updated = super::quizzes::apply_quiz_patch(&state.pool, id, owner_id, patch).await?;
+    let updated = super::quizzes::apply_quiz_patch(&state.pool, id, auth, patch).await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "quiz.update".into(),

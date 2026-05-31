@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::json;
+use std::borrow::Cow;
 use tracing::error;
 
 #[derive(thiserror::Error, Debug)]
@@ -11,7 +12,7 @@ pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
     #[error("scope required: {0}")]
-    ScopeRequired(&'static str),
+    ScopeRequired(Cow<'static, str>),
     #[error("not found: {resource}")]
     NotFound { resource: &'static str },
     #[error("validation failed")]

@@ -192,7 +192,9 @@ pub async fn create_key(
     let requesting_admin = user.token_scopes.contains(&Scope::Admin)
         || matches!(user.user.role, crate::domain::user::Role::Admin);
     if body.scopes.contains(&"admin".to_string()) && !requesting_admin {
-        return Err(ApiError::ScopeRequired(Scope::Admin.as_str()));
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            Scope::Admin.as_str(),
+        )));
     }
 
     // Validate all requested scopes are known
@@ -378,12 +380,21 @@ pub async fn create_agent(
         }]));
     }
 
+    let plan = crate::http::quota::resolve_plan(&state.pool, user.owner_id()).await?;
+    let ceiling = crate::http::quota::plan_scope_ceiling(plan);
+
     for s in &body.scopes {
-        if s.parse::<Scope>().is_err() {
-            return Err(ApiError::Validation(vec![FieldError {
+        let parsed: Scope = s.parse().map_err(|_| {
+            ApiError::Validation(vec![FieldError {
                 field: "scopes".into(),
                 message: format!("unknown scope: {s}"),
-            }]));
+            }])
+        })?;
+
+        if !ceiling.contains(&parsed) {
+            return Err(ApiError::ScopeRequired(std::borrow::Cow::Owned(format!(
+                "scope '{s}' is not permitted for your plan"
+            ))));
         }
     }
 

@@ -164,7 +164,9 @@ pub async fn create_session(
     if !auth.token_scopes.contains(&Scope::AttemptWrite)
         && !auth.token_scopes.contains(&Scope::Admin)
     {
-        return Err(ApiError::ScopeRequired("attempt.write"));
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "attempt.write",
+        )));
     }
 
     // Visibility check

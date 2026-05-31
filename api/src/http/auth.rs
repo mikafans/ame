@@ -250,6 +250,7 @@ fn scopes_for_role(role: &str) -> Vec<&'static str> {
             "feedback.write",
             "plan.read",
             "plan.write",
+            "public.publish",
         ],
     }
 }

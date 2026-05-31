@@ -324,13 +324,22 @@ pub struct PatchQuizResponse {
 )]
 async fn patch_quiz(
     State(state): State<AppState>,
-    auth: RequireAnyScope<QuizWriteScopes>,
+    auth: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(body): Json<QuizPatch>,
 ) -> Result<Json<PatchQuizResponse>, ApiError> {
-    Ok(Json(
-        apply_quiz_patch(&state.pool, id, auth.0.owner_id(), body).await?,
-    ))
+    if !auth
+        .token_scopes
+        .contains(&crate::domain::user::Scope::QuizWrite)
+        && !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::Admin)
+    {
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "quiz.write",
+        )));
+    }
+    Ok(Json(apply_quiz_patch(&state.pool, id, &auth, body).await?))
 }
 
 /// Apply a quiz patch: existence check, publish gating + draft-question
@@ -339,9 +348,10 @@ async fn patch_quiz(
 pub(crate) async fn apply_quiz_patch(
     pool: &sqlx::PgPool,
     id: Uuid,
-    owner_id: Uuid,
+    auth: &AuthenticatedUser,
     body: QuizPatch,
 ) -> Result<PatchQuizResponse, ApiError> {
+    let owner_id = auth.owner_id;
     // Verify quiz exists and is owned by caller
     let quiz_row = sqlx::query(
         "SELECT id, title, status, visibility, objectives, created_by FROM tb_quizzes WHERE id = $1",
@@ -364,6 +374,19 @@ pub(crate) async fn apply_quiz_patch(
     if new_visibility == "public" && current_visibility != "public" {
         crate::http::quota::check_quota(pool, owner_id, crate::http::quota::QuotaKind::PublicQuiz)
             .await?;
+
+        // Enforce PublicPublish scope
+        if !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::PublicPublish)
+            && !auth
+                .token_scopes
+                .contains(&crate::domain::user::Scope::Admin)
+        {
+            return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+                "public.publish",
+            )));
+        }
     }
 
     // Publish gating
@@ -508,7 +531,9 @@ async fn create_quiz(
 ) -> Result<(axum::http::StatusCode, Json<CreateQuizResponse>), ApiError> {
     if !auth.token_scopes.contains(&Scope::QuizWrite) && !auth.token_scopes.contains(&Scope::Admin)
     {
-        return Err(ApiError::ScopeRequired("quiz.write"));
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "quiz.write",
+        )));
     }
 
     let objectives = body.objectives.unwrap_or_default();
@@ -522,9 +547,21 @@ async fn create_quiz(
             crate::http::quota::QuotaKind::PublicQuiz,
         )
         .await?;
+
+        // Enforce PublicPublish scope
+        if !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::PublicPublish)
+            && !auth
+                .token_scopes
+                .contains(&crate::domain::user::Scope::Admin)
+        {
+            return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+                "public.publish",
+            )));
+        }
     }
 
-    // TODO: P4 — plan-gate public publishing
     // TODO: P6 — audit log entry for public publishing
 
     let result = sqlx::query(

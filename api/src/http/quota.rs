@@ -1,6 +1,5 @@
-//! Quota and plan management.
-
-use crate::domain::error::ApiError;
+/// Quota and plan management.
+use crate::domain::{error::ApiError, user::Scope};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -18,19 +17,49 @@ pub enum QuotaKind {
     AgentCreation,
 }
 
-/// Checks if the owner has quota available for the given kind of action.
-pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Result<(), ApiError> {
-    // 1. Resolve owner plan
+pub async fn resolve_plan(pool: &PgPool, owner_id: Uuid) -> Result<Plan, ApiError> {
     let plan_str: String = sqlx::query_scalar("SELECT plan FROM tb_users WHERE id = $1")
         .bind(owner_id)
         .fetch_one(pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let plan: Plan = match plan_str.as_str() {
+    Ok(match plan_str.as_str() {
         "premium" => Plan::Premium,
         _ => Plan::Free,
-    };
+    })
+}
+
+/// Returns the maximum set of scopes permitted for an agent under a given plan.
+pub fn plan_scope_ceiling(plan: Plan) -> Vec<Scope> {
+    match plan {
+        Plan::Premium => vec![
+            Scope::QuizRead,
+            Scope::QuizWrite,
+            Scope::AttemptRead,
+            Scope::AttemptWrite,
+            Scope::StatsRead,
+            Scope::FeedbackWrite,
+            Scope::PlanRead,
+            Scope::PlanWrite,
+            Scope::PublicPublish,
+        ],
+        Plan::Free => vec![
+            Scope::QuizRead,
+            Scope::QuizWrite,
+            Scope::AttemptRead,
+            Scope::AttemptWrite,
+            Scope::StatsRead,
+            Scope::FeedbackWrite,
+            Scope::PlanRead,
+            Scope::PlanWrite,
+        ],
+    }
+}
+/// Checks if the owner has quota available for the given kind of action.
+pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Result<(), ApiError> {
+    // 1. Resolve owner plan
+    let plan = resolve_plan(pool, owner_id).await?;
 
     // 2. Define quota limits
     let limit = match (plan, kind) {

@@ -48,6 +48,8 @@ pub enum Scope {
     PlanRead,
     #[serde(rename = "plan.write")]
     PlanWrite,
+    #[serde(rename = "public.publish")]
+    PublicPublish,
     #[serde(rename = "admin")]
     Admin,
 }
@@ -67,6 +69,7 @@ impl Scope {
             Scope::FeedbackWrite => "feedback.write",
             Scope::PlanRead => "plan.read",
             Scope::PlanWrite => "plan.write",
+            Scope::PublicPublish => "public.publish",
             Scope::Admin => "admin",
         }
     }
@@ -95,6 +98,7 @@ impl FromStr for Scope {
             "feedback.write" => Ok(Scope::FeedbackWrite),
             "plan.read" => Ok(Scope::PlanRead),
             "plan.write" => Ok(Scope::PlanWrite),
+            "public.publish" => Ok(Scope::PublicPublish),
             "admin" => Ok(Scope::Admin),
             other => Err(UnknownScope(other.to_string())),
         }
@@ -116,6 +120,7 @@ mod tests {
             Scope::FeedbackWrite,
             Scope::PlanRead,
             Scope::PlanWrite,
+            Scope::PublicPublish,
             Scope::Admin,
         ] {
             let s = scope.as_str();

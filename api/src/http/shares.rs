@@ -296,7 +296,9 @@ pub async fn revoke_share(
     let owner_id: Uuid = row.get("created_by_user_id");
     let is_admin = matches!(user.0.user.role, Role::Admin);
     if owner_id != user.0.user.id && !is_admin {
-        return Err(ApiError::ScopeRequired("owner or admin"));
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "owner or admin",
+        )));
     }
 
     sqlx::query("UPDATE tb_share_links SET revoked_at = now() WHERE id = $1")

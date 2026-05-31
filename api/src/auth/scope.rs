@@ -47,7 +47,9 @@ where
         if !auth_user.token_scopes.contains(&T::SCOPE) {
             // ApiError::ScopeRequired carries a &'static str for the wire payload;
             // Scope::as_str is `const fn` so this remains a zero-cost lookup.
-            return Err(ApiError::ScopeRequired(T::SCOPE.as_str()));
+            return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+                T::SCOPE.as_str(),
+            )));
         }
 
         Ok(RequireScope(auth_user, std::marker::PhantomData))
@@ -81,7 +83,9 @@ where
         if T::SCOPES.iter().any(|s| auth_user.token_scopes.contains(s)) {
             Ok(RequireAnyScope(auth_user, std::marker::PhantomData))
         } else {
-            Err(ApiError::ScopeRequired(T::SCOPES[0].as_str()))
+            Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+                T::SCOPES[0].as_str(),
+            )))
         }
     }
 }

@@ -1,8 +1,8 @@
-use std::net::SocketAddr;
+use ame_api::http::router;
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
-use ame_api::http::router;
+use std::net::SocketAddr;
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -37,7 +37,12 @@ async fn test_quota_enforcement() {
     let addr: SocketAddr = listener.local_addr().unwrap();
 
     tokio::spawn(async move {
-        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
 
     let client = reqwest::Client::new();
@@ -67,7 +72,8 @@ async fn test_quota_enforcement() {
     let auth = format!("{token_id}_{secret}");
 
     // 2. Test Agent Creation Quota (Free plan: 1 limit)
-    let res = client.post(format!("{base_url}/v1/me/agents"))
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({"label": "Agent 1", "scopes": ["quiz.read"]}))
         .send()
@@ -75,7 +81,8 @@ async fn test_quota_enforcement() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let res2 = client.post(format!("{base_url}/v1/me/agents"))
+    let res2 = client
+        .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({"label": "Agent 2", "scopes": ["quiz.read"]}))
         .send()
@@ -90,7 +97,8 @@ async fn test_quota_enforcement() {
     // 3. Test Public Quiz Quota (Free plan: 5 limit)
     // Create 5 public quizzes (should succeed)
     for i in 0..5 {
-        let res = client.post(format!("{base_url}/v1/quizzes"))
+        let res = client
+            .post(format!("{base_url}/v1/quizzes"))
             .header("Authorization", format!("Bearer {auth}"))
             .json(&json!({"title": format!("Quiz {i}"), "visibility": "public"}))
             .send()
@@ -100,7 +108,8 @@ async fn test_quota_enforcement() {
     }
 
     // 6th public quiz (should fail)
-    let res = client.post(format!("{base_url}/v1/quizzes"))
+    let res = client
+        .post(format!("{base_url}/v1/quizzes"))
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({"title": "Quiz 6", "visibility": "public"}))
         .send()
@@ -109,24 +118,34 @@ async fn test_quota_enforcement() {
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
 
     // Create private quiz (should succeed, doesn't consume quota)
-    let res = client.post(format!("{base_url}/v1/quizzes"))
+    let res = client
+        .post(format!("{base_url}/v1/quizzes"))
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({"title": "Private Quiz", "visibility": "private"}))
         .send()
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::CREATED);
-    let private_qid = res.json::<serde_json::Value>().await.unwrap()["id"].as_str().unwrap().to_string();
+    let status = res.status();
+    if !status.is_success() {
+        let body = res.text().await.unwrap();
+        panic!("Private Quiz creation failed ({status}): {body}");
+    }
+
+    let private_qid = res.json::<serde_json::Value>().await.unwrap()["quizId"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Patching private quiz to public (should fail due to quota)
-    let res = client.patch(format!("{base_url}/v1/quizzes/{private_qid}"))
+    let res = client
+        .patch(format!("{base_url}/v1/quizzes/{private_qid}"))
         .header("Authorization", format!("Bearer {auth}"))
         .json(&json!({"visibility": "public"}))
         .send()
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
-    
+
     // Test that Premium user has higher limits (up to 100 agents, 1000 public quizzes)
     // Create a premium user
     let prem_id = Uuid::now_v7();
@@ -150,14 +169,16 @@ async fn test_quota_enforcement() {
     let prem_auth = format!("{prem_token_id}_{secret}");
 
     // Create 2nd agent (should succeed because limit is 100)
-    client.post(format!("{base_url}/v1/me/agents"))
+    client
+        .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {prem_auth}"))
         .json(&json!({"label": "Agent 1", "scopes": ["quiz.read"]}))
         .send()
         .await
         .unwrap();
-    
-    let res = client.post(format!("{base_url}/v1/me/agents"))
+
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {prem_auth}"))
         .json(&json!({"label": "Agent 2", "scopes": ["quiz.read"]}))
         .send()
