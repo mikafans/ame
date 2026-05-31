@@ -31,7 +31,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private) */
-        post: operations["moderate_quiz"];
+        post: operations["moderate_assessment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1024,7 +1024,7 @@ export interface components {
         };
         ModerateBody: {
             /** Format: uuid */
-            quizId: string;
+            assessmentId: string;
         };
         PatchSessionBody: {
             status: components["schemas"]["SessionStatus"];
@@ -1357,7 +1357,7 @@ export interface operations {
             };
         };
     };
-    moderate_quiz: {
+    moderate_assessment: {
         parameters: {
             query?: never;
             header?: never;

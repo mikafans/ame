@@ -103,7 +103,7 @@ use crate::{
         crate::http::admin::list_users,
         crate::http::admin::patch_user_admin,
         crate::http::admin::list_audit_logs,
-        crate::http::admin::moderate_quiz,
+        crate::http::admin::moderate_assessment,
     ),
     components(schemas(
         User,

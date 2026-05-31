@@ -30,7 +30,7 @@ paths:
       tags:
       - admin
       summary: POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private)
-      operationId: moderate_quiz
+      operationId: moderate_assessment
       requestBody:
         content:
           application/json:
@@ -2373,9 +2373,9 @@ components:
     ModerateBody:
       type: object
       required:
-      - quizId
+      - assessmentId
       properties:
-        quizId:
+        assessmentId:
           type: string
           format: uuid
     PatchSessionBody:

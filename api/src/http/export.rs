@@ -7,7 +7,7 @@ use crate::{auth::extractor::AuthenticatedUser, domain::error::ApiError, http::A
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportResponse {
-    pub quizzes: serde_json::Value,
+    pub assessments: serde_json::Value,
     pub questions: serde_json::Value,
     pub sessions: serde_json::Value,
     pub attempts: serde_json::Value,
@@ -16,7 +16,7 @@ pub struct ExportResponse {
 
 /// GET /v1/me/export — export premium-only owner data bundle
 ///
-/// Returns quizzes, questions, sessions, attempts, and tag ratings owned by this user
+/// Returns assessments, questions, sessions, attempts, and tag ratings owned by this user
 /// and any of their agents. Premium plan required, throttled via governor, audited.
 #[utoipa::path(
     get,
@@ -45,10 +45,10 @@ pub async fn export_data(
     let pool = &state.pool;
     let owner_id = auth.owner_id();
 
-    // 2. Export quizzes
-    let quizzes: serde_json::Value = sqlx::query_scalar(
+    // 2. Export assessments
+    let assessments: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
-             SELECT * FROM tb_quizzes 
+             SELECT * FROM tb_assessments 
              WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
          ) q",
     )
@@ -120,7 +120,7 @@ pub async fn export_data(
     );
 
     Ok(Json(ExportResponse {
-        quizzes,
+        assessments,
         questions,
         sessions,
         attempts,

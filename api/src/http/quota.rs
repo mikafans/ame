@@ -73,9 +73,9 @@ pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Resu
     // 3. Count current usage
     let usage: i64 = match kind {
         QuotaKind::PublicQuiz => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_quizzes q 
-                 WHERE q.created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
-                 AND q.visibility = 'public'",
+            "SELECT COUNT(*) FROM tb_assessments a
+                  WHERE a.created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
+                  AND a.visibility = 'public'",
         )
         .bind(owner_id)
         .fetch_one(pool)
