@@ -109,10 +109,22 @@ export default function LibraryPage() {
   const applyVisibility = (list: Assessment[]) => {
     if (visibilityFilter === "public")
       return list.filter((a) => a.visibility === "public");
-    if (visibilityFilter === "mine")
-      return list.filter(
+    if (visibilityFilter === "mine") {
+      console.log(
+        "Mine filter input:",
+        list.map((a) => ({
+          id: a.id,
+          title: a.title,
+          visibility: a.visibility,
+          status: a.status,
+        })),
+      );
+      const filtered = list.filter(
         (a) => a.visibility === "private" || a.status === "draft",
       );
+      console.log("Mine filter results:", filtered);
+      return filtered;
+    }
     return list;
   };
 
@@ -122,13 +134,24 @@ export default function LibraryPage() {
   const pending = filteredActive.filter((a) => !a.completed);
   const completed = filteredActive.filter((a) => a.completed);
 
-  const combined = [...filteredActive, ...filteredDrafts];
+  const allAssessments = [...filteredActive, ...filteredDrafts];
+  console.log(
+    "Tab:",
+    tab,
+    "FilteredActive:",
+    filteredActive,
+    "FilteredDrafts:",
+    filteredDrafts,
+    "All:",
+    allAssessments,
+  );
+
   const listed =
     tab === "completed"
       ? completed
       : tab === "drafts"
         ? filteredDrafts
-        : combined;
+        : allAssessments;
 
   const featuredAssessment = pending[0] ?? null;
 
@@ -291,7 +314,7 @@ export default function LibraryPage() {
         >
           <Tab
             value="all"
-            label={`All (${filteredActive.length})`}
+            label={`All (${allAssessments.length})`}
             id="tab-all"
           />
           {completed.length > 0 && (
