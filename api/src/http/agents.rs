@@ -352,13 +352,15 @@ async fn run_assessment_create(
     auth: &AuthenticatedUser,
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
-    let req: crate::domain::assessment::CreateAssessmentRequest = serde_json::from_value(params).map_err(|e| {
-        ApiError::Validation(vec![FieldError {
-            field: "params".into(),
-            message: format!("invalid create request: {e}"),
-        }])
-    })?;
-    let res = super::assessments::create_assessment(auth.clone(), State(state.clone()), Json(req)).await?;
+    let req: crate::domain::assessment::CreateAssessmentRequest = serde_json::from_value(params)
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid create request: {e}"),
+            }])
+        })?;
+    let res = super::assessments::create_assessment(auth.clone(), State(state.clone()), Json(req))
+        .await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "assessment.create".into(),
@@ -373,13 +375,20 @@ async fn run_assessment_update(
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
     let id = parse_id(&params)?;
-    let req: crate::domain::assessment::UpdateAssessmentRequest = serde_json::from_value(params).map_err(|e| {
-        ApiError::Validation(vec![FieldError {
-            field: "params".into(),
-            message: format!("invalid update request: {e}"),
-        }])
-    })?;
-    let res = super::assessments::patch_assessment(auth.clone(), State(state.clone()), Path(id), Json(req)).await?;
+    let req: crate::domain::assessment::UpdateAssessmentRequest = serde_json::from_value(params)
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid update request: {e}"),
+            }])
+        })?;
+    let res = super::assessments::patch_assessment(
+        auth.clone(),
+        State(state.clone()),
+        Path(id),
+        Json(req),
+    )
+    .await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "assessment.update".into(),
@@ -394,9 +403,18 @@ async fn run_question_create(
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
     use crate::bank::questions as repo;
-    let questions: Vec<repo::QuestionInsert> = params.get("questions").cloned().map(serde_json::from_value).transpose().map_err(|e| {
-        ApiError::Validation(vec![FieldError { field: "questions".into(), message: format!("invalid questions array: {e}") }])
-    })?.unwrap_or_default();
+    let questions: Vec<repo::QuestionInsert> = params
+        .get("questions")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "questions".into(),
+                message: format!("invalid questions array: {e}"),
+            }])
+        })?
+        .unwrap_or_default();
     let created = repo::create_questions(&state.pool, *user_id, questions).await?;
     Ok(Json(RunResponse {
         ok: true,
@@ -410,14 +428,23 @@ fn require_scope(auth: &AuthenticatedUser, needed: Scope) -> Result<(), ApiError
     if auth.token_scopes.contains(&needed) || auth.token_scopes.contains(&Scope::Admin) {
         Ok(())
     } else {
-        Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(needed.as_str())))
+        Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            needed.as_str(),
+        )))
     }
 }
 
 fn parse_id(params: &Value) -> Result<Uuid, ApiError> {
-    params.get("id").and_then(|v| v.as_str()).and_then(|s| Uuid::parse_str(s).ok()).ok_or_else(|| {
-        ApiError::Validation(vec![FieldError { field: "id".into(), message: "missing or invalid id".into() }])
-    })
+    params
+        .get("id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            ApiError::Validation(vec![FieldError {
+                field: "id".into(),
+                message: "missing or invalid id".into(),
+            }])
+        })
 }
 
 pub fn public_router(state: AppState) -> Router<AppState> {

@@ -111,7 +111,9 @@ export default function ResultsPage({
           answers: questions.map((q: any) => {
             const attempt = byQuestion.get(q.questionId);
             const r = attempt?.response as Record<string, unknown> | undefined;
-            const p = attempt?.presentation as Record<string, unknown> | undefined;
+            const p = attempt?.presentation as
+              | Record<string, unknown>
+              | undefined;
             const ca = attempt?.correct_answer as
               | Record<string, unknown>
               | undefined;

@@ -181,7 +181,7 @@ export default function AuthorStudioPage({
           explanation: editExplanation || undefined,
           points: editPoints,
           tags: tags.length > 0 ? tags : undefined,
-          payload: (payloadOverride ?? editPayload) as any,
+          payload: payloadOverride ?? editPayload,
         },
       });
       load();
@@ -214,7 +214,9 @@ export default function AuthorStudioPage({
     if (selectedId === idToDelete)
       setSelectedId(remaining.length > 0 ? remaining[0].id : null);
     setQuiz((q) =>
-      q ? { ...q, questions: q.questions.filter((qq) => qq.id !== idToDelete) } : q,
+      q
+        ? { ...q, questions: q.questions.filter((qq) => qq.id !== idToDelete) }
+        : q,
     );
     try {
       await api.DELETE("/v1/assessments/{id}/questions/{question_id}", {
@@ -344,7 +346,7 @@ export default function AuthorStudioPage({
           <Button
             variant="outlined"
             size="small"
-            onClick={() => router.push(`/assessments/${quizId}/preview`)}
+            onClick={() => router.push(`/assessments/${id}/preview`)}
           >
             Preview
           </Button>

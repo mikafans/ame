@@ -26,7 +26,7 @@ use utoipa::ToSchema;
 // End of router
 // Helper to convert UTC to JST
 fn to_jst(dt: OffsetDateTime) -> OffsetDateTime {
-    dt.to_offset(UtcOffset::from_hms(9, 0, 0).unwrap())
+    dt.to_offset(UtcOffset::from_hms(9, 0, 0).expect("UTC+9 is a valid fixed offset"))
 }
 use uuid::Uuid;
 
@@ -281,7 +281,8 @@ pub async fn list_assessments(
     };
 
     let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
-    let assessments = rows.iter()
+    let assessments = rows
+        .iter()
         .map(|row| AssessmentSummary {
             id: row.get("id"),
             title: row.get("title"),
@@ -361,23 +362,26 @@ pub async fn create_assessment(
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
-    Ok((StatusCode::CREATED, Json(AssessmentSummary {
-        id: assessment_id,
-        title: payload.title,
-        description: payload.description,
-        mode: payload.mode.to_string(),
-        status: "draft".to_string(),
-        visibility,
-        course: payload.course,
-        objectives: payload.objectives,
-        duration_min: payload.duration_min,
-        total_points: 0,
-        question_count: 0,
-        completed: false,
-        last_session_id: None,
-        created_at: to_jst(OffsetDateTime::now_utc()),
-        updated_at: to_jst(OffsetDateTime::now_utc()),
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(AssessmentSummary {
+            id: assessment_id,
+            title: payload.title,
+            description: payload.description,
+            mode: payload.mode.to_string(),
+            status: "draft".to_string(),
+            visibility,
+            course: payload.course,
+            objectives: payload.objectives,
+            duration_min: payload.duration_min,
+            total_points: 0,
+            question_count: 0,
+            completed: false,
+            last_session_id: None,
+            created_at: to_jst(OffsetDateTime::now_utc()),
+            updated_at: to_jst(OffsetDateTime::now_utc()),
+        }),
+    ))
 }
 
 #[utoipa::path(
@@ -815,13 +819,11 @@ pub async fn remove_assessment_question(
         });
     }
 
-    sqlx::query(
-        "UPDATE tb_assessment_sections SET items_count = items_count - 1 WHERE id = $1",
-    )
-    .bind(section_id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    sqlx::query("UPDATE tb_assessment_sections SET items_count = items_count - 1 WHERE id = $1")
+        .bind(section_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
     // Delete the inline question if it's a draft not used by any other section
     sqlx::query(
@@ -986,7 +988,8 @@ pub async fn explore(
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
     let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
-    let assessments = rows.iter()
+    let assessments = rows
+        .iter()
         .map(|row| AssessmentSummary {
             id: row.get("id"),
             title: row.get("title"),

@@ -38,7 +38,13 @@ test.describe("assessment visibility", () => {
     ): Promise<string> {
       const r = await request.post(`${API_URL}/v1/assessments`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
-        data: { title, visibility, mode: "practice", objectives: [], method: "manual" },
+        data: {
+          title,
+          visibility,
+          mode: "practice",
+          objectives: [],
+          method: "manual",
+        },
       });
       expect(r.status(), `create ${visibility} assessment`).toBe(201);
       const body = await r.json();
@@ -62,14 +68,20 @@ test.describe("assessment visibility", () => {
       return id;
     }
 
-    privateAssessmentId = await createAssessment("private", `e2e-private-${ts}`);
+    privateAssessmentId = await createAssessment(
+      "private",
+      `e2e-private-${ts}`,
+    );
     publicAssessmentId = await createAssessment("public", `e2e-public-${ts}`);
   });
 
   test("owner can list their own private assessment", async ({ request }) => {
-    const r = await request.get(`${API_URL}/v1/assessments/${privateAssessmentId}`, {
-      headers: { Authorization: `Bearer ${ownerToken}` },
-    });
+    const r = await request.get(
+      `${API_URL}/v1/assessments/${privateAssessmentId}`,
+      {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+      },
+    );
     expect(r.status()).toBe(200);
   });
 

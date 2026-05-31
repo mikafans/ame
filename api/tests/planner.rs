@@ -61,15 +61,13 @@ fn mc_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
     QuestionInsert {
         kind: QuestionKind::Mc,
         prompt: prompt.to_string(),
-        code_snippet: None,
         payload: serde_json::to_value(McPayload {
             options: vec!["a".into(), "b".into(), "c".into()],
             correct_index: 1,
         })
         .unwrap(),
         explanation: None,
-        source: None,
-        points: 1,
+        points: Some(1),
         tags: tags.iter().map(|tag| tag.to_string()).collect(),
     }
 }
@@ -78,7 +76,6 @@ fn short_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
     QuestionInsert {
         kind: QuestionKind::Short,
         prompt: prompt.to_string(),
-        code_snippet: None,
         payload: serde_json::to_value(ShortPayload {
             accepted: vec!["answer".into()],
             normalize: Normalize::Exact,
@@ -86,8 +83,7 @@ fn short_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
         })
         .unwrap(),
         explanation: None,
-        source: None,
-        points: 1,
+        points: Some(1),
         tags: tags.iter().map(|tag| tag.to_string()).collect(),
     }
 }

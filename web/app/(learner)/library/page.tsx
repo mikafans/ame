@@ -393,7 +393,9 @@ export default function LibraryPage() {
                       <Chip
                         icon={
                           assessment.visibility === "public" ? (
-                            <PublicIcon sx={{ fontSize: "0.85rem !important" }} />
+                            <PublicIcon
+                              sx={{ fontSize: "0.85rem !important" }}
+                            />
                           ) : (
                             <LockOutlinedIcon
                               sx={{ fontSize: "0.85rem !important" }}
@@ -457,15 +459,17 @@ export default function LibraryPage() {
                   </Box>
 
                   {/* Action buttons */}
-                  <Stack direction="row" spacing={1} sx={{ ml: 2, flexShrink: 0 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ ml: 2, flexShrink: 0 }}
+                  >
                     {assessment.status === "draft" ? (
                       <Button
                         size="small"
                         variant="outlined"
                         startIcon={<EditOutlinedIcon />}
-                        onClick={() =>
-                          router.push(`/author/${assessment.id}`)
-                        }
+                        onClick={() => router.push(`/author/${assessment.id}`)}
                       >
                         Edit
                       </Button>
@@ -475,9 +479,7 @@ export default function LibraryPage() {
                           size="small"
                           variant="outlined"
                           onClick={() =>
-                            router.push(
-                              `/assessments/${assessment.id}/preview`,
-                            )
+                            router.push(`/assessments/${assessment.id}/preview`)
                           }
                         >
                           Preview

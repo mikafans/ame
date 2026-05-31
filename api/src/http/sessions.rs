@@ -173,7 +173,9 @@ pub async fn create_session(
             .fetch_optional(&state.pool)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?
-            .ok_or(ApiError::NotFound { resource: "assessment" })?;
+            .ok_or(ApiError::NotFound {
+                resource: "assessment",
+            })?;
     }
 
     let CreatePlan {
@@ -182,7 +184,7 @@ pub async fn create_session(
         questions,
         affects_rating: ar_override,
     } = build_plan(&state.pool, auth.user.id, &body).await?;
-    
+
     let question_plan = QuestionPlan {
         items: questions
             .iter()
@@ -563,14 +565,16 @@ async fn build_plan(
 }
 
 async fn build_assessment_plan(pool: &PgPool, assessment_id: Uuid) -> Result<CreatePlan, ApiError> {
-    let row = sqlx::query("SELECT mode, affects_rating FROM tb_assessments WHERE id = $1 AND status = 'active'")
-        .bind(assessment_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(internal)?
-        .ok_or(ApiError::NotFound {
-            resource: "assessment",
-        })?;
+    let row = sqlx::query(
+        "SELECT mode, affects_rating FROM tb_assessments WHERE id = $1 AND status = 'active'",
+    )
+    .bind(assessment_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(internal)?
+    .ok_or(ApiError::NotFound {
+        resource: "assessment",
+    })?;
 
     let mode_str: String = row.get("mode");
     let affects_rating: bool = row.get("affects_rating");

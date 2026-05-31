@@ -77,11 +77,9 @@ fn mc_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
     QuestionInsert {
         kind: QuestionKind::Mc,
         prompt: prompt.to_string(),
-        code_snippet: None,
         payload,
         explanation: None,
-        source: None,
-        points: 1,
+        points: Some(1),
         tags: tags.iter().map(|s| s.to_string()).collect(),
     }
 }
@@ -143,7 +141,7 @@ async fn create_questions_batch_inserts_and_links_tags() {
         tag: Some("rust:async".into()),
         ..Default::default()
     };
-    let listed = q_repo::list_questions(&pool, &filter).await.unwrap();
+    let listed = q_repo::list_questions(&pool, filter, 100, 0).await.unwrap();
     let listed_ids: Vec<Uuid> = listed.into_iter().map(|q| q.id).collect();
 
     let mut found_count = 0;
@@ -209,7 +207,7 @@ async fn update_live_question_bumps_version_and_writes_history() {
     assert_eq!(updated.version, 2, "live edit must bump version");
     assert_eq!(updated.prompt, "live-q updated");
 
-    let versions = q_repo::list_question_versions(&pool, q.id).await.unwrap();
+    let versions = q_repo::get_question_versions(&pool, q.id).await.unwrap();
     assert_eq!(
         versions.len(),
         1,
@@ -242,7 +240,7 @@ async fn update_draft_question_does_not_bump_version() {
     assert_eq!(updated.version, 1, "draft edit must not bump version");
     assert_eq!(updated.prompt, "draft-q updated");
 
-    let versions = q_repo::list_question_versions(&pool, q.id).await.unwrap();
+    let versions = q_repo::get_question_versions(&pool, q.id).await.unwrap();
     assert!(versions.is_empty(), "draft edit must not snapshot");
 }
 

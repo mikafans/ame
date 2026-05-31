@@ -19,7 +19,7 @@ use ame_api::{
 
 struct WriteQuestionsScope;
 impl ScopeConstraint for WriteQuestionsScope {
-    const SCOPE: Scope = Scope::QuizWrite;
+    const SCOPE: Scope = Scope::AssessmentWrite;
 }
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");

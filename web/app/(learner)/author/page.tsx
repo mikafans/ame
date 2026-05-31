@@ -68,7 +68,8 @@ export default function AuthorIndexPage() {
         .GET("/v1/assessments", { params: { query: { status: "draft" } } })
         .then(({ data }) => {
           if (data) {
-            const list = "assessments" in data ? (data as any).assessments : data;
+            const list =
+              "assessments" in data ? (data as any).assessments : data;
             const mappedDrafts = (list as any[]).map((d: any) => ({
               id: d.id,
               title: d.title,

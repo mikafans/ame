@@ -1,7 +1,7 @@
-use std::str::FromStr;
-/// Quiz/exam sessions engine logic.
+//! Quiz/exam sessions engine logic.
 
 use std::collections::{BTreeMap, HashMap};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -103,29 +103,32 @@ pub fn answer_session(
     if input.session.status != SessionStatus::InProgress {
         return Err(ApiError::SessionFinished);
     }
-    if let Some(deadline) = input.session.deadline_at {
-        if input.now > deadline {
-            return Err(ApiError::ExamExpired);
-        }
+    if let Some(deadline) = input.session.deadline_at
+        && input.now > deadline
+    {
+        return Err(ApiError::ExamExpired);
     }
 
-    if let Some(prev) = existing_attempts.get(&input.question.question_id) {
-        if prev.response == input.response {
-            return Ok(AnswerOutcome {
-                attempt: prev.clone(),
-                grade: GradeOutcome {
-                    status: GradeStatus::from_str(&prev.grade_status)
-                        .map_err(|_| ApiError::Internal(anyhow::anyhow!("invalid grade status")))?,
-                    correct: prev.is_correct,
-                    points_awarded: (prev.score * input.question.max_points as f64) as i32,
-                    max: input.question.max_points,
-                    correct_answer: prev.correct_answer.clone().unwrap_or(serde_json::Value::Null),
-                    note: prev.grader_notes.clone(),
-                },
-                elo: None,
-                replayed: true,
-            });
-        }
+    if let Some(prev) = existing_attempts.get(&input.question.question_id)
+        && prev.response == input.response
+    {
+        return Ok(AnswerOutcome {
+            attempt: prev.clone(),
+            grade: GradeOutcome {
+                status: GradeStatus::from_str(&prev.grade_status)
+                    .map_err(|_| ApiError::Internal(anyhow::anyhow!("invalid grade status")))?,
+                correct: prev.is_correct,
+                points_awarded: (prev.score * input.question.max_points as f64) as i32,
+                max: input.question.max_points,
+                correct_answer: prev
+                    .correct_answer
+                    .clone()
+                    .unwrap_or(serde_json::Value::Null),
+                note: prev.grader_notes.clone(),
+            },
+            elo: None,
+            replayed: true,
+        });
     }
 
     let presentation = input
@@ -271,7 +274,7 @@ fn map_grade_error(err: GradeError) -> ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::elo::{DEFAULT_RATING};
+    use crate::domain::session::PlanItem;
 
     fn now() -> time::OffsetDateTime {
         time::OffsetDateTime::from_unix_timestamp(1_700_000_000).unwrap()
@@ -353,7 +356,7 @@ mod tests {
                 user_id: session.user_id,
                 question_id: qid1,
                 question_version: 1,
-                session_id: session.id,
+                session_id: Some(session.id),
                 response: AttemptResponse::Short {
                     answer: "ok".into(),
                 },
@@ -375,7 +378,7 @@ mod tests {
                 user_id: session.user_id,
                 question_id: qid2,
                 question_version: 1,
-                session_id: session.id,
+                session_id: Some(session.id),
                 response: AttemptResponse::Short {
                     answer: "no".into(),
                 },

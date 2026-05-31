@@ -1,6 +1,5 @@
 //! Me-surface routes: profile, API keys, agents, activity, stats.
 
-
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -211,10 +210,13 @@ pub async fn create_key(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok((StatusCode::CREATED, Json(CreateKeyResponse {
-        id: token_id,
-        secret: format!("{}_{}", token_id, secret),
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateKeyResponse {
+            id: token_id,
+            secret: format!("{}_{}", token_id, secret),
+        }),
+    ))
 }
 
 #[utoipa::path(
@@ -248,7 +250,9 @@ pub async fn rotate_key(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound { resource: "api_key" });
+        return Err(ApiError::NotFound {
+            resource: "api_key",
+        });
     }
 
     Ok(Json(RotateKeyResponse {
@@ -283,7 +287,9 @@ pub async fn revoke_key(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound { resource: "api_key" });
+        return Err(ApiError::NotFound {
+            resource: "api_key",
+        });
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -308,7 +314,7 @@ pub async fn list_agents(
          FROM tb_users u
          JOIN tb_agent_profiles a ON a.user_id = u.id
          JOIN tb_api_tokens t ON t.user_id = u.id
-         WHERE u.owner_user_id = $1 AND u.role = 'agent' AND t.revoked_at IS NULL"
+         WHERE u.owner_user_id = $1 AND u.role = 'agent' AND t.revoked_at IS NULL",
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
@@ -348,9 +354,18 @@ pub async fn create_agent(
     Json(body): Json<CreateAgentBody>,
 ) -> Result<(StatusCode, Json<CreateAgentResponse>), ApiError> {
     // Check quota
-    crate::http::quota::check_quota(&state.pool, user.user.id, crate::http::quota::QuotaKind::AgentCreation).await?;
+    crate::http::quota::check_quota(
+        &state.pool,
+        user.user.id,
+        crate::http::quota::QuotaKind::AgentCreation,
+    )
+    .await?;
 
-    let mut tx = state.pool.begin().await.map_err(|e| ApiError::Internal(e.into()))?;
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     let agent_id = Uuid::now_v7();
     sqlx::query(
@@ -364,7 +379,7 @@ pub async fn create_agent(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     sqlx::query(
-        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)"
+        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)",
     )
     .bind(agent_id)
     .bind(&body.label)
@@ -389,12 +404,17 @@ pub async fn create_agent(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    tx.commit().await.map_err(|e| ApiError::Internal(e.into()))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok((StatusCode::CREATED, Json(CreateAgentResponse {
-        id: agent_id,
-        secret: format!("{}_{}", token_id, secret),
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateAgentResponse {
+            id: agent_id,
+            secret: format!("{}_{}", token_id, secret),
+        }),
+    ))
 }
 
 #[utoipa::path(
@@ -416,7 +436,11 @@ pub async fn update_agent(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateAgentBody>,
 ) -> Result<StatusCode, ApiError> {
-    let mut tx = state.pool.begin().await.map_err(|e| ApiError::Internal(e.into()))?;
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     if let Some(label) = &body.label {
         sqlx::query("UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3")
@@ -446,7 +470,9 @@ pub async fn update_agent(
             .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
-    tx.commit().await.map_err(|e| ApiError::Internal(e.into()))?;
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -467,12 +493,13 @@ pub async fn delete_agent(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    let affected = sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
-        .bind(id)
-        .bind(user.user.id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    let affected =
+        sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
+            .bind(id)
+            .bind(user.user.id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
         return Err(ApiError::NotFound { resource: "agent" });
@@ -535,7 +562,7 @@ pub async fn create_webhook(
 ) -> Result<(StatusCode, Json<CreateWebhookResponse>), ApiError> {
     let id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_webhooks (id, user_id, url, events, secret) VALUES ($1, $2, $3, $4, $5)"
+        "INSERT INTO tb_webhooks (id, user_id, url, events, secret) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(id)
     .bind(user.user.id)
@@ -574,7 +601,9 @@ pub async fn delete_webhook(
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound { resource: "webhook" });
+        return Err(ApiError::NotFound {
+            resource: "webhook",
+        });
     }
 
     Ok(StatusCode::NO_CONTENT)

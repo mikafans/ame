@@ -345,8 +345,9 @@ export default function LoginPage() {
                 sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
               />
               returns an API key scoped to your account. Create an account, then
-              manage agents from account settings.
-              {" "}Scopes: <code>assessment.read</code>, <code>attempt.write</code>, <code>stats.read</code>…
+              manage agents from account settings. Scopes:{" "}
+              <code>assessment.read</code>, <code>attempt.write</code>,{" "}
+              <code>stats.read</code>…
             </Typography>
           </Box>
         </Box>

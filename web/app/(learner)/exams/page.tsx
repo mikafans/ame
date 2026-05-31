@@ -204,41 +204,35 @@ export default function ExamsPage() {
     setComposing(true);
     setComposeError(null);
     try {
-      const body = {
-        name: composeName,
-        description: composeDesc || undefined,
-        duration: composeDuration,
-        passingPoints: composePassing === "" ? undefined : composePassing,
-        sections: sections.map((s, i) => ({
-          title: s.title || `Section ${i + 1}`,
-          weight: s.weight / 100,
-          questionIds: Array.from(s.selectedIds),
-          items: null,
-          tags: [],
-          types: [],
-        })),
-      };
-      const { data, error } = await api.POST("/v1/exams", { body });
-      if (error) {
-        const errObj = error as any;
-        if (
-          typeof errObj === "object" &&
-          "code" in errObj &&
-          errObj.code === "pool_insufficient"
-        ) {
-          setComposeError(
-            `Pool insufficient: ${errObj.message ?? "not enough questions match the section constraints"}`,
-          );
-        } else {
-          setComposeError("Failed to compose exam. Check section constraints.");
-        }
+      // Create the graded assessment (the unified "exam") …
+      const { data: created, error } = await api.POST("/v1/assessments", {
+        body: {
+          title: composeName,
+          description: composeDesc || undefined,
+          mode: "graded",
+          method: "manual",
+          objectives: [],
+          durationMin: composeDuration,
+          passingPoints: composePassing === "" ? undefined : composePassing,
+        },
+      });
+      if (error || !created) {
+        setComposeError("Failed to compose exam. Check the fields and retry.");
         return;
       }
-      if (data?.examId) {
-        setShowCompose(false);
-        load();
-        setSelected(data.examId);
+
+      // … then attach the selected questions to it.
+      const questionIds = sections.flatMap((s) => Array.from(s.selectedIds));
+      for (const questionId of questionIds) {
+        await api.POST("/v1/assessments/{id}/questions", {
+          params: { path: { id: created.id } },
+          body: { questionId },
+        });
       }
+
+      setShowCompose(false);
+      load();
+      setSelected(created.id);
     } catch {
       setComposeError("Could not reach the API.");
     } finally {

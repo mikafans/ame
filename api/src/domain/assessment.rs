@@ -39,10 +39,11 @@ impl std::fmt::Display for AssessmentStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssessmentVisibility {
     Public,
+    #[default]
     Private,
 }
 
@@ -52,12 +53,6 @@ impl std::fmt::Display for AssessmentVisibility {
             AssessmentVisibility::Public => write!(f, "public"),
             AssessmentVisibility::Private => write!(f, "private"),
         }
-    }
-}
-
-impl Default for AssessmentVisibility {
-    fn default() -> Self {
-        AssessmentVisibility::Private
     }
 }
 

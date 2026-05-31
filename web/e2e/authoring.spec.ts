@@ -96,4 +96,3 @@ test.describe("authoring navigation (all authenticated users)", () => {
     ).toBeVisible();
   });
 });
-

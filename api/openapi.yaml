@@ -711,6 +711,205 @@ paths:
           description: Not found
       security:
       - bearer_auth: []
+  /v1/questions:
+    get:
+      tags:
+      - questions
+      operationId: list_questions
+      parameters:
+      - name: tag
+        in: query
+        description: Filter by tag name
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Filter by status (draft, live, archived)
+        required: false
+        schema:
+          type: string
+      - name: search
+        in: query
+        description: Partial match on prompt
+        required: false
+        schema:
+          type: string
+      - name: kind
+        in: query
+        description: Filter by question kind
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: Pagination cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Question list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListQuestionsResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+    post:
+      tags:
+      - questions
+      operationId: create_questions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionsBody'
+        required: true
+      responses:
+        '201':
+          description: Questions created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateQuestionsResponse'
+        '401':
+          description: Unauthorized
+        '422':
+          description: Validation failed
+      security:
+      - bearer: []
+  /v1/questions/{id}:
+    get:
+      tags:
+      - questions
+      operationId: get_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: Question not found
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - questions
+      operationId: update_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionPatch'
+        required: true
+      responses:
+        '200':
+          description: Question updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: Question not found
+        '422':
+          description: Validation failed
+      security:
+      - bearer: []
+  /v1/questions/{id}/archive:
+    post:
+      tags:
+      - questions
+      operationId: archive_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: Question not found
+      security:
+      - bearer: []
+  /v1/questions/{id}/promote:
+    post:
+      tags:
+      - questions
+      operationId: promote_question
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question promoted to live
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          description: Question not found
+      security:
+      - bearer: []
+  /v1/questions/{id}/versions:
+    get:
+      tags:
+      - questions
+      operationId: list_versions
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Question history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuestionVersion'
+        '404':
+          description: Question not found
+      security:
+      - bearer: []
   /v1/sessions:
     get:
       tags:
@@ -1678,6 +1877,24 @@ components:
           - integer
           - 'null'
           format: int64
+    CreateQuestionsBody:
+      type: object
+      required:
+      - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionInsert'
+    CreateQuestionsResponse:
+      type: object
+      required:
+      - questions
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
     CreateSessionBody:
       type: object
       properties:
@@ -1984,6 +2201,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SessionSummary'
+    ListQuestionsResponse:
+      type: object
+      required:
+      - questions
+      - total
+      properties:
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+        total:
+          type: integer
+          format: int64
     ListUsersResponse:
       type: object
       required:
@@ -2180,6 +2414,32 @@ components:
         version:
           type: integer
           format: int32
+    QuestionInsert:
+      type: object
+      required:
+      - kind
+      - prompt
+      - payload
+      - tags
+      properties:
+        explanation:
+          type:
+          - string
+          - 'null'
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        payload: {}
+        points:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        prompt:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
     QuestionKind:
       type: string
       enum:
@@ -2188,6 +2448,29 @@ components:
       - short
       - essay
       - code
+    QuestionPatch:
+      type: object
+      properties:
+        explanation:
+          type:
+          - string
+          - 'null'
+        payload: {}
+        points:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        prompt:
+          type:
+          - string
+          - 'null'
+        tags:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
     QuestionPlan:
       type: object
       required:
@@ -2215,6 +2498,41 @@ components:
       - draft
       - live
       - archived
+    QuestionVersion:
+      type: object
+      required:
+      - id
+      - questionId
+      - version
+      - prompt
+      - payload
+      - createdAt
+      properties:
+        archivedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        codeSnippet: {}
+        createdAt:
+          type: string
+          format: date-time
+        explanation:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        payload: {}
+        prompt:
+          type: string
+        questionId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int32
     QuizStatsParams:
       type: object
       properties:

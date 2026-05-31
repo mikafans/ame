@@ -104,33 +104,17 @@ async fn skill_manifest_contains_all_share_tools() {
     let tools = manifest["tools"].as_array().unwrap();
     let tool_names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
-    // All tools from §6.1 with Tool names
+    // Tools exposed in the unified assessment manifest (post agent-identity refactor)
     let all_expected = [
-        "quiz.list",
-        "quiz.get",
-        "quiz.import",
-        "quiz.generate",
-        "quiz.update",
-        "quiz.delete",
-        "stats.cohort",
-        "exam.list",
-        "exam.get",
-        "exam.compose",
-        "exam.update",
-        "exam.stats",
+        "assessment.list",
+        "assessment.get",
+        "assessment.create",
+        "assessment.update",
+        "assessment.delete",
+        "question.list",
+        "question.create",
         "session.create",
-        "session.get",
-        "session.answer",
         "session.finish",
-        "attempt.get",
-        "attempt.grade",
-        "agent.activity",
-        "feedback.send",
-        "plan.create",
-        "plan.get",
-        "share.create",
-        "share.get",
-        "share.revoke",
     ];
     for expected in &all_expected {
         assert!(

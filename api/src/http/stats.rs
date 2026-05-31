@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use utoipa::{ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -78,13 +78,16 @@ pub async fn assessment_stats(
     Query(params): Query<QuizStatsParams>,
 ) -> Result<Json<QuizStatsResponse>, ApiError> {
     // Verify assessment exists
-    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1)")
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1)")
+            .bind(id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
     if !exists {
-        return Err(ApiError::NotFound { resource: "assessment" });
+        return Err(ApiError::NotFound {
+            resource: "assessment",
+        });
     }
 
     let window_filter = window_sql_filter(params.window.as_deref());

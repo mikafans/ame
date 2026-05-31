@@ -434,8 +434,8 @@ function KeysTab() {
             .filter(Boolean),
         },
       });
-      if (data?.apiKey) {
-        setCreatedSecret(data.apiKey);
+      if (data?.secret) {
+        setCreatedSecret(data.secret);
         setNewAgentLabel("");
         setNewAgentFocus("");
         setNewAgentScopes(["quiz.read"]);

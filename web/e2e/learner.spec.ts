@@ -66,9 +66,9 @@ test.describe("learner UI (seeded account)", () => {
 
   test("all assessments tab is visible", async ({ page }) => {
     await page.goto("/library");
-    await expect(
-      page.getByRole("tab", { name: /All \(\d+\)/ }),
-    ).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("tab", { name: /All \(\d+\)/ })).toBeVisible({
+      timeout: 8000,
+    });
   });
 
   test("practice setup form renders", async ({ page }) => {
@@ -103,12 +103,18 @@ test.describe("learner session flow (fresh user)", () => {
   });
 
   test("can start a quiz session", async ({ page, request }) => {
-    const r = await request.get(`${API_URL}/v1/assessments?status=active&mode=practice`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const r = await request.get(
+      `${API_URL}/v1/assessments?status=active&mode=practice`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     const body = await r.json();
     const assessments = body.assessments ?? body;
-    expect(assessments.length, "at least one active assessment").toBeGreaterThan(0);
+    expect(
+      assessments.length,
+      "at least one active assessment",
+    ).toBeGreaterThan(0);
 
     const sr = await request.post(`${API_URL}/v1/sessions`, {
       data: { assessmentId: assessments[0].id },

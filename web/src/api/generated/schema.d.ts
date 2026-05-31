@@ -381,6 +381,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_questions"];
+        put?: never;
+        post: operations["create_questions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/questions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_question"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_question"];
+        trace?: never;
+    };
+    "/v1/questions/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["archive_question"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/questions/{id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["promote_question"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/questions/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/sessions": {
         parameters: {
             query?: never;
@@ -764,6 +844,12 @@ export interface components {
             /** Format: int64 */
             lookbackDays?: number | null;
         };
+        CreateQuestionsBody: {
+            questions: components["schemas"]["QuestionInsert"][];
+        };
+        CreateQuestionsResponse: {
+            questions: components["schemas"]["Question"][];
+        };
         CreateSessionBody: {
             /** Format: uuid */
             assessmentId?: string | null;
@@ -875,6 +961,12 @@ export interface components {
         ListMySessionsResponse: {
             sessions: components["schemas"]["SessionSummary"][];
         };
+        ListQuestionsResponse: {
+            nextCursor?: string | null;
+            questions: components["schemas"]["Question"][];
+            /** Format: int64 */
+            total: number;
+        };
         ListUsersResponse: {
             users: components["schemas"]["User"][];
         };
@@ -956,8 +1048,25 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        QuestionInsert: {
+            explanation?: string | null;
+            kind: components["schemas"]["QuestionKind"];
+            payload: unknown;
+            /** Format: int32 */
+            points?: number | null;
+            prompt: string;
+            tags: string[];
+        };
         /** @enum {string} */
         QuestionKind: "mc" | "tf" | "short" | "essay" | "code";
+        QuestionPatch: {
+            explanation?: string | null;
+            payload?: unknown;
+            /** Format: int32 */
+            points?: number | null;
+            prompt?: string | null;
+            tags?: string[] | null;
+        };
         QuestionPlan: {
             items: components["schemas"]["PlanItem"][];
         };
@@ -969,6 +1078,22 @@ export interface components {
         };
         /** @enum {string} */
         QuestionStatus: "draft" | "live" | "archived";
+        QuestionVersion: {
+            /** Format: date-time */
+            archivedAt?: string | null;
+            codeSnippet?: unknown;
+            /** Format: date-time */
+            createdAt: string;
+            explanation?: string | null;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
+            prompt: string;
+            /** Format: uuid */
+            questionId: string;
+            /** Format: int32 */
+            version: number;
+        };
         QuizStatsParams: {
             /** Format: uuid */
             cohortId?: string | null;
@@ -2168,6 +2293,243 @@ export interface operations {
                 content?: never;
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_questions: {
+        parameters: {
+            query?: {
+                /** @description Filter by tag name */
+                tag?: string;
+                /** @description Filter by status (draft, live, archived) */
+                status?: string;
+                /** @description Partial match on prompt */
+                search?: string;
+                /** @description Filter by question kind */
+                kind?: string;
+                /** @description Pagination cursor */
+                after?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListQuestionsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_questions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuestionsBody"];
+            };
+        };
+        responses: {
+            /** @description Questions created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateQuestionsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Question"];
+                };
+            };
+            /** @description Question not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionPatch"];
+            };
+        };
+        responses: {
+            /** @description Question updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Question"];
+                };
+            };
+            /** @description Question not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Question"];
+                };
+            };
+            /** @description Question not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    promote_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question promoted to live */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Question"];
+                };
+            };
+            /** @description Question not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionVersion"][];
+                };
+            };
+            /** @description Question not found */
             404: {
                 headers: {
                     [name: string]: unknown;

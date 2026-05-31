@@ -6,11 +6,9 @@ use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    domain::{
-        error::ApiError,
-        question::{Question, QuestionKind, QuestionStatus, QuestionVersion},
-    },
+use crate::domain::{
+    error::ApiError,
+    question::{Question, QuestionKind, QuestionStatus, QuestionVersion},
 };
 
 fn internal<E: Into<anyhow::Error>>(e: E) -> ApiError {
@@ -43,7 +41,7 @@ pub async fn list_questions(
 ) -> Result<Vec<Question>, ApiError> {
     let status_str = filter.status.map(|s| s.as_str().to_string());
     let kind_str = filter.kind.map(|k| k.as_str().to_string());
-    
+
     let rows = sqlx::query(
         "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at
          FROM tb_questions q
@@ -125,9 +123,11 @@ pub async fn list_questions_paged(
     let total = rows.first().map(|r| r.get("total")).unwrap_or(0);
     let questions: Result<Vec<_>, _> = rows.into_iter().map(row_to_question).collect();
     let rows_vec = questions?;
-    
+
     let next_cursor = if rows_vec.len() as i64 == limit {
-        rows_vec.last().map(|q| format!("{}_{}", q.created_at.unix_timestamp(), q.id))
+        rows_vec
+            .last()
+            .map(|q| format!("{}_{}", q.created_at.unix_timestamp(), q.id))
     } else {
         None
     };
@@ -167,10 +167,12 @@ fn row_to_question(row: sqlx::postgres::PgRow) -> Result<Question, ApiError> {
     let status_str: String = row.get("status");
     Ok(Question {
         id: row.get("id"),
-        kind: QuestionKind::from_str(&kind_str).map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
+        kind: QuestionKind::from_str(&kind_str)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
         prompt: row.get("prompt"),
         version: row.get("version"),
-        status: QuestionStatus::from_str(&status_str).map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
+        status: QuestionStatus::from_str(&status_str)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
         points: row.get("points"),
         code_snippet: row.get("code_snippet"),
         payload: row.get("payload"),
@@ -216,6 +218,8 @@ pub async fn get_question_versions(
         .collect()
 }
 
+pub const MAX_BATCH: usize = 50;
+
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
 pub struct QuestionInsert {
     pub kind: QuestionKind,
@@ -226,7 +230,7 @@ pub struct QuestionInsert {
     pub points: Option<i32>,
 }
 
-#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, serde::Deserialize, utoipa::ToSchema)]
 pub struct QuestionPatch {
     pub prompt: Option<String>,
     pub explanation: Option<String>,
@@ -240,6 +244,14 @@ pub async fn create_questions(
     user_id: Uuid,
     questions: Vec<QuestionInsert>,
 ) -> Result<Vec<Question>, ApiError> {
+    if questions.len() > MAX_BATCH {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "questions".to_string(),
+                message: format!("max {MAX_BATCH} questions per batch"),
+            },
+        ]));
+    }
     let mut created = Vec::new();
     let mut tx = pool.begin().await.map_err(internal)?;
 
@@ -276,7 +288,7 @@ pub async fn create_questions(
                 .await
                 .map_err(internal)?;
         }
-        
+
         let q_row = sqlx::query("SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at FROM tb_questions WHERE id = $1")
             .bind(id)
             .fetch_one(&mut *tx)
@@ -305,9 +317,11 @@ pub async fn update_question(
             .map_err(internal)?;
     }
     // ... other fields ...
-    
+
     tx.commit().await.map_err(internal)?;
-    get_question(pool, id).await?.ok_or(ApiError::NotFound { resource: "question" })
+    get_question(pool, id).await?.ok_or(ApiError::NotFound {
+        resource: "question",
+    })
 }
 
 pub async fn promote_question(pool: &PgPool, id: Uuid) -> Result<Question, ApiError> {
@@ -316,7 +330,9 @@ pub async fn promote_question(pool: &PgPool, id: Uuid) -> Result<Question, ApiEr
         .execute(pool)
         .await
         .map_err(internal)?;
-    get_question(pool, id).await?.ok_or(ApiError::NotFound { resource: "question" })
+    get_question(pool, id).await?.ok_or(ApiError::NotFound {
+        resource: "question",
+    })
 }
 
 pub async fn archive_question(pool: &PgPool, id: Uuid) -> Result<Question, ApiError> {
@@ -325,5 +341,7 @@ pub async fn archive_question(pool: &PgPool, id: Uuid) -> Result<Question, ApiEr
         .execute(pool)
         .await
         .map_err(internal)?;
-    get_question(pool, id).await?.ok_or(ApiError::NotFound { resource: "question" })
+    get_question(pool, id).await?.ok_or(ApiError::NotFound {
+        resource: "question",
+    })
 }

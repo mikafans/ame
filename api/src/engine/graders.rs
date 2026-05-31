@@ -72,14 +72,22 @@ pub fn grade_response(
 ) -> Result<GradeOutcome, GradeError> {
     match (kind, response) {
         (QuestionKind::Mc, AttemptResponse::Mc { selected_position }) => {
-            let payload: McPayload = serde_json::from_value(payload.clone())
-                .map_err(|e| GradeError::InvalidPayload { kind, reason: e.to_string() })?;
-            
-            let option_order = presentation.option_order.as_ref()
+            let payload: McPayload = serde_json::from_value(payload.clone()).map_err(|e| {
+                GradeError::InvalidPayload {
+                    kind,
+                    reason: e.to_string(),
+                }
+            })?;
+
+            let option_order = presentation
+                .option_order
+                .as_ref()
                 .ok_or(GradeError::MissingPresentation("option_order"))?;
-            
+
             if *selected_position >= option_order.len() {
-                return Err(GradeError::InvalidResponse("selected_position out of bounds".to_string()));
+                return Err(GradeError::InvalidResponse(
+                    "selected_position out of bounds".to_string(),
+                ));
             }
 
             let canonical_index = option_order[*selected_position];
@@ -95,9 +103,13 @@ pub fn grade_response(
             })
         }
         (QuestionKind::Tf, AttemptResponse::Tf { answer }) => {
-            let payload: TfPayload = serde_json::from_value(payload.clone())
-                .map_err(|e| GradeError::InvalidPayload { kind, reason: e.to_string() })?;
-            
+            let payload: TfPayload = serde_json::from_value(payload.clone()).map_err(|e| {
+                GradeError::InvalidPayload {
+                    kind,
+                    reason: e.to_string(),
+                }
+            })?;
+
             let correct = *answer == payload.correct;
 
             Ok(GradeOutcome {
@@ -110,9 +122,13 @@ pub fn grade_response(
             })
         }
         (QuestionKind::Short, AttemptResponse::Short { answer }) => {
-            let payload: ShortPayload = serde_json::from_value(payload.clone())
-                .map_err(|e| GradeError::InvalidPayload { kind, reason: e.to_string() })?;
-            
+            let payload: ShortPayload = serde_json::from_value(payload.clone()).map_err(|e| {
+                GradeError::InvalidPayload {
+                    kind,
+                    reason: e.to_string(),
+                }
+            })?;
+
             let given = match payload.normalize {
                 Normalize::Exact => answer.trim().to_string(),
                 Normalize::CaseInsensitiveStripAccents => answer.trim().to_lowercase(),
@@ -136,13 +152,17 @@ pub fn grade_response(
             })
         }
         (QuestionKind::Essay, AttemptResponse::Essay { body, .. }) => {
-            let payload: EssayPayload = serde_json::from_value(payload.clone())
-                .map_err(|e| GradeError::InvalidPayload { kind, reason: e.to_string() })?;
-            
+            let payload: EssayPayload = serde_json::from_value(payload.clone()).map_err(|e| {
+                GradeError::InvalidPayload {
+                    kind,
+                    reason: e.to_string(),
+                }
+            })?;
+
             let word_count = body.split_whitespace().count() as i32;
-            
-            if let Some(min_words) = payload.min_words 
-                && word_count < min_words as i32 
+
+            if let Some(min_words) = payload.min_words
+                && word_count < min_words as i32
             {
                 return Ok(GradeOutcome {
                     status: GradeStatus::Graded,
@@ -150,7 +170,10 @@ pub fn grade_response(
                     points_awarded: 0,
                     max: max_points,
                     correct_answer: serde_json::json!({ "rubric": payload.rubric }),
-                    note: Some(format!("Word count {} is below minimum {}", word_count, min_words)),
+                    note: Some(format!(
+                        "Word count {} is below minimum {}",
+                        word_count, min_words
+                    )),
                 });
             }
 
@@ -164,9 +187,13 @@ pub fn grade_response(
             })
         }
         (QuestionKind::Code, AttemptResponse::Code { source: _, .. }) => {
-            let payload: CodePayload = serde_json::from_value(payload.clone())
-                .map_err(|e| GradeError::InvalidPayload { kind, reason: e.to_string() })?;
-            
+            let payload: CodePayload = serde_json::from_value(payload.clone()).map_err(|e| {
+                GradeError::InvalidPayload {
+                    kind,
+                    reason: e.to_string(),
+                }
+            })?;
+
             Ok(GradeOutcome {
                 status: GradeStatus::PendingManual,
                 correct: false,
