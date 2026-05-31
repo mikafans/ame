@@ -104,22 +104,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/assessments/explore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["explore"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/assessments/generate": {
         parameters: {
             query?: never;
@@ -293,6 +277,23 @@ export interface paths {
         put?: never;
         /** POST /v1/auth/register — register a new user with email and password. */
         post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/explore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/explore — searchable, paginated assessment exploration. */
+        get: operations["explore"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -928,6 +929,10 @@ export interface components {
             bucket: number;
             /** Format: int64 */
             count: number;
+        };
+        ExploreResponse: {
+            items: unknown[];
+            nextCursor?: string | null;
         };
         FieldError: {
             field: string;
@@ -1581,31 +1586,6 @@ export interface operations {
             };
         };
     };
-    explore: {
-        parameters: {
-            query?: {
-                /** @description Page size (default: 50) */
-                limit?: number;
-                /** @description Page offset */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Public assessment list */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListAssessmentsResponse"];
-                };
-            };
-        };
-    };
     generate_assessment: {
         parameters: {
             query?: never;
@@ -2139,6 +2119,39 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    explore: {
+        parameters: {
+            query?: {
+                tag?: string;
+                kind?: string;
+                search?: string;
+                limit?: number;
+                after?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExploreResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
