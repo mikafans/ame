@@ -15,8 +15,8 @@ canonical worked example. Copy it, import it, or run it directly:
     # or use it as a library
     from client import AmeAgent
     agent = AmeAgent(base_url="http://localhost:28080", api_key="<agent-key>")
-    profile = agent.run("profile.get")
-    print(f"I am {profile['agent']['label']}, owner ratings: {profile['owner']['ratings']}")
+    assessments = agent.get("/v1/assessments")
+    print(f"Found {len(assessments['assessments'])} assessments")
 
 Two ways to act (mirrors llms.txt):
   - reads + simple writes -> call REST directly:  agent.get(path) / agent.request(...)
@@ -60,13 +60,13 @@ class AmeAgent:
         The minted ``agentId`` is available as ``.agent_id`` afterwards.
         """
         if scopes is None:
-            scopes = ["quiz.read", "quiz.write"]
-        
+            scopes = ["assessment.read", "assessment.write"]
+
         # Internal client for the owner call
         owner = cls(base_url, owner_token)
         body = {"label": label, "scopes": scopes}
         resp = owner.request("POST", "/v1/me/agents", body)
-        
+
         # New agent client
         agent = cls(base_url, resp["apiKey"])
         agent.agent_id = resp["id"]
@@ -86,7 +86,7 @@ class AmeAgent:
         return resp.get("result")
 
     def get(self, path: str, **query):
-        """GET a read endpoint (e.g. /v1/quizzes). Read tools are direct REST."""
+        """GET a read endpoint (e.g. /v1/assessments). Read tools are direct REST."""
         if query:
             from urllib.parse import urlencode
 
@@ -124,56 +124,64 @@ class AmeAgent:
 
 # ── runnable demo / smoke test ────────────────────────────────────────────────
 def _demo(api: str, token: str, title: str) -> None:
-    """Create an agent, use behavioral tools, and author a quiz."""
+    """Create an agent and author an assessment end to end."""
     print(f"create agent @ {api}")
-    agent = AmeAgent.create(api, token, label="client-demo")
+    agent = AmeAgent.create(
+        api, token, label="client-demo", scopes=["assessment.read", "assessment.write"]
+    )
     print(f"  agentId={agent.agent_id}")
 
-    print("testing behavioral tools...")
-    profile = agent.run("profile.get")
-    print(f"  profile.get -> agent={profile['agent']['label']}, ratings_count={len(profile['owner']['ratings'])}")
-
-    agent.run("memory.set", memory={"last_run": "today"})
-    # Top-level shallow merge
-    agent.run("memory.append", append={"nested": {"key": 123}})
-    agent.run("target.set", currentGoal="Demonstrate Phase 2", nextTarget="Phase 3")
-    
-    refetched = agent.run("profile.get")
-    print(f"  updated memory: {refetched['agent']['memory']}")
-    print(f"  updated goal: {refetched['agent']['currentGoal']}")
-
-    print(f"authoring quiz: {title}")
-    source = json.dumps(
+    print("building question bank...")
+    questions = [
         {
-            "title": title,
-            "course": "Platform Eng",
-            "objectives": ["Describe pods and deployments", "Recall kubectl basics"],
-            "questions": [
-                {
-                    "kind": "mc",
-                    "prompt": "What is the smallest deployable unit in Kubernetes?",
-                    "points": 1,
-                    "explanation": "A Pod wraps one or more containers.",
-                    "payload": {"options": ["Container", "Pod", "Node", "Service"], "correct_index": 1},
-                },
-                {"kind": "tf", "prompt": "A Deployment manages ReplicaSets.", "points": 1,
-                 "payload": {"correct": True}},
-                {"kind": "short", "prompt": "Which kubectl subcommand lists pods? (one word)", "points": 1,
-                 "payload": {"accepted": ["get"], "normalize": "exact", "judge": "exact"}},
-            ],
-        }
+            "kind": "mc",
+            "prompt": "What is the smallest deployable unit in Kubernetes?",
+            "points": 1,
+            "explanation": "A Pod wraps one or more containers.",
+            "payload": {"options": ["Container", "Pod", "Node", "Service"], "correct_index": 1},
+        },
+        {
+            "kind": "tf",
+            "prompt": "A Deployment manages ReplicaSets.",
+            "points": 1,
+            "payload": {"correct": True},
+        },
+        {
+            "kind": "short",
+            "prompt": "Which kubectl subcommand lists pods? (one word)",
+            "points": 1,
+            "payload": {"accepted": ["get"], "normalize": "exact", "judge": "exact"},
+        },
+    ]
+
+    created = agent.run("question.create", questions=questions)
+    qids = [q["id"] for q in created["questions"]]
+    print(f"  created {len(qids)} questions")
+
+    print(f"creating assessment: {title}")
+    assessment = agent.run(
+        "assessment.create",
+        title=title,
+        mode="graded",
+        objectives=["Describe pods and deployments", "Recall kubectl basics"],
+        method="agent",
     )
-    imported = agent.run("quiz.import", source=source)
-    qid = imported["quizId"]
-    print(f"  imported quizId={qid} questions={imported['questionsCreated']} (draft)")
+    aid = assessment["id"]
+    print(f"  assessmentId={aid} (draft)")
 
-    published = agent.run("quiz.update", id=qid, status="active")
-    print(f"  published -> status={published['status']}")
+    print("attaching questions...")
+    for qid in qids:
+        agent.request("POST", f"/v1/assessments/{aid}/questions", {"questionId": qid})
+    print(f"  attached {len(qids)} questions")
 
-    listed = agent.get("/v1/quizzes")["quizzes"]
-    match = next((q for q in listed if q["id"] == qid), None)
-    assert match, f"quiz {qid} not visible in /v1/quizzes"
-    print(f"  library shows: {match['title']!r} ({match['status']}, {match['questionCount']} questions)")
+    print("publishing...")
+    published = agent.run("assessment.update", id=aid, status="active")
+    print(f"  status={published['status']}")
+
+    listed = agent.get("/v1/assessments")["assessments"]
+    match = next((a for a in listed if a["id"] == aid), None)
+    assert match, f"assessment {aid} not visible in /v1/assessments"
+    print(f"  library shows: {match['title']!r} ({match['status']})")
     print(f"\nRESULT: OK")
 
 

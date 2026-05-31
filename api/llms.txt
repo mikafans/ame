@@ -1,9 +1,9 @@
 # AME
 
-> A quiz/exam learning platform with a first-class agent surface. Agents can
-> author question banks, assemble quizzes and exams, publish them, and read
-> learner stats — all over plain HTTP + JSON. This file is the entry point;
-> read it first.
+> An assessment learning platform with a first-class agent surface. Agents can
+> author question banks, assemble assessments, publish them, and read learner
+> stats — all over plain HTTP + JSON. This file is the entry point; read it
+> first.
 
 This is NOT an MCP server. There is no JSON-RPC. You call a normal REST API
 with a bearer token, plus one convenience dispatcher (`/v1/agents/run`) for
@@ -11,32 +11,35 @@ composite and write operations.
 
 ## Getting a key
 
-Registration is gated by a shared access code (the operator sets
-`AME_AGENT_ACCESS_CODE`; if unset, registration is disabled).
+An authenticated owner (human user logged in with email + password) creates an
+agent:
 
 ```
-POST /v1/agents/register
-{ "label": "my-agent", "scopes": ["quiz.read", "quiz.write"], "accessCode": "<code>" }
--> 201 { "apiKey": "<id>_<secret>", "userId", "openapiUrl", "skillManifestUrl" }
+POST /v1/me/agents
+{ "label": "my-agent", "scopes": ["assessment.read", "assessment.write"], "focusTags": [...] }
+-> 201 { "id": "<uuid>", "apiKey": "<id>_<secret>" }
 ```
 
 Send the key on every request: `Authorization: Bearer <apiKey>`.
 
-Scopes: `quiz.read`, `quiz.write`, `attempt.read`, `attempt.write`, `stats.read`,
-`feedback.write`, `plan.write`. `admin` cannot be requested here.
+**Valid scopes**: `assessment.read`, `assessment.write`, `attempt.read`,
+`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`,
+`public.publish`. Note: `public.publish` is only grantable on the premium plan
+(free plan returns 403). `admin` cannot be granted to agents.
 
 ## Discovery
 
 - `GET /v1/agents/skill.json` — machine-readable tool list. Each tool carries an
   `input_schema` and the REST `method`/`path` it maps to. Add `?strict=1` to drop
   the method/path/scope hints. Top-level `run` block lists the runnable tools.
-- `GET /v1/agents/openapi.json` — full OpenAPI schema (scope: `quiz.read`).
-- `GET /v1/agents/activity` — your own call log, newest first (scope: `quiz.read`).
+- `GET /v1/agents/openapi.json` — full OpenAPI schema (public).
+- `GET /v1/agents/activity` — your own call log, newest first (scope: `assessment.read`).
 
 ## Two ways to act
 
-1. **Reads + simple writes** — call the REST endpoint directly at the
-   method/path from `skill.json` (e.g. `GET /v1/quizzes`, `GET /v1/questions`).
+1. **Reads + simple writes** — call the REST endpoint directly
+   (e.g. `GET /v1/assessments`, `GET /v1/questions`, `GET /v1/me/stats`,
+   `GET /v1/assessments/{id}`).
 2. **Composite / write tools** — POST to the dispatcher:
 
    ```
@@ -44,29 +47,54 @@ Scopes: `quiz.read`, `quiz.write`, `attempt.read`, `attempt.write`, `stats.read`
    { "tool": "<name>", "params": { ... } }
    ```
 
-   Runnable tools (each requires `quiz.write`):
-   - `quiz.import`     — create a draft quiz + draft questions from JSON.
-     `params: { source: "<json string>" }` where the JSON has
-     `{ title, course?, objectives?, questions: [{ kind, prompt, payload, points?, explanation? }] }`.
+   Runnable tools (each requires `assessment.write`):
    - `question.create` — batch-create bank questions.
-     `params: { questions: [{ kind, prompt, payload, points?, tags? }] }`.
-   - `question.promote`— promote one draft question to live. `params: { id }`.
-   - `quiz.update`     — patch metadata / publish. `params: { id, title?, status?, objectives? }`.
+     `params: { questions: [{ kind, prompt, payload, explanation?, tags?, points? }] }`.
+   - `assessment.create` — create an assessment (draft). REQUIRED params: `title`,
+     `mode` ("practice"|"graded"), `objectives` (array), `method` ("agent").
+     Optional: `description`, `course`, `durationMin`, `timeLimitSeconds`,
+     `passingPoints`, `showResultsDuring`, `affectsRating`, `visibility`
+     ("private"|"public").
+   - `assessment.update` — patch metadata / publish.
+     `params: { id, title?, status?, visibility?, objectives? }`. Publish with
+     `status: "active"`.
+   - `question.promote` — promote one draft question to live. `params: { id }`.
 
-## Authoring a quiz end to end
+   **Attaching questions to an assessment (direct REST, not a run tool)**:
+   ```
+   POST /v1/assessments/{id}/questions
+   { "questionId": "<uuid>" }
+   -> 201 { "questionId", "orderIndex" }
+   ```
+   (Also supports inline create with `{ kind, prompt, ... }` instead of questionId.)
 
-1. `POST /v1/agents/run` `quiz.import` → returns `quizId` (quiz is `draft`).
-2. `POST /v1/agents/run` `quiz.update` `{ id: quizId, status: "active" }`.
-   Publishing auto-promotes the quiz's draft questions to live. A quiz needs at
-   least one question before it can go active; archived quizzes cannot be
-   re-activated.
+   **Assessment generation helper (direct REST, not a run tool)**:
+   ```
+   POST /v1/assessments/generate
+   { "source", "questionCount"?, "types"?, "objectives"? }
+   -> { "candidates", "objectives", "warnings" }
+   ```
+   Selects existing live bank questions and returns them as candidates
+   (does not persist).
+
+## Authoring an assessment end to end
+
+1. `POST /v1/agents/run` `question.create` (batch) → collect question ids.
+2. `POST /v1/agents/run` `assessment.create` `{ title, mode, objectives, method: "agent" }`
+   → `id` (assessment is `draft`).
+3. For each question id: `POST /v1/assessments/{id}/questions` `{ "questionId": id }`.
+4. `POST /v1/agents/run` `assessment.update` `{ id, status: "active" }` to publish.
+   Publishing auto-promotes draft questions to live. Assessment needs ≥1 question.
+   Archived assessments cannot be re-activated.
+5. `GET /v1/assessments` to confirm it is listed.
 
 ## Data-model rules (violating these returns 422 or silently mis-grades)
 
-- Multiple-choice options are **bare strings**: `payload.options: ["a", "b"]`.
-  Never `[{ "text": "a" }]`. The grader and the UI both require bare strings.
+- Multiple-choice options are **bare strings**: `payload.options: ["a", "b"]` with
+  `correct_index` (never `[{ "text": "a" }]`). The grader and the UI both require
+  bare strings.
 - Question `kind` is one of `mc`, `tf`, `short`, `essay`, `code`.
-- No scheduled exams: there are no `opens_at` / `closes_at` fields.
+- No scheduled assessments: there are no `opens_at` / `closes_at` fields.
 - Auth is email + password only. No SSO/SAML.
 - `code` questions are graded by exemplar/manual comparison — there is no code
   runner.
@@ -74,9 +102,12 @@ Scopes: `quiz.read`, `quiz.write`, `attempt.read`, `attempt.write`, `stats.read`
 ## Reference client
 
 `agents/client.py` is a dependency-free Python wrapper and the canonical worked
-example (`AmeAgent.register(...)`, `.run(tool, **params)`, `.get(path)`). You do
-not need it to use the API, but it shows the exact request/auth/error shapes. Run
-its end-to-end author demo with `uv run agents/client.py --code <accessCode>`.
+example. You do not need it to use the API, but it shows the exact
+request/auth/error shapes. Run its end-to-end author demo with:
+
+```
+uv run agents/client.py --api http://localhost:28080 --token <owner-token>
+```
 
 ## Task playbooks
 
