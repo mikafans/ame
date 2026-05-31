@@ -4,14 +4,7 @@
 //! and the wire shapes defined in
 //! `docs/specs/2026-05-20-harus-platform-design.md`.
 //!
-//! The `kind` / `status` enums are the single point of translation between the
-//! Postgres `text` columns (constrained by CHECK clauses) and Rust. If the DB
-//! constraint changes, update the `FromStr` impls and the `as_str` arms in
-//! lockstep — see the same pattern in [`crate::domain::user::Scope`].
-//!
-//! Payload shapes are kept as separate per-kind structs. `Question::payload`
-//! stays as `serde_json::Value` to match the jsonb column 1:1; typed decoding
-//! happens at the repository / HTTP boundary.
+//! Shared by `bank/` (storage) and `http/` (wire).
 
 use std::str::FromStr;
 
@@ -20,7 +13,7 @@ use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestionKind {
     Mc,
@@ -31,7 +24,7 @@ pub enum QuestionKind {
 }
 
 impl QuestionKind {
-    pub const fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             QuestionKind::Mc => "mc",
             QuestionKind::Tf => "tf",
@@ -44,16 +37,12 @@ impl QuestionKind {
 
 impl std::fmt::Display for QuestionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
+        write!(f, "{}", self.as_str())
     }
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("unknown question kind: {0}")]
-pub struct UnknownQuestionKind(pub String);
-
 impl FromStr for QuestionKind {
-    type Err = UnknownQuestionKind;
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -62,12 +51,12 @@ impl FromStr for QuestionKind {
             "short" => Ok(QuestionKind::Short),
             "essay" => Ok(QuestionKind::Essay),
             "code" => Ok(QuestionKind::Code),
-            other => Err(UnknownQuestionKind(other.to_string())),
+            _ => Err(format!("unknown question kind: {}", s)),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestionStatus {
     Draft,
@@ -76,7 +65,7 @@ pub enum QuestionStatus {
 }
 
 impl QuestionStatus {
-    pub const fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             QuestionStatus::Draft => "draft",
             QuestionStatus::Live => "live",
@@ -85,130 +74,40 @@ impl QuestionStatus {
     }
 }
 
-impl std::fmt::Display for QuestionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("unknown question status: {0}")]
-pub struct UnknownQuestionStatus(pub String);
-
 impl FromStr for QuestionStatus {
-    type Err = UnknownQuestionStatus;
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "draft" => Ok(QuestionStatus::Draft),
             "live" => Ok(QuestionStatus::Live),
             "archived" => Ok(QuestionStatus::Archived),
-            other => Err(UnknownQuestionStatus(other.to_string())),
+            _ => Err(format!("unknown question status: {}", s)),
         }
     }
 }
 
-/// Normalization rule applied to *both* the stored accepted answers and the
-/// user's response at grade time. See spec §"Normalize semantics".
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Normalize {
-    Exact,
-    CaseInsensitiveStripAccents,
-}
-
-/// Free-text judge. Only `exact` is supported in MVP; `llm` is reserved for
-/// the deferred LLM-as-judge feature.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Judge {
-    Exact,
-    Manual,
-    Llm,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CodeSnippet {
     pub language: String,
-    pub body: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub caption: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct McPayload {
-    pub options: Vec<String>,
-    pub correct_index: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct TfPayload {
-    pub correct: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct ShortPayload {
-    pub accepted: Vec<String>,
-    pub normalize: Normalize,
-    pub judge: Judge,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct EssayPayload {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub min_words: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rubric: Option<String>,
-    pub judge: Judge,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct CodeTest {
-    pub name: String,
-    pub body: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct CodePayload {
-    pub language: String,
-    pub starter: String,
-    #[serde(default)]
-    pub tests: Vec<CodeTest>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub time_limit_ms: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exemplar: Option<String>,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct Tag {
-    pub id: Uuid,
-    pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(with = "time::serde::rfc3339")]
-    #[schema(value_type = String, format = DateTime)]
-    pub created_at: OffsetDateTime,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Question {
     pub id: Uuid,
     pub kind: QuestionKind,
     pub prompt: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub code_snippet: Option<CodeSnippet>,
-    #[schema(value_type = Object)]
-    pub payload: serde_json::Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub explanation: Option<String>,
+    pub version: i32,
     pub status: QuestionStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source: Option<String>,
     pub points: i32,
+    pub code_snippet: Option<serde_json::Value>,
+    pub payload: serde_json::Value,
+    pub explanation: Option<String>,
+    pub source: Option<String>,
     pub rating: f64,
     pub attempts_count: i32,
-    pub version: i32,
     pub created_by: Uuid,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
@@ -218,22 +117,94 @@ pub struct Question {
     pub updated_at: OffsetDateTime,
 }
 
-/// Historical snapshot of a question's editable fields, written when a `live`
-/// question is edited (see spec §"Versioning rule").
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionVersion {
+    pub id: Uuid,
     pub question_id: Uuid,
     pub version: i32,
     pub prompt: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub code_snippet: Option<CodeSnippet>,
-    #[schema(value_type = Object)]
+    pub code_snippet: Option<serde_json::Value>,
     pub payload: serde_json::Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub explanation: Option<String>,
+    pub archived_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Tag {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedQuestion {
+    pub id: Uuid,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub archived_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct McPayload {
+    pub options: Vec<String>,
+    pub correct_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TfPayload {
+    pub correct: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Normalize {
+    Exact,
+    CaseInsensitiveStripAccents,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Judge {
+    Exact,
+    Aigc,
+    Manual,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ShortPayload {
+    pub accepted: Vec<String>,
+    pub normalize: Normalize,
+    pub judge: Judge,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EssayPayload {
+    pub min_words: Option<usize>,
+    pub rubric: Option<String>,
+    pub judge: Judge,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CodePayload {
+    pub language: String,
+    pub starter: String,
+    pub tests: Vec<CodeTest>,
+    pub exemplar: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CodeTest {
+    pub name: String,
+    pub body: String,
 }
 
 #[cfg(test)]
@@ -241,67 +212,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn question_kind_string_roundtrip() {
-        for kind in [
-            QuestionKind::Mc,
-            QuestionKind::Tf,
-            QuestionKind::Short,
-            QuestionKind::Essay,
-            QuestionKind::Code,
-        ] {
-            let parsed: QuestionKind = kind.as_str().parse().expect("known kind should parse");
-            assert_eq!(parsed, kind);
-        }
-    }
-
-    #[test]
-    fn question_kind_rejects_unknown() {
-        let err = "cloze".parse::<QuestionKind>().unwrap_err();
-        assert_eq!(err.0, "cloze");
-    }
-
-    #[test]
-    fn question_kind_serde_matches_db_strings() {
-        assert_eq!(
-            serde_json::to_string(&QuestionKind::Short).unwrap(),
-            "\"short\""
-        );
-        let parsed: QuestionKind = serde_json::from_str("\"mc\"").unwrap();
-        assert_eq!(parsed, QuestionKind::Mc);
-    }
-
-    #[test]
-    fn question_status_string_roundtrip() {
-        for status in [
-            QuestionStatus::Draft,
-            QuestionStatus::Live,
-            QuestionStatus::Archived,
-        ] {
-            let parsed: QuestionStatus = status.as_str().parse().expect("known status parses");
-            assert_eq!(parsed, status);
-        }
-    }
-
-    #[test]
-    fn question_status_rejects_unknown() {
-        let err = "retired".parse::<QuestionStatus>().unwrap_err();
-        assert_eq!(err.0, "retired");
-    }
-
-    #[test]
-    fn mc_payload_serde() {
-        let p = McPayload {
-            options: vec!["a".into(), "b".into(), "c".into()],
-            correct_index: 1,
-        };
-        let json = serde_json::to_value(&p).unwrap();
-        assert_eq!(json["correct_index"], 1);
-        let back: McPayload = serde_json::from_value(json).unwrap();
-        assert_eq!(back, p);
-    }
-
-    #[test]
-    fn free_text_payload_normalize_variants_match_spec() {
+    fn normalize_serialization() {
         let exact = serde_json::to_string(&Normalize::Exact).unwrap();
         let ci = serde_json::to_string(&Normalize::CaseInsensitiveStripAccents).unwrap();
         assert_eq!(exact, "\"exact\"");

@@ -59,13 +59,15 @@ test.describe("learner UI (seeded account)", () => {
     await expect(page.getByText(/Alice Learner/i)).toBeVisible({
       timeout: 10000,
     });
-    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Assessments" }),
+    ).toBeVisible();
   });
 
-  test("all quizzes tab is visible", async ({ page }) => {
+  test("all assessments tab is visible", async ({ page }) => {
     await page.goto("/library");
     await expect(
-      page.getByRole("tab", { name: /All quizzes \(\d+\)/ }),
+      page.getByRole("tab", { name: /All \(\d+\)/ }),
     ).toBeVisible({ timeout: 8000 });
   });
 
@@ -101,14 +103,15 @@ test.describe("learner session flow (fresh user)", () => {
   });
 
   test("can start a quiz session", async ({ page, request }) => {
-    const r = await request.get(`${API_URL}/v1/quizzes?status=active`, {
+    const r = await request.get(`${API_URL}/v1/assessments?status=active&mode=practice`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const quizzes = (await r.json()).quizzes ?? [];
-    expect(quizzes.length, "at least one active quiz").toBeGreaterThan(0);
+    const body = await r.json();
+    const assessments = body.assessments ?? body;
+    expect(assessments.length, "at least one active assessment").toBeGreaterThan(0);
 
     const sr = await request.post(`${API_URL}/v1/sessions`, {
-      data: { quizId: quizzes[0].id },
+      data: { assessmentId: assessments[0].id },
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(sr.status()).toBe(201);

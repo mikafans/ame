@@ -1,5 +1,6 @@
 //! Shared domain types. Grows with each subsequent plan.
 
+pub mod assessment;
 pub mod attempt;
 pub mod error;
 pub mod exam;

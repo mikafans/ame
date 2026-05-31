@@ -1,10 +1,10 @@
-//! Profile, key and webhook management routes: /v1/me, /v1/me/keys, /v1/me/webhooks, /v1/me/attempts.
+//! Me-surface routes: profile, API keys, agents, activity, stats.
+
 
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
     routing::{delete, get, patch, post},
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,6 @@ use crate::{
     auth::{
         extractor::AuthenticatedUser,
         scope::{RequireAnyScope, ScopeOneOf},
-        token::{generate_secret, hash_secret},
     },
     domain::{
         attempt::Attempt,
@@ -27,46 +26,45 @@ use crate::{
     http::AppState,
 };
 
-// ── key shapes ────────────────────────────────────────────────────────────────
+// ── API keys ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KeySummary {
     pub id: Uuid,
     pub name: String,
-    pub scopes: Vec<String>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
     pub last_used_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListKeysResponse {
     pub keys: Vec<KeySummary>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateKeyBody {
-    pub label: String,
-    pub scopes: Vec<String>,
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateKeyResponse {
-    pub api_key: String,
-    pub prefix: String,
     pub id: Uuid,
+    pub secret: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RotateKeyResponse {
-    pub api_key: String,
+    pub secret: String,
 }
 
-// ── agent shapes ──────────────────────────────────────────────────────────────
+// ── agents ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -74,15 +72,16 @@ pub struct AgentSummary {
     pub id: Uuid,
     pub label: String,
     pub scopes: Vec<String>,
-    pub last_used_at: Option<OffsetDateTime>,
-    pub created_at: OffsetDateTime,
     pub focus_tags: Vec<String>,
-    pub current_goal: Option<String>,
-    pub next_target: Option<String>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub last_used_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListAgentsResponse {
     pub agents: Vec<AgentSummary>,
 }
@@ -92,26 +91,26 @@ pub struct ListAgentsResponse {
 pub struct CreateAgentBody {
     pub label: String,
     pub scopes: Vec<String>,
-    pub focus_tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub focus_tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAgentResponse {
-    pub api_key: String,
     pub id: Uuid,
+    pub secret: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAgentBody {
     pub label: Option<String>,
+    pub scopes: Option<Vec<String>>,
     pub focus_tags: Option<Vec<String>>,
-    pub current_goal: Option<String>,
-    pub next_target: Option<String>,
 }
 
-// ── webhook shapes ────────────────────────────────────────────────────────────
+// ── webhooks ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -119,40 +118,48 @@ pub struct WebhookSummary {
     pub id: Uuid,
     pub url: String,
     pub events: Vec<String>,
+    pub is_active: bool,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListWebhooksResponse {
     pub webhooks: Vec<WebhookSummary>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateWebhookBody {
     pub url: String,
     pub events: Vec<String>,
+    pub secret: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateWebhookResponse {
     pub id: Uuid,
-    pub secret: String,
 }
 
-// ── key handlers ──────────────────────────────────────────────────────────────
+// ── handlers ──────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/v1/me/keys",
+    responses(
+        (status = 200, description = "List of API keys", body = ListKeysResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
 pub async fn list_keys(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<ListKeysResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, name, scopes, last_used_at, created_at
-         FROM tb_api_tokens
-         WHERE user_id = $1 AND revoked_at IS NULL
-         ORDER BY created_at DESC",
+        "SELECT id, name, last_used_at, created_at FROM tb_api_tokens WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC"
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
@@ -160,11 +167,10 @@ pub async fn list_keys(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     let keys = rows
-        .iter()
+        .into_iter()
         .map(|r| KeySummary {
             id: r.get("id"),
             name: r.get("name"),
-            scopes: r.get("scopes"),
             last_used_at: r.get("last_used_at"),
             created_at: r.get("created_at"),
         })
@@ -173,144 +179,116 @@ pub async fn list_keys(
     Ok(Json(ListKeysResponse { keys }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/me/keys",
+    request_body = CreateKeyBody,
+    responses(
+        (status = 201, description = "Key created", body = CreateKeyResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
 pub async fn create_key(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(body): Json<CreateKeyBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    if body.label.trim().is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "label".into(),
-            message: "must not be empty".into(),
-        }]));
-    }
-    if body.scopes.is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "scopes".into(),
-            message: "must include at least one scope".into(),
-        }]));
-    }
-
-    // Only admin users may create keys that include the 'admin' scope
-    let requesting_admin = user.token_scopes.contains(&Scope::Admin)
-        || matches!(user.user.role, crate::domain::user::Role::Admin);
-    if body.scopes.contains(&"admin".to_string()) && !requesting_admin {
-        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
-            Scope::Admin.as_str(),
-        )));
-    }
-
-    // Validate all requested scopes are known
-    for s in &body.scopes {
-        if s.parse::<Scope>().is_err() {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "scopes".into(),
-                message: format!("unknown scope: {s}"),
-            }]));
-        }
-    }
-
+) -> Result<(StatusCode, Json<CreateKeyResponse>), ApiError> {
     let token_id = Uuid::now_v7();
-    let secret = generate_secret();
-    let hash = hash_secret(&secret);
-    let prefix = format!("hk_{}", &secret[..8]);
+    let secret = crate::auth::token::generate_secret();
+    let hash = crate::auth::token::hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
     )
     .bind(token_id)
     .bind(user.user.id)
-    .bind(&body.label)
+    .bind(&body.name)
     .bind(&hash)
-    .bind(&body.scopes)
+    .bind(vec!["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "feedback.write"])
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateKeyResponse {
-            api_key: format!("{token_id}_{secret}"),
-            prefix,
-            id: token_id,
-        }),
-    ))
+    Ok((StatusCode::CREATED, Json(CreateKeyResponse {
+        id: token_id,
+        secret: format!("{}_{}", token_id, secret),
+    })))
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/me/keys/{id}/rotate",
+    params(("id" = Uuid, Path, description = "Key id")),
+    responses(
+        (status = 200, description = "Key rotated", body = RotateKeyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such key"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
 pub async fn rotate_key(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-    Path(key_id): Path<Uuid>,
+    Path(id): Path<Uuid>,
 ) -> Result<Json<RotateKeyResponse>, ApiError> {
-    // Verify key belongs to caller and is active
-    let row = sqlx::query(
-        "SELECT id, name, scopes FROM tb_api_tokens
-         WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
-    )
-    .bind(key_id)
-    .bind(user.user.id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?
-    .ok_or(ApiError::NotFound { resource: "key" })?;
+    let secret = crate::auth::token::generate_secret();
+    let hash = crate::auth::token::hash_secret(&secret);
 
-    let name: String = row.get("name");
-    let scopes: Vec<String> = row.get("scopes");
-
-    // Revoke old key
-    sqlx::query("UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1")
-        .bind(key_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    // Issue new key with same name and scopes
-    let new_token_id = Uuid::now_v7();
-    let new_secret = generate_secret();
-    let new_hash = hash_secret(&new_secret);
-
-    sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(new_token_id)
-    .bind(user.user.id)
-    .bind(&name)
-    .bind(&new_hash)
-    .bind(&scopes)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok(Json(RotateKeyResponse {
-        api_key: format!("{new_token_id}_{new_secret}"),
-    }))
-}
-
-pub async fn revoke_key(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Path(key_id): Path<Uuid>,
-) -> Result<impl IntoResponse, ApiError> {
     let affected = sqlx::query(
-        "UPDATE tb_api_tokens SET revoked_at = now()
-         WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
+        "UPDATE tb_api_tokens SET token_hash = $1 WHERE id = $2 AND user_id = $3 AND revoked_at IS NULL"
     )
-    .bind(key_id)
+    .bind(&hash)
+    .bind(id)
     .bind(user.user.id)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound { resource: "key" });
+        return Err(ApiError::NotFound { resource: "api_key" });
+    }
+
+    Ok(Json(RotateKeyResponse {
+        secret: format!("{}_{}", id, secret),
+    }))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/v1/me/keys/{id}",
+    params(("id" = Uuid, Path, description = "Key id")),
+    responses(
+        (status = 204, description = "Key revoked"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such key"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn revoke_key(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let affected = sqlx::query(
+        "UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL"
+    )
+    .bind(id)
+    .bind(user.user.id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if affected.rows_affected() == 0 {
+        return Err(ApiError::NotFound { resource: "api_key" });
     }
 
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── agent handlers ────────────────────────────────────────────────────────────
-
-/// List agents owned by the current user.
 #[utoipa::path(
     get,
     path = "/v1/me/agents",
@@ -326,17 +304,11 @@ pub async fn list_agents(
     user: AuthenticatedUser,
 ) -> Result<Json<ListAgentsResponse>, ApiError> {
     let rows = sqlx::query(
-        r#"
-        SELECT 
-            u.id, u.display_name as label, u.created_at,
-            t.scopes, t.last_used_at,
-            p.focus_tags, p.current_goal, p.next_target
-        FROM tb_users u
-        LEFT JOIN tb_api_tokens t ON t.user_id = u.id AND t.revoked_at IS NULL
-        LEFT JOIN tb_agent_profiles p ON p.agent_user_id = u.id
-        WHERE u.owner_user_id = $1 AND u.role = 'agent'
-        ORDER BY u.created_at DESC
-        "#,
+        "SELECT u.id, u.display_name, t.scopes, a.focus_tags, t.last_used_at, u.created_at
+         FROM tb_users u
+         JOIN tb_agent_profiles a ON a.user_id = u.id
+         JOIN tb_api_tokens t ON t.user_id = u.id
+         WHERE u.owner_user_id = $1 AND u.role = 'agent' AND t.revoked_at IS NULL"
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
@@ -344,27 +316,20 @@ pub async fn list_agents(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     let agents = rows
-        .iter()
-        .map(|r| {
-            let scopes: Option<Vec<String>> = r.get("scopes");
-            let focus_tags: Option<Vec<String>> = r.get("focus_tags");
-            AgentSummary {
-                id: r.get("id"),
-                label: r.get("label"),
-                scopes: scopes.unwrap_or_default(),
-                last_used_at: r.get("last_used_at"),
-                created_at: r.get("created_at"),
-                focus_tags: focus_tags.unwrap_or_default(),
-                current_goal: r.get("current_goal"),
-                next_target: r.get("next_target"),
-            }
+        .into_iter()
+        .map(|r| AgentSummary {
+            id: r.get("id"),
+            label: r.get("display_name"),
+            scopes: r.get("scopes"),
+            focus_tags: r.get("focus_tags"),
+            last_used_at: r.get("last_used_at"),
+            created_at: r.get("created_at"),
         })
         .collect();
 
     Ok(Json(ListAgentsResponse { agents }))
 }
 
-/// Create a new agent sub-account.
 #[utoipa::path(
     post,
     path = "/v1/me/agents",
@@ -381,62 +346,39 @@ pub async fn create_agent(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(body): Json<CreateAgentBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    if body.label.trim().is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "label".into(),
-            message: "must not be empty".into(),
-        }]));
-    }
+) -> Result<(StatusCode, Json<CreateAgentResponse>), ApiError> {
+    // Check quota
+    crate::http::quota::check_quota(&state.pool, user.user.id, crate::http::quota::QuotaKind::AgentCreation).await?;
 
-    let plan = crate::http::quota::resolve_plan(&state.pool, user.owner_id()).await?;
-    let ceiling = crate::http::quota::plan_scope_ceiling(plan);
-
-    for s in &body.scopes {
-        let parsed: Scope = s.parse().map_err(|_| {
-            ApiError::Validation(vec![FieldError {
-                field: "scopes".into(),
-                message: format!("unknown scope: {s}"),
-            }])
-        })?;
-
-        if !ceiling.contains(&parsed) {
-            return Err(ApiError::ScopeRequired(std::borrow::Cow::Owned(format!(
-                "scope '{s}' is not permitted for your plan"
-            ))));
-        }
-    }
-
-    crate::http::quota::check_quota(
-        &state.pool,
-        user.owner_id(),
-        crate::http::quota::QuotaKind::AgentCreation,
-    )
-    .await?;
-
-    let mut tx = state
-        .pool
-        .begin()
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    let mut tx = state.pool.begin().await.map_err(|e| ApiError::Internal(e.into()))?;
 
     let agent_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, $3, 'agent')",
+        "INSERT INTO tb_users (id, email, password_hash, display_name, role, owner_user_id) VALUES ($1, NULL, NULL, $2, 'agent', $3)"
     )
     .bind(agent_id)
-    .bind(user.user.id)
     .bind(&body.label)
+    .bind(user.user.id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    sqlx::query(
+        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)"
+    )
+    .bind(agent_id)
+    .bind(&body.label)
+    .bind(&body.focus_tags)
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     let token_id = Uuid::now_v7();
-    let secret = generate_secret();
-    let hash = hash_secret(&secret);
+    let secret = crate::auth::token::generate_secret();
+    let hash = crate::auth::token::hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
     )
     .bind(token_id)
     .bind(agent_id)
@@ -447,42 +389,23 @@ pub async fn create_agent(
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    sqlx::query(
-        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)",
-    )
-    .bind(agent_id)
-    .bind(&body.label)
-    .bind(body.focus_tags.unwrap_or_default())
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    tx.commit().await.map_err(|e| ApiError::Internal(e.into()))?;
 
-    tx.commit()
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateAgentResponse {
-            api_key: format!("{token_id}_{secret}"),
-            id: agent_id,
-        }),
-    ))
+    Ok((StatusCode::CREATED, Json(CreateAgentResponse {
+        id: agent_id,
+        secret: format!("{}_{}", token_id, secret),
+    })))
 }
 
-/// Update an agent's label.
 #[utoipa::path(
     patch,
     path = "/v1/me/agents/{id}",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID"),
-    ),
+    params(("id" = Uuid, Path, description = "Agent id")),
     request_body = UpdateAgentBody,
     responses(
         (status = 204, description = "Agent updated"),
         (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 422, description = "Validation failed"),
+        (status = 404, description = "No such agent"),
     ),
     security(("bearer" = [])),
     tag = "me"
@@ -490,106 +413,51 @@ pub async fn create_agent(
 pub async fn update_agent(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-    Path(agent_id): Path<Uuid>,
+    Path(id): Path<Uuid>,
     Json(body): Json<UpdateAgentBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    // Check ownership/existence even for empty patches
-    let owner_check = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent')",
-    )
-    .bind(agent_id)
-    .bind(user.user.id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+) -> Result<StatusCode, ApiError> {
+    let mut tx = state.pool.begin().await.map_err(|e| ApiError::Internal(e.into()))?;
 
-    if !owner_check {
-        return Err(ApiError::NotFound { resource: "agent" });
-    }
-
-    if body.label.is_some()
-        || body.focus_tags.is_some()
-        || body.current_goal.is_some()
-        || body.next_target.is_some()
-    {
-        let mut tx = state
-            .pool
-            .begin()
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-
-        if let Some(label) = &body.label {
-            if label.trim().is_empty() {
-                return Err(ApiError::Validation(vec![FieldError {
-                    field: "label".into(),
-                    message: "must not be empty".into(),
-                }]));
-            }
-
-            sqlx::query(
-                "UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3 AND role = 'agent'",
-            )
+    if let Some(label) = &body.label {
+        sqlx::query("UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3")
             .bind(label)
-            .bind(agent_id)
+            .bind(id)
             .bind(user.user.id)
             .execute(&mut *tx)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
+    }
 
-            sqlx::query("UPDATE tb_agent_profiles SET label = $1 WHERE agent_user_id = $2")
-                .bind(label)
-                .bind(agent_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-        }
-
-        if let Some(focus_tags) = &body.focus_tags {
-            sqlx::query("UPDATE tb_agent_profiles SET focus_tags = $1 WHERE agent_user_id = $2")
-                .bind(focus_tags)
-                .bind(agent_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-        }
-
-        if let Some(current_goal) = &body.current_goal {
-            sqlx::query("UPDATE tb_agent_profiles SET current_goal = $1 WHERE agent_user_id = $2")
-                .bind(current_goal)
-                .bind(agent_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-        }
-
-        if let Some(next_target) = &body.next_target {
-            sqlx::query("UPDATE tb_agent_profiles SET next_target = $1 WHERE agent_user_id = $2")
-                .bind(next_target)
-                .bind(agent_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-        }
-
-        tx.commit()
+    if let Some(tags) = &body.focus_tags {
+        sqlx::query("UPDATE tb_agent_profiles SET focus_tags = $1 WHERE user_id = $2")
+            .bind(tags)
+            .bind(id)
+            .execute(&mut *tx)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
+    if let Some(scopes) = &body.scopes {
+        sqlx::query("UPDATE tb_api_tokens SET scopes = $1 WHERE user_id = $2")
+            .bind(scopes)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+    }
+
+    tx.commit().await.map_err(|e| ApiError::Internal(e.into()))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Delete an agent sub-account.
 #[utoipa::path(
     delete,
     path = "/v1/me/agents/{id}",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID"),
-    ),
+    params(("id" = Uuid, Path, description = "Agent id")),
     responses(
         (status = 204, description = "Agent deleted"),
         (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
+        (status = 404, description = "No such agent"),
     ),
     security(("bearer" = [])),
     tag = "me"
@@ -597,15 +465,14 @@ pub async fn update_agent(
 pub async fn delete_agent(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-    Path(agent_id): Path<Uuid>,
-) -> Result<impl IntoResponse, ApiError> {
-    let affected =
-        sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
-            .bind(agent_id)
-            .bind(user.user.id)
-            .execute(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let affected = sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
+        .bind(id)
+        .bind(user.user.id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
         return Err(ApiError::NotFound { resource: "agent" });
@@ -614,17 +481,22 @@ pub async fn delete_agent(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── webhook handlers ──────────────────────────────────────────────────────────
-
+#[utoipa::path(
+    get,
+    path = "/v1/me/webhooks",
+    responses(
+        (status = 200, description = "List of webhooks", body = ListWebhooksResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
 pub async fn list_webhooks(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<ListWebhooksResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, url, events, created_at
-         FROM tb_webhooks
-         WHERE user_id = $1 AND revoked_at IS NULL
-         ORDER BY created_at DESC",
+        "SELECT id, url, events, is_active, created_at FROM tb_webhooks WHERE user_id = $1 ORDER BY created_at DESC"
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
@@ -632,11 +504,12 @@ pub async fn list_webhooks(
     .map_err(|e| ApiError::Internal(e.into()))?;
 
     let webhooks = rows
-        .iter()
+        .into_iter()
         .map(|r| WebhookSummary {
             id: r.get("id"),
             url: r.get("url"),
             events: r.get("events"),
+            is_active: r.get("is_active"),
             created_at: r.get("created_at"),
         })
         .collect();
@@ -644,65 +517,64 @@ pub async fn list_webhooks(
     Ok(Json(ListWebhooksResponse { webhooks }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/me/webhooks",
+    request_body = CreateWebhookBody,
+    responses(
+        (status = 201, description = "Webhook created", body = CreateWebhookResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
 pub async fn create_webhook(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(body): Json<CreateWebhookBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    if body.url.trim().is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "url".into(),
-            message: "must not be empty".into(),
-        }]));
-    }
-
-    let webhook_id = Uuid::now_v7();
-    let secret = generate_secret();
-    let hash = hash_secret(&secret);
-
+) -> Result<(StatusCode, Json<CreateWebhookResponse>), ApiError> {
+    let id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_webhooks (id, user_id, url, events, secret_hash, signing_key)
-         VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO tb_webhooks (id, user_id, url, events, secret) VALUES ($1, $2, $3, $4, $5)"
     )
-    .bind(webhook_id)
+    .bind(id)
     .bind(user.user.id)
     .bind(&body.url)
     .bind(&body.events)
-    .bind(&hash)
-    .bind(&secret)
+    .bind(&body.secret)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    // Secret shown once; signing_key stored for outbound HMAC dispatch
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateWebhookResponse {
-            id: webhook_id,
-            secret,
-        }),
-    ))
+    Ok((StatusCode::CREATED, Json(CreateWebhookResponse { id })))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/v1/me/webhooks/{id}",
+    params(("id" = Uuid, Path, description = "Webhook id")),
+    responses(
+        (status = 204, description = "Webhook deleted"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such webhook"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
 pub async fn delete_webhook(
     State(state): State<AppState>,
     user: AuthenticatedUser,
-    Path(webhook_id): Path<Uuid>,
-) -> Result<impl IntoResponse, ApiError> {
-    let affected = sqlx::query(
-        "UPDATE tb_webhooks SET revoked_at = now()
-         WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
-    )
-    .bind(webhook_id)
-    .bind(user.user.id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let affected = sqlx::query("DELETE FROM tb_webhooks WHERE id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(user.user.id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound {
-            resource: "webhook",
-        });
+        return Err(ApiError::NotFound { resource: "webhook" });
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -717,6 +589,7 @@ pub struct MeResponse {
     pub display_name: String,
     pub email: Option<String>,
     pub role: Role,
+    #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
 }
@@ -732,7 +605,7 @@ pub struct MeResponse {
     security(("bearer" = [])),
     tag = "me"
 )]
-async fn get_me(auth: AuthenticatedUser) -> Result<Json<MeResponse>, ApiError> {
+pub async fn get_me(auth: AuthenticatedUser) -> Result<Json<MeResponse>, ApiError> {
     Ok(Json(MeResponse {
         id: auth.user.id,
         display_name: auth.user.display_name,
@@ -787,7 +660,7 @@ pub struct ListAttemptsResponse {
     security(("bearer" = [])),
     tag = "me"
 )]
-async fn list_attempts(
+pub async fn list_attempts(
     State(state): State<AppState>,
     auth: RequireAnyScope<AttemptReadScopes>,
     Query(q): Query<ListAttemptsQuery>,
@@ -795,7 +668,7 @@ async fn list_attempts(
     let rows = if let Some(sid) = q.session_id {
         sqlx::query(
             "SELECT id, user_id, question_id, question_version, session_id, response,
-                    presentation, is_correct, score, grade_status, grader_notes, time_to_answer_ms,
+                    presentation, is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms,
                     rating_before_user_avg, rating_before_question,
                     user_tag_deltas, question_delta, created_at,
                     COUNT(*) OVER() AS total
@@ -814,7 +687,7 @@ async fn list_attempts(
     } else {
         sqlx::query(
             "SELECT id, user_id, question_id, question_version, session_id, response,
-                    presentation, is_correct, score, grade_status, grader_notes, time_to_answer_ms,
+                    presentation, is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms,
                     rating_before_user_avg, rating_before_question,
                     user_tag_deltas, question_delta, created_at,
                     COUNT(*) OVER() AS total
@@ -849,6 +722,7 @@ async fn list_attempts(
             is_correct: r.get("is_correct"),
             score: r.get("score"),
             grade_status: r.get("grade_status"),
+            correct_answer: r.get("correct_answer"),
             grader_notes: r.get("grader_notes"),
             time_to_answer_ms: r.get("time_to_answer_ms"),
             rating_before_user_avg: r.get("rating_before_user_avg"),
@@ -867,7 +741,8 @@ async fn list_attempts(
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CohortStatsQuery {
-    pub quiz_id: Uuid,
+    pub assessment_id: Option<Uuid>,
+    pub quiz_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -891,7 +766,8 @@ pub struct CohortStatsResponse {
     get,
     path = "/v1/me/cohort-stats",
     params(
-        ("quizId" = Uuid, Query, description = "Quiz to compare against"),
+        ("assessmentId" = Option<Uuid>, Query, description = "Assessment to compare against"),
+        ("quizId" = Option<Uuid>, Query, description = "Quiz (legacy) to compare against"),
     ),
     responses(
         (status = 200, description = "Cohort stats", body = CohortStatsResponse),
@@ -900,12 +776,17 @@ pub struct CohortStatsResponse {
     security(("bearer" = [])),
     tag = "me"
 )]
-async fn get_cohort_stats(
+pub async fn get_cohort_stats(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
     Query(q): Query<CohortStatsQuery>,
 ) -> Result<Json<CohortStatsResponse>, ApiError> {
-    let quiz_id = q.quiz_id;
+    let assessment_id = q.assessment_id.or(q.quiz_id).ok_or_else(|| {
+        ApiError::Validation(vec![FieldError {
+            field: "assessmentId".into(),
+            message: "required".into(),
+        }])
+    })?;
     let user_id = auth.user.id;
 
     let cohort_id: Option<Uuid> = sqlx::query_scalar(
@@ -946,14 +827,14 @@ async fn get_cohort_stats(
             avg((s.result->>'percent')::double precision) as cohort_avg,
             count(distinct s.user_id) as finishers
          FROM tb_sessions s
-         WHERE s.quiz_id = $1
+         WHERE s.assessment_id = $1
            AND s.status = 'finished'
            AND s.result IS NOT NULL
            AND s.user_id IN (
                SELECT cm.user_id FROM tb_cohort_memberships cm WHERE cm.cohort_id = $2
            )",
     )
-    .bind(quiz_id)
+    .bind(assessment_id)
     .bind(cohort_id)
     .fetch_one(&state.pool)
     .await
@@ -966,14 +847,14 @@ async fn get_cohort_stats(
     let user_score: Option<f64> = sqlx::query_scalar(
         "SELECT (result->>'percent')::double precision
          FROM tb_sessions
-         WHERE quiz_id = $1
+         WHERE assessment_id = $1
            AND user_id = $2
            AND status = 'finished'
            AND result IS NOT NULL
          ORDER BY (result->>'percent')::double precision DESC
          LIMIT 1",
     )
-    .bind(quiz_id)
+    .bind(assessment_id)
     .bind(user_id)
     .fetch_optional(&state.pool)
     .await
@@ -986,7 +867,7 @@ async fn get_cohort_stats(
                 SELECT DISTINCT ON (s.user_id) s.user_id,
                     (s.result->>'percent')::double precision as best_score
                 FROM tb_sessions s
-                WHERE s.quiz_id = $1
+                WHERE s.assessment_id = $1
                   AND s.status = 'finished'
                   AND s.result IS NOT NULL
                   AND s.user_id IN (
@@ -996,12 +877,13 @@ async fn get_cohort_stats(
              ) ranked
              WHERE ranked.best_score <= $3",
         )
-        .bind(quiz_id)
+        .bind(assessment_id)
         .bind(cohort_id)
         .bind(score)
         .fetch_one(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
+
         Some(((count_at_or_below as f64 / total_members as f64) * 100.0).round() as i32)
     } else {
         None
@@ -1012,7 +894,7 @@ async fn get_cohort_stats(
             floor((s.result->>'percent')::double precision * 10)::int as bucket,
             count(*) as count
          FROM tb_sessions s
-         WHERE s.quiz_id = $1
+         WHERE s.assessment_id = $1
            AND s.status = 'finished'
            AND s.result IS NOT NULL
            AND s.user_id IN (
@@ -1021,7 +903,7 @@ async fn get_cohort_stats(
          GROUP BY 1
          ORDER BY 1",
     )
-    .bind(quiz_id)
+    .bind(assessment_id)
     .bind(cohort_id)
     .fetch_all(&state.pool)
     .await
@@ -1058,18 +940,15 @@ fn empty_histogram() -> Vec<CohortStatsBucket> {
 #[serde(rename_all = "camelCase")]
 pub struct CreateCohortBody {
     pub name: String,
-    pub description: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCohortResponse {
     pub id: Uuid,
-    pub name: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct AddCohortMemberBody {
     pub user_id: Uuid,
 }
@@ -1079,60 +958,57 @@ impl ScopeOneOf for CohortWriteScopes {
     const SCOPES: &'static [Scope] = &[Scope::Admin];
 }
 
-async fn create_cohort(
+#[utoipa::path(
+    post,
+    path = "/v1/cohorts",
+    request_body = CreateCohortBody,
+    responses(
+        (status = 201, description = "Cohort created", body = CreateCohortResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn create_cohort(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<CohortWriteScopes>,
+    _auth: AuthenticatedUser,
     Json(body): Json<CreateCohortBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    if body.name.trim().is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "name".into(),
-            message: "must not be empty".into(),
-        }]));
-    }
+) -> Result<(StatusCode, Json<CreateCohortResponse>), ApiError> {
     let id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_cohorts (id, name, description) VALUES ($1, $2, $3)")
+    sqlx::query("INSERT INTO tb_cohorts (id, name) VALUES ($1, $2)")
         .bind(id)
         .bind(&body.name)
-        .bind(&body.description)
         .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateCohortResponse {
-            id,
-            name: body.name,
-        }),
-    ))
+    Ok((StatusCode::CREATED, Json(CreateCohortResponse { id })))
 }
 
-async fn add_cohort_member(
+#[utoipa::path(
+    post,
+    path = "/v1/cohorts/{id}/members",
+    params(("id" = Uuid, Path, description = "Cohort id")),
+    request_body = AddCohortMemberBody,
+    responses(
+        (status = 204, description = "Member added"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn add_cohort_member(
     State(state): State<AppState>,
     _auth: RequireAnyScope<CohortWriteScopes>,
-    Path(cohort_id): Path<Uuid>,
+    Path(id): Path<Uuid>,
     Json(body): Json<AddCohortMemberBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    let exists: bool = sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_cohorts WHERE id = $1)")
-        .bind(cohort_id)
-        .fetch_one(&state.pool)
+) -> Result<StatusCode, ApiError> {
+    sqlx::query("INSERT INTO tb_cohort_memberships (cohort_id, user_id) VALUES ($1, $2)")
+        .bind(id)
+        .bind(body.user_id)
+        .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
-    if !exists {
-        return Err(ApiError::NotFound { resource: "cohort" });
-    }
-
-    sqlx::query(
-        "INSERT INTO tb_cohort_memberships (id, cohort_id, user_id) VALUES ($1, $2, $3)
-         ON CONFLICT (cohort_id, user_id) DO NOTHING",
-    )
-    .bind(Uuid::now_v7())
-    .bind(cohort_id)
-    .bind(body.user_id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
 
     Ok(StatusCode::NO_CONTENT)
 }

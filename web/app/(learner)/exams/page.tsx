@@ -17,6 +17,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
 import { LearningObjectives } from "@/components/LearningObjectives";
+import { tagColor } from "@/lib/tagColor";
 
 interface ExamSection {
   id: string;
@@ -42,6 +43,8 @@ interface Exam {
   totalPoints: number;
   course?: string;
   tags?: string[];
+  completed?: boolean;
+  lastSessionId?: string | null;
 }
 
 type TabId = "all" | "published" | "draft";
@@ -90,7 +93,8 @@ export default function ExamsPage() {
       })
       .then(({ data }) => {
         if (data) {
-          const mappedExams = data.map((d) => ({
+          const list = "assessments" in data ? (data as any).assessments : data;
+          const mappedExams = (list as any[]).map((d: any) => ({
             id: d.id,
             name: d.title,
             description: d.description ?? undefined,
@@ -101,6 +105,8 @@ export default function ExamsPage() {
             totalPoints: d.totalPoints,
             course: d.course ?? undefined,
             sections: null,
+            completed: d.completed,
+            lastSessionId: d.lastSessionId,
           }));
           setExams(mappedExams as any);
           if (!selected && mappedExams.length) setSelected(mappedExams[0].id);
@@ -137,6 +143,8 @@ export default function ExamsPage() {
             objectives: data.objectives,
             totalPoints: data.totalPoints,
             course: data.course ?? undefined,
+            completed: exams.find((e) => e.id === selected)?.completed,
+            lastSessionId: exams.find((e) => e.id === selected)?.lastSessionId,
             sections: data.sections.map((s) => ({
               id: s.id,
               title: s.title,
@@ -341,7 +349,12 @@ export default function ExamsPage() {
                   variant="outlined"
                 />
                 {exam.course && (
-                  <Chip label={exam.course} size="small" variant="outlined" />
+                  <Chip
+                    label={exam.course}
+                    size="small"
+                    variant="outlined"
+                    sx={tagColor(exam.course)}
+                  />
                 )}
                 {exam.method && (
                   <Chip
@@ -500,14 +513,31 @@ export default function ExamsPage() {
                 }}
               >
                 {exam.status === "published" && (
-                  <Button
-                    variant="contained"
-                    size="large"
-                    disabled={starting}
-                    onClick={startExam}
-                  >
-                    {starting ? "Starting…" : "Start exam"}
-                  </Button>
+                  <>
+                    {exam.completed && exam.lastSessionId && (
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={() =>
+                          router.push(`/sessions/${exam.lastSessionId}/results`)
+                        }
+                      >
+                        Last result
+                      </Button>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="large"
+                      disabled={starting}
+                      onClick={startExam}
+                    >
+                      {starting
+                        ? "Starting…"
+                        : exam.completed
+                          ? "Retake exam"
+                          : "Start exam"}
+                    </Button>
+                  </>
                 )}
                 {exam.status !== "published" && (
                   <Button

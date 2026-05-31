@@ -113,6 +113,8 @@ pub struct Session {
     pub user_id: Uuid,
     pub kind: SessionKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assessment_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quiz_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exam_id: Option<Uuid>,

@@ -5,8 +5,8 @@ use crate::{
     auth::extractor::AuthenticatedUser,
     domain::{
         assessment::{
-            Assessment, AssessmentMode, AssessmentStatus, CreateAssessmentRequest,
-            UpdateAssessmentRequest,
+            Assessment, AssessmentMode, AssessmentStatus, AssessmentVisibility,
+            CreateAssessmentRequest, UpdateAssessmentRequest,
         },
         error::{ApiError, FieldError},
         question::QuestionKind,
@@ -20,9 +20,14 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{Arguments, Row, postgres::PgArguments};
-use time::OffsetDateTime;
+use sqlx::Row;
+use time::{OffsetDateTime, UtcOffset};
 use utoipa::ToSchema;
+// End of router
+// Helper to convert UTC to JST
+fn to_jst(dt: OffsetDateTime) -> OffsetDateTime {
+    dt.to_offset(UtcOffset::from_hms(9, 0, 0).unwrap())
+}
 use uuid::Uuid;
 
 pub fn router(state: AppState) -> Router<AppState> {
@@ -31,6 +36,9 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/assessments",
             get(list_assessments).post(create_assessment),
         )
+        .route("/v1/assessments/explore", get(explore))
+        .route("/v1/assessments/count", get(count_assessments))
+        .route("/v1/assessments/generate", post(generate_assessment))
         .route(
             "/v1/assessments/{id}",
             get(get_assessment)
@@ -56,13 +64,19 @@ pub struct AssessmentSummary {
     pub description: Option<String>,
     pub mode: String,
     pub status: String,
+    pub visibility: String,
     pub course: Option<String>,
     pub objectives: Vec<String>,
     pub duration_min: Option<i32>,
     pub total_points: i32,
     pub question_count: i64,
     pub completed: bool,
+    pub last_session_id: Option<Uuid>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
     pub updated_at: OffsetDateTime,
 }
 
@@ -125,10 +139,26 @@ pub struct AddAssessmentQuestionResponse {
     pub order_index: i32,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ListParams {
     pub mode: Option<String>,
     pub status: Option<String>,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+}
+
+fn default_limit() -> i64 {
+    50
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAssessmentsResponse {
+    pub assessments: Vec<AssessmentSummary>,
+    pub total: i64,
 }
 
 // Helper to parse strings to Enums for manual mapping
@@ -149,15 +179,24 @@ fn parse_status(s: &str) -> Result<AssessmentStatus, String> {
     }
 }
 
+fn parse_visibility(s: &str) -> AssessmentVisibility {
+    match s {
+        "public" => AssessmentVisibility::Public,
+        _ => AssessmentVisibility::Private,
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/v1/assessments",
     params(
         ("mode" = Option<String>, Query, description = "Filter by mode (practice or graded)"),
-        ("status" = Option<String>, Query, description = "Filter by status (draft, active, archived)"),
+        ("status" = Option<String>, Query, description = "Filter by status (draft, active, archived). When absent, returns public-active + caller's own."),
+        ("limit" = Option<i64>, Query, description = "Page size (default: 50)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
-        (status = 200, description = "List of assessments", body = Vec<AssessmentSummary>),
+        (status = 200, description = "List of assessments", body = ListAssessmentsResponse),
         (status = 401, description = "Missing or invalid token"),
     ),
     security(("bearer_auth" = [])),
@@ -167,61 +206,102 @@ pub async fn list_assessments(
     user: AuthenticatedUser,
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
-) -> Result<Json<Vec<AssessmentSummary>>, ApiError> {
-    let mut query = r#"
-        SELECT a.id, a.title, a.description, a.mode, a.status, a.course, a.objectives, a.duration_min, a.total_points, a.created_at, a.updated_at,
-               COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections WHERE assessment_id = a.id), 0) AS question_count,
-               EXISTS(
-                   SELECT 1 FROM tb_sessions s
-                   WHERE s.assessment_id = a.id AND s.user_id = $1 AND s.status = 'finished'
-               ) AS completed
-        FROM tb_assessments a
-        WHERE 1=1
-    "#.to_string();
-    let mut args = PgArguments::default();
-    args.add(user.owner_id)
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+) -> Result<Json<ListAssessmentsResponse>, ApiError> {
+    let uid = user.owner_id;
 
-    if let Some(ref mode) = params.mode {
-        query.push_str(" AND a.mode = $2");
-        args.add(mode)
-            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
-    }
-
-    if let Some(status) = params.status {
-        query.push_str(if params.mode.is_some() {
-            " AND a.status = $3"
-        } else {
-            " AND a.status = $2"
-        });
-        args.add(status)
-            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
-    }
-
-    let rows = sqlx::query_with(&query, args)
+    let rows = if let Some(ref status) = params.status {
+        sqlx::query(
+            "SELECT a.id, a.title, a.description, a.mode, a.status, a.visibility,
+                    a.course, a.objectives, a.duration_min, a.total_points,
+                    a.created_at, a.updated_at,
+                    COUNT(*) OVER() AS total,
+                    COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections
+                               WHERE assessment_id = a.id), 0) AS question_count,
+                    EXISTS(
+                        SELECT 1 FROM tb_sessions s
+                        WHERE s.assessment_id = a.id AND s.user_id = $1
+                          AND s.status = 'finished'
+                    ) AS completed,
+                    (
+                        SELECT s.id FROM tb_sessions s
+                        WHERE s.assessment_id = a.id AND s.user_id = $1
+                          AND s.status = 'finished'
+                        ORDER BY s.finished_at DESC LIMIT 1
+                    ) AS last_session_id
+             FROM tb_assessments a
+             WHERE a.status = $2
+               AND (a.visibility = 'public' OR a.created_by = $1)
+               AND ($3::text IS NULL OR a.mode = $3)
+             ORDER BY a.updated_at DESC
+             LIMIT $4 OFFSET $5",
+        )
+        .bind(uid)
+        .bind(status)
+        .bind(params.mode.as_deref())
+        .bind(params.limit)
+        .bind(params.offset)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+    } else {
+        sqlx::query(
+            "SELECT a.id, a.title, a.description, a.mode, a.status, a.visibility,
+                    a.course, a.objectives, a.duration_min, a.total_points,
+                    a.created_at, a.updated_at,
+                    COUNT(*) OVER() AS total,
+                    COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections
+                               WHERE assessment_id = a.id), 0) AS question_count,
+                    EXISTS(
+                        SELECT 1 FROM tb_sessions s
+                        WHERE s.assessment_id = a.id AND s.user_id = $1
+                          AND s.status = 'finished'
+                    ) AS completed,
+                    (
+                        SELECT s.id FROM tb_sessions s
+                        WHERE s.assessment_id = a.id AND s.user_id = $1
+                          AND s.status = 'finished'
+                        ORDER BY s.finished_at DESC LIMIT 1
+                    ) AS last_session_id
+             FROM tb_assessments a
+             WHERE (
+                 (a.visibility = 'public' AND a.status = 'active')
+                 OR a.created_by = $1
+             )
+             AND ($2::text IS NULL OR a.mode = $2)
+             ORDER BY a.updated_at DESC
+             LIMIT $3 OFFSET $4",
+        )
+        .bind(uid)
+        .bind(params.mode.as_deref())
+        .bind(params.limit)
+        .bind(params.offset)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+    };
 
-    Ok(Json(
-        rows.iter()
-            .map(|row| AssessmentSummary {
-                id: row.get("id"),
-                title: row.get("title"),
-                description: row.get("description"),
-                mode: row.get("mode"),
-                status: row.get("status"),
-                course: row.get("course"),
-                objectives: row.get("objectives"),
-                duration_min: row.get("duration_min"),
-                total_points: row.get("total_points"),
-                question_count: row.get("question_count"),
-                completed: row.get("completed"),
-                created_at: row.get("created_at"),
-                updated_at: row.get("updated_at"),
-            })
-            .collect(),
-    ))
+    let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+    let assessments = rows.iter()
+        .map(|row| AssessmentSummary {
+            id: row.get("id"),
+            title: row.get("title"),
+            description: row.get("description"),
+            mode: row.get("mode"),
+            status: row.get("status"),
+            visibility: row.get("visibility"),
+            course: row.get("course"),
+            objectives: row.get("objectives"),
+            duration_min: row.get("duration_min"),
+            total_points: row.get("total_points"),
+            question_count: row.get("question_count"),
+            completed: row.get("completed"),
+            last_session_id: row.get("last_session_id"),
+            created_at: to_jst(row.get("created_at")),
+            updated_at: to_jst(row.get("updated_at")),
+        })
+        .collect();
+
+    Ok(Json(ListAssessmentsResponse { assessments, total }))
 }
 
 #[utoipa::path(
@@ -229,7 +309,7 @@ pub async fn list_assessments(
     path = "/v1/assessments",
     request_body = CreateAssessmentRequest,
     responses(
-        (status = 200, description = "Assessment created successfully", body = AssessmentSummary),
+        (status = 201, description = "Assessment created successfully", body = AssessmentSummary),
         (status = 401, description = "Missing or invalid token"),
         (status = 422, description = "Validation failed"),
     ),
@@ -240,12 +320,16 @@ pub async fn create_assessment(
     user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateAssessmentRequest>,
-) -> Result<Json<AssessmentSummary>, ApiError> {
+) -> Result<(StatusCode, Json<AssessmentSummary>), ApiError> {
     let assessment_id = Uuid::new_v4();
+    let visibility = payload.visibility.to_string();
 
     sqlx::query(
-        "INSERT INTO tb_assessments (id, title, description, mode, objectives, course, duration_min, time_limit_seconds, passing_points, show_results_during, affects_rating, method, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)"
+        "INSERT INTO tb_assessments \
+         (id, title, description, mode, objectives, course, duration_min, \
+          time_limit_seconds, passing_points, show_results_during, affects_rating, \
+          method, visibility, created_by) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
     )
     .bind(assessment_id)
     .bind(payload.title.clone())
@@ -258,7 +342,8 @@ pub async fn create_assessment(
     .bind(payload.passing_points)
     .bind(payload.show_results_during)
     .bind(payload.affects_rating)
-    .bind(payload.method)
+    .bind(&payload.method)
+    .bind(&visibility)
     .bind(user.user.id)
     .execute(&state.pool)
     .await
@@ -266,8 +351,8 @@ pub async fn create_assessment(
 
     // Create a default section
     sqlx::query(
-        "INSERT INTO tb_assessment_sections (id, assessment_id, title, order_index, weight, items_count)
-         VALUES ($1, $2, $3, 0, 1.0, 0)"
+        "INSERT INTO tb_assessment_sections (id, assessment_id, title, order_index, weight, items_count) \
+         VALUES ($1, $2, $3, 0, 1.0, 0)",
     )
     .bind(Uuid::new_v4())
     .bind(assessment_id)
@@ -276,21 +361,23 @@ pub async fn create_assessment(
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
-    Ok(Json(AssessmentSummary {
+    Ok((StatusCode::CREATED, Json(AssessmentSummary {
         id: assessment_id,
         title: payload.title,
         description: payload.description,
         mode: payload.mode.to_string(),
         status: "draft".to_string(),
+        visibility,
         course: payload.course,
         objectives: payload.objectives,
         duration_min: payload.duration_min,
         total_points: 0,
         question_count: 0,
         completed: false,
-        created_at: OffsetDateTime::now_utc(),
-        updated_at: OffsetDateTime::now_utc(),
-    }))
+        last_session_id: None,
+        created_at: to_jst(OffsetDateTime::now_utc()),
+        updated_at: to_jst(OffsetDateTime::now_utc()),
+    })))
 }
 
 #[utoipa::path(
@@ -308,18 +395,23 @@ pub async fn create_assessment(
     tag = "assessments"
 )]
 pub async fn get_assessment(
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AssessmentDetail>, ApiError> {
-    let row = sqlx::query("SELECT * FROM tb_assessments WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
-        .ok_or(ApiError::NotFound {
-            resource: "assessment",
-        })?;
+    // Visibility check: public OR owner
+    let row = sqlx::query(
+        "SELECT * FROM tb_assessments WHERE id = $1 \
+         AND (visibility = 'public' OR created_by = $2)",
+    )
+    .bind(id)
+    .bind(user.user.id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
+    .ok_or(ApiError::NotFound {
+        resource: "assessment",
+    })?;
 
     let assessment = Assessment {
         id: row.get("id"),
@@ -329,6 +421,7 @@ pub async fn get_assessment(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
         status: parse_status(&row.get::<String, _>("status"))
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
+        visibility: parse_visibility(&row.get::<String, _>("visibility")),
         objectives: row.get("objectives"),
         course: row.get("course"),
         duration_min: row.get("duration_min"),
@@ -340,8 +433,8 @@ pub async fn get_assessment(
         method: row.get("method"),
         composition_trace: row.get("composition_trace"),
         created_by: row.get("created_by"),
-        created_at: row.get("created_at"),
-        updated_at: row.get("updated_at"),
+        created_at: to_jst(row.get("created_at")),
+        updated_at: to_jst(row.get("updated_at")),
     };
 
     // Fetch sections
@@ -357,9 +450,8 @@ pub async fn get_assessment(
     for sec_row in section_rows {
         let sec_id: Uuid = sec_row.get("id");
 
-        // Fetch items for this section
         let item_rows = sqlx::query(
-            "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, 
+            "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
                     COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
              FROM tb_assessment_items ai
              JOIN tb_questions q ON q.id = ai.question_id
@@ -397,7 +489,7 @@ pub async fn get_assessment(
         });
     }
 
-    // Flat questions list for compatible single-section view (practice quizzes)
+    // Flat questions list for compatible single-section view (practice assessments)
     let questions = sections
         .first()
         .map(|s| s.questions.clone())
@@ -420,6 +512,7 @@ pub async fn get_assessment(
     responses(
         (status = 200, description = "Assessment updated successfully", body = Assessment),
         (status = 401, description = "Missing or invalid token"),
+        (status = 403, description = "Not the owner"),
         (status = 404, description = "Assessment not found"),
         (status = 422, description = "Validation failed"),
     ),
@@ -427,32 +520,55 @@ pub async fn get_assessment(
     tag = "assessments"
 )]
 pub async fn patch_assessment(
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateAssessmentRequest>,
 ) -> Result<Json<Assessment>, ApiError> {
+    // Only the owner can patch
+    let status = payload.status.as_ref().map(|s| s.to_string());
     let row = sqlx::query(
-        "UPDATE tb_assessments 
-           SET title = COALESCE($1, title), 
-               description = COALESCE($2, description), 
-               status = COALESCE($3, status),
-               objectives = COALESCE($4, objectives),
-               updated_at = now()
-           WHERE id = $5
+        "UPDATE tb_assessments
+           SET title       = COALESCE($1, title),
+               description = COALESCE($2, description),
+               status      = COALESCE($3, status),
+               visibility  = COALESCE($4, visibility),
+               objectives  = COALESCE($5, objectives),
+               updated_at  = now()
+           WHERE id = $6 AND created_by = $7
            RETURNING *",
     )
-    .bind(payload.title)
+    .bind(&payload.title)
     .bind(payload.description.flatten())
-    .bind(payload.status.map(|s| s.to_string()))
+    .bind(&status)
+    .bind(payload.visibility.map(|v| v.to_string()))
     .bind(payload.objectives)
     .bind(id)
+    .bind(user.user.id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
     .ok_or(ApiError::NotFound {
         resource: "assessment",
     })?;
+
+    if status == Some("active".to_string()) {
+        // Promote all draft questions in this assessment to live
+        sqlx::query(
+            "UPDATE tb_questions
+             SET status = 'live'
+             WHERE status = 'draft'
+               AND id IN (
+                   SELECT question_id FROM tb_assessment_items ai
+                   JOIN tb_assessment_sections s ON s.id = ai.section_id
+                   WHERE s.assessment_id = $1
+               )",
+        )
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    }
 
     Ok(Json(Assessment {
         id: row.get("id"),
@@ -462,6 +578,7 @@ pub async fn patch_assessment(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
         status: parse_status(&row.get::<String, _>("status"))
             .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?,
+        visibility: parse_visibility(&row.get::<String, _>("visibility")),
         objectives: row.get("objectives"),
         course: row.get("course"),
         duration_min: row.get("duration_min"),
@@ -473,8 +590,8 @@ pub async fn patch_assessment(
         method: row.get("method"),
         composition_trace: row.get("composition_trace"),
         created_by: row.get("created_by"),
-        created_at: row.get("created_at"),
-        updated_at: row.get("updated_at"),
+        created_at: to_jst(row.get("created_at")),
+        updated_at: to_jst(row.get("updated_at")),
     }))
 }
 
@@ -493,12 +610,14 @@ pub async fn patch_assessment(
     tag = "assessments"
 )]
 pub async fn delete_assessment(
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    sqlx::query("DELETE FROM tb_assessments WHERE id = $1")
+    // Only the owner can delete
+    sqlx::query("DELETE FROM tb_assessments WHERE id = $1 AND created_by = $2")
         .bind(id)
+        .bind(user.user.id)
         .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
@@ -526,15 +645,21 @@ pub async fn add_assessment_question(
     Path(assessment_id): Path<Uuid>,
     Json(body): Json<AddAssessmentQuestionBody>,
 ) -> Result<(StatusCode, Json<AddAssessmentQuestionResponse>), ApiError> {
-    // Find the first section
+    // Find the first section (owner check implicit: section exists only for owned assessments)
     let section_id: Uuid = sqlx::query_scalar(
-        "SELECT id FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index ASC LIMIT 1"
+        "SELECT s.id FROM tb_assessment_sections s
+         JOIN tb_assessments a ON a.id = s.assessment_id
+         WHERE s.assessment_id = $1 AND a.created_by = $2
+         ORDER BY s.order_index ASC LIMIT 1",
     )
     .bind(assessment_id)
+    .bind(auth.user.id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
-    .ok_or(ApiError::NotFound { resource: "assessment" })?;
+    .ok_or(ApiError::NotFound {
+        resource: "assessment",
+    })?;
 
     // Resolve the question ID
     let question_id = if let Some(qid) = body.question_id {
@@ -558,12 +683,12 @@ pub async fn add_assessment_question(
             }])
         })?;
         let prompt = body.prompt.unwrap_or_default();
-        let default_payload = crate::http::quizzes::default_payload_for_kind(kind);
+        let default_payload = default_payload_for_kind(kind);
 
         sqlx::query_scalar(
             "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by)
              VALUES ($1, $2, $3, 'draft', 1, $4)
-             RETURNING id"
+             RETURNING id",
         )
         .bind(kind.as_str())
         .bind(&prompt)
@@ -615,6 +740,31 @@ pub async fn add_assessment_question(
     ))
 }
 
+pub fn default_payload_for_kind(kind: QuestionKind) -> serde_json::Value {
+    match kind {
+        QuestionKind::Mc => serde_json::json!({
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correct_index": 0
+        }),
+        QuestionKind::Tf => serde_json::json!({ "correct": true }),
+        QuestionKind::Short => serde_json::json!({
+            "accepted": [],
+            "normalize": "exact",
+            "judge": "exact"
+        }),
+        QuestionKind::Essay => serde_json::json!({
+            "min_words": null,
+            "rubric": null,
+            "judge": "manual"
+        }),
+        QuestionKind::Code => serde_json::json!({
+            "language": "python",
+            "starter": "",
+            "tests": []
+        }),
+    }
+}
+
 #[utoipa::path(
     delete,
     path = "/v1/assessments/{id}/questions/{question_id}",
@@ -632,18 +782,24 @@ pub async fn add_assessment_question(
 )]
 pub async fn remove_assessment_question(
     State(state): State<AppState>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     Path((assessment_id, question_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    // Find the first section
+    // Find the first section, scoped to owner
     let section_id: Uuid = sqlx::query_scalar(
-        "SELECT id FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index ASC LIMIT 1"
+        "SELECT s.id FROM tb_assessment_sections s
+         JOIN tb_assessments a ON a.id = s.assessment_id
+         WHERE s.assessment_id = $1 AND a.created_by = $2
+         ORDER BY s.order_index ASC LIMIT 1",
     )
     .bind(assessment_id)
+    .bind(auth.user.id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
-    .ok_or(ApiError::NotFound { resource: "assessment" })?;
+    .ok_or(ApiError::NotFound {
+        resource: "assessment",
+    })?;
 
     let deleted =
         sqlx::query("DELETE FROM tb_assessment_items WHERE section_id = $1 AND question_id = $2")
@@ -655,17 +811,19 @@ pub async fn remove_assessment_question(
 
     if deleted.rows_affected() == 0 {
         return Err(ApiError::NotFound {
-            resource: "quiz_question",
+            resource: "assessment_question",
         });
     }
 
-    sqlx::query("UPDATE tb_assessment_sections SET items_count = items_count - 1 WHERE id = $1")
-        .bind(section_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    sqlx::query(
+        "UPDATE tb_assessment_sections SET items_count = items_count - 1 WHERE id = $1",
+    )
+    .bind(section_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
-    // Delete the question itself if it's a draft not used by any other section
+    // Delete the inline question if it's a draft not used by any other section
     sqlx::query(
         "DELETE FROM tb_questions
          WHERE id = $1
@@ -678,4 +836,175 @@ pub async fn remove_assessment_question(
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ── count ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CountAssessmentsQuery {
+    #[serde(default)]
+    pub mode: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CountAssessmentsResponse {
+    pub count: i64,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/assessments/count",
+    params(
+        ("mode" = Option<String>, Query, description = "Filter by mode"),
+    ),
+    responses(
+        (status = 200, description = "Assessment count", body = CountAssessmentsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn count_assessments(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Query(q): Query<CountAssessmentsQuery>,
+) -> Result<Json<CountAssessmentsResponse>, ApiError> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tb_assessments a
+         WHERE (a.visibility = 'public' AND a.status = 'active')
+            OR a.created_by = $1
+           AND ($2::text IS NULL OR a.mode = $2)",
+    )
+    .bind(auth.owner_id)
+    .bind(q.mode)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(Json(CountAssessmentsResponse { count }))
+}
+
+// ── generate (stub) ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateAssessmentBody {
+    pub source: String,
+    #[serde(default = "default_generate_count")]
+    pub question_count: u32,
+    pub types: Option<Vec<QuestionKind>>,
+    pub objectives: Option<Vec<String>>,
+}
+
+fn default_generate_count() -> u32 {
+    5
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateAssessmentResponse {
+    pub candidates: Vec<serde_json::Value>,
+    pub objectives: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/assessments/generate",
+    request_body = GenerateAssessmentBody,
+    responses(
+        (status = 200, description = "Generated assessment candidates", body = GenerateAssessmentResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn generate_assessment(
+    _auth: AuthenticatedUser,
+    Json(_body): Json<GenerateAssessmentBody>,
+) -> Result<Json<GenerateAssessmentResponse>, ApiError> {
+    Ok(Json(GenerateAssessmentResponse {
+        candidates: vec![],
+        objectives: vec![],
+        warnings: vec!["assessment.generate is not yet implemented".into()],
+    }))
+}
+
+// ── explore ──────────────────────────────────────────────────────────────────
+
+#[utoipa::path(
+    get,
+    path = "/v1/assessments/explore",
+    params(
+        ("limit" = Option<i64>, Query, description = "Page size (default: 50)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Public assessment list", body = ListAssessmentsResponse),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn explore(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Query(params): Query<ListParams>,
+) -> Result<Json<ListAssessmentsResponse>, ApiError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT a.id, a.title, a.description, a.mode, a.status, a.visibility,
+               a.course, a.objectives, a.duration_min, a.total_points,
+               a.created_at, a.updated_at,
+               COUNT(*) OVER() AS total,
+               COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections
+                          WHERE assessment_id = a.id), 0) AS question_count,
+               EXISTS(
+                   SELECT 1 FROM tb_sessions s
+                   WHERE s.assessment_id = a.id AND s.user_id = $1
+                     AND s.status = 'finished'
+               ) AS completed,
+               (
+                   SELECT s.id FROM tb_sessions s
+                   WHERE s.assessment_id = a.id AND s.user_id = $1
+                     AND s.status = 'finished'
+                   ORDER BY s.finished_at DESC LIMIT 1
+               ) AS last_session_id
+        FROM tb_assessments a
+        WHERE a.visibility = 'public' AND a.status = 'active'
+        ORDER BY a.updated_at DESC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(auth.owner_id)
+    .bind(params.limit)
+    .bind(params.offset)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+    let assessments = rows.iter()
+        .map(|row| AssessmentSummary {
+            id: row.get("id"),
+            title: row.get("title"),
+            description: row.get("description"),
+            mode: row.get("mode"),
+            status: row.get("status"),
+            visibility: row.get("visibility"),
+            course: row.get("course"),
+            objectives: row.get("objectives"),
+            duration_min: row.get("duration_min"),
+            total_points: row.get("total_points"),
+            question_count: row.get("question_count"),
+            completed: row.get("completed"),
+            last_session_id: row.get("last_session_id"),
+            created_at: to_jst(row.get("created_at")),
+            updated_at: to_jst(row.get("updated_at")),
+        })
+        .collect();
+
+    Ok(Json(ListAssessmentsResponse { assessments, total }))
 }

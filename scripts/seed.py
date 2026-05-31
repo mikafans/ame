@@ -31,6 +31,7 @@ DEFAULT_API = os.environ.get("AME_API_URL", "http://localhost:8080")
 USERS = [
     {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "user"},
     {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "user"},
+    
     {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "admin"},
 ]
 
@@ -206,9 +207,23 @@ QUIZ_PYTHON = {
     ],
 }
 
+QUIZ_DRAFT = {
+    "title": "Algorithmic Complexity & Graph Theory (Draft)",
+    "course": "Computer Science",
+    "visibility": "private",
+    "objectives": [
+        "Analyze recurrence relations",
+        "Implement DFS and BFS graph traversals",
+    ],
+}
+
 EXAM_BLUEPRINT = {
-    "name": "CS Fundamentals Midterm",
+    "title": "CS Fundamentals Midterm",
     "description": "Covers algorithms, data structures, and complexity analysis.",
+    "objectives": [
+        "Analyze time and space complexity using Big O notation",
+        "Implement basic data structures and algorithms",
+    ],
     "duration": 60,
     "passing_points": 10,
 }
@@ -347,62 +362,106 @@ def seed_questions(client: httpx.Client, auth: dict, result: SeedResult) -> None
     console.print(f"  Promoted {promoted}/{len(created)} questions to live")
 
 
-def _find_quiz_by_title(client: httpx.Client, auth: dict, title: str) -> str | None:
-    """Return the id of an existing active quiz with this title, if any.
+def _find_assessment_by_title(client: httpx.Client, auth: dict, title: str) -> str | None:
+    """Return the id of an existing active assessment with this title, if any.
 
-    Keeps the seed idempotent so repeated runs (e.g. the e2e auto-seed) don't
-    pile up duplicate quizzes.
+    Keeps the seed idempotent so repeated runs don't pile up duplicates.
     """
-    resp = client.get("/v1/quizzes", params={"status": "active", "limit": 200}, headers=auth)
+    resp = client.get("/v1/assessments", params={"status": "active"}, headers=auth)
     if not resp.is_success:
         return None
-    for q in resp.json().get("quizzes", []):
-        if q.get("title") == title:
-            return q["id"]
+    for a in resp.json() if isinstance(resp.json(), list) else []:
+        if a.get("title") == title:
+            return a["id"]
     return None
 
 
-def _create_and_publish_quiz(client: httpx.Client, auth: dict, meta: dict, questions: list[dict], result: SeedResult) -> str | None:
-    existing = _find_quiz_by_title(client, auth, meta["title"])
+def _create_and_publish_assessment(
+    client: httpx.Client, auth: dict, meta: dict, questions: list[dict], result: SeedResult
+) -> str | None:
+    existing = _find_assessment_by_title(client, auth, meta["title"])
     if existing:
-        console.print(f"  Reusing quiz {existing[:8]}…  '{meta['title']}' (already seeded)")
+        console.print(f"  Reusing assessment {existing[:8]}…  '{meta['title']}' (already seeded)")
         return existing
 
-    resp = client.post("/v1/quizzes", json=meta, headers=auth)
+    body = {
+        "title": meta["title"],
+        "description": meta.get("description"),
+        "mode": "practice",
+        "objectives": meta.get("objectives", []),
+        "course": meta.get("course"),
+        "durationMin": meta.get("duration"),
+        "timeLimitSeconds": None,
+        "passingPoints": None,
+        "showResultsDuring": False,
+        "affectsRating": True,
+        "visibility": meta.get("visibility", "private"),
+        "method": "manual",
+    }
+    resp = client.post("/v1/assessments", json=body, headers=auth)
     if not resp.is_success:
-        console.print(f"[red]Failed to create quiz '{meta['title']}':[/red] {resp.text[:200]}")
+        console.print(f"[red]Failed to create assessment '{meta['title']}':[/red] {resp.text[:200]}")
         return None
 
-    quiz_id = resp.json()["quiz"]["id"]
-    console.print(f"  Created quiz {quiz_id[:8]}…  '{meta['title']}'")
+    assessment_id = resp.json()["id"]
+    console.print(f"  Created assessment {assessment_id[:8]}…  '{meta['title']}'")
 
     added = sum(
         1 for q in questions
-        if client.post(f"/v1/quizzes/{quiz_id}/questions", json={"questionId": q["id"]}, headers=auth).is_success
+        if client.post(
+            f"/v1/assessments/{assessment_id}/questions",
+            json={"questionId": q["id"]},
+            headers=auth,
+        ).is_success
     )
     console.print(f"  Linked {added}/{len(questions)} questions")
 
-    pub = client.patch(f"/v1/quizzes/{quiz_id}", json={"status": "active"}, headers=auth)
+    pub = client.patch(
+        f"/v1/assessments/{assessment_id}",
+        json={"status": "active", "visibility": meta.get("visibility", "private")},
+        headers=auth,
+    )
     if pub.is_success:
-        console.print("  Published → active")
+        console.print(f"  Published → active  (visibility={meta.get('visibility', 'private')})")
     else:
         console.print(f"  [yellow]Could not publish:[/yellow] {pub.text[:200]}")
-    return quiz_id
+    return assessment_id
 
 
 def seed_quizzes(client: httpx.Client, auth: dict, result: SeedResult) -> None:
-    console.rule("[bold]Quizzes")
+    console.rule("[bold]Assessments")
     if not result.questions:
         console.print("  [yellow]No questions — skipping[/yellow]")
         return
 
-    # Main quiz: all question kinds
-    result.quiz_id = _create_and_publish_quiz(client, auth, QUIZ, result.questions, result)
+    # Main assessment: all question kinds, public
+    result.quiz_id = _create_and_publish_assessment(client, auth, QUIZ, result.questions, result)
 
-    # Python quiz: python + math questions only (short + code)
+    # Python assessment: python + math questions only (short + code), public
     python_qs = [q for q in result.questions if q["kind"] in ("short", "code")]
     if python_qs:
-        result.quiz_python_id = _create_and_publish_quiz(client, auth, QUIZ_PYTHON, python_qs, result)
+        result.quiz_python_id = _create_and_publish_assessment(client, auth, QUIZ_PYTHON, python_qs, result)
+
+    # Draft assessment (private) for Author studio
+    draft_body = {
+        "title": QUIZ_DRAFT["title"],
+        "description": None,
+        "mode": "practice",
+        "objectives": QUIZ_DRAFT.get("objectives", []),
+        "course": QUIZ_DRAFT.get("course"),
+        "durationMin": None,
+        "timeLimitSeconds": None,
+        "passingPoints": None,
+        "showResultsDuring": False,
+        "affectsRating": True,
+        "visibility": "private",
+        "method": "manual",
+    }
+    draft_resp = client.post("/v1/assessments", json=draft_body, headers=auth)
+    if draft_resp.is_success:
+        console.print(f"  Created private draft assessment: '{QUIZ_DRAFT['title']}'")
+    else:
+        console.print(f"  [yellow]Failed to create draft assessment:[/yellow] {draft_resp.text[:200]}")
 
 
 def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
@@ -418,16 +477,23 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
         console.print("  [yellow]No multiple-choice questions — skipping exam[/yellow]")
         return
 
-    sections = [{"title": "Multiple Choice", "questionIds": mc_ids, "weight": 0.6}]
-    if essay_ids:
-        sections.append({"title": "Essay Questions", "questionIds": essay_ids, "weight": 0.4})
-
-    resp = client.post("/v1/exams", json={**EXAM_BLUEPRINT, "sections": sections}, headers=auth)
+    body = {
+        **EXAM_BLUEPRINT,
+        "mode": "graded",
+        "visibility": "public",
+        "method": "manual",
+    }
+    resp = client.post("/v1/assessments", json=body, headers=auth)
     if resp.is_success:
-        exam_id = resp.json().get("examId") or resp.json().get("id")
+        exam_id = resp.json().get("id")
         result.exam_id = exam_id
-        console.print(f"  Created exam {exam_id} with {len(sections)} sections")
-        pub = client.patch(f"/v1/exams/{exam_id}", json={"status": "published"}, headers=auth)
+        console.print(f"  Created exam assessment {exam_id}")
+        
+        # Link questions to the default section
+        for qid in mc_ids + essay_ids:
+            client.post(f"/v1/assessments/{exam_id}/questions", json={"questionId": qid}, headers=auth)
+            
+        pub = client.patch(f"/v1/assessments/{exam_id}", json={"status": "active"}, headers=auth)
         if pub.is_success:
             console.print("  Published exam → active")
         else:
@@ -479,7 +545,7 @@ def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
         id_to_answer[q["id"]] = ans
 
     # Start a session
-    resp = client.post("/v1/sessions", json={"quizId": result.quiz_id}, headers=auth)
+    resp = client.post("/v1/sessions", json={"assessmentId": result.quiz_id}, headers=auth)
     if not resp.is_success:
         console.print(f"  [yellow]Could not start session:[/yellow] {resp.status_code} {resp.text[:200]}")
         return
@@ -546,6 +612,71 @@ def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
 
     console.print(f"  Submitted {answered}/{len(questions)} answers for learner session {session_id[:8]}…")
 
+    # Finish the session to complete it
+    finish_resp = client.post(f"/v1/sessions/{session_id}/finish", headers=auth)
+    if finish_resp.is_success:
+        console.print(f"  [green]Finished learner session {session_id[:8]}[/green]")
+    else:
+        console.print(f"  [yellow]Failed to finish session {session_id[:8]}:[/yellow] {finish_resp.status_code}")
+
+
+def seed_agents(client: httpx.Client, result: SeedResult) -> None:
+    console.rule("[bold]Agents")
+    admin = next((u for u in result.users if u["email"] == "admin@example.com"), None)
+    if not admin:
+        console.print("  [yellow]No admin user — skipping agents[/yellow]")
+        return
+    admin_auth = {"Authorization": f"Bearer {admin['token']}"}
+
+    # 1. Upgrade learner and instructor to premium
+    for u in result.users:
+        if u["role"] == "user":
+            r = client.patch(f"/v1/admin/users/{u['id']}", json={"plan": "premium"}, headers=admin_auth)
+            if r.is_success:
+                console.print(f"  Upgraded {u['email']} to PREMIUM")
+            else:
+                console.print(f"  [yellow]Failed to upgrade {u['email']}:[/yellow] {r.status_code}")
+
+    # 2. Create agent for learner
+    learner = next((u for u in result.users if u["email"] == "learner@example.com"), None)
+    if learner:
+        learner_auth = {"Authorization": f"Bearer {learner['token']}"}
+        agent_resp = client.post(
+            "/v1/me/agents",
+            json={
+                "label": "Alice's Study Assistant",
+                "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
+                "focusTags": ["algorithms", "python"],
+            },
+            headers=learner_auth,
+        )
+        if agent_resp.is_success:
+            agent_data = agent_resp.json()
+            console.print(f"  [green]✓[/green] Created agent for Learner: [cyan]{agent_data.get('id')}[/cyan]")
+            console.print(f"    Key: {agent_data.get('secret')}")
+        else:
+            console.print(f"  [yellow]Failed to create learner agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
+
+    # 3. Create agent for instructor
+    instructor = next((u for u in result.users if u["email"] == "instructor@example.com"), None)
+    if instructor:
+        instructor_auth = {"Authorization": f"Bearer {instructor['token']}"}
+        agent_resp = client.post(
+            "/v1/me/agents",
+            json={
+                "label": "Bob's Content Generator",
+                "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write", "public.publish"],
+                "focusTags": ["data-structures", "sorting"],
+            },
+            headers=instructor_auth,
+        )
+        if agent_resp.is_success:
+            agent_data = agent_resp.json()
+            console.print(f"  [green]✓[/green] Created agent for Instructor: [cyan]{agent_data.get('id')}[/cyan]")
+            console.print(f"    Key: {agent_data.get('secret')}")
+        else:
+            console.print(f"  [yellow]Failed to create instructor agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
+
 
 def print_summary(result: SeedResult) -> None:
     console.rule("[bold green]Seed complete")
@@ -603,6 +734,7 @@ def main() -> None:
         seed_exam(client, auth, result)
         seed_cohort(client, admin_auth, result)
         seed_attempts(client, result)
+        seed_agents(client, result)
 
     print_summary(result)
 

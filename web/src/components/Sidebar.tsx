@@ -59,9 +59,9 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
   }
 
   const items = [
-    { id: "library", label: "Library", icon: "library", section: "Learn" },
+    { id: "library", label: "Assessments", icon: "library", section: "Learn" },
     { id: "exams", label: "Exams", icon: "stack", section: "Learn" },
-    { id: "quiz", label: "Take quiz", icon: "take", section: "Learn" },
+    { id: "quiz", label: "Take assessment", icon: "take", section: "Learn" },
     {
       id: "flashcards",
       label: "Flashcards",

@@ -6,7 +6,7 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
-    let database_url = std::env::var("DATABASE_URL")
+    let database_url = std::env::var("AME_DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/ame".to_string());
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Initialize tracing. Set `LOG_FORMAT=json` for structured logs in production;
+/// Initialize tracing. Set `AME_LOG_FORMAT=json` for structured logs in production;
 /// otherwise a compact human-readable format is used.
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env()
@@ -49,7 +49,7 @@ fn init_tracing() {
         .with_target(true)
         .with_thread_ids(false);
 
-    if std::env::var("LOG_FORMAT").as_deref() == Ok("json") {
+    if std::env::var("AME_LOG_FORMAT").as_deref() == Ok("json") {
         builder.json().init();
     } else {
         builder.compact().init();

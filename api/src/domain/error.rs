@@ -6,8 +6,9 @@ use axum::{
 use serde_json::json;
 use std::borrow::Cow;
 use tracing::error;
+use utoipa::ToSchema;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, ToSchema)]
 pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
@@ -42,10 +43,11 @@ pub enum ApiError {
         usage: i64,
     },
     #[error(transparent)]
+    #[schema(value_type = String)]
     Internal(#[from] anyhow::Error),
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ToSchema)]
 pub struct FieldError {
     pub field: String,
     pub message: String,

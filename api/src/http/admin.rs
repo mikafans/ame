@@ -49,6 +49,7 @@ pub struct AuditLogEntry {
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,
     pub metadata: serde_json::Value,
+    #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: time::OffsetDateTime,
 }

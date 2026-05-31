@@ -34,7 +34,7 @@ See `docs/plans/` for implementation plans, including `docs/plans/2026-05-20-des
 - **MC options**: bare strings (`Vec<String>` in `McPayload`) — never `{text:"..."}` objects. Both the grading engine and frontend `McOptionsEditor` expect this format.
 - **Scheduled exams**: not supported. No `opens_at`/`closes_at` in `tb_exams` or the API.
 - **Auth**: email + password only (`POST /v1/auth/register`, `/v1/auth/login`). SSO/SAML not implemented.
-- **Quiz publish**: `PATCH /v1/quizzes/{id}` with `status: active` auto-promotes any draft questions to live.
+- **Assessment unification**: `Quizzes` and `Exams` are unified into the `Assessment` entity (modes: `practice` vs `graded`). API endpoints consolidated to `/v1/assessments`.
 - **Code questions**: fall back to `pending_manual` grading unless `payload.exemplar` is set; exemplar match is exact (whitespace-trimmed).
 
 ## Module boundaries (api/src/)

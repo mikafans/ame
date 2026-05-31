@@ -5,6 +5,7 @@ use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
 
 // ── shapes ────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterBody {
     pub email: String,
@@ -24,20 +25,20 @@ pub struct RegisterBody {
     pub role: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginBody {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub token: String,
     pub user: UserInfo,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub id: Uuid,
@@ -61,6 +62,16 @@ fn set_token_cookie_header(token: &str) -> String {
 }
 
 /// POST /v1/auth/register — register a new user with email and password.
+#[utoipa::path(
+    post,
+    path = "/v1/auth/register",
+    request_body = RegisterBody,
+    responses(
+        (status = 201, description = "User registered", body = AuthResponse),
+        (status = 422, description = "Validation failed")
+    ),
+    tag = "auth"
+)]
 pub async fn register(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<RegisterBody>,
@@ -157,6 +168,16 @@ pub async fn register(
 }
 
 /// POST /v1/auth/login — authenticate with email and password.
+#[utoipa::path(
+    post,
+    path = "/v1/auth/login",
+    request_body = LoginBody,
+    responses(
+        (status = 200, description = "Logged in", body = AuthResponse),
+        (status = 401, description = "Unauthorized")
+    ),
+    tag = "auth"
+)]
 pub async fn login(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<LoginBody>,
@@ -234,10 +255,10 @@ async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String,
 
 fn scopes_for_role(role: &str) -> Vec<&'static str> {
     match role {
-        "agent" => vec!["quiz.read"],
+        "agent" => vec!["assessment.read"],
         "admin" => vec![
-            "quiz.read",
-            "quiz.write",
+            "assessment.read",
+            "assessment.write",
             "attempt.read",
             "attempt.write",
             "stats.read",
@@ -247,8 +268,8 @@ fn scopes_for_role(role: &str) -> Vec<&'static str> {
             "admin",
         ],
         _ => vec![
-            "quiz.read",
-            "quiz.write",
+            "assessment.read",
+            "assessment.write",
             "attempt.read",
             "attempt.write",
             "stats.read",
@@ -280,6 +301,14 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
 }
 
 /// POST /v1/auth/logout — clear the HttpOnly token cookie.
+#[utoipa::path(
+    post,
+    path = "/v1/auth/logout",
+    responses(
+        (status = 200, description = "Logged out")
+    ),
+    tag = "auth"
+)]
 pub async fn logout() -> impl IntoResponse {
     (
         StatusCode::OK,

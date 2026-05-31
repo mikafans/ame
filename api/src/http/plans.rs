@@ -14,9 +14,11 @@ use uuid::Uuid;
 use crate::{
     auth::scope::{RequireAnyScope, ScopeOneOf},
     domain::{error::ApiError, user::Scope},
-    engine::planner::{DEFAULT_LOOKBACK_DAYS, StudyPlan, create_study_plan, get_study_plan},
+    engine::planner::{DEFAULT_LOOKBACK_DAYS, create_study_plan, get_study_plan},
     http::AppState,
 };
+
+pub use crate::engine::planner::StudyPlan;
 
 pub struct PlanWriteScopes;
 impl ScopeOneOf for PlanWriteScopes {

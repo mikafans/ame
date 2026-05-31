@@ -2,9 +2,10 @@
 use crate::domain::{error::ApiError, user::Scope};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Plan {
     Free,
@@ -34,8 +35,8 @@ pub async fn resolve_plan(pool: &PgPool, owner_id: Uuid) -> Result<Plan, ApiErro
 pub fn plan_scope_ceiling(plan: Plan) -> Vec<Scope> {
     match plan {
         Plan::Premium => vec![
-            Scope::QuizRead,
-            Scope::QuizWrite,
+            Scope::AssessmentRead,
+            Scope::AssessmentWrite,
             Scope::AttemptRead,
             Scope::AttemptWrite,
             Scope::StatsRead,
@@ -45,8 +46,8 @@ pub fn plan_scope_ceiling(plan: Plan) -> Vec<Scope> {
             Scope::PublicPublish,
         ],
         Plan::Free => vec![
-            Scope::QuizRead,
-            Scope::QuizWrite,
+            Scope::AssessmentRead,
+            Scope::AssessmentWrite,
             Scope::AttemptRead,
             Scope::AttemptWrite,
             Scope::StatsRead,

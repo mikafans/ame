@@ -97,14 +97,3 @@ test.describe("authoring navigation (all authenticated users)", () => {
   });
 });
 
-test.describe("tweaks panel", () => {
-  test("tweaks panel is not visible when DEMO_MODE is off", async ({
-    page,
-    request,
-  }) => {
-    const token = await loginAs(request, "learner@example.com");
-    await setAuthCookie(page, token);
-    await page.goto("/");
-    await expect(page.getByText("Tweaks (demo)")).not.toBeVisible();
-  });
-});

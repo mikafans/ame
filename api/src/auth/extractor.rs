@@ -19,6 +19,7 @@ use uuid::Uuid;
 /// `token_scopes` holds the parsed [`Scope`] enum (not raw strings) so downstream
 /// code cannot accidentally accept a scope that drifts from the `api_tokens.scopes`
 /// CHECK constraint in `db/migrations/20260519092355_init.sql`.
+#[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
     pub user: User,
     pub token_scopes: Vec<Scope>,

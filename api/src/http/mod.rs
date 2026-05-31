@@ -62,8 +62,8 @@ impl KeyExtractor for TokenKeyExtractor {
 pub mod activity;
 pub mod admin;
 pub mod agents;
+pub mod assessments;
 pub mod auth;
-pub mod exams;
 pub mod export;
 pub mod idempotency;
 pub mod me;
@@ -71,7 +71,6 @@ pub mod messages;
 pub mod openapi;
 pub mod plans;
 pub mod questions;
-pub mod quizzes;
 pub mod quota;
 pub mod sessions;
 pub mod shares;
@@ -114,9 +113,8 @@ pub fn router(pool: PgPool) -> Router {
         .merge(tags::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(sessions::router(state.clone()))
-        .merge(exams::router(state.clone()))
         .merge(plans::router(state.clone()))
-        .merge(quizzes::router(state.clone()))
+        .merge(assessments::router(state.clone()))
         .merge(stats::router(state.clone()))
         .merge(messages::router(state.clone()))
         .merge(me::router(state.clone()))

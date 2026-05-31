@@ -1109,7 +1109,7 @@ function ToolsTab() {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)
-      .GET("/v1/agents/mcp.json")
+      .GET("/v1/agents/skill.json")
       .then(({ data }: { data?: { tools: McpTool[] } }) => {
         if (data?.tools) {
           setTools(data.tools);

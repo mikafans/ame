@@ -11,6 +11,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import { tagColor } from "@/lib/tagColor";
 
 const KIND_LABEL: Record<string, string> = {
   mc: "MC",
@@ -116,7 +117,7 @@ export default function QuizPreviewPage({
           }}
           onClick={() => router.push("/library")}
         >
-          Library
+          Assessments
         </Typography>
         <Typography variant="caption" color="text.secondary">
           ›
@@ -139,9 +140,9 @@ export default function QuizPreviewPage({
         {quiz.course && (
           <Chip
             label={quiz.course}
-            color="primary"
             size="small"
-            sx={{ mb: 1.25 }}
+            variant="outlined"
+            sx={{ mb: 1.25, ...tagColor(quiz.course) }}
           />
         )}
         <Typography variant="h4" sx={{ fontWeight: 500, mb: 2 }}>
@@ -261,10 +262,10 @@ export default function QuizPreviewPage({
         }}
       >
         <Button variant="outlined" onClick={() => router.push("/library")}>
-          Back to library
+          Back to assessments
         </Button>
         <Button variant="contained" onClick={handleStart} disabled={starting}>
-          {starting ? "Starting…" : "Start quiz"}
+          {starting ? "Starting…" : "Start assessment"}
         </Button>
       </Box>
     </Box>

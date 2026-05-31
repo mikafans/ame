@@ -67,9 +67,9 @@ function getMinutesAgo(iso: string): string {
 export default function AuthorStudioPage({
   params,
 }: {
-  params: Promise<{ quizId: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const { quizId } = use(params);
+  const { id } = use(params);
   const { user } = useAuth();
   const router = useRouter();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -98,16 +98,16 @@ export default function AuthorStudioPage({
   function load(showSpinner = false) {
     if (showSpinner) setLoading(true);
     api
-      .GET("/v1/assessments/{id}", { params: { path: { id: quizId } } })
+      .GET("/v1/assessments/{id}", { params: { path: { id } } })
       .then(({ data }) => {
         if (data) {
           const mappedQuiz: Quiz = {
-            id: data.id,
-            title: data.title,
-            description: data.description ?? undefined,
-            status: data.status,
-            course: data.course ?? undefined,
-            questions: data.questions.map((q) => ({
+            id: (data as any).id,
+            title: (data as any).title,
+            description: (data as any).description ?? undefined,
+            status: (data as any).status,
+            course: (data as any).course ?? undefined,
+            questions: (data as any).questions.map((q: any) => ({
               id: q.id,
               kind: q.kind,
               prompt: q.prompt,
@@ -134,7 +134,7 @@ export default function AuthorStudioPage({
   useEffect(() => {
     load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quizId]);
+  }, [id]);
 
   const selectedQ = quiz?.questions.find((q) => q.id === selectedId) ?? null;
 
@@ -153,7 +153,7 @@ export default function AuthorStudioPage({
     setSaving(true);
     try {
       await api.PATCH("/v1/assessments/{id}", {
-        params: { path: { id: quizId } },
+        params: { path: { id } },
         body: {
           title: editTitle,
         },
@@ -197,7 +197,7 @@ export default function AuthorStudioPage({
     setSaving(true);
     try {
       const { data } = await api.POST("/v1/assessments/{id}/questions", {
-        params: { path: { id: quizId } },
+        params: { path: { id } },
         body: { kind: kind as any, prompt: "" },
       });
       load();
@@ -209,16 +209,16 @@ export default function AuthorStudioPage({
     }
   }
 
-  async function deleteQuestion(id: string) {
-    const remaining = quiz?.questions.filter((q) => q.id !== id) ?? [];
-    if (selectedId === id)
+  async function deleteQuestion(idToDelete: string) {
+    const remaining = quiz?.questions.filter((q) => q.id !== idToDelete) ?? [];
+    if (selectedId === idToDelete)
       setSelectedId(remaining.length > 0 ? remaining[0].id : null);
     setQuiz((q) =>
-      q ? { ...q, questions: q.questions.filter((qq) => qq.id !== id) } : q,
+      q ? { ...q, questions: q.questions.filter((qq) => qq.id !== idToDelete) } : q,
     );
     try {
       await api.DELETE("/v1/assessments/{id}/questions/{question_id}", {
-        params: { path: { id: quizId, question_id: id } },
+        params: { path: { id, question_id: idToDelete } },
       });
       load();
     } catch (err) {
@@ -233,7 +233,7 @@ export default function AuthorStudioPage({
     setSaving(true);
     try {
       const { data } = await api.POST("/v1/assessments/{id}/questions", {
-        params: { path: { id: quizId } },
+        params: { path: { id } },
         body: {
           kind: newKind as any,
           prompt: editPrompt,
@@ -256,7 +256,7 @@ export default function AuthorStudioPage({
     setPublishError(null);
     try {
       await api.PATCH("/v1/assessments/{id}", {
-        params: { path: { id: quizId } },
+        params: { path: { id } },
         body: { status: "active" },
       });
       load();
@@ -344,7 +344,7 @@ export default function AuthorStudioPage({
           <Button
             variant="outlined"
             size="small"
-            onClick={() => router.push(`/quizzes/${quizId}/preview`)}
+            onClick={() => router.push(`/assessments/${quizId}/preview`)}
           >
             Preview
           </Button>

@@ -168,8 +168,8 @@ export default function LoginPage() {
         <Typography
           sx={{ fontSize: 13, color: subColor, lineHeight: 1.65, mb: 4 }}
         >
-          A structured quiz engine with a real API. Every quiz, attempt, and
-          rubric is typed, documented, and queryable.
+          A structured assessment engine with a real API. Every assessment,
+          attempt, and rubric is typed, documented, and queryable.
         </Typography>
 
         {/* Agent block */}
@@ -208,7 +208,7 @@ export default function LoginPage() {
           >
             {`curl -X POST $API/v1/me/agents \\
   -H 'Authorization: Bearer <token>' \\
-  -d '{"label":"my-agent","scopes":["quiz.read"]}'`}
+  -d '{"label":"my-agent","scopes":["assessment.read"]}'`}
           </Box>
           <Typography
             sx={{
@@ -346,6 +346,7 @@ export default function LoginPage() {
               />
               returns an API key scoped to your account. Create an account, then
               manage agents from account settings.
+              {" "}Scopes: <code>assessment.read</code>, <code>attempt.write</code>, <code>stats.read</code>…
             </Typography>
           </Box>
         </Box>

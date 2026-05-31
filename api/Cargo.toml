@@ -38,7 +38,7 @@ hex = "0.4"
 subtle = "2"
 http-body-util = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-utoipa = { version = "5", features = ["uuid", "time"] }
+utoipa = { version = "5", features = ["uuid", "time", "yaml"] }
 serde_yaml = "0.9"
 axum-prometheus = "0.10.0"
 

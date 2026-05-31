@@ -27,9 +27,16 @@ interface Props {
   index: number;
   total: number;
   onRate: (knew: boolean) => void;
+  onSkip: () => void;
 }
 
-export function FlashcardReview({ question, index, total, onRate }: Props) {
+export function FlashcardReview({
+  question,
+  index,
+  total,
+  onRate,
+  onSkip,
+}: Props) {
   const [revealed, setRevealed] = useState(false);
   const back = deriveBack(question);
 
@@ -38,12 +45,15 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
     setRevealed(false);
   }, [question.id]);
 
-  // Space flips; 1/ArrowLeft = missed, 2/ArrowRight = got it (only once revealed).
+  // Space flips; 1/ArrowLeft = missed, 2/ArrowRight = got it (only once
+  // revealed); s = skip for now (any time).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === " ") {
         e.preventDefault();
         setRevealed(true);
+      } else if (e.key === "s" || e.key === "S") {
+        onSkip();
       } else if (revealed && (e.key === "2" || e.key === "ArrowRight")) {
         onRate(true);
       } else if (revealed && (e.key === "1" || e.key === "ArrowLeft")) {
@@ -52,7 +62,7 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [revealed, onRate]);
+  }, [revealed, onRate, onSkip]);
 
   const snippet =
     question.code_snippet && typeof question.code_snippet === "object"
@@ -146,7 +156,10 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
         </CardContent>
       </Card>
 
-      <Box sx={{ mt: 2.5 }}>
+      <Stack
+        direction="row"
+        sx={{ mt: 2.5, alignItems: "center", justifyContent: "space-between" }}
+      >
         {!revealed ? (
           <Button
             variant="contained"
@@ -174,7 +187,14 @@ export function FlashcardReview({ question, index, total, onRate }: Props) {
             </Button>
           </Stack>
         )}
-      </Box>
+        <Button
+          color="inherit"
+          onClick={onSkip}
+          sx={{ color: "text.secondary" }}
+        >
+          Skip (S)
+        </Button>
+      </Stack>
     </Box>
   );
 }

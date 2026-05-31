@@ -53,9 +53,11 @@ test.describe("UI/UX spec alignment", () => {
       timeout: 10000,
     });
 
-    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
     await expect(
-      page.getByRole("tab", { name: /All quizzes \(\d+\)/ }),
+      page.getByRole("heading", { name: "Assessments" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: /All assessments \(\d+\)/ }),
     ).toBeVisible();
     // "Up next" highlights the first unfinished quiz; it is absent once the
     // learner has completed everything. Assert its detail fields only when shown.
@@ -71,20 +73,20 @@ test.describe("UI/UX spec alignment", () => {
 
     // --- Quiz preview (use a quiz with MCQ questions for the session test) ---
     const quizId = await firstMcqQuizId(request, token);
-    await page.goto(`/quizzes/${quizId}/preview`);
-    await expect(page.getByText("Library")).toBeVisible();
+    await page.goto(`/assessments/${quizId}/preview`);
+    await expect(page.getByText("Assessments")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back to library" }),
+      page.getByRole("button", { name: "Back to assessments" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Start quiz" }),
+      page.getByRole("button", { name: "Start assessment" }),
     ).toBeVisible();
     await expect(page.getByText(/questions/i).first()).toBeVisible();
     await expect(page.getByText(/pts/i).first()).toBeVisible();
     await screenshot(page, "quiz-preview");
 
     // --- Active session: navigate to an MCQ question ---
-    await page.getByRole("button", { name: "Start quiz" }).click();
+    await page.getByRole("button", { name: "Start assessment" }).click();
     await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]+$/);
     const sessionId = page.url().split("/").pop();
     expect(sessionId).toBeTruthy();
@@ -124,7 +126,7 @@ test.describe("UI/UX spec alignment", () => {
     await expect(page.getByRole("heading", { name: /Results/ })).toBeVisible();
     await expect(page.getByText("Answer review")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back to library" }),
+      page.getByRole("button", { name: "Back to assessments" }),
     ).toBeVisible();
     // Wait for the first answer card to render before reading captions
     await expect(page.locator(".MuiCardContent-root").first()).toBeVisible({
