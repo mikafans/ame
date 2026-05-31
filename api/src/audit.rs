@@ -13,7 +13,7 @@ pub fn audit(
     metadata: Value,
 ) {
     tokio::spawn(async move {
-        let _ = sqlx::query(
+        if let Err(e) = sqlx::query(
             "INSERT INTO tb_audit_log (actor_user_id, action, target_type, target_id, metadata)
              VALUES ($1, $2, $3, $4, $5)",
         )
@@ -23,6 +23,9 @@ pub fn audit(
         .bind(target_id)
         .bind(metadata)
         .execute(&pool)
-        .await;
+        .await
+        {
+            tracing::error!("Failed to write audit log entry: {e}");
+        }
     });
 }

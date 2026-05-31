@@ -34,15 +34,10 @@ pub struct ListUsersResponse {
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct UpdateUserRoleBody {
-    pub role: String,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct PatchUserAdminBody {
     pub plan: Option<String>,
     pub disabled: Option<bool>,
+    pub role: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -180,100 +175,82 @@ pub async fn patch_user_admin(
         );
     }
 
-    // 3. Perform disable if requested
-    if body.disabled == Some(true) {
-        sqlx::query(
-            "UPDATE tb_api_tokens SET revoked_at = now()
-             WHERE user_id = $1 AND revoked_at IS NULL",
-        )
-        .bind(user_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    // 3. Perform disable/enable if requested
+    if let Some(disabled) = body.disabled {
+        if disabled {
+            sqlx::query("UPDATE tb_users SET deactivated_at = now() WHERE id = $1")
+                .bind(user_id)
+                .execute(&state.pool)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+
+            sqlx::query(
+                "UPDATE tb_api_tokens SET revoked_at = now()
+                 WHERE user_id = $1 AND revoked_at IS NULL",
+            )
+            .bind(user_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            crate::audit::audit(
+                state.pool.clone(),
+                Some(admin.0.user.id),
+                "user.disable",
+                Some("user"),
+                Some(user_id),
+                serde_json::json!({
+                    "disabled": true,
+                }),
+            );
+        } else {
+            sqlx::query("UPDATE tb_users SET deactivated_at = NULL WHERE id = $1")
+                .bind(user_id)
+                .execute(&state.pool)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+
+            crate::audit::audit(
+                state.pool.clone(),
+                Some(admin.0.user.id),
+                "user.enable",
+                Some("user"),
+                Some(user_id),
+                serde_json::json!({
+                    "disabled": false,
+                }),
+            );
+        }
+    }
+
+    // 4. Perform role updates if requested
+    if let Some(role) = &body.role {
+        let valid_roles = ["user", "admin"];
+        if !valid_roles.contains(&role.as_str()) {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "role".into(),
+                message: "must be 'user' or 'admin'".into(),
+            }]));
+        }
+
+        sqlx::query("UPDATE tb_users SET role = $1 WHERE id = $2")
+            .bind(role)
+            .bind(user_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
         crate::audit::audit(
             state.pool.clone(),
             Some(admin.0.user.id),
-            "user.disable",
+            "user.update_role",
             Some("user"),
             Some(user_id),
             serde_json::json!({
-                "disabled": true,
+                "role": role,
             }),
         );
     }
-
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// POST /v1/admin/users/{id}/role — update user role
-#[utoipa::path(
-    post,
-    path = "/v1/admin/users/{id}/role",
-    request_body = UpdateUserRoleBody,
-    responses(
-        (status = 204, description = "User role successfully updated"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden (Admin required)"),
-        (status = 404, description = "User not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "admin"
-)]
-pub async fn update_user_role(
-    State(state): State<AppState>,
-    _admin: RequireScope<AdminScope>,
-    Path(user_id): Path<Uuid>,
-    Json(body): Json<UpdateUserRoleBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    let valid_roles = ["user", "admin"];
-    if !valid_roles.contains(&body.role.as_str()) {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "role".into(),
-            message: "must be 'user' or 'admin'".into(),
-        }]));
-    }
-
-    let affected = sqlx::query("UPDATE tb_users SET role = $1 WHERE id = $2")
-        .bind(&body.role)
-        .bind(user_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound { resource: "user" });
-    }
-
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// POST /v1/admin/users/{id}/deactivate — deactivate/disable a user
-#[utoipa::path(
-    post,
-    path = "/v1/admin/users/{id}/deactivate",
-    responses(
-        (status = 204, description = "User successfully deactivated"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden (Admin required)"),
-    ),
-    security(("bearer" = [])),
-    tag = "admin"
-)]
-pub async fn deactivate_user(
-    State(state): State<AppState>,
-    _admin: RequireScope<AdminScope>,
-    Path(user_id): Path<Uuid>,
-) -> Result<impl IntoResponse, ApiError> {
-    // Deactivate by revoking all tokens
-    sqlx::query(
-        "UPDATE tb_api_tokens SET revoked_at = now()
-         WHERE user_id = $1 AND revoked_at IS NULL",
-    )
-    .bind(user_id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -377,8 +354,6 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/admin/users/{id}",
             axum::routing::patch(patch_user_admin),
         )
-        .route("/v1/admin/users/{id}/role", post(update_user_role))
-        .route("/v1/admin/users/{id}/deactivate", post(deactivate_user))
         .route("/v1/admin/audit", get(list_audit_logs))
         .route("/v1/admin/moderate", post(moderate_quiz))
         .with_state(state)

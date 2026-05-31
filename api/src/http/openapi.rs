@@ -37,7 +37,7 @@ use crate::{
         AppState,
         admin::{
             AuditLogEntry, ListAuditLogsResponse, ListUsersResponse, ModerateBody,
-            PatchUserAdminBody, UpdateUserRoleBody,
+            PatchUserAdminBody,
         },
         me::{
             AgentSummary, CohortStatsBucket, CohortStatsQuery, CohortStatsResponse,
@@ -138,8 +138,6 @@ impl Modify for SecurityAddon {
         crate::http::exams::patch_exam_status,
         crate::http::admin::list_users,
         crate::http::admin::patch_user_admin,
-        crate::http::admin::update_user_role,
-        crate::http::admin::deactivate_user,
         crate::http::admin::list_audit_logs,
         crate::http::admin::moderate_quiz,
     ),
@@ -190,7 +188,6 @@ impl Modify for SecurityAddon {
         SendMessageResponse,
         User,
         ListUsersResponse,
-        UpdateUserRoleBody,
         PatchUserAdminBody,
         AuditLogEntry,
         ListAuditLogsResponse,

@@ -163,7 +163,7 @@ pub async fn login(
 ) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Fetch user by email
     let user_row = sqlx::query(
-        "SELECT id, email, display_name, role, password_hash FROM tb_users WHERE email = $1",
+        "SELECT id, email, display_name, role, password_hash, deactivated_at FROM tb_users WHERE email = $1",
     )
     .bind(&body.email)
     .fetch_optional(&state.pool)
@@ -176,6 +176,11 @@ pub async fn login(
     let display_name: String = user_row.get("display_name");
     let role: String = user_row.get("role");
     let password_hash: Option<String> = user_row.get("password_hash");
+    let deactivated_at: Option<time::OffsetDateTime> = user_row.get("deactivated_at");
+
+    if deactivated_at.is_some() {
+        return Err(ApiError::Unauthorized);
+    }
 
     // Verify password
     let password_hash_str = password_hash.ok_or(ApiError::Unauthorized)?;

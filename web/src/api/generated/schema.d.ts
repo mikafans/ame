@@ -72,40 +72,6 @@ export interface paths {
         patch: operations["patch_user_admin"];
         trace?: never;
     };
-    "/v1/admin/users/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/admin/users/{id}/deactivate — deactivate/disable a user */
-        post: operations["deactivate_user"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/users/{id}/role": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/admin/users/{id}/role — update user role */
-        post: operations["update_user_role"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/attempts/pending": {
         parameters: {
             query?: never;
@@ -1201,6 +1167,7 @@ export interface components {
         PatchUserAdminBody: {
             disabled?: boolean | null;
             plan?: string | null;
+            role?: string | null;
         };
         PendingAttemptRow: {
             /** Format: uuid */
@@ -1539,9 +1506,6 @@ export interface components {
             label?: string | null;
             nextTarget?: string | null;
         };
-        UpdateUserRoleBody: {
-            role: string;
-        };
         User: {
             /** Format: date-time */
             created_at: string;
@@ -1697,81 +1661,6 @@ export interface operations {
         };
         responses: {
             /** @description User successfully updated */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description User not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    deactivate_user: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description User successfully deactivated */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    update_user_role: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateUserRoleBody"];
-            };
-        };
-        responses: {
-            /** @description User role successfully updated */
             204: {
                 headers: {
                     [name: string]: unknown;

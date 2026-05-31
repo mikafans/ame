@@ -90,44 +90,6 @@ paths:
           description: User not found
       security:
       - bearer: []
-  /v1/admin/users/{id}/deactivate:
-    post:
-      tags:
-      - admin
-      summary: POST /v1/admin/users/{id}/deactivate — deactivate/disable a user
-      operationId: deactivate_user
-      responses:
-        '204':
-          description: User successfully deactivated
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-      security:
-      - bearer: []
-  /v1/admin/users/{id}/role:
-    post:
-      tags:
-      - admin
-      summary: POST /v1/admin/users/{id}/role — update user role
-      operationId: update_user_role
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateUserRoleBody'
-        required: true
-      responses:
-        '204':
-          description: User role successfully updated
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-        '404':
-          description: User not found
-      security:
-      - bearer: []
   /v1/attempts/pending:
     get:
       tags:
@@ -2778,6 +2740,10 @@ components:
           type:
           - string
           - 'null'
+        role:
+          type:
+          - string
+          - 'null'
     PendingAttemptRow:
       type: object
       required:
@@ -3606,13 +3572,6 @@ components:
           type:
           - string
           - 'null'
-    UpdateUserRoleBody:
-      type: object
-      required:
-      - role
-      properties:
-        role:
-          type: string
     User:
       type: object
       required:

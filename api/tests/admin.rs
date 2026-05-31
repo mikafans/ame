@@ -248,6 +248,49 @@ async fn test_admin_flow_and_audit() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
+    // Admin re-enables regular user
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{reg_user_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"disabled": false}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Create a new token for the re-enabled user and check it works
+    let reg_token_id2 = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'reg-key2', $3, $4::text[])",
+    )
+    .bind(reg_token_id2)
+    .bind(reg_user_id)
+    .bind(&hash)
+    .bind(vec!["quiz.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let reg_auth2 = format!("{reg_token_id2}_{secret}");
+
+    let res = client
+        .get(format!("{base_url}/v1/me"))
+        .header("Authorization", format!("Bearer {reg_auth2}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // Admin updates regular user's role to admin
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{reg_user_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"role": "admin"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
     // 8. Verify the Audit Trail
     // Wait slightly to let Tokios background spawns finish insertion
     tokio::time::sleep(std::time::Duration::from_millis(150)).await;
@@ -282,46 +325,62 @@ async fn test_admin_flow_and_audit() {
     // 3. quiz.publish (by regular user)
     // 4. moderate.unpublish (unpublishing the quiz by admin)
     // 5. user.disable (disabling the user by admin)
-    // Therefore, newest first: user.disable, moderate.unpublish, quiz.publish, user.update_plan, user.update_plan
+    // 6. user.enable (re-enabling the user by admin)
+    // 7. user.update_role (updating the user's role to admin)
+    // Therefore, newest first: user.update_role, user.enable, user.disable, moderate.unpublish, quiz.publish, user.update_plan, user.update_plan
 
     assert_eq!(
         logs.len(),
-        5,
-        "Expected exactly 5 audit logs for this test run. Found: {logs:#?}"
+        7,
+        "Expected exactly 7 audit logs for this test run. Found: {logs:#?}"
     );
 
-    // Validate user.disable
-    assert_eq!(logs[0]["action"], "user.disable");
+    // Validate user.update_role
+    assert_eq!(logs[0]["action"], "user.update_role");
     assert_eq!(logs[0]["actorUserId"], admin_user_id.to_string());
     assert_eq!(logs[0]["targetType"], "user");
     assert_eq!(logs[0]["targetId"], reg_user_id.to_string());
-    assert_eq!(logs[0]["metadata"]["disabled"], true);
+    assert_eq!(logs[0]["metadata"]["role"], "admin");
+
+    // Validate user.enable
+    assert_eq!(logs[1]["action"], "user.enable");
+    assert_eq!(logs[1]["actorUserId"], admin_user_id.to_string());
+    assert_eq!(logs[1]["targetType"], "user");
+    assert_eq!(logs[1]["targetId"], reg_user_id.to_string());
+    assert_eq!(logs[1]["metadata"]["disabled"], false);
+
+    // Validate user.disable
+    assert_eq!(logs[2]["action"], "user.disable");
+    assert_eq!(logs[2]["actorUserId"], admin_user_id.to_string());
+    assert_eq!(logs[2]["targetType"], "user");
+    assert_eq!(logs[2]["targetId"], reg_user_id.to_string());
+    assert_eq!(logs[2]["metadata"]["disabled"], true);
 
     // Validate moderate.unpublish
-    assert_eq!(logs[1]["action"], "moderate.unpublish");
-    assert_eq!(logs[1]["actorUserId"], admin_user_id.to_string());
-    assert_eq!(logs[1]["targetType"], "quiz");
-    assert_eq!(logs[1]["targetId"], quiz_id.to_string());
-    assert_eq!(logs[1]["metadata"]["visibility"], "private");
+    assert_eq!(logs[3]["action"], "moderate.unpublish");
+    assert_eq!(logs[3]["actorUserId"], admin_user_id.to_string());
+    assert_eq!(logs[3]["targetType"], "quiz");
+    assert_eq!(logs[3]["targetId"], quiz_id.to_string());
+    assert_eq!(logs[3]["metadata"]["visibility"], "private");
 
     // Validate quiz.publish
-    assert_eq!(logs[2]["action"], "quiz.publish");
-    assert_eq!(logs[2]["actorUserId"], reg_user_id.to_string());
-    assert_eq!(logs[2]["targetType"], "quiz");
-    assert_eq!(logs[2]["targetId"], quiz_id.to_string());
-    assert_eq!(logs[2]["metadata"]["visibility"], "public");
+    assert_eq!(logs[4]["action"], "quiz.publish");
+    assert_eq!(logs[4]["actorUserId"], reg_user_id.to_string());
+    assert_eq!(logs[4]["targetType"], "quiz");
+    assert_eq!(logs[4]["targetId"], quiz_id.to_string());
+    assert_eq!(logs[4]["metadata"]["visibility"], "public");
 
     // Validate user.update_plan (to free)
-    assert_eq!(logs[3]["action"], "user.update_plan");
-    assert_eq!(logs[3]["actorUserId"], admin_user_id.to_string());
-    assert_eq!(logs[3]["targetType"], "user");
-    assert_eq!(logs[3]["targetId"], reg_user_id.to_string());
-    assert_eq!(logs[3]["metadata"]["plan"], "free");
+    assert_eq!(logs[5]["action"], "user.update_plan");
+    assert_eq!(logs[5]["actorUserId"], admin_user_id.to_string());
+    assert_eq!(logs[5]["targetType"], "user");
+    assert_eq!(logs[5]["targetId"], reg_user_id.to_string());
+    assert_eq!(logs[5]["metadata"]["plan"], "free");
 
     // Validate user.update_plan (to premium)
-    assert_eq!(logs[4]["action"], "user.update_plan");
-    assert_eq!(logs[4]["actorUserId"], admin_user_id.to_string());
-    assert_eq!(logs[4]["targetType"], "user");
-    assert_eq!(logs[4]["targetId"], reg_user_id.to_string());
-    assert_eq!(logs[4]["metadata"]["plan"], "premium");
+    assert_eq!(logs[6]["action"], "user.update_plan");
+    assert_eq!(logs[6]["actorUserId"], admin_user_id.to_string());
+    assert_eq!(logs[6]["targetType"], "user");
+    assert_eq!(logs[6]["targetId"], reg_user_id.to_string());
+    assert_eq!(logs[6]["metadata"]["plan"], "premium");
 }

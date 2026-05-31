@@ -30,11 +30,32 @@ struct TokenKeyExtractor;
 impl KeyExtractor for TokenKeyExtractor {
     type Key = String;
     fn extract<T>(&self, req: &axum::http::Request<T>) -> Result<Self::Key, GovernorError> {
-        req.headers()
+        // 1. Try Authorization header (agents, direct API callers)
+        if let Some(auth) = req
+            .headers()
             .get("authorization")
             .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .ok_or(GovernorError::UnableToExtractKey)
+        {
+            return Ok(auth.to_string());
+        }
+
+        // 2. Try ame_token cookie (browser clients)
+        if let Some(cookie_key) = req
+            .headers()
+            .get("cookie")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|cookies| {
+                cookies.split(';').find_map(|c| {
+                    let c = c.trim();
+                    c.strip_prefix("ame_token=").map(|v| v.to_owned())
+                })
+            })
+        {
+            return Ok(cookie_key);
+        }
+
+        // 3. Fall back to peer IP so unauthenticated requests still get rate-limited
+        PeerIpKeyExtractor.extract(req).map(|ip| ip.to_string())
     }
 }
 
@@ -69,10 +90,12 @@ pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
 
     // Routes wrapped with activity-log middleware (records all authenticated calls)
+    let global_burst = env_u32("AME_GLOBAL_RATELIMIT_BURST", 100);
+    let global_period_secs = env_u64("AME_GLOBAL_RATELIMIT_PERIOD_SECS", 1);
     let governor_conf = Arc::new(
         GovernorConfigBuilder::default()
-            .per_second(2)
-            .burst_size(20)
+            .per_second(global_period_secs)
+            .burst_size(global_burst)
             .key_extractor(TokenKeyExtractor)
             .finish()
             .expect("valid rate-limit config"),

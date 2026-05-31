@@ -96,7 +96,7 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 		if ! curl -sf http://localhost:$(API_PORT)/healthz > /dev/null 2>&1; then \
 			echo "[e2e] API not running — starting..."; \
 			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
-			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://localhost:$(WEB_PORT) \
+			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://localhost:$(WEB_PORT),http://127.0.0.1:$(WEB_PORT) \
 			AME_RATELIMIT_BURST=100 AME_AGENT_ACCESS_CODE=e2e-access-code \
 				mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api >> .tmp/ame-api-e2e.log 2>&1 & \
 			echo $$! > .tmp/ame-api-e2e.pid; \

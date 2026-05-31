@@ -71,20 +71,32 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             r#"
             SELECT 
                 t.token_hash, t.scopes, t.revoked_at,
-                u.id as user_id, u.email, u.display_name, u.role, u.created_at, u.owner_user_id
+                u.id as user_id, u.email, u.display_name, u.role, u.created_at, u.owner_user_id,
+                u.deactivated_at as user_deactivated_at,
+                o.deactivated_at as owner_deactivated_at
             FROM tb_api_tokens t
             JOIN tb_users u ON t.user_id = u.id
+            LEFT JOIN tb_users o ON u.owner_user_id = o.id
             WHERE t.id = $1
             "#,
         )
         .bind(parsed.id)
         .fetch_optional(&state.pool)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?
+        .map_err(|e| {
+            eprintln!("EXTRACTOR QUERY ERROR: {:?}", e);
+            ApiError::Internal(e.into())
+        })?
         .ok_or(ApiError::Unauthorized)?;
 
         let revoked_at: Option<time::OffsetDateTime> = record.get("revoked_at");
         if revoked_at.is_some() {
+            return Err(ApiError::Unauthorized);
+        }
+
+        let user_deactivated_at: Option<time::OffsetDateTime> = record.get("user_deactivated_at");
+        let owner_deactivated_at: Option<time::OffsetDateTime> = record.get("owner_deactivated_at");
+        if user_deactivated_at.is_some() || owner_deactivated_at.is_some() {
             return Err(ApiError::Unauthorized);
         }
 
