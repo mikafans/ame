@@ -76,6 +76,9 @@ pub struct AgentSummary {
     pub scopes: Vec<String>,
     pub last_used_at: Option<OffsetDateTime>,
     pub created_at: OffsetDateTime,
+    pub focus_tags: Vec<String>,
+    pub current_goal: Option<String>,
+    pub next_target: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -326,9 +329,11 @@ pub async fn list_agents(
         r#"
         SELECT 
             u.id, u.display_name as label, u.created_at,
-            t.scopes, t.last_used_at
+            t.scopes, t.last_used_at,
+            p.focus_tags, p.current_goal, p.next_target
         FROM tb_users u
         LEFT JOIN tb_api_tokens t ON t.user_id = u.id AND t.revoked_at IS NULL
+        LEFT JOIN tb_agent_profiles p ON p.agent_user_id = u.id
         WHERE u.owner_user_id = $1 AND u.role = 'agent'
         ORDER BY u.created_at DESC
         "#,
@@ -342,12 +347,16 @@ pub async fn list_agents(
         .iter()
         .map(|r| {
             let scopes: Option<Vec<String>> = r.get("scopes");
+            let focus_tags: Option<Vec<String>> = r.get("focus_tags");
             AgentSummary {
                 id: r.get("id"),
                 label: r.get("label"),
                 scopes: scopes.unwrap_or_default(),
                 last_used_at: r.get("last_used_at"),
                 created_at: r.get("created_at"),
+                focus_tags: focus_tags.unwrap_or_default(),
+                current_goal: r.get("current_goal"),
+                next_target: r.get("next_target"),
             }
         })
         .collect();
@@ -498,23 +507,73 @@ pub async fn update_agent(
         return Err(ApiError::NotFound { resource: "agent" });
     }
 
-    if let Some(label) = &body.label {
-        if label.trim().is_empty() {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "label".into(),
-                message: "must not be empty".into(),
-            }]));
+    if body.label.is_some()
+        || body.focus_tags.is_some()
+        || body.current_goal.is_some()
+        || body.next_target.is_some()
+    {
+        let mut tx = state
+            .pool
+            .begin()
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+        if let Some(label) = &body.label {
+            if label.trim().is_empty() {
+                return Err(ApiError::Validation(vec![FieldError {
+                    field: "label".into(),
+                    message: "must not be empty".into(),
+                }]));
+            }
+
+            sqlx::query(
+                "UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3 AND role = 'agent'",
+            )
+            .bind(label)
+            .bind(agent_id)
+            .bind(user.user.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            sqlx::query("UPDATE tb_agent_profiles SET label = $1 WHERE agent_user_id = $2")
+                .bind(label)
+                .bind(agent_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
         }
 
-        sqlx::query(
-            "UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3 AND role = 'agent'",
-        )
-        .bind(label)
-        .bind(agent_id)
-        .bind(user.user.id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        if let Some(focus_tags) = &body.focus_tags {
+            sqlx::query("UPDATE tb_agent_profiles SET focus_tags = $1 WHERE agent_user_id = $2")
+                .bind(focus_tags)
+                .bind(agent_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+
+        if let Some(current_goal) = &body.current_goal {
+            sqlx::query("UPDATE tb_agent_profiles SET current_goal = $1 WHERE agent_user_id = $2")
+                .bind(current_goal)
+                .bind(agent_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+
+        if let Some(next_target) = &body.next_target {
+            sqlx::query("UPDATE tb_agent_profiles SET next_target = $1 WHERE agent_user_id = $2")
+                .bind(next_target)
+                .bind(agent_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
     Ok(StatusCode::NO_CONTENT)

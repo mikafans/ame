@@ -12,14 +12,35 @@ import Chip from "@mui/material/Chip";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import CircularProgress from "@mui/material/CircularProgress";
+import TextField from "@mui/material/TextField";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import FormGroup from "@mui/material/FormGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Checkbox from "@mui/material/Checkbox";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 
-interface ApiKey {
+// Icons
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
+
+interface AgentSummary {
   id: string;
-  name: string;
-  prefix: string;
+  label: string;
   scopes: string[];
   createdAt: string;
-  lastUsedAt?: string;
+  lastUsedAt?: string | null;
+  focusTags: string[];
+  currentGoal?: string | null;
+  nextTarget?: string | null;
 }
 
 interface McpTool {
@@ -49,7 +70,7 @@ const SAMPLE_IMPORT = JSON.stringify(
         kind: "mc",
         prompt: "What is 2 + 2?",
         payload: {
-          options: [{ text: "3" }, { text: "4" }, { text: "5" }],
+          options: ["3", "4", "5"],
           correct_index: 1,
         },
       },
@@ -97,9 +118,6 @@ export default function AgentPage() {
           </Button>
           <Button variant="outlined" size="small">
             MCP manifest
-          </Button>
-          <Button variant="contained" size="small">
-            + New API key
           </Button>
         </Stack>
       </Box>
@@ -169,7 +187,7 @@ export default function AgentPage() {
             label="curl"
             lines={[
               `curl https://api.ame-platform.app/v1/quizzes \\`,
-              `  -H "Authorization: Bearer hk_live_3fY9…ax2P" \\`,
+              `  -H "Authorization: Bearer hk_agent_3fY9…ax2P" \\`,
               `  -H "Content-Type: application/json"`,
               ``,
               `→ 200 OK · 24 quizzes`,
@@ -312,43 +330,105 @@ function CodeBlock({
   );
 }
 
-// ── API Keys tab ──────────────────────────────────────────────────────────────
+// ── API Keys / Agents tab ──────────────────────────────────────────────────────
 
 function KeysTab() {
-  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+  // Create agent form state
   const [creating, setCreating] = useState(false);
-  const [newKeyName, setNewKeyName] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [newKeyScopes, setNewKeyScopes] = useState("quiz.read");
+  const [newAgentLabel, setNewAgentLabel] = useState("");
+  const [newAgentScopes, setNewAgentScopes] = useState<string[]>(["quiz.read"]);
+  const [newAgentFocus, setNewAgentFocus] = useState("");
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
 
-  function loadKeys() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
-      .GET("/v1/me/keys")
-      .then(({ data }: { data?: { keys: ApiKey[] } }) => {
-        if (data?.keys) setKeys(data.keys);
+  // Edit agent modal state
+  const [editAgent, setEditAgent] = useState<AgentSummary | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editFocus, setEditFocus] = useState("");
+  const [editGoal, setEditGoal] = useState("");
+  const [editTarget, setEditTarget] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Revoke agent modal state
+  const [revokeAgent, setRevokeAgent] = useState<AgentSummary | null>(null);
+  const [revoking, setRevoking] = useState(false);
+
+  const ALL_SCOPES = [
+    {
+      value: "quiz.read",
+      label: "quiz.read",
+      desc: "Read quizzes and questions",
+    },
+    {
+      value: "quiz.write",
+      label: "quiz.write",
+      desc: "Create, edit, and archive quizzes",
+    },
+    {
+      value: "attempt.read",
+      label: "attempt.read",
+      desc: "Read session attempt details",
+    },
+    {
+      value: "attempt.write",
+      label: "attempt.write",
+      desc: "Answer questions and submit attempts",
+    },
+    {
+      value: "stats.read",
+      label: "stats.read",
+      desc: "Read metrics and user ELO",
+    },
+    {
+      value: "feedback.write",
+      label: "feedback.write",
+      desc: "Submit essay grades and notes",
+    },
+    {
+      value: "plan.read",
+      label: "plan.read",
+      desc: "Read recommended study plans",
+    },
+    {
+      value: "plan.write",
+      label: "plan.write",
+      desc: "Generate and configure study plans",
+    },
+    {
+      value: "public.publish",
+      label: "public.publish",
+      desc: "Publish quizzes publicly (Premium only)",
+    },
+  ];
+
+  function loadAgents() {
+    setLoading(true);
+    api
+      .GET("/v1/me/agents")
+      .then(({ data }) => {
+        if (data?.agents) {
+          setAgents(data.agents as unknown as AgentSummary[]);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }
 
   useEffect(() => {
-    loadKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadAgents();
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function createKey() {
+  async function createAgent() {
+    if (!newAgentLabel.trim()) return;
     setCreating(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (api as any).POST("/v1/me/keys", {
+      const { data } = await api.POST("/v1/me/agents", {
         body: {
-          name: newKeyName || "New key",
-          scopes: newKeyScopes
+          label: newAgentLabel,
+          scopes: newAgentScopes,
+          focusTags: newAgentFocus
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean),
@@ -356,178 +436,455 @@ function KeysTab() {
       });
       if (data?.apiKey) {
         setCreatedSecret(data.apiKey);
-        setNewKeyName("");
-        loadKeys();
+        setNewAgentLabel("");
+        setNewAgentFocus("");
+        setNewAgentScopes(["quiz.read"]);
+        loadAgents();
       }
-    } catch {
-      // noop
+    } catch (err) {
+      console.error(err);
     } finally {
       setCreating(false);
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function revokeKey(id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (api as any).DELETE(`/v1/me/keys/${id}`);
-    loadKeys();
+  async function handleSaveEdit() {
+    if (!editAgent) return;
+    setSavingEdit(true);
+    try {
+      const res = await api.PATCH("/v1/me/agents/{id}", {
+        params: {
+          path: { id: editAgent.id },
+        },
+        body: {
+          label: editLabel || undefined,
+          focusTags: editFocus
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          currentGoal: editGoal || "",
+          nextTarget: editTarget || "",
+        },
+      });
+      if (res.response.ok) {
+        setEditAgent(null);
+        loadAgents();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function rotateKey(id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (api as any).POST(`/v1/me/keys/${id}/rotate`);
-    if (data?.apiKey) setCreatedSecret(data.apiKey);
-    loadKeys();
+  async function handleConfirmRevoke() {
+    if (!revokeAgent) return;
+    setRevoking(true);
+    try {
+      const res = await api.DELETE("/v1/me/agents/{id}", {
+        params: {
+          path: { id: revokeAgent.id },
+        },
+      });
+      if (res.response.ok) {
+        setRevokeAgent(null);
+        loadAgents();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRevoking(false);
+    }
   }
+
+  const handleToggleScope = (scope: string) => {
+    setNewAgentScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
+    );
+  };
+
+  const handleOpenEdit = (agent: AgentSummary) => {
+    setEditAgent(agent);
+    setEditLabel(agent.label);
+    setEditFocus((agent.focusTags || []).join(", "));
+    setEditGoal(agent.currentGoal || "");
+    setEditTarget(agent.nextTarget || "");
+  };
 
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 2.25 }}>
-      {/* Keys list */}
-      <Card variant="outlined">
-        <Box
-          sx={{
-            px: 2.5,
-            py: 1.75,
-            borderBottom: 1,
-            borderColor: "divider",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-            API keys
-          </Typography>
-          <Button size="small" variant="outlined">
-            Create
-          </Button>
-        </Box>
-
-        {loading ? (
-          <Box sx={{ p: "24px 20px", color: "text.secondary", fontSize: 13 }}>
-            Loading…
-          </Box>
-        ) : keys.length === 0 ? (
-          <Box sx={{ p: "24px 20px" }}>
-            <Typography variant="body2" color="text.secondary">
-              No API keys yet.
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "1.4fr 1fr",
+        gap: 3.5,
+        alignItems: "start",
+      }}
+    >
+      {/* Agents list */}
+      <Stack spacing={2.5}>
+        <Card variant="outlined">
+          <Box
+            sx={{
+              px: 2.5,
+              py: 2,
+              borderBottom: 1,
+              borderColor: "divider",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Agent Sub-Accounts
             </Typography>
+            <Chip label={agents.length} size="small" color="primary" />
           </Box>
-        ) : (
-          keys.map((k, i) => (
-            <Box
-              key={k.id}
-              sx={{
-                px: 2.5,
-                py: 2,
-                borderBottom: i < keys.length - 1 ? 1 : 0,
-                borderColor: "divider",
-              }}
+
+          {loading ? (
+            <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : agents.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography variant="body2" color="text.secondary">
+                No agent keys created yet. Configure your first agent
+                sub-account on the right.
+              </Typography>
+            </Box>
+          ) : (
+            <Stack
+              divider={<Box sx={{ borderBottom: 1, borderColor: "divider" }} />}
             >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {k.name}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
+              {agents.map((agent) => (
+                <Box key={agent.id} sx={{ p: 2.5 }}>
+                  <Box
                     sx={{
-                      fontFamily: "monospace",
-                      letterSpacing: 0.4,
-                      display: "block",
-                      mt: 0.5,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      mb: 1.5,
                     }}
                   >
-                    {k.prefix}
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={0.75}>
-                  <Button size="small" variant="text">
-                    Copy
-                  </Button>
-                  <Button size="small" variant="text">
-                    Rotate
-                  </Button>
-                  <Button size="small" variant="text" color="error">
-                    Revoke
-                  </Button>
-                </Stack>
-              </Box>
-              <Box
-                sx={{ mt: 1.25, display: "flex", gap: 2, alignItems: "center" }}
-              >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontFamily: "monospace", letterSpacing: 0.5 }}
-                >
-                  Created {k.createdAt} · Last used {k.lastUsedAt || "—"}
-                </Typography>
-                <Stack direction="row" spacing={0.5} sx={{ ml: "auto" }}>
-                  {k.scopes.map((s) => (
-                    <Chip
-                      key={s}
-                      label={s}
-                      size="small"
-                      color={s === "*" ? "warning" : "default"}
-                      variant="outlined"
-                    />
-                  ))}
-                </Stack>
-              </Box>
-            </Box>
-          ))
-        )}
-      </Card>
+                    <Box
+                      sx={{ display: "flex", gap: 1.5, alignItems: "center" }}
+                    >
+                      <Paper
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "primary.50",
+                          color: "primary.main",
+                          borderRadius: "10px",
+                        }}
+                      >
+                        <SmartToyOutlinedIcon />
+                      </Paper>
+                      <Box>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, fontSize: 15 }}
+                        >
+                          {agent.label}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", mt: 0.25 }}
+                        >
+                          Created on{" "}
+                          {new Date(agent.createdAt).toLocaleDateString()} ·
+                          Last used{" "}
+                          {agent.lastUsedAt
+                            ? new Date(agent.lastUsedAt).toLocaleDateString()
+                            : "never"}
+                        </Typography>
+                      </Box>
+                    </Box>
 
-      {/* Right panel: auth info */}
-      <Card variant="outlined" sx={{ p: 2.5 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            fontFamily: "monospace",
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            display: "block",
-            mb: 1.25,
-          }}
-        >
-          Authentication
-        </Typography>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-          Header-based bearer token
-        </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ lineHeight: 1.6, mb: 0 }}
-        >
-          Send the key in an{" "}
-          <Box component="code" sx={codeStyle}>
-            Authorization
-          </Box>{" "}
-          header. Scopes are checked per endpoint.
-        </Typography>
-        <CodeBlock
-          label="request"
-          style={{ marginTop: 14 }}
-          lines={[
-            `GET /v1/quizzes/qz_8sd1/stats`,
-            `Authorization: Bearer hk_live_3fY9…ax2P`,
-            `Accept: application/json`,
-            `X-Cohort: spring-2026`,
-          ]}
-        />
-        <Box sx={{ mt: 2.25, pt: 2.25, borderTop: 1, borderColor: "divider" }}>
+                    <Stack direction="row" spacing={0.5}>
+                      <Tooltip title="Edit Profile & Focus">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEdit(agent)}
+                        >
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Revoke Programmatic Access">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setRevokeAgent(agent)}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </Box>
+
+                  {/* Scopes */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 0.75,
+                      mb: 1.5,
+                    }}
+                  >
+                    {agent.scopes.map((scope) => (
+                      <Chip
+                        key={scope}
+                        label={scope}
+                        size="small"
+                        color={scope === "admin" ? "warning" : "default"}
+                        variant="outlined"
+                        sx={{ fontSize: 11, height: 22 }}
+                      />
+                    ))}
+                  </Box>
+
+                  {/* Focus Tags */}
+                  {agent.focusTags && agent.focusTags.length > 0 && (
+                    <Box
+                      sx={{
+                        mb: 1.5,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <TagOutlinedIcon
+                        sx={{ fontSize: 16, color: "text.secondary" }}
+                      />
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontWeight: 500, mr: 0.5 }}
+                      >
+                        Focus:
+                      </Typography>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                        {agent.focusTags.map((tag) => (
+                          <Chip
+                            key={tag}
+                            label={tag}
+                            size="small"
+                            variant="outlined"
+                            sx={{
+                              height: 18,
+                              fontSize: 10,
+                              borderColor: "primary.light",
+                              color: "primary.main",
+                              bgcolor: "primary.50",
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Goal & Trajectory (if exists) */}
+                  {(agent.currentGoal || agent.nextTarget) && (
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 1.5,
+                        bgcolor: "action.hover",
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        fontSize: 12,
+                      }}
+                    >
+                      {agent.currentGoal && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            alignItems: "flex-start",
+                            mb: agent.nextTarget ? 1 : 0,
+                          }}
+                        >
+                          <FlagOutlinedIcon
+                            sx={{
+                              fontSize: 16,
+                              color: "warning.main",
+                              mt: 0.25,
+                            }}
+                          />
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: "block", fontWeight: 600 }}
+                            >
+                              Current Goal
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontSize: 12,
+                                mt: 0.25,
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {agent.currentGoal}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      )}
+                      {agent.nextTarget && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <TagOutlinedIcon
+                            sx={{
+                              fontSize: 16,
+                              color: "success.main",
+                              mt: 0.25,
+                            }}
+                          />
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: "block", fontWeight: 600 }}
+                            >
+                              Next Target
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontSize: 12, mt: 0.25 }}
+                            >
+                              {agent.nextTarget}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      )}
+                    </Paper>
+                  )}
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Card>
+      </Stack>
+
+      {/* Create agent column */}
+      <Stack spacing={2.5}>
+        <Card variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+            Create Agent Sub-Account
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+            Assign a label, target focus tags, and specific capability scopes to
+            authorize an autonomous sub-account.
+          </Typography>
+
+          <Stack spacing={2.5}>
+            <TextField
+              label="Agent Label"
+              placeholder="e.g. Grader Agent"
+              size="small"
+              value={newAgentLabel}
+              onChange={(e) => setNewAgentLabel(e.target.value)}
+              fullWidth
+              required
+            />
+
+            <TextField
+              label="Focus Tags (comma-separated)"
+              placeholder="e.g. rust, math, logic"
+              size="small"
+              value={newAgentFocus}
+              onChange={(e) => setNewAgentFocus(e.target.value)}
+              fullWidth
+            />
+
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.25 }}>
+                Select Capability Scopes
+              </Typography>
+              <FormGroup>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr",
+                    gap: 1.25,
+                  }}
+                >
+                  {ALL_SCOPES.map((s) => (
+                    <Box
+                      key={s.value}
+                      sx={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        p: 1,
+                        borderRadius: 1,
+                        border: 1,
+                        borderColor: newAgentScopes.includes(s.value)
+                          ? "primary.light"
+                          : "divider",
+                        bgcolor: newAgentScopes.includes(s.value)
+                          ? "primary.50"
+                          : "transparent",
+                        transition: "all 0.2s",
+                        "&:hover": { borderColor: "primary.main" },
+                      }}
+                    >
+                      <Checkbox
+                        size="small"
+                        checked={newAgentScopes.includes(s.value)}
+                        onChange={() => handleToggleScope(s.value)}
+                        sx={{ mt: -0.5 }}
+                      />
+                      <Box
+                        sx={{ cursor: "pointer" }}
+                        onClick={() => handleToggleScope(s.value)}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontFamily: "monospace",
+                            fontWeight: 600,
+                            display: "block",
+                          }}
+                        >
+                          {s.label}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontSize: 11 }}
+                        >
+                          {s.desc}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              </FormGroup>
+            </Box>
+
+            <Button
+              variant="contained"
+              disabled={creating || !newAgentLabel.trim()}
+              onClick={createAgent}
+              fullWidth
+            >
+              {creating ? <CircularProgress size={20} /> : "+ Create Agent"}
+            </Button>
+          </Stack>
+        </Card>
+
+        {/* Right side info panel */}
+        <Card variant="outlined" sx={{ p: 2.5 }}>
           <Typography
             variant="caption"
             color="text.secondary"
@@ -536,107 +893,207 @@ function KeysTab() {
               letterSpacing: 1.3,
               textTransform: "uppercase",
               display: "block",
-              mb: 1,
+              mb: 1.25,
             }}
           >
-            Scope reference
+            Agent Authentication
           </Typography>
-          <Box
-            sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            Secure bearer authorization
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ lineHeight: 1.55 }}
           >
-            {[
-              "quiz.read",
-              "quiz.write",
-              "attempt.read",
-              "stats.read",
-              "feedback.write",
-              "plan.write",
-            ].map((s) => (
-              <Box
-                key={s}
-                sx={{
-                  display: "flex",
-                  gap: 1,
-                  fontSize: 12,
-                  color: "text.secondary",
-                }}
-              >
-                <Typography variant="caption" color="primary.main">
-                  ✓
-                </Typography>
-                <Box component="code" sx={codeStyle}>
-                  {s}
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-      </Card>
+            Send the key in an{" "}
+            <Box component="code" sx={codeStyle}>
+              Authorization
+            </Box>{" "}
+            header. Sub-accounts act within their restricted scopes and plan
+            ceilings.
+          </Typography>
+        </Card>
+      </Stack>
 
-      {/* Secret shown once modal */}
+      {/* Secret Shown Once Modal */}
       {createdSecret && (
-        <Box
-          sx={{
-            position: "fixed",
-            inset: 0,
-            bgcolor: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1300,
-          }}
+        <Dialog
+          open={!!createdSecret}
+          onClose={() => setCreatedSecret(null)}
+          maxWidth="xs"
+          fullWidth
         >
-          <Card sx={{ width: 480, p: 3.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1.25 }}>
-              API key created
-            </Typography>
+          <DialogTitle sx={{ fontWeight: 600 }}>
+            API Token Generated
+          </DialogTitle>
+          <DialogContent>
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ lineHeight: 1.6, mb: 1.75 }}
+              sx={{ mb: 2, lineHeight: 1.6 }}
             >
-              Copy this key now — it will not be shown again.
+              Copy this token secret now. **For security, it will never be
+              displayed again.**
             </Typography>
             <Box
               sx={{
-                p: "12px 14px",
+                p: 2,
                 bgcolor: "action.hover",
                 border: 1,
                 borderColor: "primary.main",
-                borderRadius: 0.5,
+                borderRadius: 1,
                 fontFamily: "monospace",
                 fontSize: 13,
                 color: "primary.main",
                 wordBreak: "break-all",
-                mb: 1.75,
+                mb: 1,
+                userSelect: "all",
               }}
             >
               {createdSecret}
             </Box>
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ justifyContent: "flex-end" }}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() =>
+                navigator.clipboard.writeText(createdSecret).catch(() => {})
+              }
+              startIcon={<ContentCopyOutlinedIcon />}
             >
-              <Button
-                variant="outlined"
+              Copy
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => setCreatedSecret(null)}
+            >
+              Done
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Edit agent profile dialog */}
+      {editAgent && (
+        <Dialog
+          open={!!editAgent}
+          onClose={() => setEditAgent(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 600 }}>
+            Edit Agent Profile & Focus
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={2.5} sx={{ mt: 1.5 }}>
+              <TextField
+                label="Agent Label"
                 size="small"
-                onClick={() => {
-                  navigator.clipboard.writeText(createdSecret).catch(() => {});
-                }}
-              >
-                Copy
-              </Button>
-              <Button
-                variant="contained"
+                value={editLabel}
+                onChange={(e) => setEditLabel(e.target.value)}
+                fullWidth
+                required
+              />
+              <TextField
+                label="Focus Tags (comma-separated)"
+                placeholder="e.g. rust, mathematics"
                 size="small"
-                onClick={() => setCreatedSecret(null)}
-              >
-                Done
-              </Button>
+                value={editFocus}
+                onChange={(e) => setEditFocus(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Current Goal"
+                placeholder="Describe current task goals..."
+                size="small"
+                multiline
+                rows={2}
+                value={editGoal}
+                onChange={(e) => setEditGoal(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Next Target"
+                placeholder="e.g. Solve weakest ELO tag"
+                size="small"
+                value={editTarget}
+                onChange={(e) => setEditTarget(e.target.value)}
+                fullWidth
+              />
             </Stack>
-          </Card>
-        </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setEditAgent(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleSaveEdit}
+              disabled={savingEdit || !editLabel.trim()}
+            >
+              {savingEdit ? <CircularProgress size={16} /> : "Save Changes"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Revoke confirmation dialog */}
+      {revokeAgent && (
+        <Dialog
+          open={!!revokeAgent}
+          onClose={() => setRevokeAgent(null)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              display: "flex",
+              gap: 1,
+              alignItems: "center",
+            }}
+          >
+            <WarningAmberOutlinedIcon color="error" />
+            Revoke Agent Key?
+          </DialogTitle>
+          <DialogContent>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ lineHeight: 1.6 }}
+            >
+              Are you sure you want to revoke programmatic access for **
+              {revokeAgent.label}**? This action is permanent. The agent will
+              lose all access immediately.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setRevokeAgent(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              color="error"
+              onClick={handleConfirmRevoke}
+              disabled={revoking}
+            >
+              {revoking ? <CircularProgress size={16} /> : "Revoke Access"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </Box>
   );

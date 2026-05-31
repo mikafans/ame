@@ -676,11 +676,14 @@ export interface components {
         AgentSummary: {
             /** Format: date-time */
             createdAt: string;
+            currentGoal?: string | null;
+            focusTags: string[];
             /** Format: uuid */
             id: string;
             label: string;
             /** Format: date-time */
             lastUsedAt?: string | null;
+            nextTarget?: string | null;
             scopes: string[];
         };
         AnswerSessionBody: {

@@ -1429,10 +1429,19 @@ components:
       - label
       - scopes
       - createdAt
+      - focusTags
       properties:
         createdAt:
           type: string
           format: date-time
+        currentGoal:
+          type:
+          - string
+          - 'null'
+        focusTags:
+          type: array
+          items:
+            type: string
         id:
           type: string
           format: uuid
@@ -1443,6 +1452,10 @@ components:
           - string
           - 'null'
           format: date-time
+        nextTarget:
+          type:
+          - string
+          - 'null'
         scopes:
           type: array
           items:
