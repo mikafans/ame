@@ -92,20 +92,19 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 		if ! DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate info --source db/migrations > /dev/null 2>&1; then \
 			echo "[e2e] FAILED: Postgres is not reachable on :5432. Run 'make db-up' first."; \
 			exit 1; \
-		fi; \
-		if ! curl -sf http://localhost:$(API_PORT)/healthz > /dev/null 2>&1; then \
+		fi; 		if ! curl -sf http://$(API_HOST):$(API_PORT)/healthz > /dev/null 2>&1; then \
 			echo "[e2e] API not running — starting..."; \
 			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
-			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://localhost:$(WEB_PORT),http://127.0.0.1:$(WEB_PORT) \
+			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
 			AME_RATELIMIT_BURST=100 AME_AGENT_ACCESS_CODE=e2e-access-code \
 				mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api >> .tmp/ame-api-e2e.log 2>&1 & \
 			echo $$! > .tmp/ame-api-e2e.pid; \
 			_api_owned=1; \
 			echo "[e2e] Waiting for API on :$(API_PORT)..."; \
-			until curl -sf http://localhost:$(API_PORT)/healthz > /dev/null 2>&1; do sleep 1; done; \
+			until curl -sf http://$(API_HOST):$(API_PORT)/healthz > /dev/null 2>&1; do sleep 1; done; \
 		fi; \
 		echo "[e2e] Seeding..."; \
-		if ! uv run scripts/seed.py --api http://localhost:$(API_PORT) >> .tmp/ame-seed-e2e.log 2>&1; then \
+		if ! uv run scripts/seed.py --api http://$(API_HOST):$(API_PORT) >> .tmp/ame-seed-e2e.log 2>&1; then \
 			echo "[e2e] FAILED: seeding errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
 			tail -20 .tmp/ame-seed-e2e.log; \
 			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
@@ -114,8 +113,8 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 			exit 1; \
 		fi; \
 		echo "[e2e] Running playwright tests..."; \
-		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://localhost:$(API_PORT) \
-			E2E_API_URL=http://localhost:$(API_PORT) E2E_BASE_URL=http://localhost:$(WEB_PORT) \
+		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://$(API_HOST):$(API_PORT) \
+			E2E_API_URL=http://$(API_HOST):$(API_PORT) E2E_BASE_URL=http://$(API_HOST):$(WEB_PORT) \
 			mise exec -- bun run e2e > ../.tmp/playwright-e2e.log 2>&1; _exit=$$?; cd ..; \
 		if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
 			kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; \
@@ -132,14 +131,12 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 	else \
 		echo "[web] skipping e2e (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
-
+ 
 uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://localhost:$(API_PORT) \
-			E2E_API_URL=http://localhost:$(API_PORT) E2E_BASE_URL=http://localhost:$(WEB_PORT) \
+		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://$(API_HOST):$(API_PORT) \
+			E2E_API_URL=http://$(API_HOST):$(API_PORT) E2E_BASE_URL=http://$(API_HOST):$(WEB_PORT) \
 			mise exec -- bunx playwright test e2e/uiux.spec.ts --project=chromium; \
-	else \
-		echo "[web] skipping uiux (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
 check: fmt-check lint test ## Pre-commit gate (read-only)

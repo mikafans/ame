@@ -49,7 +49,7 @@ export default function QuizPreviewPage({
 
   useEffect(() => {
     api
-      .GET("/v1/quizzes/{id}" as never, { params: { path: { id } } } as never)
+      .GET("/v1/assessments/{id}", { params: { path: { id } } })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data: d }: { data?: any }) => {
         if (d) setQuiz(d);
@@ -63,7 +63,7 @@ export default function QuizPreviewPage({
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (api as any).POST("/v1/sessions", {
-        body: { quizId: id, count: quiz.questions.length },
+        body: { assessmentId: id, count: quiz.questions.length },
       });
       const sessionId = data?.sessionId ?? data?.session_id;
       if (sessionId) router.push(`/sessions/${sessionId}`);

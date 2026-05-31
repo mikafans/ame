@@ -33,6 +33,7 @@ interface Quiz {
   title: string;
   status: string;
   course?: string;
+  description?: string;
   duration?: number;
   difficulty?: string;
   attempts?: number;
@@ -96,19 +97,33 @@ export default function AuthorStudioPage({
 
   function load(showSpinner = false) {
     if (showSpinner) setLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
-      .GET(`/v1/quizzes/${quizId}`)
-      .then(({ data }: { data?: Quiz }) => {
+    api
+      .GET("/v1/assessments/{id}", { params: { path: { id: quizId } } })
+      .then(({ data }) => {
         if (data) {
-          setQuiz(data);
-          setEditTitle(data.title || "");
-          setEditCourse(data.course || "");
-          setEditDuration(data.duration || 30);
-          setEditDifficulty(data.difficulty || "intermediate");
-          setEditAttempts(data.attempts || 2);
-          if (data.questions.length && !selectedId) {
-            setSelectedId(data.questions[0].id);
+          const mappedQuiz: Quiz = {
+            id: data.id,
+            title: data.title,
+            description: data.description ?? undefined,
+            status: data.status,
+            course: data.course ?? undefined,
+            questions: data.questions.map((q) => ({
+              id: q.id,
+              kind: q.kind,
+              prompt: q.prompt,
+              codeSnippet: q.codeSnippet ?? undefined,
+              payload: q.payload,
+              explanation: q.explanation ?? undefined,
+              points: q.points,
+              status: q.status,
+              orderIndex: q.orderIndex,
+            })),
+          };
+          setQuiz(mappedQuiz);
+          setEditTitle(mappedQuiz.title || "");
+          setEditCourse(mappedQuiz.course || "");
+          if (mappedQuiz.questions.length && !selectedId) {
+            setSelectedId(mappedQuiz.questions[0].id);
           }
         }
       })
@@ -137,14 +152,10 @@ export default function AuthorStudioPage({
   async function saveMetadata() {
     setSaving(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (api as any).PATCH(`/v1/quizzes/${quizId}`, {
+      await api.PATCH("/v1/assessments/{id}", {
+        params: { path: { id: quizId } },
         body: {
           title: editTitle,
-          course: editCourse,
-          duration: editDuration,
-          difficulty: editDifficulty,
-          attempts: editAttempts,
         },
       });
       load();
@@ -163,14 +174,14 @@ export default function AuthorStudioPage({
       .map((t) => t.trim())
       .filter(Boolean);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (api as any).PATCH(`/v1/questions/${selectedId}`, {
+      await api.PATCH("/v1/questions/{id}", {
+        params: { path: { id: selectedId } },
         body: {
           prompt: editPrompt,
           explanation: editExplanation || undefined,
           points: editPoints,
           tags: tags.length > 0 ? tags : undefined,
-          payload: payloadOverride ?? editPayload,
+          payload: (payloadOverride ?? editPayload) as any,
         },
       });
       load();
@@ -185,11 +196,10 @@ export default function AuthorStudioPage({
     setShowKindPicker(false);
     setSaving(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (api as any).POST(
-        `/v1/quizzes/${quizId}/questions`,
-        { body: { kind, prompt: "" } },
-      );
+      const { data } = await api.POST("/v1/assessments/{id}/questions", {
+        params: { path: { id: quizId } },
+        body: { kind: kind as any, prompt: "" },
+      });
       load();
       if (data?.questionId) setSelectedId(data.questionId);
     } catch {
@@ -207,8 +217,9 @@ export default function AuthorStudioPage({
       q ? { ...q, questions: q.questions.filter((qq) => qq.id !== id) } : q,
     );
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (api as any).DELETE(`/v1/quizzes/${quizId}/questions/${id}`);
+      await api.DELETE("/v1/assessments/{id}/questions/{question_id}", {
+        params: { path: { id: quizId, question_id: id } },
+      });
       load();
     } catch (err) {
       console.error("delete failed", err);
@@ -221,17 +232,16 @@ export default function AuthorStudioPage({
     if (newKind === selectedQ.kind) return;
     setSaving(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = api as any;
-      const { data } = await client.POST(`/v1/quizzes/${quizId}/questions`, {
+      const { data } = await api.POST("/v1/assessments/{id}/questions", {
+        params: { path: { id: quizId } },
         body: {
-          kind: newKind,
+          kind: newKind as any,
           prompt: editPrompt,
-          points: editPoints,
-          explanation: editExplanation || undefined,
         },
       });
-      await client.POST(`/v1/questions/${selectedId}/archive`);
+      await api.POST("/v1/questions/{id}/archive", {
+        params: { path: { id: selectedId } },
+      });
       load();
       if (data?.questionId) setSelectedId(data.questionId);
     } catch {
@@ -245,8 +255,8 @@ export default function AuthorStudioPage({
     setPublishing(true);
     setPublishError(null);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (api as any).PATCH(`/v1/quizzes/${quizId}`, {
+      await api.PATCH("/v1/assessments/{id}", {
+        params: { path: { id: quizId } },
         body: { status: "active" },
       });
       load();

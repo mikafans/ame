@@ -462,11 +462,27 @@ pub(crate) async fn apply_quiz_patch(
          RETURNING id, title, status, visibility, objectives",
     )
     .bind(id)
+    .bind(body.title.clone())
+    .bind(body.objectives.clone())
+    .bind(body.status.clone())
+    .bind(body.visibility.as_ref().map(|v| v.as_str()))
+    .fetch_one(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    sqlx::query(
+        "UPDATE tb_assessments SET \
+           title      = COALESCE($2, title), \
+           objectives = COALESCE($3, objectives), \
+           status     = COALESCE($4, status), \
+           updated_at = now() \
+         WHERE id = $1",
+    )
+    .bind(id)
     .bind(body.title)
     .bind(body.objectives)
     .bind(body.status)
-    .bind(body.visibility.map(|v| v.as_str()))
-    .fetch_one(pool)
+    .execute(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -585,6 +601,35 @@ async fn create_quiz(
     .bind(visibility.as_str())
     .bind(auth.user.id)
     .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let quiz_id: Uuid = result.get("id");
+    let now: OffsetDateTime = result.get("created_at");
+
+    sqlx::query(
+        "INSERT INTO tb_assessments \
+         (id, title, description, mode, objectives, course, duration_min, total_points, passing_points, \
+          show_results_during, affects_rating, method, composition_trace, status, created_by, created_at, updated_at) \
+         VALUES ($1,$2,NULL,'practice',$3,$4,NULL,0,NULL,FALSE,TRUE,'manual',NULL,'draft',$5,$6,$6)",
+    )
+    .bind(quiz_id)
+    .bind(&body.title)
+    .bind(&objectives)
+    .bind(&body.course)
+    .bind(auth.user.id)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    sqlx::query(
+        "INSERT INTO tb_assessment_sections \
+         (assessment_id, title, order_index, weight, mix, items_count) \
+         VALUES ($1, 'Main Section', 0, 1.0, NULL, 0)",
+    )
+    .bind(quiz_id)
+    .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -742,6 +787,36 @@ async fn add_quiz_question(
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
+
+    // Dual write to assessment
+    if let Some(section_id) = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index ASC LIMIT 1"
+    )
+    .bind(quiz_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))? {
+        let inserted = sqlx::query(
+            "INSERT INTO tb_assessment_items (section_id, question_id, order_index, points_override) \
+             VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (section_id, question_id) DO NOTHING",
+        )
+        .bind(section_id)
+        .bind(question_id)
+        .bind(next_order)
+        .bind(body.points_override)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        if inserted.rows_affected() > 0 {
+            sqlx::query("UPDATE tb_assessment_sections SET items_count = items_count + 1 WHERE id = $1")
+                .bind(section_id)
+                .execute(&state.pool)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+    }
 
     Ok((
         axum::http::StatusCode::CREATED,

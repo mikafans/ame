@@ -72,6 +72,70 @@ export interface paths {
         patch: operations["patch_user_admin"];
         trace?: never;
     };
+    "/v1/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_assessments"];
+        put?: never;
+        post: operations["create_assessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_assessment"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_assessment"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_assessment"];
+        trace?: never;
+    };
+    "/v1/assessments/{id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["add_assessment_question"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove_assessment_question"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/attempts/pending": {
         parameters: {
             query?: never;
@@ -528,7 +592,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/sessions — the caller's finished attempt history, newest first. */
         get: operations["list_my_sessions"];
         put?: never;
         post: operations["create_session"];
@@ -622,6 +685,23 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddAssessmentQuestionBody: {
+            kind?: null | components["schemas"]["QuestionKind"];
+            /** Format: int32 */
+            pointsOverride?: number | null;
+            prompt?: string | null;
+            /**
+             * Format: uuid
+             * @description Link an existing bank question by ID.
+             */
+            questionId?: string | null;
+        };
+        AddAssessmentQuestionResponse: {
+            /** Format: int32 */
+            orderIndex: number;
+            /** Format: uuid */
+            questionId: string;
+        };
         AddQuizQuestionBody: {
             kind?: null | components["schemas"]["QuestionKind"];
             /** Format: int32 */
@@ -663,6 +743,90 @@ export interface components {
             attempt: components["schemas"]["Attempt"];
             grade: components["schemas"]["GradeOutcome"];
             replayed: boolean;
+        };
+        Assessment: {
+            affectsRating: boolean;
+            compositionTrace?: unknown;
+            course?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            /** Format: uuid */
+            id: string;
+            method: string;
+            mode: components["schemas"]["AssessmentMode"];
+            objectives: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            showResultsDuring: boolean;
+            status: components["schemas"]["AssessmentStatus"];
+            /** Format: int32 */
+            timeLimitSeconds?: number | null;
+            title: string;
+            /** Format: int32 */
+            totalPoints: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AssessmentDetail: components["schemas"]["Assessment"] & {
+            questions: components["schemas"]["AssessmentQuestion"][];
+            sections: components["schemas"]["AssessmentSectionDetail"][];
+        };
+        /** @enum {string} */
+        AssessmentMode: "practice" | "graded";
+        AssessmentQuestion: {
+            codeSnippet?: unknown;
+            explanation?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: int32 */
+            orderIndex: number;
+            payload: unknown;
+            /** Format: int32 */
+            points: number;
+            prompt: string;
+            status: string;
+        };
+        AssessmentSectionDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            itemsCount: number;
+            mix?: unknown;
+            /** Format: int32 */
+            orderIndex: number;
+            questions: components["schemas"]["AssessmentQuestion"][];
+            title: string;
+            /** Format: double */
+            weight: number;
+        };
+        /** @enum {string} */
+        AssessmentStatus: "draft" | "active" | "archived";
+        AssessmentSummary: {
+            completed: boolean;
+            course?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            /** Format: uuid */
+            id: string;
+            mode: string;
+            objectives: string[];
+            /** Format: int64 */
+            questionCount: number;
+            status: string;
+            title: string;
+            /** Format: int32 */
+            totalPoints: number;
+            /** Format: date-time */
+            updatedAt: string;
         };
         Attempt: {
             /** Format: date-time */
@@ -804,6 +968,22 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        CreateAssessmentRequest: {
+            affectsRating: boolean;
+            course?: string | null;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            method: string;
+            mode: components["schemas"]["AssessmentMode"];
+            objectives: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            showResultsDuring: boolean;
+            /** Format: int32 */
+            timeLimitSeconds?: number | null;
+            title: string;
+        };
         CreateKeyBody: {
             label: string;
             scopes: string[];
@@ -839,6 +1019,8 @@ export interface components {
             quizId: string;
         };
         CreateSessionBody: {
+            /** Format: uuid */
+            assessmentId?: string | null;
             cats?: string[];
             count?: number | null;
             diff?: string | null;
@@ -1006,10 +1188,6 @@ export interface components {
             codeSnippet?: unknown;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
-            /**
-             * @description Grading language for code questions (from the question payload), so the
-             *     client submits a `Code` response whose language matches the grader.
-             */
             language?: string | null;
             optionOrder?: number[] | null;
             options?: unknown[] | null;
@@ -1382,6 +1560,8 @@ export interface components {
         };
         Session: {
             affects_rating: boolean;
+            /** Format: uuid */
+            assessment_id?: string | null;
             course_title?: string | null;
             /** Format: date-time */
             deadline_at?: string | null;
@@ -1431,12 +1611,10 @@ export interface components {
         };
         /** @enum {string} */
         SessionStatus: "in_progress" | "finished" | "abandoned";
-        /** @description One row in a learner's attempt history. */
         SessionSummary: {
-            /**
-             * Format: int64
-             * @description 1-based position of this attempt within its quiz/exam (chronological).
-             */
+            /** Format: uuid */
+            assessmentId?: string | null;
+            /** Format: int64 */
             attemptNumber: number;
             /** Format: uuid */
             examId?: string | null;
@@ -1455,10 +1633,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             status: string;
-            /**
-             * Format: int64
-             * @description Total finished attempts the learner has for the same quiz/exam.
-             */
+            /** Format: int64 */
             totalAttempts: number;
         };
         ShortPayload: {
@@ -1505,6 +1680,12 @@ export interface components {
             focusTags?: string[] | null;
             label?: string | null;
             nextTarget?: string | null;
+        };
+        UpdateAssessmentRequest: {
+            description?: string | null;
+            objectives?: string[] | null;
+            status?: null | components["schemas"]["AssessmentStatus"];
+            title?: string | null;
         };
         User: {
             /** Format: date-time */
@@ -1682,6 +1863,281 @@ export interface operations {
                 content?: never;
             };
             /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_assessments: {
+        parameters: {
+            query?: {
+                /** @description Filter by mode (practice or graded) */
+                mode?: string;
+                /** @description Filter by status (draft, active, archived) */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of assessments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSummary"][];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assessment created successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSummary"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentDetail"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assessment updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Assessment"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_assessment_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAssessmentQuestionBody"];
+            };
+        };
+        responses: {
+            /** @description Question linked */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddAssessmentQuestionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or question */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_assessment_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+                /** @description Question ID */
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question removed from assessment */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or question */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2421,25 +2877,25 @@ export interface operations {
     };
     list_questions: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tag: string | null;
-                status: null | components["schemas"]["QuestionStatus"];
-                minRating: number | null;
-                maxRating: number | null;
-                limit: number | null;
-                offset: number | null;
-                search: string | null;
-                kind: string | null;
-                page: number | null;
-                pageSize: number | null;
+            query?: {
+                tag?: string;
+                status?: components["schemas"]["QuestionStatus"];
+                minRating?: number;
+                maxRating?: number;
+                limit?: number;
+                offset?: number;
+                search?: string;
+                kind?: string;
+                page?: number;
+                pageSize?: number;
                 /**
                  * @description Keyset cursor from a prior response's `nextCursor`; when set, `page` is
                  *     ignored and the next rows after the cursor are returned.
                  */
-                cursor: string | null;
+                cursor?: string;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3027,9 +3483,11 @@ export interface operations {
     list_my_sessions: {
         parameters: {
             query?: {
-                /** @description Filter by quiz */
+                /** @description Filter by assessment */
+                assessmentId?: string;
+                /** @description Filter by quiz (legacy) */
                 quizId?: string;
-                /** @description Filter by exam */
+                /** @description Filter by exam (legacy) */
                 examId?: string;
             };
             header?: never;

@@ -41,6 +41,7 @@ impl ScopeOneOf for WriteQuestionScopes {
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 #[serde(rename_all = "camelCase")]
 pub struct ListQuestionsQuery {
     #[serde(default)]

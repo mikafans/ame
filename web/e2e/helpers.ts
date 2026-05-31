@@ -82,11 +82,10 @@ export async function registerUserFull(
  * authenticated. Must be called before the first page.goto().
  */
 export async function setAuthCookie(page: Page, token: string): Promise<void> {
+  const domain = new URL(BASE_URL).hostname;
   await page
     .context()
-    .addCookies([
-      { name: "ame_token", value: token, domain: "localhost", path: "/" },
-    ]);
+    .addCookies([{ name: "ame_token", value: token, domain, path: "/" }]);
 }
 
 // ---------------------------------------------------------------------------

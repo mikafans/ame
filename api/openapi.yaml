@@ -90,6 +90,203 @@ paths:
           description: User not found
       security:
       - bearer: []
+  /v1/assessments:
+    get:
+      tags:
+      - assessments
+      operationId: list_assessments
+      parameters:
+      - name: mode
+        in: query
+        description: Filter by mode (practice or graded)
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Filter by status (draft, active, archived)
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: List of assessments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssessmentSummary'
+        '401':
+          description: Missing or invalid token
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - assessments
+      operationId: create_assessment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssessmentRequest'
+        required: true
+      responses:
+        '200':
+          description: Assessment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentSummary'
+        '401':
+          description: Missing or invalid token
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/assessments/{id}:
+    get:
+      tags:
+      - assessments
+      operationId: get_assessment
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Assessment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentDetail'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Assessment not found
+      security:
+      - bearer_auth: []
+    delete:
+      tags:
+      - assessments
+      operationId: delete_assessment
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Assessment deleted successfully
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Assessment not found
+      security:
+      - bearer_auth: []
+    patch:
+      tags:
+      - assessments
+      operationId: patch_assessment
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssessmentRequest'
+        required: true
+      responses:
+        '200':
+          description: Assessment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Assessment not found
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/assessments/{id}/questions:
+    post:
+      tags:
+      - assessments
+      operationId: add_assessment_question
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddAssessmentQuestionBody'
+        required: true
+      responses:
+        '201':
+          description: Question linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddAssessmentQuestionResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such assessment or question
+        '422':
+          description: Validation failed
+      security:
+      - bearer_auth: []
+  /v1/assessments/{id}/questions/{question_id}:
+    delete:
+      tags:
+      - assessments
+      operationId: remove_assessment_question
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: question_id
+        in: path
+        description: Question ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Question removed from assessment
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such assessment or question
+      security:
+      - bearer_auth: []
   /v1/attempts/pending:
     get:
       tags:
@@ -603,91 +800,69 @@ paths:
       operationId: list_questions
       parameters:
       - name: tag
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       - name: status
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/QuestionStatus'
+          $ref: '#/components/schemas/QuestionStatus'
       - name: minRating
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - number
-          - 'null'
+          type: number
           format: double
       - name: maxRating
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - number
-          - 'null'
+          type: number
           format: double
       - name: limit
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: offset
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: search
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       - name: kind
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       - name: page
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: pageSize
-        in: path
-        required: true
+        in: query
+        required: false
         schema:
-          type:
-          - integer
-          - 'null'
+          type: integer
           format: int64
       - name: cursor
-        in: path
+        in: query
         description: |-
           Keyset cursor from a prior response's `nextCursor`; when set, `page` is
           ignored and the next rows after the cursor are returned.
-        required: true
+        required: false
         schema:
-          type:
-          - string
-          - 'null'
+          type: string
       responses:
         '200':
           description: Filtered list of questions
@@ -1126,19 +1301,25 @@ paths:
     get:
       tags:
       - crate::http::sessions
-      summary: GET /v1/sessions — the caller's finished attempt history, newest first.
       operationId: list_my_sessions
       parameters:
+      - name: assessmentId
+        in: query
+        description: Filter by assessment
+        required: false
+        schema:
+          type: string
+          format: uuid
       - name: quizId
         in: query
-        description: Filter by quiz
+        description: Filter by quiz (legacy)
         required: false
         schema:
           type: string
           format: uuid
       - name: examId
         in: query
-        description: Filter by exam
+        description: Filter by exam (legacy)
         required: false
         schema:
           type: string
@@ -1349,6 +1530,41 @@ paths:
       - bearer_auth: []
 components:
   schemas:
+    AddAssessmentQuestionBody:
+      type: object
+      properties:
+        kind:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/QuestionKind'
+            description: Create a new question inline (kind + prompt required if question_id absent).
+        pointsOverride:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        prompt:
+          type:
+          - string
+          - 'null'
+        questionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Link an existing bank question by ID.
+    AddAssessmentQuestionResponse:
+      type: object
+      required:
+      - questionId
+      - orderIndex
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        questionId:
+          type: string
+          format: uuid
     AddQuizQuestionBody:
       type: object
       properties:
@@ -1451,6 +1667,219 @@ components:
           $ref: '#/components/schemas/GradeOutcome'
         replayed:
           type: boolean
+    Assessment:
+      type: object
+      required:
+      - id
+      - title
+      - mode
+      - status
+      - objectives
+      - totalPoints
+      - showResultsDuring
+      - affectsRating
+      - method
+      - createdBy
+      - createdAt
+      - updatedAt
+      properties:
+        affectsRating:
+          type: boolean
+        compositionTrace: {}
+        course:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        description:
+          type:
+          - string
+          - 'null'
+        durationMin:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        id:
+          type: string
+          format: uuid
+        method:
+          type: string
+        mode:
+          $ref: '#/components/schemas/AssessmentMode'
+        objectives:
+          type: array
+          items:
+            type: string
+        passingPoints:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        showResultsDuring:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/AssessmentStatus'
+        timeLimitSeconds:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        title:
+          type: string
+        totalPoints:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
+    AssessmentDetail:
+      allOf:
+      - $ref: '#/components/schemas/Assessment'
+      - type: object
+        required:
+        - sections
+        - questions
+        properties:
+          questions:
+            type: array
+            items:
+              $ref: '#/components/schemas/AssessmentQuestion'
+          sections:
+            type: array
+            items:
+              $ref: '#/components/schemas/AssessmentSectionDetail'
+    AssessmentMode:
+      type: string
+      enum:
+      - practice
+      - graded
+    AssessmentQuestion:
+      type: object
+      required:
+      - id
+      - kind
+      - prompt
+      - payload
+      - points
+      - status
+      - orderIndex
+      properties:
+        codeSnippet: {}
+        explanation:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        payload: {}
+        points:
+          type: integer
+          format: int32
+        prompt:
+          type: string
+        status:
+          type: string
+    AssessmentSectionDetail:
+      type: object
+      required:
+      - id
+      - title
+      - orderIndex
+      - weight
+      - itemsCount
+      - questions
+      properties:
+        id:
+          type: string
+          format: uuid
+        itemsCount:
+          type: integer
+          format: int32
+        mix: {}
+        orderIndex:
+          type: integer
+          format: int32
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentQuestion'
+        title:
+          type: string
+        weight:
+          type: number
+          format: double
+    AssessmentStatus:
+      type: string
+      enum:
+      - draft
+      - active
+      - archived
+    AssessmentSummary:
+      type: object
+      required:
+      - id
+      - title
+      - mode
+      - status
+      - objectives
+      - totalPoints
+      - questionCount
+      - completed
+      - createdAt
+      - updatedAt
+      properties:
+        completed:
+          type: boolean
+        course:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - 'null'
+        durationMin:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        id:
+          type: string
+          format: uuid
+        mode:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+        questionCount:
+          type: integer
+          format: int64
+        status:
+          type: string
+        title:
+          type: string
+        totalPoints:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
     Attempt:
       type: object
       required:
@@ -1816,6 +2245,53 @@ components:
         id:
           type: string
           format: uuid
+    CreateAssessmentRequest:
+      type: object
+      required:
+      - title
+      - mode
+      - objectives
+      - showResultsDuring
+      - affectsRating
+      - method
+      properties:
+        affectsRating:
+          type: boolean
+        course:
+          type:
+          - string
+          - 'null'
+        description:
+          type:
+          - string
+          - 'null'
+        durationMin:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        method:
+          type: string
+        mode:
+          $ref: '#/components/schemas/AssessmentMode'
+        objectives:
+          type: array
+          items:
+            type: string
+        passingPoints:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        showResultsDuring:
+          type: boolean
+        timeLimitSeconds:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        title:
+          type: string
     CreateKeyBody:
       type: object
       required:
@@ -1915,6 +2391,11 @@ components:
     CreateSessionBody:
       type: object
       properties:
+        assessmentId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         cats:
           type: array
           items:
@@ -2353,9 +2834,6 @@ components:
           type:
           - string
           - 'null'
-          description: |-
-            Grading language for code questions (from the question payload), so the
-            client submits a `Code` response whose language matches the grader.
         optionOrder:
           type:
           - array
@@ -3277,6 +3755,11 @@ components:
       properties:
         affects_rating:
           type: boolean
+        assessment_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
         course_title:
           type:
           - string
@@ -3396,7 +3879,6 @@ components:
       - abandoned
     SessionSummary:
       type: object
-      description: One row in a learner's attempt history.
       required:
       - id
       - kind
@@ -3405,10 +3887,14 @@ components:
       - attemptNumber
       - totalAttempts
       properties:
+        assessmentId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         attemptNumber:
           type: integer
           format: int64
-          description: 1-based position of this attempt within its quiz/exam (chronological).
         examId:
           type:
           - string
@@ -3451,7 +3937,6 @@ components:
         totalAttempts:
           type: integer
           format: int64
-          description: Total finished attempts the learner has for the same quiz/exam.
     ShortPayload:
       type: object
       required:
@@ -3569,6 +4054,27 @@ components:
           - string
           - 'null'
         nextTarget:
+          type:
+          - string
+          - 'null'
+    UpdateAssessmentRequest:
+      type: object
+      properties:
+        description:
+          type:
+          - string
+          - 'null'
+        objectives:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        status:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/AssessmentStatus'
+        title:
           type:
           - string
           - 'null'

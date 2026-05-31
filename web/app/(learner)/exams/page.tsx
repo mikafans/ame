@@ -80,16 +80,30 @@ export default function ExamsPage() {
   const [composing, setComposing] = useState(false);
 
   const [starting, setStarting] = useState(false);
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
 
   function load() {
     setLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
-      .GET("/v1/exams")
-      .then(({ data }: { data?: { exams: Exam[] } }) => {
-        if (data?.exams) {
-          setExams(data.exams);
-          if (!selected && data.exams.length) setSelected(data.exams[0].id);
+    api
+      .GET("/v1/assessments", {
+        params: { query: { mode: "graded" } },
+      })
+      .then(({ data }) => {
+        if (data) {
+          const mappedExams = data.map((d) => ({
+            id: d.id,
+            name: d.title,
+            description: d.description ?? undefined,
+            status: d.status === "active" ? "published" : d.status,
+            method: "manual",
+            durationMin: d.durationMin ?? undefined,
+            objectives: d.objectives,
+            totalPoints: d.totalPoints,
+            course: d.course ?? undefined,
+            sections: null,
+          }));
+          setExams(mappedExams as any);
+          if (!selected && mappedExams.length) setSelected(mappedExams[0].id);
         }
       })
       .catch(console.error)
@@ -101,6 +115,42 @@ export default function ExamsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!selected) {
+      setSelectedExam(null);
+      return;
+    }
+    api
+      .GET("/v1/assessments/{id}", {
+        params: { path: { id: selected } },
+      })
+      .then(({ data }) => {
+        if (data) {
+          const mappedExam: Exam = {
+            id: data.id,
+            name: data.title,
+            description: data.description ?? undefined,
+            status: data.status === "active" ? "published" : data.status,
+            method: data.method,
+            durationMin: data.durationMin ?? undefined,
+            passingPoints: data.passingPoints ?? undefined,
+            objectives: data.objectives,
+            totalPoints: data.totalPoints,
+            course: data.course ?? undefined,
+            sections: data.sections.map((s) => ({
+              id: s.id,
+              title: s.title,
+              weight: s.weight * 100,
+              itemsCount: s.itemsCount,
+              mix: s.mix ? JSON.stringify(s.mix) : undefined,
+            })),
+          };
+          setSelectedExam(mappedExam);
+        }
+      })
+      .catch(console.error);
+  }, [selected]);
+
   const tabs: { id: TabId; label: string }[] = [
     { id: "all", label: "All" },
     { id: "published", label: "Active" },
@@ -109,7 +159,7 @@ export default function ExamsPage() {
 
   const filtered =
     tab === "all" ? exams : exams.filter((e) => e.status === tab);
-  const exam = exams.find((e) => e.id === selected) ?? null;
+  const exam = selectedExam;
   const examQuestionCount =
     exam?.sections && exam.sections.length > 0
       ? exam.sections.reduce((sum, s) => sum + (s.itemsCount ?? 0), 0)
@@ -119,9 +169,8 @@ export default function ExamsPage() {
     if (!selected) return;
     setStarting(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (api as any).POST("/v1/sessions", {
-        body: { examId: selected },
+      const { data } = await api.POST("/v1/sessions", {
+        body: { assessmentId: selected },
       });
       if (data?.sessionId) router.push(`/sessions/${data.sessionId}`);
     } catch (err) {
@@ -133,12 +182,11 @@ export default function ExamsPage() {
 
   function openCompose() {
     setShowCompose(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
+    api
       .GET("/v1/questions", {
         params: { query: { status: "live", limit: 200 } },
       })
-      .then(({ data }: { data?: { questions: AvailableQuestion[] } }) => {
+      .then(({ data }) => {
         setAvailableQuestions(data?.questions ?? []);
       })
       .catch(console.error);
@@ -162,16 +210,16 @@ export default function ExamsPage() {
           types: [],
         })),
       };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (api as any).POST("/v1/exams", { body });
+      const { data, error } = await api.POST("/v1/exams", { body });
       if (error) {
+        const errObj = error as any;
         if (
-          typeof error === "object" &&
-          "code" in error &&
-          error.code === "pool_insufficient"
+          typeof errObj === "object" &&
+          "code" in errObj &&
+          errObj.code === "pool_insufficient"
         ) {
           setComposeError(
-            `Pool insufficient: ${(error as { message?: string }).message ?? "not enough questions match the section constraints"}`,
+            `Pool insufficient: ${errObj.message ?? "not enough questions match the section constraints"}`,
           );
         } else {
           setComposeError("Failed to compose exam. Check section constraints.");
@@ -191,9 +239,9 @@ export default function ExamsPage() {
   }
 
   async function handlePublish(id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (api as any).PATCH(`/v1/exams/${id}`, {
-      body: { status: "published" },
+    await api.PATCH("/v1/assessments/{id}", {
+      params: { path: { id } },
+      body: { status: "active" },
     });
     load();
   }
