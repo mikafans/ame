@@ -396,6 +396,10 @@ pub async fn run(
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_question_promote(&state, body.params).await
         }
+        "profile.get" => run_profile_get(&state, &auth).await,
+        "memory.set" => run_memory_set(&state, &user_id, body.params).await,
+        "memory.append" => run_memory_append(&state, &user_id, body.params).await,
+        "target.set" => run_target_set(&state, &user_id, body.params).await,
         other => Ok(Json(RunResponse {
             ok: false,
             tool: other.to_string(),
@@ -492,6 +496,169 @@ async fn run_question_promote(
         ok: true,
         tool: "question.promote".into(),
         result: serde_json::to_value(question).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+// ── behavioral tools (P1 sub-account profile) ──────────────────────────────────
+
+/// Loads the calling agent's profile row, returning a 404-style error if the
+/// caller has no profile (i.e. is not an agent sub-account).
+async fn load_agent_profile(
+    state: &AppState,
+    agent_id: &Uuid,
+) -> Result<sqlx::postgres::PgRow, ApiError> {
+    sqlx::query(
+        "SELECT label, focus_tags, current_goal, next_target, memory \
+         FROM tb_agent_profiles WHERE agent_user_id = $1",
+    )
+    .bind(agent_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?
+    .ok_or(ApiError::NotFound {
+        resource: "agent_profile",
+    })
+}
+
+/// profile.get — the agent's own config plus owner shared truth (per-tag ratings).
+async fn run_profile_get(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+) -> Result<Json<RunResponse>, ApiError> {
+    let profile = load_agent_profile(state, &auth.user.id).await?;
+    let owner_id = auth.owner_id();
+
+    let rating_rows = sqlx::query(
+        "SELECT t.name AS tag, r.rating AS rating \
+         FROM tb_user_tag_ratings r JOIN tb_tags t ON t.id = r.tag_id \
+         WHERE r.user_id = $1 ORDER BY r.rating DESC",
+    )
+    .bind(owner_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let ratings: Vec<Value> = rating_rows
+        .iter()
+        .map(|row| {
+            json!({
+                "tag": row.get::<String, _>("tag"),
+                "rating": row.get::<f64, _>("rating"),
+            })
+        })
+        .collect();
+
+    let agent = json!({
+        "label": profile.get::<String, _>("label"),
+        "focusTags": profile.get::<Vec<String>, _>("focus_tags"),
+        "currentGoal": profile.get::<Option<String>, _>("current_goal"),
+        "nextTarget": profile.get::<Option<String>, _>("next_target"),
+        "memory": profile.get::<Value, _>("memory"),
+    });
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "profile.get".into(),
+        result: json!({
+            "agent": agent,
+            "owner": { "id": owner_id, "ratings": ratings },
+        }),
+        error: None,
+    }))
+}
+
+/// memory.set — replace the agent's memory blob wholesale.
+async fn run_memory_set(
+    state: &AppState,
+    agent_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let memory = params.get("memory").cloned().ok_or_else(|| {
+        ApiError::Validation(vec![FieldError {
+            field: "memory".into(),
+            message: "missing memory object".into(),
+        }])
+    })?;
+    update_profile_memory(state, agent_id, memory, false).await
+}
+
+/// memory.append — shallow-merge the given keys into the agent's memory blob.
+async fn run_memory_append(
+    state: &AppState,
+    agent_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let append = params.get("append").cloned().ok_or_else(|| {
+        ApiError::Validation(vec![FieldError {
+            field: "append".into(),
+            message: "missing append object".into(),
+        }])
+    })?;
+    update_profile_memory(state, agent_id, append, true).await
+}
+
+async fn update_profile_memory(
+    state: &AppState,
+    agent_id: &Uuid,
+    value: Value,
+    merge: bool,
+) -> Result<Json<RunResponse>, ApiError> {
+    // `memory || $1` shallow-merges; `$1` replaces.
+    let sql = if merge {
+        "UPDATE tb_agent_profiles SET memory = memory || $1 WHERE agent_user_id = $2 RETURNING memory"
+    } else {
+        "UPDATE tb_agent_profiles SET memory = $1 WHERE agent_user_id = $2 RETURNING memory"
+    };
+    let row = sqlx::query(sql)
+        .bind(&value)
+        .bind(agent_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .ok_or(ApiError::NotFound {
+            resource: "agent_profile",
+        })?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "memory.set".into(),
+        result: json!({ "memory": row.get::<Value, _>("memory") }),
+        error: None,
+    }))
+}
+
+/// target.set — update the agent's current goal and/or next target.
+async fn run_target_set(
+    state: &AppState,
+    agent_id: &Uuid,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let current_goal = params.get("currentGoal").and_then(|v| v.as_str());
+    let next_target = params.get("nextTarget").and_then(|v| v.as_str());
+
+    let row = sqlx::query(
+        "UPDATE tb_agent_profiles \
+         SET current_goal = COALESCE($1, current_goal), \
+             next_target = COALESCE($2, next_target) \
+         WHERE agent_user_id = $3 RETURNING current_goal, next_target",
+    )
+    .bind(current_goal)
+    .bind(next_target)
+    .bind(agent_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?
+    .ok_or(ApiError::NotFound {
+        resource: "agent_profile",
+    })?;
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "target.set".into(),
+        result: json!({
+            "currentGoal": row.get::<Option<String>, _>("current_goal"),
+            "nextTarget": row.get::<Option<String>, _>("next_target"),
+        }),
         error: None,
     }))
 }

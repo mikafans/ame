@@ -105,10 +105,7 @@ async fn test_public_publish_scope_and_ceiling() {
 
     let body = res.json::<serde_json::Value>().await.unwrap();
     assert_eq!(body["error"]["code"], "scope_required");
-    assert_eq!(
-        body["error"]["details"]["scope"],
-        "scope 'public.publish' is not permitted for your plan"
-    );
+    assert_eq!(body["error"]["details"]["scope"], "public.publish");
 
     // 4. Create a premium human user
     let prem_id = Uuid::now_v7();

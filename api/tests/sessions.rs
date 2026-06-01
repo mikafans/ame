@@ -338,6 +338,7 @@ async fn list_my_sessions_excludes_in_progress() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
+    make_live_mc_question(&pool).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -379,6 +380,7 @@ async fn abandon_session_roundtrip() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
+    make_live_mc_question(&pool).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -431,6 +433,7 @@ async fn patch_session_rejects_finished_target() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
+    make_live_mc_question(&pool).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 

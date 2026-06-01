@@ -186,7 +186,7 @@ CREATE INDEX idx_assessment_items_section ON tb_assessment_items (section_id, or
 CREATE TABLE tb_sessions (
   id              uuid        PRIMARY KEY DEFAULT uuid_generate_v7(),
   user_id         uuid        NOT NULL REFERENCES tb_users(id)   ON DELETE CASCADE,
-  assessment_id   uuid        NOT NULL REFERENCES tb_assessments(id) ON DELETE CASCADE,
+  assessment_id   uuid        REFERENCES tb_assessments(id) ON DELETE CASCADE,
   kind            text        NOT NULL DEFAULT 'assessment',
   filter          jsonb,
   question_plan   jsonb       NOT NULL,
