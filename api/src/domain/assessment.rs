@@ -5,9 +5,10 @@ use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssessmentMode {
+    #[default]
     Practice,
     Graded,
 }
@@ -103,7 +104,9 @@ pub struct QuestionImport {
 pub struct CreateAssessmentRequest {
     pub title: String,
     pub description: Option<String>,
+    #[serde(default)]
     pub mode: AssessmentMode,
+    #[serde(default)]
     pub objectives: Vec<String>,
     pub course: Option<String>,
     pub duration_min: Option<i32>,
@@ -115,6 +118,7 @@ pub struct CreateAssessmentRequest {
     pub affects_rating: bool,
     #[serde(default)]
     pub visibility: AssessmentVisibility,
+    #[serde(default = "default_method")]
     pub method: String, // 'manual' or 'agent'
     #[serde(default)]
     pub questions: Vec<QuestionImport>,
@@ -122,6 +126,10 @@ pub struct CreateAssessmentRequest {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_method() -> String {
+    "manual".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

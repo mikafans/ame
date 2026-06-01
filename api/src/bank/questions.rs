@@ -355,15 +355,113 @@ pub async fn update_question(
 ) -> Result<Question, ApiError> {
     let mut tx = pool.begin().await.map_err(internal)?;
 
-    if let Some(prompt) = patch.prompt {
-        sqlx::query("UPDATE tb_questions SET prompt = $1 WHERE id = $2")
+    // Fetch current state and check if editable.
+    let current_row = sqlx::query(
+        "SELECT version, status, prompt, code_snippet, payload, explanation FROM tb_questions WHERE id = $1 FOR UPDATE"
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(internal)?
+    .ok_or(ApiError::NotFound { resource: "question" })?;
+
+    let current_status: String = current_row.get("status");
+    if current_status == "archived" {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "status".to_string(),
+                message: "archived questions cannot be edited".to_string(),
+            },
+        ]));
+    }
+
+    // If the question is live, snapshot the current version before mutating.
+    if current_status == "live" {
+        let current_version: i32 = current_row.get("version");
+        let current_prompt: String = current_row.get("prompt");
+        let current_code_snippet: Option<serde_json::Value> = current_row.get("code_snippet");
+        let current_payload: serde_json::Value = current_row.get("payload");
+        let current_explanation: Option<String> = current_row.get("explanation");
+
+        sqlx::query(
+            "INSERT INTO tb_question_versions (question_id, version, prompt, code_snippet, payload, explanation) \
+             VALUES ($1, $2, $3, $4, $5, $6)"
+        )
+        .bind(id)
+        .bind(current_version)
+        .bind(current_prompt)
+        .bind(current_code_snippet)
+        .bind(current_payload)
+        .bind(current_explanation)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal)?;
+
+        sqlx::query(
+            "UPDATE tb_questions SET version = version + 1, updated_at = now() WHERE id = $1",
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal)?;
+    }
+
+    // Apply patch fields.
+    if let Some(prompt) = &patch.prompt {
+        sqlx::query("UPDATE tb_questions SET prompt = $1, updated_at = now() WHERE id = $2")
             .bind(prompt)
             .bind(id)
             .execute(&mut *tx)
             .await
             .map_err(internal)?;
     }
-    // ... other fields ...
+    if let Some(explanation) = &patch.explanation {
+        sqlx::query("UPDATE tb_questions SET explanation = $1, updated_at = now() WHERE id = $2")
+            .bind(explanation)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal)?;
+    }
+    if let Some(points) = patch.points {
+        sqlx::query("UPDATE tb_questions SET points = $1, updated_at = now() WHERE id = $2")
+            .bind(points)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal)?;
+    }
+    if let Some(payload) = &patch.payload {
+        sqlx::query("UPDATE tb_questions SET payload = $1, updated_at = now() WHERE id = $2")
+            .bind(payload)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal)?;
+    }
+    if let Some(tags) = &patch.tags {
+        // Replace tags: delete existing, re-insert new ones.
+        sqlx::query("DELETE FROM tb_question_tags WHERE question_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal)?;
+        for tag_name in tags {
+            let tag_id: Uuid = sqlx::query_scalar(
+                "INSERT INTO tb_tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"
+            )
+            .bind(tag_name)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(internal)?;
+            sqlx::query("INSERT INTO tb_question_tags (question_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
+                .bind(id)
+                .bind(tag_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(internal)?;
+        }
+    }
 
     tx.commit().await.map_err(internal)?;
     get_question(pool, id).await?.ok_or(ApiError::NotFound {

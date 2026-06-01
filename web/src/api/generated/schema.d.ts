@@ -879,9 +879,9 @@ export interface components {
             description?: string | null;
             /** Format: int32 */
             durationMin?: number | null;
-            method: string;
-            mode: components["schemas"]["AssessmentMode"];
-            objectives: string[];
+            method?: string;
+            mode?: components["schemas"]["AssessmentMode"];
+            objectives?: string[];
             /** Format: int32 */
             passingPoints?: number | null;
             questions?: components["schemas"]["QuestionImport"][];

@@ -1972,9 +1972,6 @@ components:
       type: object
       required:
       - title
-      - mode
-      - objectives
-      - method
       properties:
         affectsRating:
           type: boolean

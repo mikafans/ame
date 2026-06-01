@@ -96,7 +96,7 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
 
 async fn make_assessment(pool: &PgPool, owner_id: Uuid) -> Uuid {
     sqlx::query(
-        "INSERT INTO tb_assessments (title, status, created_by) VALUES ($1, 'active', $2) RETURNING id",
+        "INSERT INTO tb_assessments (title, mode, status, created_by) VALUES ($1, 'practice', 'active', $2) RETURNING id",
     )
     .bind("Test Assessment")
     .bind(owner_id)
@@ -218,15 +218,17 @@ async fn exam_stats_returns_correct_shape() {
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
-    // compose exam via API
+    // compose exam via the unified assessment API (mode: graded, method: manual)
     let q1 = make_live_question(&pool, "mc", user_id).await;
     let composed: Value = client
-        .post(format!("{base}/v1/exams"))
+        .post(format!("{base}/v1/assessments"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "Stats Test Exam",
-            "duration": 30,
-            "sections": [{"title": "S1", "weight": 1.0, "questionIds": [q1]}]
+            "title": "Stats Test Exam",
+            "mode": "graded",
+            "method": "manual",
+            "objectives": [],
+            "duration_min": 30
         }))
         .send()
         .await
@@ -236,10 +238,37 @@ async fn exam_stats_returns_correct_shape() {
         .json()
         .await
         .unwrap();
-    let exam_id = composed["examId"].as_str().unwrap();
+    let exam_id = composed["id"].as_str().unwrap();
+
+    // Link question into the assessment's default section
+    let section_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index LIMIT 1",
+    )
+    .bind(Uuid::parse_str(exam_id).unwrap())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_assessment_items (section_id, question_id, order_index) VALUES ($1, $2, 0)",
+    )
+    .bind(section_id)
+    .bind(q1)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE tb_assessment_sections SET items_count = 1 WHERE id = $1")
+        .bind(section_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE tb_assessments SET status = 'active' WHERE id = $1")
+        .bind(Uuid::parse_str(exam_id).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let resp: Value = client
-        .get(format!("{base}/v1/exams/{exam_id}/stats"))
+        .get(format!("{base}/v1/assessments/{exam_id}/stats"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
@@ -250,14 +279,14 @@ async fn exam_stats_returns_correct_shape() {
         .await
         .unwrap();
 
-    assert!(resp["passRate"].is_number(), "passRate should be a number");
+    // The unified assessment stats endpoint returns avg/median/distribution/items.
+    assert!(resp["avg"].is_number(), "avg should be a number");
+    assert!(resp["median"].is_number(), "median should be a number");
     assert!(
-        resp["sectionAvgs"].is_array(),
-        "sectionAvgs should be array"
+        resp["distribution"].is_array(),
+        "distribution should be array"
     );
-    // no finished sessions yet, so timeP50/P95 are null
-    assert!(resp["timeP50"].is_null() || resp["timeP50"].is_number());
-    assert!(resp["timeP95"].is_null() || resp["timeP95"].is_number());
+    assert!(resp["items"].is_array(), "items should be array");
 }
 
 // ── Task 6: scope enforcement ────────────────────────────────────────────────
@@ -278,14 +307,16 @@ async fn stats_endpoints_require_stats_read_scope() {
     let base = serve(pool.clone()).await;
     let client = reqwest::Client::new();
 
-    // compose an exam to get an exam id
-    let q = make_live_question(&pool, "mc", user_id).await;
+    // compose a second assessment (graded/exam-mode) via the unified API
+    let _q = make_live_question(&pool, "mc", user_id).await;
     let composed: Value = client
-        .post(format!("{base}/v1/exams"))
+        .post(format!("{base}/v1/assessments"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "Scope Test Exam",
-            "sections": [{"title": "S", "weight": 1.0, "questionIds": [q]}]
+            "title": "Scope Test Exam",
+            "mode": "graded",
+            "method": "manual",
+            "objectives": []
         }))
         .send()
         .await
@@ -295,8 +326,9 @@ async fn stats_endpoints_require_stats_read_scope() {
         .json()
         .await
         .unwrap();
-    let exam_id = composed["examId"].as_str().unwrap();
+    let exam_assessment_id = composed["id"].as_str().unwrap();
 
+    // Both assessments must return 403 when caller lacks stats.read
     let assessment_resp = client
         .get(format!("{base}/v1/assessments/{assessment_id}/stats"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
@@ -306,7 +338,7 @@ async fn stats_endpoints_require_stats_read_scope() {
     assert_eq!(assessment_resp.status(), StatusCode::FORBIDDEN);
 
     let exam_resp = client
-        .get(format!("{base}/v1/exams/{exam_id}/stats"))
+        .get(format!("{base}/v1/assessments/{exam_assessment_id}/stats"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
@@ -441,7 +473,7 @@ async fn key_rotation_invalidates_old_token() {
         .await
         .unwrap();
     assert!(
-        rotated["apiKey"].is_string(),
+        rotated["secret"].is_string(),
         "rotate should return new key"
     );
 
@@ -474,7 +506,7 @@ async fn create_key_requires_admin_scope_for_admin_key() {
     let resp = client
         .post(format!("{base}/v1/me/keys"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
-        .json(&json!({ "label": "admin key attempt", "scopes": ["admin"] }))
+        .json(&json!({ "name": "admin key attempt", "scopes": ["admin"] }))
         .send()
         .await
         .unwrap();

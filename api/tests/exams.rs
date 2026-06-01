@@ -106,18 +106,16 @@ async fn static_exam_compose_get_and_session_roundtrip() {
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
-    // compose a static exam
-    let composed: Value = client
-        .post(format!("{base}/v1/exams"))
+    // Create a graded assessment via the unified API (replaces old POST /v1/exams)
+    let created: Value = client
+        .post(format!("{base}/v1/assessments"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "Integration Test Exam",
-            "duration": 30,
-            "sections": [{
-                "title": "Section A",
-                "weight": 1.0,
-                "questionIds": [q1, q2]
-            }]
+            "title": "Integration Test Exam",
+            "mode": "graded",
+            "method": "manual",
+            "objectives": [],
+            "duration_min": 30
         }))
         .send()
         .await
@@ -128,13 +126,25 @@ async fn static_exam_compose_get_and_session_roundtrip() {
         .await
         .unwrap();
 
-    let exam_id = composed["examId"].as_str().unwrap();
-    assert_eq!(composed["totalPoints"], 2);
-    assert_eq!(composed["sections"][0]["itemsCount"], 2);
+    let exam_id = created["id"].as_str().unwrap();
+    assert!(created["id"].is_string(), "id should be present");
 
-    // get exam
+    // Link the two questions into the default section
+    for qid in [q1, q2] {
+        client
+            .post(format!("{base}/v1/assessments/{exam_id}/questions"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+            .json(&json!({ "questionId": qid }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+    }
+
+    // get exam via the unified assessment endpoint
     let got: Value = client
-        .get(format!("{base}/v1/exams/{exam_id}"))
+        .get(format!("{base}/v1/assessments/{exam_id}"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
@@ -144,10 +154,15 @@ async fn static_exam_compose_get_and_session_roundtrip() {
         .json()
         .await
         .unwrap();
-    assert_eq!(got["exam"]["name"], "Integration Test Exam");
+    // AssessmentDetail flattens the assessment fields, so title is at the top level.
+    assert_eq!(got["title"], "Integration Test Exam");
     assert_eq!(got["sections"].as_array().unwrap().len(), 1);
+    assert_eq!(got["sections"][0]["itemsCount"], 2);
 }
 
+/// The old dynamic-exam-pool check is now surfaced via the practice session
+/// planner: requesting more questions than the bank contains returns 422
+/// exam_pool_insufficient.
 #[tokio::test]
 async fn dynamic_exam_pool_insufficient_returns_422() {
     if skip_if_no_db() {
@@ -158,17 +173,14 @@ async fn dynamic_exam_pool_insufficient_returns_422() {
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
+    // Request a practice session filtered to a tag that has zero questions.
     let resp = client
-        .post(format!("{base}/v1/exams"))
+        .post(format!("{base}/v1/sessions"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "Dynamic Exam",
-            "sections": [{
-                "title": "Impossible Section",
-                "weight": 1.0,
-                "items": 9999,
-                "tags": ["__nonexistent_tag__"]
-            }]
+            "tags": ["__nonexistent_tag_xyz_impossible__"],
+            "count": 9999,
+            "mode": "practice"
         }))
         .send()
         .await
@@ -190,11 +202,13 @@ async fn compose_body_validation_rejects_empty_name() {
     let client = reqwest::Client::new();
 
     let resp = client
-        .post(format!("{base}/v1/exams"))
+        .post(format!("{base}/v1/assessments"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "",
-            "sections": [{ "title": "S", "weight": 1.0, "questionIds": [] }]
+            "title": "",
+            "mode": "graded",
+            "method": "manual",
+            "objectives": []
         }))
         .send()
         .await

@@ -131,7 +131,7 @@ async fn test_quota_enforcement() {
         panic!("Private Assessment creation failed ({status}): {body}");
     }
 
-    let private_qid = res.json::<serde_json::Value>().await.unwrap()["assessmentId"]
+    let private_qid = res.json::<serde_json::Value>().await.unwrap()["id"]
         .as_str()
         .unwrap()
         .to_string();

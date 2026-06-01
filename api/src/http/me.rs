@@ -48,6 +48,8 @@ pub struct ListKeysResponse {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateKeyBody {
     pub name: String,
+    #[serde(default)]
+    pub scopes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -194,6 +196,22 @@ pub async fn create_key(
     user: AuthenticatedUser,
     Json(body): Json<CreateKeyBody>,
 ) -> Result<(StatusCode, Json<CreateKeyResponse>), ApiError> {
+    let effective_scopes: Vec<String> = body.scopes.unwrap_or_else(|| {
+        vec![
+            "assessment.read".into(),
+            "assessment.write".into(),
+            "attempt.read".into(),
+            "attempt.write".into(),
+            "stats.read".into(),
+            "feedback.write".into(),
+        ]
+    });
+
+    // Non-admin users may not create keys with the admin scope.
+    if effective_scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
+        return Err(ApiError::ScopeRequired("admin".into()));
+    }
+
     let token_id = Uuid::now_v7();
     let secret = crate::auth::token::generate_secret();
     let hash = crate::auth::token::hash_secret(&secret);
@@ -205,7 +223,7 @@ pub async fn create_key(
     .bind(user.user.id)
     .bind(&body.name)
     .bind(&hash)
-    .bind(vec!["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "feedback.write"])
+    .bind(effective_scopes)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;

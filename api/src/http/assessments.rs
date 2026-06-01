@@ -355,6 +355,15 @@ pub async fn create_assessment(
     State(state): State<AppState>,
     Json(payload): Json<CreateAssessmentRequest>,
 ) -> Result<(StatusCode, Json<AssessmentSummary>), ApiError> {
+    if payload.title.trim().is_empty() {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "title".to_string(),
+                message: "title must not be empty".to_string(),
+            },
+        ]));
+    }
+
     tracing::info!(
         "Creating assessment: title='{}', questions={}",
         payload.title,
