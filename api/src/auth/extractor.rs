@@ -77,7 +77,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let record = sqlx::query(
             r#"
             SELECT 
-                t.token_hash, t.scopes, t.revoked_at,
+                t.token_hash, t.scopes, t.revoked_at, t.expires_at,
                 u.id as user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.owner_user_id,
                 u.deactivated_at as user_deactivated_at,
                 o.deactivated_at as owner_deactivated_at,
@@ -98,7 +98,8 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         .ok_or(ApiError::Unauthorized)?;
 
         let revoked_at: Option<time::OffsetDateTime> = record.get("revoked_at");
-        if revoked_at.is_some() {
+        let expires_at: time::OffsetDateTime = record.get("expires_at");
+        if revoked_at.is_some() || expires_at < time::OffsetDateTime::now_utc() {
             return Err(ApiError::Unauthorized);
         }
 

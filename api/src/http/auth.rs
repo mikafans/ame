@@ -55,6 +55,9 @@ fn set_token_cookie_header(token: &str) -> String {
     } else {
         ""
     };
+    // Note: SameSite=Lax is fine for same-host dev or same-site prod deploys.
+    // True cross-domain deploys (e.g. web and api on completely different domains)
+    // will require SameSite=None and Secure to allow the cookie on subrequests.
     format!(
         "ame_token={}; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=86400",
         token, secure
@@ -100,14 +103,14 @@ pub async fn register(
         }]));
     }
 
-    // Validate role — only user and admin are valid for human registration
+    // Validate role — only user is valid for human registration
     let normalized_role = body.role.to_lowercase();
     match normalized_role.as_str() {
-        "user" | "admin" => {}
+        "user" => {}
         _ => {
             return Err(ApiError::Validation(vec![FieldError {
                 field: "role".into(),
-                message: "must be 'user' or 'admin'".to_string(),
+                message: "must be 'user'".to_string(),
             }]));
         }
     }
@@ -189,25 +192,38 @@ pub async fn login(
     .bind(&body.email)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| ApiError::Internal(e.into()))?
-    .ok_or(ApiError::Unauthorized)?;
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    // A valid dummy hash to equalize timing on the miss path
+    let dummy_hash = "$argon2id$v=19$m=19456,t=2,p=1$fgRxq3Ut+2IcRLdMp41ROw$xzZcJdQfimlft7Byw21EMnT/p4TcRAJa68gHeUK2EZ4";
+
+    let (hash_to_verify, is_valid_user) = match &user_row {
+        Some(row) => {
+            let hash: Option<String> = row.get("password_hash");
+            let deactivated_at: Option<time::OffsetDateTime> = row.get("deactivated_at");
+            match (hash, deactivated_at) {
+                (Some(h), None) => (h.to_string(), true),
+                _ => (dummy_hash.to_string(), false),
+            }
+        }
+        None => (dummy_hash.to_string(), false),
+    };
+
+    let password_valid = verify_password(&hash_to_verify, &body.password);
+
+    if !password_valid || !is_valid_user {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let user_row = match user_row {
+        Some(row) => row,
+        None => return Err(ApiError::Unauthorized), // Unreachable because of is_valid_user check
+    };
 
     let user_id: Uuid = user_row.get("id");
     let email: String = user_row.get("email");
     let display_name: String = user_row.get("display_name");
     let role: String = user_row.get("role");
-    let password_hash: Option<String> = user_row.get("password_hash");
-    let deactivated_at: Option<time::OffsetDateTime> = user_row.get("deactivated_at");
-
-    if deactivated_at.is_some() {
-        return Err(ApiError::Unauthorized);
-    }
-
-    // Verify password
-    let password_hash_str = password_hash.ok_or(ApiError::Unauthorized)?;
-    if !verify_password(&password_hash_str, &body.password) {
-        return Err(ApiError::Unauthorized);
-    }
 
     let token_str = issue_token(&state.pool, user_id, &role).await?;
     let cookie_header = set_token_cookie_header(&token_str);
@@ -238,8 +254,8 @@ async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String,
     let token_hash = hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '30 days')",
     )
     .bind(token_id)
     .bind(user_id)
@@ -309,7 +325,36 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
     ),
     tag = "auth"
 )]
-pub async fn logout() -> impl IntoResponse {
+pub async fn logout(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    req: axum::extract::Request,
+) -> impl IntoResponse {
+    // Try to extract the token to revoke it in the DB
+    if let Some(parsed) = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(crate::auth::token::parse_bearer_token)
+        .or_else(|| {
+            req.headers()
+                .get(axum::http::header::COOKIE)
+                .and_then(|h| h.to_str().ok())
+                .and_then(|cookies| {
+                    cookies.split(';').find_map(|c| {
+                        let c = c.trim();
+                        c.strip_prefix("ame_token=").map(|v| v.to_owned())
+                    })
+                })
+                .and_then(|v| crate::auth::token::parse_token_value(&v))
+        })
+    {
+        // Ignore failures since we're logging out anyway
+        let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
+            .bind(parsed.id)
+            .execute(&state.pool)
+            .await;
+    }
+
     (
         StatusCode::OK,
         [(

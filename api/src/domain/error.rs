@@ -122,8 +122,8 @@ impl IntoResponse for ApiError {
             ),
             ApiError::TooManyRequests => (
                 StatusCode::TOO_MANY_REQUESTS,
-                "anonymous_attempt_rate_limited",
-                "rate limit exceeded for anonymous attempts".to_string(),
+                "rate_limited",
+                "rate limit exceeded".to_string(),
                 None,
             ),
             ApiError::QuotaExceeded { kind, limit, usage } => (
