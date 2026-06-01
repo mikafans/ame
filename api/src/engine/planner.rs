@@ -1,4 +1,4 @@
-//! Quiz planning.
+//! Assessment planning.
 
 use std::str::FromStr;
 
@@ -13,8 +13,8 @@ use crate::domain::error::{ApiError, FieldError};
 use crate::domain::question::{McPayload, QuestionKind};
 use crate::domain::session::{PlanItem, QuestionPlan};
 
-pub const DEFAULT_QUIZ_COUNT: usize = 10;
-pub const MAX_QUIZ_COUNT: usize = 100;
+pub const DEFAULT_ASSESSMENT_COUNT: usize = 10;
+pub const MAX_ASSESSMENT_COUNT: usize = 100;
 pub const DEFAULT_EXCLUDE_RECENT_HOURS: i64 = 24;
 pub const DEFAULT_LOOKBACK_DAYS: i64 = 30;
 pub const PLAN_WEEKS: usize = 4;
@@ -177,7 +177,7 @@ impl TagsMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct QuizPlanRequest {
+pub struct AssessmentPlanRequest {
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
@@ -186,7 +186,7 @@ pub struct QuizPlanRequest {
     pub difficulty_min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub difficulty_max: Option<f64>,
-    #[serde(default = "default_quiz_count")]
+    #[serde(default = "default_assessment_count")]
     pub count: usize,
     #[serde(default = "default_exclude_recent_hours")]
     pub exclude_recent_hours: i64,
@@ -200,7 +200,7 @@ pub struct PlanWarning {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct QuizPlan {
+pub struct AssessmentPlan {
     pub question_plan: QuestionPlan,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warning: Option<PlanWarning>,
@@ -214,19 +214,19 @@ struct PlanCandidate {
     payload: serde_json::Value,
 }
 
-fn default_quiz_count() -> usize {
-    DEFAULT_QUIZ_COUNT
+fn default_assessment_count() -> usize {
+    DEFAULT_ASSESSMENT_COUNT
 }
 
 fn default_exclude_recent_hours() -> i64 {
     DEFAULT_EXCLUDE_RECENT_HOURS
 }
 
-pub async fn plan_quiz(
+pub async fn plan_assessment(
     pool: &PgPool,
     user_id: Uuid,
-    request: &QuizPlanRequest,
-) -> Result<QuizPlan, ApiError> {
+    request: &AssessmentPlanRequest,
+) -> Result<AssessmentPlan, ApiError> {
     validate_request(request)?;
 
     let tags = normalize_tags(&request.tags);
@@ -295,7 +295,7 @@ fn plan_from_candidates<R: rand::Rng + ?Sized>(
     mut candidates: Vec<PlanCandidate>,
     requested_count: usize,
     rng: &mut R,
-) -> Result<QuizPlan, ApiError> {
+) -> Result<AssessmentPlan, ApiError> {
     candidates.shuffle(rng);
     candidates.truncate(requested_count);
 
@@ -305,7 +305,7 @@ fn plan_from_candidates<R: rand::Rng + ?Sized>(
         .collect::<Result<Vec<_>, ApiError>>()?;
     let planned = items.len();
 
-    Ok(QuizPlan {
+    Ok(AssessmentPlan {
         question_plan: QuestionPlan { items },
         warning: (planned < requested_count).then(|| PlanWarning {
             requested: requested_count,
@@ -350,12 +350,12 @@ fn normalize_tags(tags: &[String]) -> Vec<String> {
     normalized
 }
 
-fn validate_request(request: &QuizPlanRequest) -> Result<(), ApiError> {
+fn validate_request(request: &AssessmentPlanRequest) -> Result<(), ApiError> {
     let mut fields = Vec::new();
-    if request.count == 0 || request.count > MAX_QUIZ_COUNT {
+    if request.count == 0 || request.count > MAX_ASSESSMENT_COUNT {
         fields.push(FieldError {
             field: "count".to_string(),
-            message: format!("count must be between 1 and {MAX_QUIZ_COUNT}"),
+            message: format!("count must be between 1 and {MAX_ASSESSMENT_COUNT}"),
         });
     }
     if request.exclude_recent_hours < 0 {
@@ -447,14 +447,14 @@ mod tests {
 
     #[test]
     fn validate_rejects_empty_count() {
-        let err = validate_request(&QuizPlanRequest {
+        let err = validate_request(&AssessmentPlanRequest {
             count: 0,
-            ..QuizPlanRequest {
+            ..AssessmentPlanRequest {
                 tags: Vec::new(),
                 tags_mode: TagsMode::Any,
                 difficulty_min: None,
                 difficulty_max: None,
-                count: DEFAULT_QUIZ_COUNT,
+                count: DEFAULT_ASSESSMENT_COUNT,
                 exclude_recent_hours: DEFAULT_EXCLUDE_RECENT_HOURS,
             }
         })

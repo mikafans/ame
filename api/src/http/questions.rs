@@ -1,72 +1,58 @@
-//! Question HTTP routes.
-//!
-//! - `GET /questions`, `GET /questions/{id}` — open to any authenticated user
-//!   (including `agent:read-only`).
-//! - Writes (`POST`, `PATCH`, promote, archive) require the `human` or
-//!   `agent:write-questions` scope. This is the "either" gate spec'd in
-//!   §"Tokens & scopes" — agent:read-only must not be able to inflate the
-//!   bank.
-//! - `POST /questions` participates in the idempotency middleware (see the
-//!   parent router) so retried batch ingests don't double-insert.
+//! Question bank HTTP routes.
+
+use std::str::FromStr;
 
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    middleware,
-    response::{IntoResponse, Response},
     routing::{get, post},
 };
-use serde::Deserialize;
-use utoipa::{IntoParams, ToSchema};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::{
-        extractor::AuthenticatedUser,
-        scope::{RequireAnyScope, ScopeOneOf},
-    },
+    auth::scope::{RequireAnyScope, ScopeOneOf},
     bank::questions as repo,
     domain::{
-        error::{ApiError, FieldError},
-        question::{Question, QuestionStatus, QuestionVersion},
+        error::ApiError,
+        question::{Question, QuestionKind, QuestionStatus, QuestionVersion},
         user::Scope,
     },
-    http::{AppState, idempotency::idempotency_middleware},
+    http::AppState,
 };
 
-pub struct WriteQuestionScopes;
-impl ScopeOneOf for WriteQuestionScopes {
-    const SCOPES: &'static [Scope] = &[Scope::QuizWrite];
+pub struct QuestionReadScopes;
+impl ScopeOneOf for QuestionReadScopes {
+    const SCOPES: &'static [Scope] = &[Scope::AssessmentRead, Scope::Admin];
 }
 
-#[derive(Debug, Deserialize, IntoParams)]
+pub struct QuestionWriteScopes;
+impl ScopeOneOf for QuestionWriteScopes {
+    const SCOPES: &'static [Scope] = &[Scope::AssessmentWrite, Scope::Admin];
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListQuestionsQuery {
-    #[serde(default)]
     pub tag: Option<String>,
-    #[serde(default)]
     pub status: Option<QuestionStatus>,
-    #[serde(default)]
-    pub min_rating: Option<f64>,
-    #[serde(default)]
-    pub max_rating: Option<f64>,
-    #[serde(default)]
-    pub limit: Option<i64>,
-    #[serde(default)]
-    pub offset: Option<i64>,
-    #[serde(default)]
     pub search: Option<String>,
-    #[serde(default)]
     pub kind: Option<String>,
-    #[serde(default)]
-    pub page: Option<i64>,
-    #[serde(default)]
-    pub page_size: Option<i64>,
-    /// Keyset cursor from a prior response's `nextCursor`; when set, `page` is
-    /// ignored and the next rows after the cursor are returned.
-    #[serde(default)]
-    pub cursor: Option<String>,
+    pub min_rating: Option<f64>,
+    pub max_rating: Option<f64>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub after: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListQuestionsResponse {
+    pub questions: Vec<Question>,
+    pub total: i64,
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -74,105 +60,71 @@ pub struct CreateQuestionsBody {
     pub questions: Vec<repo::QuestionInsert>,
 }
 
-#[derive(Debug, serde::Serialize, ToSchema)]
-pub struct QuestionListResponse {
-    pub questions: Vec<Question>,
-}
-
-#[derive(Debug, serde::Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct QuestionBankListResponse {
-    pub questions: Vec<repo::QuestionRow>,
-    pub total: i64,
-    /// Cursor to fetch the next page via `?cursor=`; null when there are no
-    /// more rows or the query used an ordering that doesn't support keyset.
-    pub next_cursor: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize, ToSchema)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CreateQuestionsResponse {
     pub questions: Vec<Question>,
-}
-
-#[derive(Debug, serde::Serialize, ToSchema)]
-pub struct QuestionVersionsResponse {
-    pub versions: Vec<QuestionVersion>,
 }
 
 #[utoipa::path(
     get,
     path = "/v1/questions",
-    params(ListQuestionsQuery),
-    responses(
-        (status = 200, description = "Filtered list of questions", body = QuestionListResponse),
-        (status = 401, description = "Missing or invalid token"),
+    params(
+        ("tag" = Option<String>, Query, description = "Filter by tag name"),
+        ("status" = Option<String>, Query, description = "Filter by status (draft, live, archived)"),
+        ("search" = Option<String>, Query, description = "Partial match on prompt"),
+        ("kind" = Option<String>, Query, description = "Filter by question kind"),
+        ("after" = Option<String>, Query, description = "Pagination cursor"),
     ),
-    security(("bearer_auth" = []))
+    responses(
+        (status = 200, description = "Question list", body = ListQuestionsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn list_questions(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    auth: RequireAnyScope<QuestionReadScopes>,
     Query(q): Query<ListQuestionsQuery>,
-) -> Result<Response, ApiError> {
-    // If using new pagination params (page/pageSize/search/kind/cursor), use
-    // list_questions_paged.
-    if q.page.is_some()
-        || q.page_size.is_some()
-        || q.search.is_some()
-        || q.kind.is_some()
-        || q.cursor.is_some()
-    {
-        // A keyset cursor seeks past a position, so it supersedes page/offset.
-        let after = match q.cursor.as_deref() {
-            Some(c) => Some(repo::decode_cursor(c).ok_or_else(|| {
-                ApiError::Validation(vec![FieldError {
-                    field: "cursor".into(),
-                    message: "malformed cursor".into(),
-                }])
-            })?),
-            None => None,
-        };
-        let page = q.page.unwrap_or(1).max(1);
-        let page_size = q.page_size.unwrap_or(25).clamp(1, 200);
-        let offset = if after.is_some() {
-            0
-        } else {
-            (page - 1) * page_size
-        };
+) -> Result<Json<ListQuestionsResponse>, ApiError> {
+    let kind = q.kind.and_then(|k| QuestionKind::from_str(&k).ok());
 
-        let filter = repo::QuestionFilter {
-            tag: q.tag,
-            status: q.status,
-            min_rating: q.min_rating,
-            max_rating: q.max_rating,
-            limit: page_size,
-            offset,
-            search: q.search,
-            kind: q.kind,
-        };
+    // Filter by owner unless admin
+    let created_by = if auth.0.user.role == crate::domain::user::Role::Admin {
+        None
+    } else {
+        Some(auth.0.owner_id)
+    };
 
-        let paged = repo::list_questions_paged(&state.pool, &filter, after).await?;
-        return Ok(Json(QuestionBankListResponse {
-            questions: paged.rows,
-            total: paged.total,
-            next_cursor: paged.next_cursor,
-        })
-        .into_response());
-    }
-
-    // Fall back to old API for backward compatibility
     let filter = repo::QuestionFilter {
         tag: q.tag,
         status: q.status,
+        search: q.search,
+        kind,
         min_rating: q.min_rating,
         max_rating: q.max_rating,
-        limit: q.limit.unwrap_or(50),
-        offset: q.offset.unwrap_or(0),
-        search: None,
-        kind: None,
+        limit: q.limit,
+        offset: q.offset,
+        created_by,
     };
-    let questions = repo::list_questions(&state.pool, &filter).await?;
-    Ok(Json(QuestionListResponse { questions }).into_response())
+
+    let after = match q.after {
+        Some(c) => Some(repo::decode_cursor(&c).ok_or_else(|| {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "after".into(),
+                message: "invalid cursor format".into(),
+            }])
+        })?),
+        None => None,
+    };
+
+    let paged = repo::list_questions_paged(&state.pool, &filter, after).await?;
+
+    Ok(Json(ListQuestionsResponse {
+        questions: paged.rows,
+        total: paged.total,
+        next_cursor: paged.next_cursor,
+    }))
 }
 
 #[utoipa::path(
@@ -180,14 +132,15 @@ pub async fn list_questions(
     path = "/v1/questions/{id}",
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
-        (status = 200, description = "Question by id", body = Question),
-        (status = 404, description = "No such question"),
+        (status = 200, description = "Question details", body = Question),
+        (status = 404, description = "Question not found"),
     ),
-    security(("bearer_auth" = []))
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn get_question(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
     let question = repo::get_question(&state.pool, id)
@@ -195,6 +148,16 @@ pub async fn get_question(
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
+
+    // Check ownership if not admin
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     Ok(Json(question))
 }
 
@@ -203,25 +166,34 @@ pub async fn get_question(
     path = "/v1/questions/{id}/versions",
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
-        (status = 200, description = "Historical versions, newest first", body = QuestionVersionsResponse),
-        (status = 404, description = "No such question"),
+        (status = 200, description = "Question history", body = Vec<QuestionVersion>),
+        (status = 404, description = "Question not found"),
     ),
-    security(("bearer_auth" = []))
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn list_versions(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
-) -> Result<Json<QuestionVersionsResponse>, ApiError> {
-    // Confirm the parent exists so callers get a 404 instead of an empty list
-    // for a non-existent id.
-    if repo::get_question(&state.pool, id).await?.is_none() {
+) -> Result<Json<Vec<QuestionVersion>>, ApiError> {
+    let _question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    // Check ownership if not admin
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+    {
         return Err(ApiError::NotFound {
             resource: "question",
         });
     }
-    let versions = repo::list_question_versions(&state.pool, id).await?;
-    Ok(Json(QuestionVersionsResponse { versions }))
+
+    let versions = repo::get_question_versions(&state.pool, id).await?;
+    Ok(Json(versions))
 }
 
 #[utoipa::path(
@@ -229,26 +201,19 @@ pub async fn list_versions(
     path = "/v1/questions",
     request_body = CreateQuestionsBody,
     responses(
-        (status = 201, description = "Batch of created questions", body = CreateQuestionsResponse),
-        (status = 401, description = "Missing or invalid token"),
-        (status = 403, description = "Token lacks required scope"),
+        (status = 201, description = "Questions created", body = CreateQuestionsResponse),
+        (status = 401, description = "Unauthorized"),
         (status = 422, description = "Validation failed"),
-        (status = 409, description = "Idempotency key conflict"),
     ),
-    security(("bearer_auth" = []))
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn create_questions(
     State(state): State<AppState>,
-    user: RequireAnyScope<WriteQuestionScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Json(body): Json<CreateQuestionsBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    if body.questions.is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "questions".into(),
-            message: "must contain at least one question".into(),
-        }]));
-    }
-    let questions = repo::create_questions(&state.pool, user.0.user.id, body.questions).await?;
+) -> Result<(StatusCode, Json<CreateQuestionsResponse>), ApiError> {
+    let questions = repo::create_questions(&state.pool, auth.0.user.id, body.questions).await?;
     Ok((
         StatusCode::CREATED,
         Json(CreateQuestionsResponse { questions }),
@@ -261,20 +226,33 @@ pub async fn create_questions(
     params(("id" = Uuid, Path, description = "Question id")),
     request_body = repo::QuestionPatch,
     responses(
-        (status = 200, description = "Updated question", body = Question),
-        (status = 401, description = "Missing or invalid token"),
-        (status = 403, description = "Token lacks required scope"),
-        (status = 404, description = "No such question"),
-        (status = 422, description = "Cannot edit archived question"),
+        (status = 200, description = "Question updated", body = Question),
+        (status = 404, description = "Question not found"),
+        (status = 422, description = "Validation failed"),
     ),
-    security(("bearer_auth" = []))
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn update_question(
     State(state): State<AppState>,
-    _user: RequireAnyScope<WriteQuestionScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
     Json(patch): Json<repo::QuestionPatch>,
 ) -> Result<Json<Question>, ApiError> {
+    let _question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     let updated = repo::update_question(&state.pool, id, patch).await?;
     Ok(Json(updated))
 }
@@ -285,15 +263,30 @@ pub async fn update_question(
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
         (status = 200, description = "Question promoted to live", body = Question),
-        (status = 404, description = "No such question"),
+        (status = 404, description = "Question not found"),
     ),
-    security(("bearer_auth" = []))
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn promote_question(
     State(state): State<AppState>,
-    _user: RequireAnyScope<WriteQuestionScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
+    let _question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     Ok(Json(repo::promote_question(&state.pool, id).await?))
 }
 
@@ -303,38 +296,42 @@ pub async fn promote_question(
     params(("id" = Uuid, Path, description = "Question id")),
     responses(
         (status = 200, description = "Question archived", body = Question),
-        (status = 404, description = "No such question"),
+        (status = 404, description = "Question not found"),
     ),
-    security(("bearer_auth" = []))
+    security(("bearer" = [])),
+    tag = "questions"
 )]
 pub async fn archive_question(
     State(state): State<AppState>,
-    _user: RequireAnyScope<WriteQuestionScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
+    let _question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     Ok(Json(repo::archive_question(&state.pool, id).await?))
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
-    // POST /questions runs under the idempotency middleware so retried batch
-    // ingests don't double-insert; the other routes don't accept the header
-    // and don't need it.
-    let create_only = Router::new()
-        .route("/v1/questions", post(create_questions))
-        .route_layer(middleware::from_fn_with_state(
-            state.clone(),
-            idempotency_middleware,
-        ));
-
-    let rest = Router::new()
-        .route("/v1/questions", get(list_questions))
+    Router::new()
+        .route("/v1/questions", get(list_questions).post(create_questions))
         .route(
             "/v1/questions/{id}",
             get(get_question).patch(update_question),
         )
         .route("/v1/questions/{id}/versions", get(list_versions))
         .route("/v1/questions/{id}/promote", post(promote_question))
-        .route("/v1/questions/{id}/archive", post(archive_question));
-
-    create_only.merge(rest).with_state(state)
+        .route("/v1/questions/{id}/archive", post(archive_question))
+        .with_state(state)
 }

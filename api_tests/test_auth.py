@@ -1,7 +1,7 @@
 def test_register_creates_agent(client):
     resp = client.post("/v1/agents/register", json={
         "label": "test-agent",
-        "scopes": ["quiz.read"],
+        "scopes": ["assessment.read"],
     })
     assert resp.status_code == 201
     body = resp.json()

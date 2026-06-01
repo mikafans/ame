@@ -20,22 +20,6 @@ import { useTheme } from "@mui/material/styles";
 import { useAuth } from "@/hooks/useAuth";
 
 type TabId = "signup" | "login";
-type Role = "learner" | "instructor";
-
-const ROLES: { id: Role; label: string; color: string; desc: string }[] = [
-  {
-    id: "learner",
-    label: "Learner",
-    color: "#22c55e",
-    desc: "Take quizzes, track scores, build a progress history. Adaptive difficulty adjusts to your level over time.",
-  },
-  {
-    id: "instructor",
-    label: "Instructor",
-    color: "#f59e0b",
-    desc: "Author quizzes with a point-per-question rubric, manage cohorts, and review graded attempts.",
-  },
-];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,11 +32,14 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("learner");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ??
+    (typeof window !== "undefined"
+      ? `http://${window.location.hostname}:28080`
+      : "http://localhost:28080");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,7 +52,7 @@ export default function LoginPage() {
           : `${apiUrl}/v1/auth/login`;
       const body =
         tab === "signup"
-          ? { email, name: fullName, password, role }
+          ? { email, name: fullName, password, role: "user" }
           : { email, password };
       const response = await fetch(endpoint, {
         method: "POST",
@@ -185,50 +172,9 @@ export default function LoginPage() {
         <Typography
           sx={{ fontSize: 13, color: subColor, lineHeight: 1.65, mb: 4 }}
         >
-          A structured quiz engine with a real API. Every quiz, attempt, and
-          rubric is typed, documented, and queryable.
+          A structured assessment engine with a real API. Every assessment,
+          attempt, and rubric is typed, documented, and queryable.
         </Typography>
-
-        {/* Role cards */}
-        <Box
-          sx={{ display: "flex", flexDirection: "column", gap: 1.25, mb: 3 }}
-        >
-          {ROLES.map((r) => (
-            <Box
-              key={r.id}
-              sx={{
-                border: cardBorder,
-                borderRadius: 2,
-                p: "12px 16px",
-                background: cardBg,
-                display: "flex",
-                gap: 1.5,
-                alignItems: "flex-start",
-              }}
-            >
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: r.color,
-                  flexShrink: 0,
-                  mt: "5px",
-                }}
-              />
-              <Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 600, mb: 0.25 }}>
-                  {r.label}
-                </Typography>
-                <Typography
-                  sx={{ fontSize: 12, color: subColor, lineHeight: 1.5 }}
-                >
-                  {r.desc}
-                </Typography>
-              </Box>
-            </Box>
-          ))}
-        </Box>
 
         {/* Agent block */}
         <Box
@@ -264,8 +210,9 @@ export default function LoginPage() {
               wordBreak: "break-word",
             }}
           >
-            {`curl -X POST $API/v1/agents/register \\
-  -d '{"accessCode":"…","scopes":["quiz.read"]}'`}
+            {`curl -X POST $API/v1/me/agents \\
+  -H 'Authorization: Bearer <token>' \\
+  -d '{"label":"my-agent","scopes":["assessment.read"]}'`}
           </Box>
           <Typography
             sx={{
@@ -275,9 +222,8 @@ export default function LoginPage() {
               lineHeight: 1.5,
             }}
           >
-            Returns an API key plus the OpenAPI 3.1 schema and skill manifest
-            URLs. Requires an access code from the operator and at least one
-            scope.
+            Returns an API key scoped to your account. Sign in first, then
+            create agents via your account settings.
           </Typography>
         </Box>
 
@@ -362,36 +308,6 @@ export default function LoginPage() {
               size="small"
             />
 
-            {tab === "signup" && (
-              <Box>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1 }}
-                >
-                  Role
-                </Typography>
-                <Grid container spacing={1} sx={{ mb: 0.5 }}>
-                  {ROLES.map((r) => (
-                    <Grid size={6} key={r.id}>
-                      <Button
-                        fullWidth
-                        variant={role === r.id ? "contained" : "outlined"}
-                        size="small"
-                        onClick={() => setRole(r.id)}
-                        sx={{ textTransform: "capitalize" }}
-                      >
-                        {r.label}
-                      </Button>
-                    </Grid>
-                  ))}
-                </Grid>
-                <Typography variant="caption" color="text.secondary">
-                  {ROLES.find((r) => r.id === role)?.desc}
-                </Typography>
-              </Box>
-            )}
-
             {error && <Alert severity="error">{error}</Alert>}
 
             <Button
@@ -427,13 +343,14 @@ export default function LoginPage() {
             </Typography>
             <Typography variant="caption" color="text.secondary">
               <Chip
-                label="POST /v1/agents/register"
+                label="POST /v1/me/agents"
                 size="small"
                 variant="outlined"
                 sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
               />
-              returns a key, schema &amp; skill manifest. Needs an operator
-              access code and a scope list.
+              Create an account, then generate API keys via{" "}
+              <b>Account Settings</b> to programmatically interact with
+              assessments, attempts, and stats.
             </Typography>
           </Box>
         </Box>

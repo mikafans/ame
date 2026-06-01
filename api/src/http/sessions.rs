@@ -47,9 +47,7 @@ impl ScopeOneOf for SessionWriteScopes {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionBody {
     #[serde(default)]
-    pub quiz_id: Option<Uuid>,
-    #[serde(default)]
-    pub exam_id: Option<Uuid>,
+    pub assessment_id: Option<Uuid>,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
@@ -84,8 +82,6 @@ pub struct GetSessionQuestion {
     pub explanation: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_snippet: Option<serde_json::Value>,
-    /// Grading language for code questions (from the question payload), so the
-    /// client submits a `Code` response whose language matches the grader.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -156,15 +152,35 @@ struct PlannedQuestion {
 )]
 pub async fn create_session(
     State(state): State<AppState>,
-    user: RequireAnyScope<SessionWriteScopes>,
+    auth: AuthenticatedUser,
     Json(body): Json<CreateSessionBody>,
 ) -> Result<impl IntoResponse, ApiError> {
+    if !auth.token_scopes.contains(&Scope::AttemptWrite)
+        && !auth.token_scopes.contains(&Scope::Admin)
+    {
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "attempt.write",
+        )));
+    }
+
+    if let Some(assessment_id) = body.assessment_id {
+        let _row = sqlx::query("SELECT status, created_by FROM tb_assessments WHERE id = $1")
+            .bind(assessment_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?
+            .ok_or(ApiError::NotFound {
+                resource: "assessment",
+            })?;
+    }
+
     let CreatePlan {
         kind,
         filter,
         questions,
         affects_rating: ar_override,
-    } = build_plan(&state.pool, user.0.user.id, &body).await?;
+    } = build_plan(&state.pool, auth.user.id, &body).await?;
+
     let question_plan = QuestionPlan {
         items: questions
             .iter()
@@ -178,10 +194,9 @@ pub async fn create_session(
     };
     let started_at = OffsetDateTime::now_utc();
     let session = start_session(StartSessionInput {
-        user_id: user.0.user.id,
+        user_id: auth.user.id,
         kind,
-        quiz_id: body.quiz_id,
-        exam_id: body.exam_id,
+        assessment_id: body.assessment_id,
         filter,
         question_plan,
         affects_rating: ar_override.unwrap_or(kind != SessionKind::Exam),
@@ -222,14 +237,14 @@ pub async fn get_session(
     let attempts = list_session_attempts(&state.pool, session.id).await?;
     let questions = hydrate_session_questions(&state.pool, &session).await?;
 
-    if let Some(qid) = session.quiz_id {
-        let row = sqlx::query("SELECT title, course FROM tb_quizzes WHERE id = $1")
-            .bind(qid)
+    if let Some(aid) = session.assessment_id {
+        let row = sqlx::query("SELECT title, course FROM tb_assessments WHERE id = $1")
+            .bind(aid)
             .fetch_optional(&state.pool)
             .await
             .map_err(internal)?;
         if let Some(r) = row {
-            session.quiz_title = r.try_get("title").ok();
+            session.assessment_title = r.try_get("title").ok();
             session.course_title = r.try_get("course").ok();
         }
     }
@@ -265,7 +280,6 @@ async fn hydrate_session_questions(
     .await
     .map_err(internal)?;
 
-    // preserve plan order
     let mut by_id: std::collections::HashMap<Uuid, _> = rows
         .into_iter()
         .map(|r| (r.get::<Uuid, _>("id"), r))
@@ -462,11 +476,8 @@ async fn build_plan(
     user_id: Uuid,
     body: &CreateSessionBody,
 ) -> Result<CreatePlan, ApiError> {
-    if let Some(quiz_id) = body.quiz_id {
-        return build_quiz_plan(pool, quiz_id).await;
-    }
-    if let Some(exam_id) = body.exam_id {
-        return build_exam_plan(pool, exam_id).await;
+    if let Some(assessment_id) = body.assessment_id {
+        return build_assessment_plan(pool, assessment_id).await;
     }
 
     let count = body.count.unwrap_or(10).clamp(1, 100);
@@ -547,30 +558,44 @@ async fn build_plan(
     })
 }
 
-async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, ApiError> {
-    sqlx::query("SELECT id FROM tb_quizzes WHERE id = $1 AND status = 'active'")
-        .bind(quiz_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(internal)?
-        .ok_or(ApiError::NotFound { resource: "quiz" })?;
+async fn build_assessment_plan(pool: &PgPool, assessment_id: Uuid) -> Result<CreatePlan, ApiError> {
+    let row = sqlx::query(
+        "SELECT mode, affects_rating FROM tb_assessments WHERE id = $1 AND status = 'active'",
+    )
+    .bind(assessment_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(internal)?
+    .ok_or(ApiError::NotFound {
+        resource: "assessment",
+    })?;
+
+    let mode_str: String = row.get("mode");
+    let affects_rating: bool = row.get("affects_rating");
+    let kind = match mode_str.as_str() {
+        "practice" => SessionKind::Practice,
+        "graded" => SessionKind::Exam,
+        _ => SessionKind::Practice,
+    };
 
     let rows = sqlx::query(
-        "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM tb_quiz_questions qq \
-         JOIN tb_questions q ON q.id = qq.question_id \
-         WHERE qq.quiz_id = $1 AND q.status = 'live' \
-         ORDER BY qq.order_index ASC",
+        "SELECT q.id, q.kind, q.prompt, q.payload, q.version, \
+                COALESCE(ai.points_override, q.points) AS points \
+         FROM tb_assessment_sections sec \
+         JOIN tb_assessment_items ai ON ai.section_id = sec.id \
+         JOIN tb_questions q ON q.id = ai.question_id \
+         WHERE sec.assessment_id = $1 AND q.status = 'live' \
+         ORDER BY sec.order_index ASC, ai.order_index ASC",
     )
-    .bind(quiz_id)
+    .bind(assessment_id)
     .fetch_all(pool)
     .await
     .map_err(internal)?;
 
     if rows.is_empty() {
         return Err(ApiError::Validation(vec![FieldError {
-            field: "quizId".to_string(),
-            message: "quiz has no live questions".to_string(),
+            field: "assessmentId".to_string(),
+            message: "assessment has no live questions".to_string(),
         }]));
     }
 
@@ -596,97 +621,7 @@ async fn build_quiz_plan(pool: &PgPool, quiz_id: Uuid) -> Result<CreatePlan, Api
     }
 
     Ok(CreatePlan {
-        kind: SessionKind::Quiz,
-        filter: None,
-        questions,
-        affects_rating: None,
-    })
-}
-
-async fn build_exam_plan(pool: &PgPool, exam_id: Uuid) -> Result<CreatePlan, ApiError> {
-    let exam_row = sqlx::query(
-        "SELECT id, affects_rating FROM tb_exams WHERE id = $1 AND status = 'published'",
-    )
-    .bind(exam_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(internal)?
-    .ok_or(ApiError::NotFound { resource: "exam" })?;
-
-    let affects_rating: bool = exam_row.get("affects_rating");
-
-    let section_rows = sqlx::query(
-        "SELECT question_ids, order_index FROM tb_exam_sections \
-         WHERE exam_id = $1 ORDER BY order_index ASC",
-    )
-    .bind(exam_id)
-    .fetch_all(pool)
-    .await
-    .map_err(internal)?;
-
-    if section_rows.is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "examId".to_string(),
-            message: "exam has no sections".to_string(),
-        }]));
-    }
-
-    // Collect all question_ids across sections in order
-    let mut all_ids: Vec<Uuid> = Vec::new();
-    for row in &section_rows {
-        let ids: Option<Vec<Uuid>> = row.get("question_ids");
-        if let Some(ids) = ids {
-            all_ids.extend(ids);
-        }
-    }
-
-    if all_ids.is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "examId".to_string(),
-            message: "exam sections contain no questions".to_string(),
-        }]));
-    }
-
-    let q_rows = sqlx::query(
-        "SELECT q.id, q.kind, q.prompt, q.payload, q.version, q.points \
-         FROM tb_questions q WHERE q.id = ANY($1::uuid[]) AND q.status = 'live'",
-    )
-    .bind(&all_ids)
-    .fetch_all(pool)
-    .await
-    .map_err(internal)?;
-
-    // Build ordered questions matching all_ids order
-    let q_map: std::collections::HashMap<Uuid, _> = q_rows
-        .into_iter()
-        .map(|r| (r.get::<Uuid, _>("id"), r))
-        .collect();
-
-    let mut questions = Vec::new();
-    for id in &all_ids {
-        let row = q_map.get(id).ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-        let kind_str: String = row.get("kind");
-        let kind = QuestionKind::from_str(&kind_str)
-            .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid kind in DB: {e}")))?;
-        let payload: serde_json::Value = row.get("payload");
-        let option_order = option_order(kind, &payload)?;
-        questions.push(PlannedQuestion {
-            question: SessionQuestion {
-                id: *id,
-                kind,
-                prompt: row.get("prompt"),
-                version: row.get("version"),
-                points: row.get("points"),
-                payload,
-                option_order,
-            },
-        });
-    }
-
-    Ok(CreatePlan {
-        kind: SessionKind::Exam,
+        kind,
         filter: None,
         questions,
         affects_rating: Some(affects_rating),
@@ -713,15 +648,14 @@ fn option_order(
 async fn insert_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
     sqlx::query(
         "INSERT INTO tb_sessions \
-         (id, user_id, kind, quiz_id, exam_id, filter, question_plan, status, affects_rating, \
+         (id, user_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
           rating_snapshot, result, deadline_at, started_at, finished_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
     )
     .bind(session.id)
     .bind(session.user_id)
     .bind(session.kind.as_str())
-    .bind(session.quiz_id)
-    .bind(session.exam_id)
+    .bind(session.assessment_id)
     .bind(&session.filter)
     .bind(serde_json::to_value(&session.question_plan).map_err(anyhow::Error::from)?)
     .bind(session.status.as_str())
@@ -739,7 +673,7 @@ async fn insert_session(pool: &PgPool, session: &Session) -> Result<(), ApiError
 
 async fn get_owned_session(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<Session, ApiError> {
     let row = sqlx::query(
-        "SELECT id, user_id, kind, quiz_id, exam_id, filter, question_plan, status, affects_rating, \
+        "SELECT id, user_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
                 rating_snapshot, result, deadline_at, started_at, finished_at \
          FROM tb_sessions WHERE id = $1 AND user_id = $2",
     )
@@ -765,8 +699,7 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
         user_id: row.get("user_id"),
         kind: SessionKind::from_str(&kind_str)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid session kind: {e}")))?,
-        quiz_id: row.get("quiz_id"),
-        exam_id: row.get("exam_id"),
+        assessment_id: row.get("assessment_id"),
         filter: row.get("filter"),
         question_plan: serde_json::from_value(question_plan).map_err(anyhow::Error::from)?,
         status: SessionStatus::from_str(&status_str)
@@ -777,7 +710,7 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
         deadline_at: row.get("deadline_at"),
         started_at: row.get("started_at"),
         finished_at: row.get("finished_at"),
-        quiz_title: None,
+        assessment_title: None,
         course_title: None,
     })
 }
@@ -858,7 +791,7 @@ async fn existing_attempts_by_question(
 async fn list_session_attempts(pool: &PgPool, session_id: Uuid) -> Result<Vec<Attempt>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, user_id, question_id, question_version, session_id, response, presentation, \
-                is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
+                is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
                 rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
                 created_at \
          FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
@@ -886,6 +819,7 @@ fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
         is_correct: row.get("is_correct"),
         score: row.get("score"),
         grade_status: row.get("grade_status"),
+        correct_answer: row.get("correct_answer"),
         grader_notes: row.get("grader_notes"),
         time_to_answer_ms: row.get("time_to_answer_ms"),
         rating_before_user_avg: row.get("rating_before_user_avg"),
@@ -901,9 +835,9 @@ async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), Ap
     sqlx::query(
         "INSERT INTO tb_attempts \
          (id, user_id, question_id, question_version, session_id, response, presentation, \
-          is_correct, score, grade_status, time_to_answer_ms, rating_before_user_avg, \
+          is_correct, score, grade_status, correct_answer, time_to_answer_ms, rating_before_user_avg, \
           rating_before_question, user_tag_deltas, question_delta, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
     )
     .bind(attempt.id)
     .bind(attempt.user_id)
@@ -915,6 +849,7 @@ async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), Ap
     .bind(attempt.is_correct)
     .bind(attempt.score)
     .bind(&attempt.grade_status)
+    .bind(&outcome.grade.correct_answer)
     .bind(attempt.time_to_answer_ms)
     .bind(attempt.rating_before_user_avg)
     .bind(attempt.rating_before_question)
@@ -1046,7 +981,7 @@ pub struct PendingAttemptRow {
     path = "/v1/attempts/pending",
     responses(
         (status = 200, description = "Pending manual attempts", body = Vec<PendingAttemptRow>),
-        (status = 403, description = "Not instructor or admin"),
+        (status = 401, description = "Agent role not allowed"),
     ),
     security(("bearer_auth" = []))
 )]
@@ -1054,8 +989,8 @@ pub async fn list_pending_attempts(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<PendingAttemptRow>>, ApiError> {
-    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
-        return Err(ApiError::ScopeRequired("instructor"));
+    if matches!(user.user.role, Role::Agent) {
+        return Err(ApiError::Unauthorized);
     }
 
     let rows = sqlx::query(
@@ -1112,7 +1047,7 @@ pub struct GradeAttemptBody {
     request_body = GradeAttemptBody,
     responses(
         (status = 200, description = "Graded attempt", body = Attempt),
-        (status = 403, description = "Not instructor or admin"),
+        (status = 401, description = "Agent role not allowed"),
         (status = 404, description = "No such attempt"),
         (status = 409, description = "Attempt is not pending manual grading"),
         (status = 422, description = "Validation failed"),
@@ -1125,8 +1060,8 @@ pub async fn grade_attempt(
     Path(id): Path<Uuid>,
     Json(body): Json<GradeAttemptBody>,
 ) -> Result<Json<Attempt>, ApiError> {
-    if !matches!(user.user.role, Role::Instructor | Role::Admin) {
-        return Err(ApiError::ScopeRequired("instructor"));
+    if matches!(user.user.role, Role::Agent) {
+        return Err(ApiError::Unauthorized);
     }
 
     if body.score < 0.0 || body.score > 1.0 {
@@ -1158,7 +1093,7 @@ pub async fn grade_attempt(
          SET score = $2, is_correct = ($2 > 0), grade_status = 'graded', grader_notes = $3 \
          WHERE id = $1 \
          RETURNING id, user_id, question_id, question_version, session_id, response, presentation, \
-                   is_correct, score, grade_status, grader_notes, time_to_answer_ms, \
+                   is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
                    rating_before_user_avg, rating_before_question, user_tag_deltas, \
                    question_delta, created_at",
     )
@@ -1176,12 +1111,9 @@ pub async fn grade_attempt(
 #[serde(rename_all = "camelCase")]
 pub struct ListMySessionsQuery {
     #[serde(default)]
-    pub quiz_id: Option<Uuid>,
-    #[serde(default)]
-    pub exam_id: Option<Uuid>,
+    pub assessment_id: Option<Uuid>,
 }
 
-/// One row in a learner's attempt history.
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
@@ -1189,11 +1121,9 @@ pub struct SessionSummary {
     pub kind: String,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub quiz_id: Option<Uuid>,
+    pub assessment_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exam_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub quiz_title: Option<String>,
+    pub assessment_title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub points_awarded: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1207,9 +1137,7 @@ pub struct SessionSummary {
     )]
     #[schema(value_type = Option<String>, format = DateTime)]
     pub finished_at: Option<OffsetDateTime>,
-    /// 1-based position of this attempt within its quiz/exam (chronological).
     pub attempt_number: i64,
-    /// Total finished attempts the learner has for the same quiz/exam.
     pub total_attempts: i64,
 }
 
@@ -1219,13 +1147,13 @@ pub struct ListMySessionsResponse {
     pub sessions: Vec<SessionSummary>,
 }
 
-/// GET /v1/sessions — the caller's finished attempt history, newest first.
 #[utoipa::path(
     get,
     path = "/v1/sessions",
     params(
-        ("quizId" = Option<Uuid>, Query, description = "Filter by quiz"),
-        ("examId" = Option<Uuid>, Query, description = "Filter by exam"),
+        ("assessmentId" = Option<Uuid>, Query, description = "Filter by assessment"),
+        ("assessmentId" = Option<Uuid>, Query, description = "Filter by quiz (legacy)"),
+        ("examId" = Option<Uuid>, Query, description = "Filter by exam (legacy)"),
     ),
     responses(
         (status = 200, description = "Attempt history", body = ListMySessionsResponse),
@@ -1238,35 +1166,28 @@ pub async fn list_my_sessions(
     user: AuthenticatedUser,
     Query(q): Query<ListMySessionsQuery>,
 ) -> Result<Json<ListMySessionsResponse>, ApiError> {
-    // Finished sessions only — in-progress/abandoned ones aren't "results".
-    // Oldest first so we can number attempts chronologically, then reverse.
     let rows = sqlx::query(
-        "SELECT s.id, s.kind, s.status, s.quiz_id, s.exam_id, s.result, \
-                s.started_at, s.finished_at, q.title AS quiz_title \
+        "SELECT s.id, s.kind, s.status, s.assessment_id, s.result, \
+                s.started_at, s.finished_at, a.title AS assessment_title \
          FROM tb_sessions s \
-         LEFT JOIN tb_quizzes q ON q.id = s.quiz_id \
+         LEFT JOIN tb_assessments a ON a.id = s.assessment_id \
          WHERE s.user_id = $1 AND s.status = 'finished' \
-           AND ($2::uuid IS NULL OR s.quiz_id = $2) \
-           AND ($3::uuid IS NULL OR s.exam_id = $3) \
+           AND ($2::uuid IS NULL OR s.assessment_id = $2) \
          ORDER BY s.started_at ASC",
     )
     .bind(user.user.id)
-    .bind(q.quiz_id)
-    .bind(q.exam_id)
+    .bind(q.assessment_id)
     .fetch_all(&state.pool)
     .await
     .map_err(internal)?;
 
-    // Number attempts per quiz/exam, and count totals per group.
     let mut seen: HashMap<Uuid, i64> = HashMap::new();
     let mut totals: HashMap<Uuid, i64> = HashMap::new();
     let mut summaries: Vec<SessionSummary> = rows
         .into_iter()
         .map(|r| {
-            let quiz_id: Option<Uuid> = r.get("quiz_id");
-            let exam_id: Option<Uuid> = r.get("exam_id");
-            // Group by whichever owns the attempt; quiz takes precedence.
-            let group = quiz_id.or(exam_id).unwrap_or(Uuid::nil());
+            let assessment_id: Option<Uuid> = r.get("assessment_id");
+            let group = assessment_id.unwrap_or(Uuid::nil());
             let n = seen.entry(group).or_insert(0);
             *n += 1;
             let attempt_number = *n;
@@ -1288,15 +1209,14 @@ pub async fn list_my_sessions(
                     id: r.get("id"),
                     kind: r.get("kind"),
                     status: r.get("status"),
-                    quiz_id,
-                    exam_id,
-                    quiz_title: r.try_get("quiz_title").ok(),
+                    assessment_id,
+                    assessment_title: r.try_get("assessment_title").ok(),
                     points_awarded,
                     max_points,
                     started_at: r.get("started_at"),
                     finished_at: r.get("finished_at"),
                     attempt_number,
-                    total_attempts: 0, // backfilled below
+                    total_attempts: 0,
                 },
             )
         })
@@ -1308,7 +1228,6 @@ pub async fn list_my_sessions(
         })
         .collect();
 
-    // Newest first for display.
     summaries.reverse();
     Ok(Json(ListMySessionsResponse {
         sessions: summaries,

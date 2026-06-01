@@ -41,7 +41,7 @@ __pycache__/
 .agents/sessions/
 
 # Local agent CLI scratch (not part of repo)
-.antigravitycli/api/.env
+.antigravitycli/
 .tmp/
 .claude/
 .playwright-cli

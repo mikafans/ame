@@ -27,8 +27,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL =
   typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080")
-    : "http://localhost:8080";
+    ? (process.env.NEXT_PUBLIC_API_URL ??
+      `http://${window.location.hostname}:28080`)
+    : "http://localhost:28080";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

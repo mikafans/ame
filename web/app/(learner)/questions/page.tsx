@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import { tagColor } from "@/lib/tagColor";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -20,7 +21,15 @@ import TableRow from "@mui/material/TableRow";
 import Chip from "@mui/material/Chip";
 import Pagination from "@mui/material/Pagination";
 import Skeleton from "@mui/material/Skeleton";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
+import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
 interface Question {
   id: string;
@@ -29,6 +38,11 @@ interface Question {
   points: number;
   status: string;
   tags: string[];
+}
+
+interface QuestionDetail extends Question {
+  payload: Record<string, unknown>;
+  explanation: string | null;
 }
 
 interface Tag {
@@ -70,6 +84,11 @@ export default function QuestionsPage() {
   const [total, setTotal] = useState(0);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
+  const [previewRow, setPreviewRow] = useState<Question | null>(null);
+  const [previewDetail, setPreviewDetail] = useState<QuestionDetail | null>(
+    null,
+  );
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -115,7 +134,7 @@ export default function QuestionsPage() {
       });
 
       if (data?.questions) {
-        setQuestions(data.questions);
+        setQuestions(data.questions as Question[]);
         setTotal(data.total ?? 0);
       } else {
         setQuestions([]);
@@ -157,6 +176,30 @@ export default function QuestionsPage() {
   const handlePageChange = (_: unknown, newPage: number) => {
     setPage(newPage);
   };
+
+  const openPreview = useCallback(async (row: Question) => {
+    setPreviewRow(row);
+    setPreviewDetail(null);
+    setPreviewLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (api as any).GET("/v1/questions/{id}", {
+        params: { path: { id: row.id } },
+      });
+      if (data) {
+        setPreviewDetail({ ...row, ...data });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewRow(null);
+    setPreviewDetail(null);
+  }, []);
 
   const handlePageSizeChange = (newSize: unknown) => {
     setPageSize(newSize as number);
@@ -270,12 +313,18 @@ export default function QuestionsPage() {
               </TableRow>
             ) : (
               questions.map((q) => (
-                <TableRow key={q.id} hover>
+                <TableRow
+                  key={q.id}
+                  hover
+                  onClick={() => openPreview(q)}
+                  sx={{ cursor: "pointer" }}
+                >
                   <TableCell>
                     <Chip
                       label={KIND_LABELS[q.kind] || q.kind}
                       size="small"
-                      color={KIND_COLORS[q.kind] || "default"}
+                      variant="outlined"
+                      sx={tagColor(q.kind)}
                     />
                   </TableCell>
                   <TableCell>
@@ -306,6 +355,7 @@ export default function QuestionsPage() {
                           label={tag}
                           size="small"
                           variant="outlined"
+                          sx={tagColor(tag)}
                         />
                       ))}
                       {q.tags.length > 3 && (
@@ -361,6 +411,217 @@ export default function QuestionsPage() {
           </Select>
         </Stack>
       </Stack>
+
+      <Dialog
+        open={previewRow !== null}
+        onClose={closePreview}
+        maxWidth="sm"
+        fullWidth
+      >
+        {previewRow && (
+          <>
+            <DialogTitle
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                pr: 6,
+              }}
+            >
+              <Chip
+                label={KIND_LABELS[previewRow.kind] || previewRow.kind}
+                size="small"
+                variant="outlined"
+                sx={tagColor(previewRow.kind)}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {previewRow.points} pt{previewRow.points === 1 ? "" : "s"} ·{" "}
+                {previewRow.status}
+              </Typography>
+              <IconButton
+                onClick={closePreview}
+                size="small"
+                sx={{ position: "absolute", right: 8, top: 8 }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {previewLoading || !previewDetail ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Stack spacing={2}>
+                  <Typography sx={{ whiteSpace: "pre-wrap" }}>
+                    {previewDetail.prompt}
+                  </Typography>
+                  <AnswerBlock detail={previewDetail} />
+                  {previewDetail.explanation && (
+                    <>
+                      <Divider />
+                      <Box>
+                        <Typography variant="overline" color="text.secondary">
+                          Explanation
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {previewDetail.explanation}
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
+                  {previewRow.tags.length > 0 && (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {previewRow.tags.map((tag) => (
+                        <Chip
+                          key={tag}
+                          label={tag}
+                          size="small"
+                          variant="outlined"
+                          sx={tagColor(tag)}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Stack>
+              )}
+            </DialogContent>
+          </>
+        )}
+      </Dialog>
     </Box>
   );
+}
+
+const MCQ_LABELS = ["A", "B", "C", "D", "E", "F"];
+
+// Read-only answer view for the preview dialog — one branch per question kind.
+function AnswerBlock({ detail }: { detail: QuestionDetail }) {
+  const p = detail.payload;
+
+  if (detail.kind === "mc") {
+    const options = (p.options as string[]) ?? [];
+    const correct = p.correct_index as number;
+    return (
+      <Stack spacing={0.75}>
+        {options.map((opt, i) => {
+          const isCorrect = i === correct;
+          return (
+            <Box
+              key={i}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                px: 1.5,
+                py: 1,
+                borderRadius: 1,
+                border: 1,
+                borderColor: isCorrect ? "success.main" : "divider",
+                bgcolor: isCorrect ? "success.50" : "transparent",
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 700, color: "text.secondary" }}
+              >
+                {MCQ_LABELS[i] ?? i + 1}
+              </Typography>
+              <Typography variant="body2" sx={{ flex: 1 }}>
+                {opt}
+              </Typography>
+              {isCorrect && (
+                <CheckCircleIcon color="success" fontSize="small" />
+              )}
+            </Box>
+          );
+        })}
+      </Stack>
+    );
+  }
+
+  if (detail.kind === "tf") {
+    const correct = p.correct as boolean;
+    return (
+      <Stack direction="row" spacing={1}>
+        {[true, false].map((val) => (
+          <Chip
+            key={String(val)}
+            label={val ? "True" : "False"}
+            color={val === correct ? "success" : "default"}
+            variant={val === correct ? "filled" : "outlined"}
+            icon={val === correct ? <CheckCircleIcon /> : undefined}
+          />
+        ))}
+      </Stack>
+    );
+  }
+
+  if (detail.kind === "short") {
+    const accepted = (p.accepted as string[]) ?? [];
+    return (
+      <Box>
+        <Typography variant="overline" color="text.secondary">
+          Accepted answers
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+          {accepted.map((a, i) => (
+            <Chip key={i} label={a} size="small" color="success" />
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
+  if (detail.kind === "essay") {
+    const rubric = p.rubric as string | undefined;
+    const minWords = p.min_words as number | undefined;
+    return (
+      <Box>
+        <Typography variant="body2" color="text.secondary">
+          Open response{minWords ? ` · min ${minWords} words` : ""}
+        </Typography>
+        {rubric && (
+          <Typography variant="body2" sx={{ mt: 1, whiteSpace: "pre-wrap" }}>
+            {rubric}
+          </Typography>
+        )}
+      </Box>
+    );
+  }
+
+  if (detail.kind === "code") {
+    const language = p.language as string | undefined;
+    const starter = p.starter as string | undefined;
+    const tests = (p.tests as unknown[]) ?? [];
+    return (
+      <Box>
+        <Typography variant="overline" color="text.secondary">
+          Code{language ? ` · ${language}` : ""} · {tests.length} test
+          {tests.length === 1 ? "" : "s"}
+        </Typography>
+        {starter && (
+          <Box
+            component="pre"
+            sx={{
+              mt: 1,
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: "action.hover",
+              fontSize: 13,
+              overflowX: "auto",
+              fontFamily: "monospace",
+            }}
+          >
+            {starter}
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  return null;
 }

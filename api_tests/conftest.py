@@ -6,8 +6,8 @@ BASE_URL = os.getenv("AME_API_URL", "http://localhost:8080")
 
 ALL_SCOPES = [
     "human",
-    "quiz.read",
-    "quiz.write",
+    "assessment.read",
+    "assessment.write",
     "attempt.read",
     "attempt.write",
     "stats.read",

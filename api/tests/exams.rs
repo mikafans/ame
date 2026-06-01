@@ -35,7 +35,14 @@ async fn serve(pool: PgPool) -> String {
     let app = ame_api::http::router(pool);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr: SocketAddr = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
     format!("http://{addr}")
 }
 
@@ -44,34 +51,30 @@ async fn make_bearer(pool: &PgPool) -> String {
     let token_id = Uuid::now_v7();
     let secret = "exam_secret_abc";
     let hash = hash_secret(secret);
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
-    )
-    .bind(user_id)
-    .bind(format!("exam-user-{user_id}"))
-    .bind(format!("exam-{user_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(user_id)
+        .bind(format!("exam-user-{user_id}"))
+        .bind(format!("exam-{user_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
     )
-    .bind(token_id).bind(user_id).bind(hash).bind(vec!["quiz.write".to_string(), "attempt.write".to_string()])
+    .bind(token_id).bind(user_id).bind(hash).bind(vec!["assessment.write".to_string(), "attempt.write".to_string()])
     .execute(pool).await.unwrap();
     format!("{token_id}_{secret}")
 }
 
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
     let author = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
-    )
-    .bind(author)
-    .bind(format!("author-{author}"))
-    .bind(format!("author-{author}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(author)
+        .bind(format!("author-{author}"))
+        .bind(format!("author-{author}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     let payload = match kind {
         "mc" => json!({ "options": ["a", "b", "c"], "correct_index": 0 }),
         "tf" => json!({ "correct": true }),
@@ -103,18 +106,16 @@ async fn static_exam_compose_get_and_session_roundtrip() {
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
-    // compose a static exam
-    let composed: Value = client
-        .post(format!("{base}/v1/exams"))
+    // Create a graded assessment via the unified API (replaces old POST /v1/exams)
+    let created: Value = client
+        .post(format!("{base}/v1/assessments"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "Integration Test Exam",
-            "duration": 30,
-            "sections": [{
-                "title": "Section A",
-                "weight": 1.0,
-                "questionIds": [q1, q2]
-            }]
+            "title": "Integration Test Exam",
+            "mode": "graded",
+            "method": "manual",
+            "objectives": [],
+            "duration_min": 30
         }))
         .send()
         .await
@@ -125,13 +126,25 @@ async fn static_exam_compose_get_and_session_roundtrip() {
         .await
         .unwrap();
 
-    let exam_id = composed["examId"].as_str().unwrap();
-    assert_eq!(composed["totalPoints"], 2);
-    assert_eq!(composed["sections"][0]["itemsCount"], 2);
+    let exam_id = created["id"].as_str().unwrap();
+    assert!(created["id"].is_string(), "id should be present");
 
-    // get exam
+    // Link the two questions into the default section
+    for qid in [q1, q2] {
+        client
+            .post(format!("{base}/v1/assessments/{exam_id}/questions"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+            .json(&json!({ "questionId": qid }))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+    }
+
+    // get exam via the unified assessment endpoint
     let got: Value = client
-        .get(format!("{base}/v1/exams/{exam_id}"))
+        .get(format!("{base}/v1/assessments/{exam_id}"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
@@ -141,10 +154,15 @@ async fn static_exam_compose_get_and_session_roundtrip() {
         .json()
         .await
         .unwrap();
-    assert_eq!(got["exam"]["name"], "Integration Test Exam");
+    // AssessmentDetail flattens the assessment fields, so title is at the top level.
+    assert_eq!(got["title"], "Integration Test Exam");
     assert_eq!(got["sections"].as_array().unwrap().len(), 1);
+    assert_eq!(got["sections"][0]["itemsCount"], 2);
 }
 
+/// The old dynamic-exam-pool check is now surfaced via the practice session
+/// planner: requesting more questions than the bank contains returns 422
+/// exam_pool_insufficient.
 #[tokio::test]
 async fn dynamic_exam_pool_insufficient_returns_422() {
     if skip_if_no_db() {
@@ -155,17 +173,14 @@ async fn dynamic_exam_pool_insufficient_returns_422() {
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
+    // Request a practice session filtered to a tag that has zero questions.
     let resp = client
-        .post(format!("{base}/v1/exams"))
+        .post(format!("{base}/v1/sessions"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "Dynamic Exam",
-            "sections": [{
-                "title": "Impossible Section",
-                "weight": 1.0,
-                "items": 9999,
-                "tags": ["__nonexistent_tag__"]
-            }]
+            "tags": ["__nonexistent_tag_xyz_impossible__"],
+            "count": 9999,
+            "mode": "practice"
         }))
         .send()
         .await
@@ -187,11 +202,13 @@ async fn compose_body_validation_rejects_empty_name() {
     let client = reqwest::Client::new();
 
     let resp = client
-        .post(format!("{base}/v1/exams"))
+        .post(format!("{base}/v1/assessments"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "name": "",
-            "sections": [{ "title": "S", "weight": 1.0, "questionIds": [] }]
+            "title": "",
+            "mode": "graded",
+            "method": "manual",
+            "objectives": []
         }))
         .send()
         .await

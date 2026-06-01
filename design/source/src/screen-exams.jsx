@@ -1,4 +1,4 @@
-function ExamsScreen({ onStartQuiz }) {
+function ExamsScreen({ onStartAssessment }) {
   const [selected, setSelected] = React.useState(EXAMS[0].id);
   const [filter, setFilter] = React.useState("all");
   const exam = EXAMS.find((e) => e.id === selected);
@@ -14,7 +14,7 @@ function ExamsScreen({ onStartQuiz }) {
   return (
     <div style={{ padding: "28px 36px 56px" }}>
       <SectionLabel
-        kicker="Composed assessments · multi-quiz · weighted"
+        kicker="Composed assessments · multi-assessment · weighted"
         action={
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="ghost" icon={<Icon name="filter" size={14} />}>Filter</Button>
@@ -49,7 +49,7 @@ function ExamsScreen({ onStartQuiz }) {
         </div>
 
         {/* Detail */}
-        <ExamDetail exam={exam} onStart={onStartQuiz} />
+        <ExamDetail exam={exam} onStart={onStartAssessment} />
       </div>
     </div>
   );
@@ -207,7 +207,7 @@ function ExamDetail({ exam, onStart }) {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{s.title}</div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted)", letterSpacing: 0.4, marginTop: 2 }}>
-                    sourced from {s.quizId}
+                    sourced from {s.assessmentId}
                   </div>
                 </div>
                 <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text-2)", letterSpacing: 0.3 }}>{s.mix}</span>
@@ -253,7 +253,7 @@ function ExamDetail({ exam, onStart }) {
               </div>
               <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 4, padding: 10, fontFamily: "var(--mono)", fontSize: 11, color: "var(--text-2)", lineHeight: 1.6, letterSpacing: 0.3 }}>
                 seed: <span style={{ color: "var(--text)" }}>syllabus-u2</span><br />
-                inputs: 3 quizzes, 24 items<br />
+                inputs: 3 assessments, 24 items<br />
                 strategy: <span style={{ color: "var(--accent)" }}>weighted-by-mastery</span><br />
                 confidence: 0.82
               </div>

@@ -26,7 +26,6 @@ pub struct SendMessageBody {
     pub user_id: Uuid,
     pub channel: String,
     pub body: String,
-    pub link_quiz_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -78,15 +77,14 @@ pub async fn send_message(
     }
 
     let row = sqlx::query(
-        "INSERT INTO tb_messages (from_user_id, to_user_id, channel, body, link_quiz_id, status)
-         VALUES ($1, $2, $3, $4, $5, 'queued')
+        "INSERT INTO tb_messages (from_user_id, to_user_id, channel, body, status)
+         VALUES ($1, $2, $3, $4, 'queued')
          RETURNING id, status",
     )
     .bind(user.0.user.id)
     .bind(body.user_id)
     .bind(&body.channel)
     .bind(&body.body)
-    .bind(body.link_quiz_id)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;

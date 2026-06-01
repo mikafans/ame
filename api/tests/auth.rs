@@ -19,7 +19,7 @@ use ame_api::{
 
 struct WriteQuestionsScope;
 impl ScopeConstraint for WriteQuestionsScope {
-    const SCOPE: Scope = Scope::QuizWrite;
+    const SCOPE: Scope = Scope::AssessmentWrite;
 }
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -82,7 +82,12 @@ async fn test_auth_and_idempotency() {
     let addr: SocketAddr = listener.local_addr().unwrap();
 
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
 
     let client = reqwest::Client::new();
@@ -105,7 +110,7 @@ async fn test_auth_and_idempotency() {
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) \
-         VALUES ($1, 'Test User', $2, 'learner')",
+         VALUES ($1, 'Test User', $2, 'user')",
     )
     .bind(user_id)
     .bind(format!("auth-{user_id}@example.com"))
@@ -113,7 +118,7 @@ async fn test_auth_and_idempotency() {
     .await
     .unwrap();
 
-    let scopes = vec!["quiz.read".to_string()];
+    let scopes = vec!["assessment.read".to_string()];
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test token', $3, $4)",
     )
@@ -145,9 +150,9 @@ async fn test_auth_and_idempotency() {
         .send()
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "quiz.write"
+    assert_eq!(res.status(), StatusCode::FORBIDDEN); // Missing "assessment.write"
     let body: Value = res.json().await.unwrap();
-    assert_eq!(body["error"]["details"]["scope"], "quiz.write");
+    assert_eq!(body["error"]["details"]["scope"], "assessment.write");
 
     // Test 4: Idempotency
     let idem_key = "test-key-1";
@@ -221,7 +226,12 @@ async fn revoked_token_returns_unauthorized() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr: SocketAddr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
 
     let user_id = uuid::Uuid::now_v7();
@@ -232,7 +242,7 @@ async fn revoked_token_returns_unauthorized() {
 
     sqlx::query(
         "INSERT INTO tb_users (id, display_name, email, role) \
-         VALUES ($1, 'Revoked User', $2, 'learner')",
+         VALUES ($1, 'Revoked User', $2, 'user')",
     )
     .bind(user_id)
     .bind(format!("revoked-{user_id}@example.com"))
@@ -242,7 +252,7 @@ async fn revoked_token_returns_unauthorized() {
 
     // revoked_at set at insert time — the secret hash is still valid, so any
     // 200 here would prove the extractor stopped checking revocation.
-    let scopes = vec!["quiz.read".to_string()];
+    let scopes = vec!["assessment.read".to_string()];
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
          VALUES ($1, $2, 'revoked token', $3, $4, now())",

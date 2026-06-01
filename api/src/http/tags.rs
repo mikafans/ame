@@ -21,7 +21,7 @@ use crate::{
 
 pub struct TagWriteScope;
 impl ScopeConstraint for TagWriteScope {
-    const SCOPE: Scope = Scope::QuizWrite;
+    const SCOPE: Scope = Scope::AssessmentWrite;
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

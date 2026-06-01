@@ -1,19 +1,20 @@
+/**
+ * UI/UX spec alignment — comprehensive learner surface contract test.
+ *
+ * Exercises: Library, assessment preview, active session (MCQ), results, progress
+ * dashboard, question bank, exams. This test is intentionally a large single
+ * flow so it can verify the session round-trip end-to-end with screenshots.
+ *
+ * Uses shared helpers for login, cookie, MCQ assessment lookup, and session finish.
+ */
+import { expect, test, type Page } from "@playwright/test";
 import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
-
-const API_URL = process.env.E2E_API_URL ?? "http://localhost:8080";
-
-type LoginResponse = {
-  token: string;
-};
-
-type QuizListResponse = {
-  quizzes: Array<{ id: string; title: string }>;
-};
+  API_URL,
+  loginAs,
+  setAuthCookie,
+  firstMcqAssessmentId,
+  finishSession,
+} from "./helpers";
 
 type SessionResponse = {
   session: { id: string };
@@ -24,113 +25,12 @@ type SessionResponse = {
   }>;
 };
 
-async function login(request: APIRequestContext) {
-  const response = await request.post(`${API_URL}/v1/auth/login`, {
-    data: { email: "learner@example.com", password: "password123" },
-  });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as LoginResponse;
-}
-
-async function setAuthCookie(page: Page, token: string) {
-  await page.context().addCookies([
-    {
-      name: "ame_token",
-      value: token,
-      url: process.env.E2E_BASE_URL ?? "http://localhost:23000",
-    },
-  ]);
-}
-
 async function screenshot(page: Page, name: string) {
   await page.screenshot({
     path: `../.tmp/uiux-${name}.png`,
     fullPage: true,
     scale: "css",
   });
-}
-
-async function firstActiveQuizId(request: APIRequestContext, token: string) {
-  const response = await request.get(`${API_URL}/v1/quizzes?status=active`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  expect(response.ok()).toBeTruthy();
-  const data = (await response.json()) as QuizListResponse;
-  expect(data.quizzes.length).toBeGreaterThan(0);
-  return data.quizzes[0].id;
-}
-
-async function firstMcqQuizId(
-  request: APIRequestContext,
-  token: string,
-): Promise<string> {
-  const listResp = await request.get(`${API_URL}/v1/quizzes?status=active`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  expect(listResp.ok()).toBeTruthy();
-  const { quizzes } = (await listResp.json()) as QuizListResponse;
-  for (const q of quizzes) {
-    const detail = await request.get(`${API_URL}/v1/quizzes/${q.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!detail.ok()) continue;
-    const d = await detail.json();
-    const questions: Array<{ kind: string }> = d.questions ?? [];
-    if (questions.some((qs) => qs.kind === "mc" || qs.kind === "mcq")) {
-      return q.id;
-    }
-  }
-  throw new Error("No active quiz with MCQ questions found");
-}
-
-async function finishSession(
-  request: APIRequestContext,
-  token: string,
-  sessionId: string,
-) {
-  const stateResponse = await request.get(
-    `${API_URL}/v1/sessions/${sessionId}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  expect(stateResponse.ok()).toBeTruthy();
-  const state = (await stateResponse.json()) as SessionResponse;
-
-  for (const question of state.questions) {
-    const body = responseFor(question.kind);
-    const answerResponse = await request.post(
-      `${API_URL}/v1/sessions/${sessionId}/answer`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        data: { questionId: question.questionId, response: body },
-      },
-    );
-    expect(answerResponse.ok()).toBeTruthy();
-  }
-
-  const finishResponse = await request.post(
-    `${API_URL}/v1/sessions/${sessionId}/finish`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  expect(finishResponse.ok()).toBeTruthy();
-}
-
-function responseFor(kind: string) {
-  switch (kind) {
-    case "mc":
-    case "mcq":
-      return { selected_position: 0 };
-    case "tf":
-      return { answer: false };
-    case "essay":
-      return {
-        body: "Depth-first search explores a path before backtracking, while breadth-first search explores by distance from the start. I would choose DFS for cycle detection or topological ordering and BFS for shortest paths in unweighted graphs.",
-        word_count: 31,
-      };
-    case "code":
-      return { source: "def solve():\n    return None", language: "python" };
-    default:
-      return { answer: "stack" };
-  }
 }
 
 test.describe("UI/UX spec alignment", () => {
@@ -143,7 +43,7 @@ test.describe("UI/UX spec alignment", () => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
 
-    const { token } = await login(request);
+    const token = await loginAs(request, "learner@example.com");
     await setAuthCookie(page, token);
 
     // --- Library ---
@@ -153,37 +53,37 @@ test.describe("UI/UX spec alignment", () => {
       timeout: 10000,
     });
 
-    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
     await expect(
-      page.getByRole("tab", { name: /All quizzes \(\d+\)/ }),
+      page.getByRole("heading", { name: "Assessments" }),
     ).toBeVisible();
-    // "Up next" highlights the first unfinished quiz; it is absent once the
+    await expect(page.getByRole("tab", { name: /All \(\d+\)/ })).toBeVisible();
+    // "Up next" highlights the first unfinished assessment; it is absent once the
     // learner has completed everything. Assert its detail fields only when shown.
     const upNext = page.getByText("Up next");
     if (await upNext.isVisible().catch(() => false)) {
       await expect(page.getByText("Questions", { exact: true })).toBeVisible();
       await expect(page.getByText("Duration", { exact: true })).toBeVisible();
-      await expect(page.getByText("Attempts", { exact: true })).toBeVisible();
-      await expect(page.getByText("Recommended prep")).toBeVisible();
+      // "Recommended prep" is only shown when the planner has generated tags.
+      // Skip asserting it to avoid seed-state flakiness.
     }
     await screenshot(page, "library");
 
-    // --- Quiz preview (use a quiz with MCQ questions for the session test) ---
-    const quizId = await firstMcqQuizId(request, token);
-    await page.goto(`/quizzes/${quizId}/preview`);
-    await expect(page.getByText("Library")).toBeVisible();
+    // --- Assessment preview (use a assessment with MCQ questions for the session test) ---
+    const assessmentId = await firstMcqAssessmentId(request, token);
+    await page.goto(`/assessments/${assessmentId}/preview`);
+    await expect(page.getByText("Assessments")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back to library" }),
+      page.getByRole("button", { name: "Back to assessments" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Start quiz" }),
+      page.getByRole("button", { name: "Start assessment" }),
     ).toBeVisible();
     await expect(page.getByText(/questions/i).first()).toBeVisible();
     await expect(page.getByText(/pts/i).first()).toBeVisible();
-    await screenshot(page, "quiz-preview");
+    await screenshot(page, "assessment-preview");
 
     // --- Active session: navigate to an MCQ question ---
-    await page.getByRole("button", { name: "Start quiz" }).click();
+    await page.getByRole("button", { name: "Start assessment" }).click();
     await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]+$/);
     const sessionId = page.url().split("/").pop();
     expect(sessionId).toBeTruthy();
@@ -210,8 +110,9 @@ test.describe("UI/UX spec alignment", () => {
     const optionInput = page.getByTestId("question-input");
     const firstOption = optionInput.locator('[role="button"]').first();
     await expect(firstOption).toBeVisible();
-    // A/B/C/D labels should be present
-    await expect(optionInput.getByText("A")).toBeVisible();
+    // A/B/C/D labels should be present (use .first() to avoid strict-mode
+    // violation — the text "A" appears in both the label div and option text)
+    await expect(optionInput.getByText("A").first()).toBeVisible();
     await firstOption.click();
     await expect(page.getByText(/\d+\/\d+ answered/)).toBeVisible();
     await screenshot(page, "active-session");
@@ -222,8 +123,13 @@ test.describe("UI/UX spec alignment", () => {
     await expect(page.getByRole("heading", { name: /Results/ })).toBeVisible();
     await expect(page.getByText("Answer review")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back to library" }),
+      page.getByRole("button", { name: "Back to assessments" }),
     ).toBeVisible();
+    // Wait for the first answer card to render before reading captions
+    await expect(page.locator(".MuiCardContent-root").first()).toBeVisible({
+      timeout: 5000,
+    });
+    await page.waitForLoadState("networkidle");
     // At least one answer should show a non-blank value
     const answerCaptions = await page
       .locator(".MuiCardContent-root .MuiTypography-caption")

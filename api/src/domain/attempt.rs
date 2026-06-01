@@ -40,6 +40,9 @@ pub struct Attempt {
     pub score: f64,
     pub grade_status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
+    pub correct_answer: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grader_notes: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_to_answer_ms: Option<i32>,

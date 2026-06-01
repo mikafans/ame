@@ -8,7 +8,10 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Cap at 2 workers to avoid hitting the auth rate-limit (10 burst / 2s).
+  // Auth endpoints are public and rate-limited per IP, so concurrent
+  // register/login calls across workers exhaust the burst quickly.
+  workers: process.env.CI ? 1 : 2,
   reporter: "list",
   use: {
     baseURL: BASE_URL,

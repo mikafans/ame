@@ -4,14 +4,16 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::json;
+use std::borrow::Cow;
 use tracing::error;
+use utoipa::ToSchema;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, ToSchema)]
 pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
     #[error("scope required: {0}")]
-    ScopeRequired(&'static str),
+    ScopeRequired(Cow<'static, str>),
     #[error("not found: {resource}")]
     NotFound { resource: &'static str },
     #[error("validation failed")]
@@ -34,11 +36,18 @@ pub enum ApiError {
     ScoringUnavailable,
     #[error("too many requests")]
     TooManyRequests,
+    #[error("quota exceeded")]
+    QuotaExceeded {
+        kind: String,
+        limit: i64,
+        usage: i64,
+    },
     #[error(transparent)]
+    #[schema(value_type = String)]
     Internal(#[from] anyhow::Error),
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ToSchema)]
 pub struct FieldError {
     pub field: String,
     pub message: String,
@@ -113,9 +122,15 @@ impl IntoResponse for ApiError {
             ),
             ApiError::TooManyRequests => (
                 StatusCode::TOO_MANY_REQUESTS,
-                "anonymous_attempt_rate_limited",
-                "rate limit exceeded for anonymous attempts".to_string(),
+                "rate_limited",
+                "rate limit exceeded".to_string(),
                 None,
+            ),
+            ApiError::QuotaExceeded { kind, limit, usage } => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "quota_exceeded",
+                format!("plan quota exceeded for {}", kind),
+                Some(json!({ "kind": kind, "limit": limit, "usage": usage })),
             ),
             ApiError::Internal(err) => {
                 let request_id = uuid::Uuid::now_v7().to_string();

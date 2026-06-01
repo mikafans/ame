@@ -5,6 +5,7 @@ use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
 
 // ── shapes ────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RegisterBody {
     pub email: String,
@@ -24,20 +25,20 @@ pub struct RegisterBody {
     pub role: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginBody {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthResponse {
     pub token: String,
     pub user: UserInfo,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub id: Uuid,
@@ -54,6 +55,9 @@ fn set_token_cookie_header(token: &str) -> String {
     } else {
         ""
     };
+    // Note: SameSite=Lax is fine for same-host dev or same-site prod deploys.
+    // True cross-domain deploys (e.g. web and api on completely different domains)
+    // will require SameSite=None and Secure to allow the cookie on subrequests.
     format!(
         "ame_token={}; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=86400",
         token, secure
@@ -61,6 +65,16 @@ fn set_token_cookie_header(token: &str) -> String {
 }
 
 /// POST /v1/auth/register — register a new user with email and password.
+#[utoipa::path(
+    post,
+    path = "/v1/auth/register",
+    request_body = RegisterBody,
+    responses(
+        (status = 201, description = "User registered", body = AuthResponse),
+        (status = 422, description = "Validation failed")
+    ),
+    tag = "auth"
+)]
 pub async fn register(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<RegisterBody>,
@@ -89,14 +103,14 @@ pub async fn register(
         }]));
     }
 
-    // Validate role
+    // Validate role — only user is valid for human registration
     let normalized_role = body.role.to_lowercase();
     match normalized_role.as_str() {
-        "learner" | "instructor" | "admin" | "agent" => {}
+        "user" => {}
         _ => {
             return Err(ApiError::Validation(vec![FieldError {
                 field: "role".into(),
-                message: format!("unknown role: {}", body.role),
+                message: "must be 'user'".to_string(),
             }]));
         }
     }
@@ -157,31 +171,59 @@ pub async fn register(
 }
 
 /// POST /v1/auth/login — authenticate with email and password.
+#[utoipa::path(
+    post,
+    path = "/v1/auth/login",
+    request_body = LoginBody,
+    responses(
+        (status = 200, description = "Logged in", body = AuthResponse),
+        (status = 401, description = "Unauthorized")
+    ),
+    tag = "auth"
+)]
 pub async fn login(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<LoginBody>,
 ) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Fetch user by email
     let user_row = sqlx::query(
-        "SELECT id, email, display_name, role, password_hash FROM tb_users WHERE email = $1",
+        "SELECT id, email, display_name, role, password_hash, deactivated_at FROM tb_users WHERE email = $1",
     )
     .bind(&body.email)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| ApiError::Internal(e.into()))?
-    .ok_or(ApiError::Unauthorized)?;
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    // A valid dummy hash to equalize timing on the miss path
+    let dummy_hash = "$argon2id$v=19$m=19456,t=2,p=1$fgRxq3Ut+2IcRLdMp41ROw$xzZcJdQfimlft7Byw21EMnT/p4TcRAJa68gHeUK2EZ4";
+
+    let (hash_to_verify, is_valid_user) = match &user_row {
+        Some(row) => {
+            let hash: Option<String> = row.get("password_hash");
+            let deactivated_at: Option<time::OffsetDateTime> = row.get("deactivated_at");
+            match (hash, deactivated_at) {
+                (Some(h), None) => (h.to_string(), true),
+                _ => (dummy_hash.to_string(), false),
+            }
+        }
+        None => (dummy_hash.to_string(), false),
+    };
+
+    let password_valid = verify_password(&hash_to_verify, &body.password);
+
+    if !password_valid || !is_valid_user {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let user_row = match user_row {
+        Some(row) => row,
+        None => return Err(ApiError::Unauthorized), // Unreachable because of is_valid_user check
+    };
 
     let user_id: Uuid = user_row.get("id");
     let email: String = user_row.get("email");
     let display_name: String = user_row.get("display_name");
     let role: String = user_row.get("role");
-    let password_hash: Option<String> = user_row.get("password_hash");
-
-    // Verify password
-    let password_hash_str = password_hash.ok_or(ApiError::Unauthorized)?;
-    if !verify_password(&password_hash_str, &body.password) {
-        return Err(ApiError::Unauthorized);
-    }
 
     let token_str = issue_token(&state.pool, user_id, &role).await?;
     let cookie_header = set_token_cookie_header(&token_str);
@@ -212,8 +254,8 @@ async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String,
     let token_hash = hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '30 days')",
     )
     .bind(token_id)
     .bind(user_id)
@@ -229,10 +271,10 @@ async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String,
 
 fn scopes_for_role(role: &str) -> Vec<&'static str> {
     match role {
-        "agent" => vec!["quiz.read"],
+        "agent" => vec!["assessment.read"],
         "admin" => vec![
-            "quiz.read",
-            "quiz.write",
+            "assessment.read",
+            "assessment.write",
             "attempt.read",
             "attempt.write",
             "stats.read",
@@ -242,14 +284,15 @@ fn scopes_for_role(role: &str) -> Vec<&'static str> {
             "admin",
         ],
         _ => vec![
-            "quiz.read",
-            "quiz.write",
+            "assessment.read",
+            "assessment.write",
             "attempt.read",
             "attempt.write",
             "stats.read",
             "feedback.write",
             "plan.read",
             "plan.write",
+            "public.publish",
         ],
     }
 }
@@ -274,7 +317,44 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
 }
 
 /// POST /v1/auth/logout — clear the HttpOnly token cookie.
-pub async fn logout() -> impl IntoResponse {
+#[utoipa::path(
+    post,
+    path = "/v1/auth/logout",
+    responses(
+        (status = 200, description = "Logged out")
+    ),
+    tag = "auth"
+)]
+pub async fn logout(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    req: axum::extract::Request,
+) -> impl IntoResponse {
+    // Try to extract the token to revoke it in the DB
+    if let Some(parsed) = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(crate::auth::token::parse_bearer_token)
+        .or_else(|| {
+            req.headers()
+                .get(axum::http::header::COOKIE)
+                .and_then(|h| h.to_str().ok())
+                .and_then(|cookies| {
+                    cookies.split(';').find_map(|c| {
+                        let c = c.trim();
+                        c.strip_prefix("ame_token=").map(|v| v.to_owned())
+                    })
+                })
+                .and_then(|v| crate::auth::token::parse_token_value(&v))
+        })
+    {
+        // Ignore failures since we're logging out anyway
+        let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
+            .bind(parsed.id)
+            .execute(&state.pool)
+            .await;
+    }
+
     (
         StatusCode::OK,
         [(

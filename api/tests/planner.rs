@@ -12,7 +12,7 @@ use ame_api::{
         question::{Judge, McPayload, Normalize, QuestionKind, ShortPayload},
         session::PlanItem,
     },
-    engine::planner::{QuizPlanRequest, TagsMode, plan_quiz},
+    engine::planner::{AssessmentPlanRequest, TagsMode, plan_assessment},
 };
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -47,15 +47,13 @@ fn skip_if_no_db() -> bool {
 
 async fn make_user(pool: &PgPool) -> Uuid {
     let id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
-    )
-    .bind(id)
-    .bind(format!("planner-test-{id}"))
-    .bind(format!("planner-{id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(id)
+        .bind(format!("planner-test-{id}"))
+        .bind(format!("planner-{id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     id
 }
 
@@ -63,16 +61,15 @@ fn mc_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
     QuestionInsert {
         kind: QuestionKind::Mc,
         prompt: prompt.to_string(),
-        code_snippet: None,
         payload: serde_json::to_value(McPayload {
             options: vec!["a".into(), "b".into(), "c".into()],
             correct_index: 1,
         })
         .unwrap(),
         explanation: None,
-        source: None,
-        points: 1,
+        points: Some(1),
         tags: tags.iter().map(|tag| tag.to_string()).collect(),
+        status: None,
     }
 }
 
@@ -80,7 +77,6 @@ fn short_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
     QuestionInsert {
         kind: QuestionKind::Short,
         prompt: prompt.to_string(),
-        code_snippet: None,
         payload: serde_json::to_value(ShortPayload {
             accepted: vec!["answer".into()],
             normalize: Normalize::Exact,
@@ -88,14 +84,14 @@ fn short_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
         })
         .unwrap(),
         explanation: None,
-        source: None,
-        points: 1,
+        points: Some(1),
         tags: tags.iter().map(|tag| tag.to_string()).collect(),
+        status: None,
     }
 }
 
 #[tokio::test]
-async fn quiz_planner_filters_live_questions_and_snapshots_mc_option_order() {
+async fn assessment_planner_filters_live_questions_and_snapshots_mc_option_order() {
     if skip_if_no_db() {
         return;
     }
@@ -122,10 +118,10 @@ async fn quiz_planner_filters_live_questions_and_snapshots_mc_option_order() {
         .await
         .unwrap();
 
-    let plan = plan_quiz(
+    let plan = plan_assessment(
         &pool,
         user_id,
-        &QuizPlanRequest {
+        &AssessmentPlanRequest {
             tags: vec!["Rust".to_string()],
             tags_mode: TagsMode::Any,
             difficulty_min: None,
@@ -153,7 +149,7 @@ async fn quiz_planner_filters_live_questions_and_snapshots_mc_option_order() {
 }
 
 #[tokio::test]
-async fn quiz_planner_excludes_recent_attempts_for_user() {
+async fn assessment_planner_excludes_recent_attempts_for_user() {
     if skip_if_no_db() {
         return;
     }
@@ -189,10 +185,10 @@ async fn quiz_planner_excludes_recent_attempts_for_user() {
     .await
     .unwrap();
 
-    let plan = plan_quiz(
+    let plan = plan_assessment(
         &pool,
         user_id,
-        &QuizPlanRequest {
+        &AssessmentPlanRequest {
             tags: vec!["rust".to_string()],
             tags_mode: TagsMode::All,
             difficulty_min: None,

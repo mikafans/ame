@@ -1,5 +1,5 @@
 [tools]
-rust = { version = "latest", components = "rustfmt,clippy" }
+rust = { version = "1.96.0", components = "rustfmt,clippy" }
 bun = "latest"
 uv = "latest"
 

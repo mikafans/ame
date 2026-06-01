@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
 pub mod assess;
+pub mod audit;
 pub mod auth;
 pub mod bank;
 pub mod domain;

@@ -9,15 +9,14 @@ The agent surface is plain HTTP + JSON (NOT MCP) — see ``GET /llms.txt``. You 
 not need this file to use it; it is a dependency-free convenience wrapper and the
 canonical worked example. Copy it, import it, or run it directly:
 
-    # run the end-to-end author demo against a dev stack
-    uv run agents/client.py --api http://localhost:28080 --code devsmoke
+    # create an agent via an owner token
+    uv run agents/client.py --api http://localhost:28080 --token <owner-token>
 
     # or use it as a library
     from client import AmeAgent
-    agent = AmeAgent.register("http://localhost:28080", ["quiz.read", "quiz.write"], "devsmoke")
-    quiz = agent.run("quiz.import", source=json.dumps({...}))
-    agent.run("quiz.update", id=quiz["quizId"], status="active")
-    quizzes = agent.get("/v1/quizzes")["quizzes"]
+    agent = AmeAgent(base_url="http://localhost:28080", api_key="<agent-key>")
+    assessments = agent.get("/v1/assessments")
+    print(f"Found {len(assessments['assessments'])} assessments")
 
 Two ways to act (mirrors llms.txt):
   - reads + simple writes -> call REST directly:  agent.get(path) / agent.request(...)
@@ -49,27 +48,33 @@ class AmeAgent:
 
     # ── bootstrap ────────────────────────────────────────────────────────────
     @classmethod
-    def register(
+    def create(
         cls,
         base_url: str,
-        scopes: list[str],
-        access_code: str,
+        owner_token: str,
         label: str = "agent",
+        scopes: list[str] = None,
     ) -> "AmeAgent":
-        """POST /v1/agents/register and return a ready-to-use client.
+        """POST /v1/me/agents as an owner and return a ready-to-use client.
 
-        The minted ``userId`` is available as ``.user_id`` afterwards.
+        The minted ``agentId`` is available as ``.agent_id`` afterwards.
         """
-        agent = cls(base_url)
-        body = {"label": label, "scopes": scopes, "accessCode": access_code}
-        resp = agent.request("POST", "/v1/agents/register", body)
-        agent.api_key = resp["apiKey"]
-        agent.user_id = resp["userId"]
+        if scopes is None:
+            scopes = ["assessment.read", "assessment.write"]
+
+        # Internal client for the owner call
+        owner = cls(base_url, owner_token)
+        body = {"label": label, "scopes": scopes}
+        resp = owner.request("POST", "/v1/me/agents", body)
+
+        # New agent client
+        agent = cls(base_url, resp["apiKey"])
+        agent.agent_id = resp["id"]
         return agent
 
     # ── verbs ────────────────────────────────────────────────────────────────
     def run(self, tool: str, **params):
-        """Invoke a runnable write/composite tool via POST /v1/agents/run.
+        """Invoke a runnable tool via POST /v1/agents/run.
 
         Raises AgentError if the dispatcher reports ok=false.
         """
@@ -81,7 +86,7 @@ class AmeAgent:
         return resp.get("result")
 
     def get(self, path: str, **query):
-        """GET a read endpoint (e.g. /v1/quizzes). Read tools are direct REST."""
+        """GET a read endpoint (e.g. /v1/assessments). Read tools are direct REST."""
         if query:
             from urllib.parse import urlencode
 
@@ -118,44 +123,66 @@ class AmeAgent:
 
 
 # ── runnable demo / smoke test ────────────────────────────────────────────────
-def _demo(api: str, code: str, title: str) -> None:
-    """Author a quiz end to end and confirm it lands in the library."""
-    print(f"register write agent @ {api}")
-    agent = AmeAgent.register(api, ["quiz.read", "quiz.write"], code, label="client-demo")
-    print(f"  userId={agent.user_id}")
-
-    source = json.dumps(
-        {
-            "title": title,
-            "course": "Platform Eng",
-            "objectives": ["Describe pods and deployments", "Recall kubectl basics"],
-            "questions": [
-                {
-                    "kind": "mc",
-                    "prompt": "What is the smallest deployable unit in Kubernetes?",
-                    "points": 1,
-                    "explanation": "A Pod wraps one or more containers.",
-                    "payload": {"options": ["Container", "Pod", "Node", "Service"], "correct_index": 1},
-                },
-                {"kind": "tf", "prompt": "A Deployment manages ReplicaSets.", "points": 1,
-                 "payload": {"correct": True}},
-                {"kind": "short", "prompt": "Which kubectl subcommand lists pods? (one word)", "points": 1,
-                 "payload": {"accepted": ["get"], "normalize": "exact", "judge": "exact"}},
-            ],
-        }
+def _demo(api: str, token: str, title: str) -> None:
+    """Create an agent and author an assessment end to end."""
+    print(f"create agent @ {api}")
+    agent = AmeAgent.create(
+        api, token, label="client-demo", scopes=["assessment.read", "assessment.write"]
     )
-    imported = agent.run("quiz.import", source=source)
-    qid = imported["quizId"]
-    print(f"  imported quizId={qid} questions={imported['questionsCreated']} (draft)")
+    print(f"  agentId={agent.agent_id}")
 
-    published = agent.run("quiz.update", id=qid, status="active")
-    print(f"  published -> status={published['status']}")
+    print("building question bank...")
+    questions = [
+        {
+            "kind": "mc",
+            "prompt": "What is the smallest deployable unit in Kubernetes?",
+            "points": 1,
+            "explanation": "A Pod wraps one or more containers.",
+            "payload": {"options": ["Container", "Pod", "Node", "Service"], "correct_index": 1},
+        },
+        {
+            "kind": "tf",
+            "prompt": "A Deployment manages ReplicaSets.",
+            "points": 1,
+            "payload": {"correct": True},
+        },
+        {
+            "kind": "short",
+            "prompt": "Which kubectl subcommand lists pods? (one word)",
+            "points": 1,
+            "payload": {"accepted": ["get"], "normalize": "exact", "judge": "exact"},
+        },
+    ]
 
-    listed = agent.get("/v1/quizzes")["quizzes"]
-    match = next((q for q in listed if q["id"] == qid), None)
-    assert match, f"quiz {qid} not visible in /v1/quizzes"
-    print(f"  library shows: {match['title']!r} ({match['status']}, {match['questionCount']} questions)")
-    print(f"\nPUBLISHED_QUIZ_ID={qid}\nRESULT: OK")
+    created = agent.run("question.create", questions=questions)
+    qids = [q["id"] for q in created["questions"]]
+    print(f"  created {len(qids)} questions")
+
+    print(f"creating assessment: {title}")
+    assessment = agent.run(
+        "assessment.create",
+        title=title,
+        mode="graded",
+        objectives=["Describe pods and deployments", "Recall kubectl basics"],
+        method="agent",
+    )
+    aid = assessment["id"]
+    print(f"  assessmentId={aid} (draft)")
+
+    print("attaching questions...")
+    for qid in qids:
+        agent.request("POST", f"/v1/assessments/{aid}/questions", {"questionId": qid})
+    print(f"  attached {len(qids)} questions")
+
+    print("publishing...")
+    published = agent.run("assessment.update", id=aid, status="active")
+    print(f"  status={published['status']}")
+
+    listed = agent.get("/v1/assessments")["assessments"]
+    match = next((a for a in listed if a["id"] == aid), None)
+    assert match, f"assessment {aid} not visible in /v1/assessments"
+    print(f"  library shows: {match['title']!r} ({match['status']})")
+    print(f"\nRESULT: OK")
 
 
 if __name__ == "__main__":
@@ -163,7 +190,12 @@ if __name__ == "__main__":
 
     ap = argparse.ArgumentParser(description="AME agent reference client demo")
     ap.add_argument("--api", default="http://localhost:28080")
-    ap.add_argument("--code", default="devsmoke", help="AME_AGENT_ACCESS_CODE")
-    ap.add_argument("--title", default="Kubernetes Basics (client demo)")
+    ap.add_argument("--token", help="Owner token to create the agent")
+    ap.add_argument("--title", default="Kubernetes Basics (Phase 2 demo)")
     args = ap.parse_args()
-    _demo(args.api, args.code, args.title)
+
+    if not args.token:
+        print("Error: --token <owner-token> is required to run the demo.")
+        exit(1)
+
+    _demo(args.api, args.token, args.title)

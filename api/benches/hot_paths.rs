@@ -12,7 +12,7 @@ use uuid::Uuid;
 use ame_api::auth::token::{generate_secret, hash_secret, verify_token_secret};
 use ame_api::domain::attempt::{AttemptPresentation, AttemptResponse};
 use ame_api::domain::question::QuestionKind;
-use ame_api::engine::elo::{QuestionRating, UserTagRating, update_elo};
+use ame_api::engine::elo::{QuestionRating, UserTagRating, compute_elo};
 use ame_api::engine::graders::grade_response;
 
 fn bench_token_verify(c: &mut Criterion) {
@@ -73,13 +73,7 @@ fn bench_update_elo(c: &mut Criterion) {
     ];
 
     c.bench_function("update_elo", |b| {
-        b.iter(|| {
-            update_elo(
-                black_box(question.clone()),
-                black_box(&user_tags),
-                black_box(1.0),
-            )
-        })
+        b.iter(|| compute_elo(black_box(&user_tags), black_box(&question), black_box(1.0)))
     });
 }
 

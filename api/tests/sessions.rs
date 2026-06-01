@@ -46,7 +46,12 @@ async fn serve(pool: PgPool) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr: SocketAddr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
     format!("http://{addr}")
 }
@@ -57,15 +62,13 @@ async fn make_bearer(pool: &PgPool) -> String {
     let secret = "session_secret_123";
     let hash = hash_secret(secret);
 
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
-    )
-    .bind(user_id)
-    .bind(format!("session-user-{user_id}"))
-    .bind(format!("session-{user_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(user_id)
+        .bind(format!("session-user-{user_id}"))
+        .bind(format!("session-{user_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
     sqlx::query(
         "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
          VALUES ($1, $2, 'session token', $3, $4)",
@@ -73,7 +76,10 @@ async fn make_bearer(pool: &PgPool) -> String {
     .bind(token_id)
     .bind(user_id)
     .bind(hash)
-    .bind(vec!["attempt.write".to_string(), "quiz.write".to_string()])
+    .bind(vec![
+        "attempt.write".to_string(),
+        "assessment.write".to_string(),
+    ])
     .execute(pool)
     .await
     .unwrap();
@@ -89,15 +95,13 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
 /// tag to make tag-filtered practice planning deterministic on a shared DB.
 async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
     let author_id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'learner')",
-    )
-    .bind(author_id)
-    .bind(format!("author-{author_id}"))
-    .bind(format!("author-{author_id}@example.com"))
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+        .bind(author_id)
+        .bind(format!("author-{author_id}"))
+        .bind(format!("author-{author_id}@example.com"))
+        .execute(pool)
+        .await
+        .unwrap();
 
     let question_id: Uuid = sqlx::query(
         "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
@@ -140,7 +144,8 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
-    let question_id = make_live_mc_question(&pool).await;
+    let unique_tag = format!("rust-{}", uuid::Uuid::now_v7());
+    let question_id = make_live_mc_question_with_tag(&pool, &unique_tag).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -148,7 +153,7 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
         .post(format!("{base_url}/v1/sessions"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "tags": ["rust"],
+            "tags": [unique_tag],
             "types": ["mc"],
             "count": 1,
             "duration": 30,
@@ -334,6 +339,7 @@ async fn list_my_sessions_excludes_in_progress() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
+    make_live_mc_question(&pool).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -375,6 +381,7 @@ async fn abandon_session_roundtrip() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
+    make_live_mc_question(&pool).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -427,6 +434,7 @@ async fn patch_session_rejects_finished_target() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
+    make_live_mc_question(&pool).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 

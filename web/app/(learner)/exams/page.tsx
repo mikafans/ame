@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -18,6 +17,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
 import { LearningObjectives } from "@/components/LearningObjectives";
+import { tagColor } from "@/lib/tagColor";
 
 interface ExamSection {
   id: string;
@@ -25,7 +25,6 @@ interface ExamSection {
   weight: number;
   itemsCount: number;
   mix?: string;
-  quizId?: string;
 }
 
 interface Exam {
@@ -43,6 +42,8 @@ interface Exam {
   totalPoints: number;
   course?: string;
   tags?: string[];
+  completed?: boolean;
+  lastSessionId?: string | null;
 }
 
 type TabId = "all" | "published" | "draft";
@@ -61,7 +62,6 @@ interface SectionDraft {
 }
 
 export default function ExamsPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -82,18 +82,33 @@ export default function ExamsPage() {
   const [composing, setComposing] = useState(false);
 
   const [starting, setStarting] = useState(false);
-
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
 
   function load() {
     setLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
-      .GET("/v1/exams")
-      .then(({ data }: { data?: { exams: Exam[] } }) => {
-        if (data?.exams) {
-          setExams(data.exams);
-          if (!selected && data.exams.length) setSelected(data.exams[0].id);
+    api
+      .GET("/v1/assessments", {
+        params: { query: { mode: "graded" } },
+      })
+      .then(({ data }) => {
+        if (data) {
+          const list = "assessments" in data ? (data as any).assessments : data;
+          const mappedExams = (list as any[]).map((d: any) => ({
+            id: d.id,
+            name: d.title,
+            description: d.description ?? undefined,
+            status: d.status === "active" ? "published" : d.status,
+            method: "manual",
+            durationMin: d.durationMin ?? undefined,
+            objectives: d.objectives,
+            totalPoints: d.totalPoints,
+            course: d.course ?? undefined,
+            sections: null,
+            completed: d.completed,
+            lastSessionId: d.lastSessionId,
+          }));
+          setExams(mappedExams as any);
+          if (!selected && mappedExams.length) setSelected(mappedExams[0].id);
         }
       })
       .catch(console.error)
@@ -105,6 +120,44 @@ export default function ExamsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!selected) {
+      setSelectedExam(null);
+      return;
+    }
+    api
+      .GET("/v1/assessments/{id}", {
+        params: { path: { id: selected } },
+      })
+      .then(({ data }) => {
+        if (data) {
+          const mappedExam: Exam = {
+            id: data.id,
+            name: data.title,
+            description: data.description ?? undefined,
+            status: data.status === "active" ? "published" : data.status,
+            method: data.method,
+            durationMin: data.durationMin ?? undefined,
+            passingPoints: data.passingPoints ?? undefined,
+            objectives: data.objectives,
+            totalPoints: data.totalPoints,
+            course: data.course ?? undefined,
+            completed: exams.find((e) => e.id === selected)?.completed,
+            lastSessionId: exams.find((e) => e.id === selected)?.lastSessionId,
+            sections: data.sections.map((s) => ({
+              id: s.id,
+              title: s.title,
+              weight: s.weight * 100,
+              itemsCount: s.itemsCount,
+              mix: s.mix ? JSON.stringify(s.mix) : undefined,
+            })),
+          };
+          setSelectedExam(mappedExam);
+        }
+      })
+      .catch(console.error);
+  }, [selected]);
+
   const tabs: { id: TabId; label: string }[] = [
     { id: "all", label: "All" },
     { id: "published", label: "Active" },
@@ -113,7 +166,7 @@ export default function ExamsPage() {
 
   const filtered =
     tab === "all" ? exams : exams.filter((e) => e.status === tab);
-  const exam = exams.find((e) => e.id === selected) ?? null;
+  const exam = selectedExam;
   const examQuestionCount =
     exam?.sections && exam.sections.length > 0
       ? exam.sections.reduce((sum, s) => sum + (s.itemsCount ?? 0), 0)
@@ -123,9 +176,8 @@ export default function ExamsPage() {
     if (!selected) return;
     setStarting(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (api as any).POST("/v1/sessions", {
-        body: { examId: selected },
+      const { data } = await api.POST("/v1/sessions", {
+        body: { assessmentId: selected },
       });
       if (data?.sessionId) router.push(`/sessions/${data.sessionId}`);
     } catch (err) {
@@ -137,12 +189,11 @@ export default function ExamsPage() {
 
   function openCompose() {
     setShowCompose(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
+    api
       .GET("/v1/questions", {
         params: { query: { status: "live", limit: 200 } },
       })
-      .then(({ data }: { data?: { questions: AvailableQuestion[] } }) => {
+      .then(({ data }) => {
         setAvailableQuestions(data?.questions ?? []);
       })
       .catch(console.error);
@@ -152,41 +203,35 @@ export default function ExamsPage() {
     setComposing(true);
     setComposeError(null);
     try {
-      const body = {
-        name: composeName,
-        description: composeDesc || undefined,
-        duration: composeDuration,
-        passingPoints: composePassing === "" ? undefined : composePassing,
-        sections: sections.map((s, i) => ({
-          title: s.title || `Section ${i + 1}`,
-          weight: s.weight / 100,
-          questionIds: Array.from(s.selectedIds),
-          items: null,
-          tags: [],
-          types: [],
-        })),
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (api as any).POST("/v1/exams", { body });
-      if (error) {
-        if (
-          typeof error === "object" &&
-          "code" in error &&
-          error.code === "pool_insufficient"
-        ) {
-          setComposeError(
-            `Pool insufficient: ${(error as { message?: string }).message ?? "not enough questions match the section constraints"}`,
-          );
-        } else {
-          setComposeError("Failed to compose exam. Check section constraints.");
-        }
+      // Create the graded assessment (the unified "exam") …
+      const { data: created, error } = await api.POST("/v1/assessments", {
+        body: {
+          title: composeName,
+          description: composeDesc || undefined,
+          mode: "graded",
+          method: "manual",
+          objectives: [],
+          durationMin: composeDuration,
+          passingPoints: composePassing === "" ? undefined : composePassing,
+        },
+      });
+      if (error || !created) {
+        setComposeError("Failed to compose exam. Check the fields and retry.");
         return;
       }
-      if (data?.examId) {
-        setShowCompose(false);
-        load();
-        setSelected(data.examId);
+
+      // … then attach the selected questions to it.
+      const questionIds = sections.flatMap((s) => Array.from(s.selectedIds));
+      for (const questionId of questionIds) {
+        await api.POST("/v1/assessments/{id}/questions", {
+          params: { path: { id: created.id } },
+          body: { questionId },
+        });
       }
+
+      setShowCompose(false);
+      load();
+      setSelected(created.id);
     } catch {
       setComposeError("Could not reach the API.");
     } finally {
@@ -195,9 +240,9 @@ export default function ExamsPage() {
   }
 
   async function handlePublish(id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (api as any).PATCH(`/v1/exams/${id}`, {
-      body: { status: "published" },
+    await api.PATCH("/v1/assessments/{id}", {
+      params: { path: { id } },
+      body: { status: "active" },
     });
     load();
   }
@@ -271,13 +316,11 @@ export default function ExamsPage() {
           )}
         </Box>
 
-        {isInstructor && (
-          <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
-            <Button fullWidth variant="outlined" onClick={openCompose}>
-              Compose exam
-            </Button>
-          </Box>
-        )}
+        <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
+          <Button fullWidth variant="outlined" onClick={openCompose}>
+            Compose exam
+          </Button>
+        </Box>
       </Box>
 
       {/* Right: exam detail */}
@@ -299,7 +342,12 @@ export default function ExamsPage() {
                   variant="outlined"
                 />
                 {exam.course && (
-                  <Chip label={exam.course} size="small" variant="outlined" />
+                  <Chip
+                    label={exam.course}
+                    size="small"
+                    variant="outlined"
+                    sx={tagColor(exam.course)}
+                  />
                 )}
                 {exam.method && (
                   <Chip
@@ -446,8 +494,7 @@ export default function ExamsPage() {
               </Alert>
             )}
 
-            {(exam.status === "published" ||
-              (isInstructor && exam.status !== "published")) && (
+            {(exam.status === "published" || exam.status !== "published") && (
               <Box
                 sx={{
                   display: "flex",
@@ -459,16 +506,33 @@ export default function ExamsPage() {
                 }}
               >
                 {exam.status === "published" && (
-                  <Button
-                    variant="contained"
-                    size="large"
-                    disabled={starting}
-                    onClick={startExam}
-                  >
-                    {starting ? "Starting…" : "Start exam"}
-                  </Button>
+                  <>
+                    {exam.completed && exam.lastSessionId && (
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={() =>
+                          router.push(`/sessions/${exam.lastSessionId}/results`)
+                        }
+                      >
+                        Last result
+                      </Button>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="large"
+                      disabled={starting}
+                      onClick={startExam}
+                    >
+                      {starting
+                        ? "Starting…"
+                        : exam.completed
+                          ? "Retake exam"
+                          : "Start exam"}
+                    </Button>
+                  </>
                 )}
-                {isInstructor && exam.status !== "published" && (
+                {exam.status !== "published" && (
                   <Button
                     variant="outlined"
                     onClick={() => handlePublish(exam.id)}

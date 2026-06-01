@@ -1,4 +1,4 @@
-//! Quiz/exam session domain types.
+//! Assessment/exam session domain types.
 //!
 //! These mirror the `sessions` table and the `question_plan` JSON shape from
 //! `docs/specs/2026-05-20-harus-platform-design.md`.
@@ -13,7 +13,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionKind {
-    Quiz,
+    Assessment,
     Exam,
     Practice,
 }
@@ -21,7 +21,7 @@ pub enum SessionKind {
 impl SessionKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            SessionKind::Quiz => "quiz",
+            SessionKind::Assessment => "assessment",
             SessionKind::Exam => "exam",
             SessionKind::Practice => "practice",
         }
@@ -43,7 +43,7 @@ impl FromStr for SessionKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "quiz" => Ok(SessionKind::Quiz),
+            "assessment" => Ok(SessionKind::Assessment),
             "exam" => Ok(SessionKind::Exam),
             "practice" => Ok(SessionKind::Practice),
             other => Err(UnknownSessionKind(other.to_string())),
@@ -113,9 +113,7 @@ pub struct Session {
     pub user_id: Uuid,
     pub kind: SessionKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quiz_id: Option<Uuid>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exam_id: Option<Uuid>,
+    pub assessment_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub filter: Option<serde_json::Value>,
@@ -139,7 +137,7 @@ pub struct Session {
     #[schema(value_type = Option<String>, format = DateTime)]
     pub finished_at: Option<OffsetDateTime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quiz_title: Option<String>,
+    pub assessment_title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub course_title: Option<String>,
 }
@@ -150,7 +148,11 @@ mod tests {
 
     #[test]
     fn session_kind_string_roundtrip() {
-        for kind in [SessionKind::Quiz, SessionKind::Exam, SessionKind::Practice] {
+        for kind in [
+            SessionKind::Assessment,
+            SessionKind::Exam,
+            SessionKind::Practice,
+        ] {
             let parsed: SessionKind = kind.as_str().parse().expect("known kind parses");
             assert_eq!(parsed, kind);
             assert_eq!(kind.to_string(), kind.as_str());

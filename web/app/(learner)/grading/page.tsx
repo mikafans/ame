@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -31,19 +30,17 @@ interface GradeState {
 }
 
 export default function GradingPage() {
-  const { user } = useAuth();
   const [attempts, setAttempts] = useState<PendingAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [grades, setGrades] = useState<Record<string, GradeState>>({});
 
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
-
   useEffect(() => {
-    if (!isInstructor) return;
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/pending`,
-      { credentials: "include" },
-    )
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (typeof window !== "undefined"
+        ? `http://${window.location.hostname}:28080`
+        : "http://localhost:28080");
+    fetch(`${apiUrl}/v1/attempts/pending`, { credentials: "include" })
       .then((r) => r.json())
       .then((data: PendingAttempt[]) => {
         setAttempts(data);
@@ -60,7 +57,7 @@ export default function GradingPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isInstructor]);
+  }, []);
 
   const handleGrade = async (attemptId: string) => {
     const g = grades[attemptId];
@@ -71,21 +68,23 @@ export default function GradingPage() {
       ...prev,
       [attemptId]: { ...prev[attemptId], submitting: true },
     }));
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (typeof window !== "undefined"
+        ? `http://${window.location.hostname}:28080`
+        : "http://localhost:28080");
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/${attemptId}/grade`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            score: scoreNum / 100,
-            notes: g.notes || null,
-          }),
+      const res = await fetch(`${apiUrl}/v1/attempts/${attemptId}/grade`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        credentials: "include",
+        body: JSON.stringify({
+          score: scoreNum / 100,
+          notes: g.notes || null,
+        }),
+      });
       if (res.ok) {
         setGrades((prev) => ({
           ...prev,
@@ -105,14 +104,6 @@ export default function GradingPage() {
       }));
     }
   };
-
-  if (!isInstructor) {
-    return (
-      <Box sx={{ p: 4, color: "text.secondary", fontSize: 14 }}>
-        Access restricted to instructors and admins.
-      </Box>
-    );
-  }
 
   if (loading) {
     return (
@@ -142,7 +133,7 @@ export default function GradingPage() {
             mb: 1,
           }}
         >
-          Instructor · Manual grading
+          Manual grading
         </Typography>
         <Typography variant="h4" sx={{ fontWeight: 500 }}>
           Essay Grading
@@ -249,7 +240,7 @@ export default function GradingPage() {
                       mb: 1,
                     }}
                   >
-                    Learner&apos;s answer
+                    Response
                   </Typography>
                   <Typography
                     variant="body2"

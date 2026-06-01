@@ -120,6 +120,18 @@ export default function FlashcardsPage() {
     }
   }
 
+  // Skip-for-now: re-queue the current card to the end of the deck without
+  // counting it. No-op on the last remaining card (nothing left to defer past).
+  function handleSkip() {
+    setDeck((d) => {
+      if (d.length <= 1 || cursor >= d.length) return d;
+      const next = [...d];
+      const [card] = next.splice(cursor, 1);
+      next.push(card);
+      return next;
+    });
+  }
+
   function reviewMissed() {
     if (missed.length === 0) return;
     startReview(buildDeck(missed, missed.length));
@@ -230,6 +242,7 @@ export default function FlashcardsPage() {
           index={cursor}
           total={deck.length}
           onRate={handleRate}
+          onSkip={handleSkip}
         />
       </Box>
     );

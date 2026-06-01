@@ -12,17 +12,24 @@ use axum::{
 };
 use sqlx::Row;
 
-use crate::{auth::token::parse_bearer_token, http::AppState};
+use crate::{
+    auth::{extractor::AuthenticatedUser, token::parse_bearer_token},
+    http::AppState,
+};
 
 /// Mapping from (METHOD, matched-path-template) to MCP tool name.
 fn derive_tool_name(method: &str, path: &str) -> String {
     match (method, path) {
-        ("GET", "/v1/quizzes") => "quiz.list",
-        ("GET", "/v1/quizzes/:id") | ("GET", "/v1/quizzes/{id}") => "quiz.get",
-        ("POST", "/v1/quizzes") => "quiz.import",
-        ("PATCH", "/v1/quizzes/:id") | ("PATCH", "/v1/quizzes/{id}") => "quiz.update",
-        ("DELETE", "/v1/quizzes/:id") | ("DELETE", "/v1/quizzes/{id}") => "quiz.delete",
-        ("GET", "/v1/quizzes/:id/stats") | ("GET", "/v1/quizzes/{id}/stats") => "stats.cohort",
+        ("GET", "/v1/assessments") => "assessment.list",
+        ("GET", "/v1/assessments/:id") | ("GET", "/v1/assessments/{id}") => "assessment.get",
+        ("POST", "/v1/assessments") => "assessment.import",
+        ("PATCH", "/v1/assessments/:id") | ("PATCH", "/v1/assessments/{id}") => "assessment.update",
+        ("DELETE", "/v1/assessments/:id") | ("DELETE", "/v1/assessments/{id}") => {
+            "assessment.delete"
+        }
+        ("GET", "/v1/assessments/:id/stats") | ("GET", "/v1/assessments/{id}/stats") => {
+            "stats.cohort"
+        }
         ("GET", "/v1/exams") => "exam.list",
         ("GET", "/v1/exams/:id") | ("GET", "/v1/exams/{id}") => "exam.get",
         ("POST", "/v1/exams") => "exam.compose",
@@ -41,9 +48,6 @@ fn derive_tool_name(method: &str, path: &str) -> String {
         ("POST", "/v1/messages") => "feedback.send",
         ("POST", "/v1/plans") => "plan.create",
         ("GET", "/v1/plans/:id") | ("GET", "/v1/plans/{id}") => "plan.get",
-        ("POST", "/v1/shares") => "share.create",
-        ("GET", "/v1/shares/:id") | ("GET", "/v1/shares/{id}") => "share.get",
-        ("DELETE", "/v1/shares/:id") | ("DELETE", "/v1/shares/{id}") => "share.revoke",
         ("GET", "/v1/agents/activity") => "agent.activity",
         _ => return format!("{method} {path}"),
     }
@@ -68,10 +72,31 @@ pub async fn activity_log_middleware(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string());
 
+    let auth_extension = req.extensions().get::<AuthenticatedUser>().cloned();
+
     let response = next.run(req).await;
     let status = response.status().as_u16() as i32;
 
-    if let Some(auth_str) = auth_header
+    if let Some(auth) = auth_extension {
+        let pool = state.pool.clone();
+        let tool_name = derive_tool_name(&method, &path);
+        let path_clone = path.clone();
+        let agent_id = auth.user.id;
+
+        tokio::spawn(async move {
+            let _ = sqlx::query(
+                "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
+                         VALUES ($1, $2, $3, $4, $5)",
+            )
+            .bind(agent_id)
+            .bind(&tool_name)
+            .bind(&method)
+            .bind(&path_clone)
+            .bind(status)
+            .execute(&pool)
+            .await;
+        });
+    } else if let Some(auth_str) = auth_header
         && let Some(parsed) = parse_bearer_token(&auth_str)
     {
         let pool = state.pool.clone();

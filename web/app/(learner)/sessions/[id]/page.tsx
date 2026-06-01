@@ -40,7 +40,7 @@ interface SessionData {
     duration?: number;
     allowed_materials?: string[];
     course_title?: string;
-    quiz_title?: string;
+    assessment_title?: string;
   };
   questions: SessionQuestion[];
 }
@@ -287,7 +287,7 @@ export default function ActiveQuizPage({
         }}
       >
         <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
-          {session.session.quiz_title || "Quiz"}
+          {session.session.assessment_title || "Quiz"}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {answered}/{questions.length} answered

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,79 +13,88 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
+import PublicIcon from "@mui/icons-material/Public";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import { LearningObjectives } from "@/components/LearningObjectives";
 import { formatMinutes } from "@/utils/format";
+import { tagColor } from "@/lib/tagColor";
 
-interface Quiz {
+interface Assessment {
   id: string;
   title: string;
   description?: string;
   status: string;
+  visibility: "public" | "private";
   course?: string;
   difficulty?: string;
-  color?: string;
   objectives?: string[];
-  due_date?: string;
   questionCount?: number;
   durationMin?: number;
-  attemptLimit?: number;
   completed?: boolean;
+  lastSessionId?: string | null;
   createdAt: string;
 }
 
 type TabId = "all" | "completed" | "drafts";
+type VisibilityFilter = "all" | "public" | "mine";
 
 export default function LibraryPage() {
-  const { user } = useAuth();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<TabId>("all");
-  const [activeQuizzes, setActiveQuizzes] = useState<Quiz[]>([]);
-  const [draftQuizzes, setDraftQuizzes] = useState<Quiz[]>([]);
+  const [visibilityFilter, setVisibilityFilter] =
+    useState<VisibilityFilter>("all");
+  const [activeAssessments, setActiveAssessments] = useState<Assessment[]>([]);
+  const [draftAssessments, setDraftAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchAssessments = useCallback(async () => {
+    if (authLoading || !user) return;
     setLoading(true);
-    const client = api;
-
-    const fetchStatus = async (status: string): Promise<Quiz[]> => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (client as any).GET("/v1/quizzes", {
-        params: { query: { status } },
+    const fetchStatus = async (status: string): Promise<Assessment[]> => {
+      const { data } = await api.GET("/v1/assessments", {
+        params: { query: { mode: "practice", status } },
       });
-      return Array.isArray(data?.quizzes) ? data.quizzes : [];
+      if (data && "assessments" in data) {
+        return data.assessments as Assessment[];
+      }
+      return Array.isArray(data) ? (data as Assessment[]) : [];
     };
 
-    const isInst = user?.role === "instructor" || user?.role === "admin";
-    Promise.all([
-      fetchStatus("active"),
-      isInst ? fetchStatus("draft") : Promise.resolve([]),
-    ])
-      .then(([active, drafts]) => {
-        setActiveQuizzes(active);
-        setDraftQuizzes(drafts);
-      })
-      .finally(() => setLoading(false));
-  }, [user?.role]);
+    try {
+      const [active, drafts] = await Promise.all([
+        fetchStatus("active"),
+        fetchStatus("draft"),
+      ]);
+      setActiveAssessments(active);
+      setDraftAssessments(drafts);
+    } finally {
+      setLoading(false);
+    }
+  }, [authLoading, user]);
 
-  async function startQuiz(quizId: string) {
-    setStarting(quizId);
+  useEffect(() => {
+    if (!authLoading) fetchAssessments();
+  }, [fetchAssessments, authLoading]);
+
+  async function startAssessment(assessmentId: string) {
+    setStarting(assessmentId);
     setStartError(null);
     try {
-      const client = api;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (client as any).POST("/v1/sessions", {
-        body: { quizId },
+      const { data, error } = await api.POST("/v1/sessions", {
+        body: { assessmentId },
       });
       if (error) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setStartError((error as any)?.message ?? "Failed to start quiz");
+        setStartError((error as any)?.message ?? "Failed to start assessment");
         return;
       }
       if (data?.sessionId) {
@@ -99,9 +108,41 @@ export default function LibraryPage() {
     }
   }
 
-  const isInstructor = user?.role === "instructor" || user?.role === "admin";
+  // Apply visibility filter client-side (data already includes both public + own)
+  const applyVisibility = (list: Assessment[]) => {
+    if (visibilityFilter === "public")
+      return list.filter((a) => a.visibility === "public");
+    if (visibilityFilter === "mine") {
+      return list.filter(
+        (a) => a.visibility === "private" || a.status === "draft",
+      );
+    }
+    return list;
+  };
 
-  if (loading) {
+  const filteredActive = applyVisibility(activeAssessments);
+  const filteredDrafts = applyVisibility(draftAssessments);
+
+  const pending = filteredActive.filter((a) => !a.completed);
+  const completed = filteredActive.filter((a) => a.completed);
+
+  const allAssessments = [...filteredActive, ...filteredDrafts];
+
+  const listed =
+    tab === "completed"
+      ? completed
+      : tab === "drafts"
+        ? filteredDrafts
+        : allAssessments;
+
+  useEffect(() => {
+    if (tab === "completed" && completed.length === 0) setTab("all");
+    if (tab === "drafts" && filteredDrafts.length === 0) setTab("all");
+  }, [tab, completed.length, filteredDrafts.length]);
+
+  const featuredAssessment = pending[0] ?? null;
+
+  if (loading || authLoading) {
     return (
       <Box
         sx={{
@@ -116,21 +157,9 @@ export default function LibraryPage() {
     );
   }
 
-  const pendingQuizzes = activeQuizzes.filter((q) => !q.completed);
-  const completedQuizzes = activeQuizzes.filter((q) => q.completed);
-  // "All quizzes" lists everything (completed ones carry a badge + Retake);
-  // "Completed" is just a filtered view of the same set.
-  const quizzes =
-    tab === "completed"
-      ? completedQuizzes
-      : tab === "drafts"
-        ? draftQuizzes
-        : activeQuizzes;
-  // "Up next" highlights the first quiz the learner hasn't finished yet.
-  const featuredQuiz = pendingQuizzes[0] ?? null;
-
   return (
     <Box sx={{ p: 4 }}>
+      {/* ── Header ── */}
       <Box
         sx={{
           display: "flex",
@@ -140,26 +169,37 @@ export default function LibraryPage() {
         }}
       >
         <Typography variant="h4" sx={{ fontWeight: 500 }}>
-          Library
+          Assessments
         </Typography>
-        {isInstructor && (
-          <Button
-            variant="outlined"
-            startIcon={<AddOutlinedIcon />}
-            onClick={async () => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { data } = await (api as any).POST("/v1/quizzes", {
-                body: { title: "Untitled quiz" },
-              });
-              if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
-            }}
-          >
-            New quiz
-          </Button>
-        )}
+        <Button
+          variant="outlined"
+          startIcon={<AddOutlinedIcon />}
+          onClick={async () => {
+            const { data } = await api.POST("/v1/assessments", {
+              body: {
+                title: "Untitled assessment",
+                description: null,
+                mode: "practice",
+                objectives: [],
+                course: null,
+                durationMin: null,
+                timeLimitSeconds: null,
+                passingPoints: null,
+                showResultsDuring: false,
+                affectsRating: true,
+                visibility: "private",
+                method: "manual",
+              },
+            });
+            if (data?.id) router.push(`/author/${data.id}`);
+          }}
+        >
+          New assessment
+        </Button>
       </Box>
 
-      {featuredQuiz && (
+      {/* ── Up-next hero ── */}
+      {featuredAssessment && (
         <Card variant="outlined" sx={{ mb: 4, borderColor: "primary.main" }}>
           <CardContent>
             <Typography
@@ -170,15 +210,15 @@ export default function LibraryPage() {
               Up next
             </Typography>
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
-              {featuredQuiz.title}
+              {featuredAssessment.title}
             </Typography>
-            {featuredQuiz.description && (
+            {featuredAssessment.description && (
               <Typography
                 variant="body2"
                 color="text.secondary"
                 sx={{ mb: 1.5 }}
               >
-                {featuredQuiz.description}
+                {featuredAssessment.description}
               </Typography>
             )}
             <Stack direction="row" spacing={3} sx={{ mb: 2 }}>
@@ -187,7 +227,7 @@ export default function LibraryPage() {
                   Questions
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {featuredQuiz.questionCount ?? "—"}
+                  {featuredAssessment.questionCount ?? "—"}
                 </Typography>
               </Box>
               <Box>
@@ -195,43 +235,36 @@ export default function LibraryPage() {
                   Duration
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {featuredQuiz.durationMin
-                    ? formatMinutes(featuredQuiz.durationMin)
+                  {featuredAssessment.durationMin
+                    ? formatMinutes(featuredAssessment.durationMin)
                     : "—"}
                 </Typography>
               </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Attempts
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {featuredQuiz.attemptLimit ?? "Unlimited"}
-                </Typography>
-              </Box>
             </Stack>
-            {featuredQuiz.objectives && featuredQuiz.objectives.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    display: "block",
-                    mb: 0.5,
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Recommended prep
-                </Typography>
-                <LearningObjectives items={featuredQuiz.objectives} />
-              </Box>
-            )}
+            {featuredAssessment.objectives &&
+              featuredAssessment.objectives.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      display: "block",
+                      mb: 0.5,
+                      letterSpacing: 1.2,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Recommended prep
+                  </Typography>
+                  <LearningObjectives items={featuredAssessment.objectives} />
+                </Box>
+              )}
             <Stack direction="row" spacing={1}>
               <Button
                 size="small"
                 variant="outlined"
                 onClick={() =>
-                  router.push(`/quizzes/${featuredQuiz.id}/preview`)
+                  router.push(`/assessments/${featuredAssessment.id}/preview`)
                 }
               >
                 Preview questions
@@ -240,41 +273,87 @@ export default function LibraryPage() {
                 size="small"
                 variant="contained"
                 startIcon={<PlayArrowOutlinedIcon />}
-                disabled={starting === featuredQuiz.id}
-                onClick={() => startQuiz(featuredQuiz.id)}
+                disabled={starting === featuredAssessment.id}
+                onClick={() => startAssessment(featuredAssessment.id)}
               >
-                {starting === featuredQuiz.id ? "Starting…" : "Start"}
+                {starting === featuredAssessment.id ? "Starting…" : "Start"}
               </Button>
             </Stack>
           </CardContent>
         </Card>
       )}
 
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
+      {/* ── Tabs + Visibility filter ── */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: 1,
+          borderColor: "divider",
+          mb: 3,
+        }}
       >
-        <Tab
-          value="all"
-          label={`All quizzes (${activeQuizzes.length})`}
-          sx={{ textTransform: "none" }}
-        />
-        {completedQuizzes.length > 0 && (
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ "& .MuiTab-root": { textTransform: "none" } }}
+        >
           <Tab
-            value="completed"
-            label={`Completed (${completedQuizzes.length})`}
-            sx={{ textTransform: "none" }}
+            value="all"
+            label={`All (${allAssessments.length})`}
+            id="tab-all"
           />
-        )}
-        {draftQuizzes.length > 0 && (
-          <Tab
-            value="drafts"
-            label={`Drafts (${draftQuizzes.length})`}
-            sx={{ textTransform: "none" }}
-          />
-        )}
-      </Tabs>
+          {completed.length > 0 && (
+            <Tab
+              value="completed"
+              label={`Completed (${completed.length})`}
+              id="tab-completed"
+            />
+          )}
+          {filteredDrafts.length > 0 && (
+            <Tab
+              value="drafts"
+              label={`Drafts (${filteredDrafts.length})`}
+              id="tab-drafts"
+            />
+          )}
+        </Tabs>
+
+        {/* Visibility segmented control */}
+        <ToggleButtonGroup
+          value={visibilityFilter}
+          exclusive
+          onChange={(_, v) => {
+            if (v !== null) {
+              setVisibilityFilter(v);
+              // Reset to "all" tab if currently on drafts and switching filter
+              if (tab === "drafts" && v === "public") setTab("all");
+            }
+          }}
+          size="small"
+          aria-label="visibility filter"
+          sx={{ mb: 0.5 }}
+        >
+          <ToggleButton value="all" id="vis-filter-all" sx={{ px: 1.5 }}>
+            <Typography variant="caption" sx={{ textTransform: "none" }}>
+              All sets
+            </Typography>
+          </ToggleButton>
+          <ToggleButton value="public" id="vis-filter-public" sx={{ px: 1.5 }}>
+            <PublicIcon sx={{ fontSize: 14, mr: 0.5 }} />
+            <Typography variant="caption" sx={{ textTransform: "none" }}>
+              Public
+            </Typography>
+          </ToggleButton>
+          <ToggleButton value="mine" id="vis-filter-mine" sx={{ px: 1.5 }}>
+            <LockOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
+            <Typography variant="caption" sx={{ textTransform: "none" }}>
+              Mine
+            </Typography>
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
       {startError && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -282,12 +361,15 @@ export default function LibraryPage() {
         </Alert>
       )}
 
-      {quizzes.length === 0 ? (
-        <Typography color="text.secondary">No quizzes in this tab.</Typography>
+      {/* ── Assessment list ── */}
+      {listed.length === 0 ? (
+        <Typography color="text.secondary">
+          No assessments match this filter.
+        </Typography>
       ) : (
         <Stack spacing={2}>
-          {quizzes.map((quiz) => (
-            <Card key={quiz.id} variant="outlined">
+          {listed.map((assessment) => (
+            <Card key={assessment.id} variant="outlined">
               <CardContent>
                 <Box
                   sx={{
@@ -303,27 +385,52 @@ export default function LibraryPage() {
                         alignItems: "center",
                         gap: 1,
                         mb: 0.5,
+                        flexWrap: "wrap",
                       }}
                     >
                       <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        {quiz.title}
+                        {assessment.title}
                       </Typography>
-                      {quiz.course && (
+
+                      {/* Course chip */}
+                      {assessment.course && (
                         <Chip
-                          label={quiz.course}
+                          label={assessment.course}
                           size="small"
                           variant="outlined"
+                          sx={tagColor(assessment.course)}
                         />
                       )}
-                      {quiz.difficulty && (
-                        <Chip
-                          label={quiz.difficulty}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      )}
-                      {quiz.completed && (
+
+                      {/* Visibility chip */}
+                      <Chip
+                        icon={
+                          assessment.visibility === "public" ? (
+                            <PublicIcon
+                              sx={{ fontSize: "0.85rem !important" }}
+                            />
+                          ) : (
+                            <LockOutlinedIcon
+                              sx={{ fontSize: "0.85rem !important" }}
+                            />
+                          )
+                        }
+                        label={
+                          assessment.visibility === "public"
+                            ? "Public"
+                            : "Private"
+                        }
+                        size="small"
+                        variant="outlined"
+                        color={
+                          assessment.visibility === "public"
+                            ? "info"
+                            : "default"
+                        }
+                      />
+
+                      {/* Completed badge */}
+                      {assessment.completed && (
                         <Chip
                           label="Completed"
                           size="small"
@@ -332,57 +439,92 @@ export default function LibraryPage() {
                         />
                       )}
                     </Box>
-                    {quiz.description && (
+
+                    {assessment.description && (
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mb: 1 }}
                       >
-                        {quiz.description}
+                        {assessment.description}
                       </Typography>
                     )}
-                    {quiz.objectives && quiz.objectives.length > 0 && (
-                      <Box sx={{ mb: 1 }}>
-                        <LearningObjectives items={quiz.objectives} />
-                      </Box>
-                    )}
+
+                    {assessment.objectives &&
+                      assessment.objectives.length > 0 && (
+                        <Box sx={{ mb: 1 }}>
+                          <LearningObjectives items={assessment.objectives} />
+                        </Box>
+                      )}
+
                     <Stack direction="row" spacing={2}>
-                      {quiz.questionCount != null && (
+                      {assessment.questionCount != null && (
                         <Typography variant="caption" color="text.secondary">
-                          {quiz.questionCount} questions
+                          {assessment.questionCount} questions
                         </Typography>
                       )}
-                      {quiz.durationMin != null && (
+                      {assessment.durationMin != null && (
                         <Typography variant="caption" color="text.secondary">
-                          {formatMinutes(quiz.durationMin)}
+                          {formatMinutes(assessment.durationMin)}
                         </Typography>
                       )}
                     </Stack>
                   </Box>
-                  <Stack direction="row" spacing={1}>
-                    {quiz.status === "draft" ? (
+
+                  {/* Action buttons */}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ ml: 2, flexShrink: 0 }}
+                  >
+                    {assessment.status === "draft" ? (
                       <Button
                         size="small"
                         variant="outlined"
                         startIcon={<EditOutlinedIcon />}
-                        onClick={() => router.push(`/author/${quiz.id}`)}
+                        onClick={() => router.push(`/author/${assessment.id}`)}
                       >
                         Edit
                       </Button>
                     ) : (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<PlayArrowOutlinedIcon />}
-                        disabled={starting === quiz.id}
-                        onClick={() => startQuiz(quiz.id)}
-                      >
-                        {starting === quiz.id
-                          ? "Starting…"
-                          : quiz.completed
-                            ? "Retake"
-                            : "Start"}
-                      </Button>
+                      <>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() =>
+                            router.push(`/assessments/${assessment.id}/preview`)
+                          }
+                        >
+                          Preview
+                        </Button>
+                        {assessment.completed && assessment.lastSessionId && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="success"
+                            onClick={() =>
+                              router.push(
+                                `/sessions/${assessment.lastSessionId}/results`,
+                              )
+                            }
+                          >
+                            Last result
+                          </Button>
+                        )}
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<PlayArrowOutlinedIcon />}
+                          disabled={starting === assessment.id}
+                          onClick={() => startAssessment(assessment.id)}
+                        >
+                          {starting === assessment.id
+                            ? "Starting…"
+                            : assessment.completed
+                              ? "Retake"
+                              : "Start"}
+                        </Button>
+                      </>
                     )}
                   </Stack>
                 </Box>

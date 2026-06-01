@@ -113,7 +113,7 @@ function ShareModal({ payload, onClose }) {
           <div style={{ padding: "20px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div>
               <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--muted)" }}>
-                Share · {payload.kind === "item" ? "single question" : payload.kind === "exam" ? "exam" : "quiz"}
+                Share · {payload.kind === "item" ? "single question" : payload.kind === "exam" ? "exam" : "assessment"}
               </div>
               <h2 style={{ margin: "4px 0 0", fontFamily: "var(--serif)", fontSize: 22, fontWeight: 500, letterSpacing: -0.3 }}>
                 {payload.title}
@@ -210,7 +210,7 @@ function ShareModal({ payload, onClose }) {
           </div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text-2)", lineHeight: 1.6, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: 10 }}>
             POST /v1/shares<br />
-            {`{ "kind": "${payload.kind || "quiz"}",`}<br />
+            {`{ "kind": "${payload.kind || "assessment"}",`}<br />
             &nbsp;&nbsp;{`"id": "${payload.id || "demo"}",`}<br />
             &nbsp;&nbsp;{`"visibility": "public" }`}
           </div>
@@ -386,7 +386,7 @@ function CardTab({ payload, explanation, attrib, copy, copied }) {
         {/* middle */}
         <div style={{ position: "relative", zIndex: 1, maxWidth: "85%" }}>
           <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--accent)", letterSpacing: 1, marginBottom: 8 }}>
-            {payload.kind === "item" ? "Q · explained" : "Try this " + (payload.kind || "quiz")}
+            {payload.kind === "item" ? "Q · explained" : "Try this " + (payload.kind || "assessment")}
           </div>
           <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 500, lineHeight: 1.3, letterSpacing: -0.2, color: "var(--text)" }}>
             {payload.body || payload.title}
@@ -453,7 +453,7 @@ function EmbedTab({ url, copy, copied }) {
           { l: "Notion",  hint: "Drop URL"      },
           { l: "Obsidian", hint: "Web embed"    },
           { l: "WordPress", hint: "oEmbed"      },
-          { l: "MDX / Docs", hint: "<Quiz id>"  },
+          { l: "MDX / Docs", hint: "<Assessment id>"  },
           { l: "Slack",    hint: "Unfurled"     },
           { l: "Discord",  hint: "Unfurled"     },
         ].map((p) => (

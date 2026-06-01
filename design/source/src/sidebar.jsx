@@ -2,7 +2,7 @@ function Sidebar({ route, setRoute, showAgent }) {
   const items = [
     { id: "library",   label: "Library",        icon: "library", section: "Learn" },
     { id: "exams",     label: "Exams",          icon: "stack",    section: "Learn" },
-    { id: "quiz",      label: "Take quiz",      icon: "take",     section: "Learn" },
+    { id: "assessment",      label: "Take assessment",      icon: "take",     section: "Learn" },
     { id: "results",   label: "Last results",   icon: "results",  section: "Learn" },
     { id: "dashboard", label: "Progress",       icon: "dashboard",section: "Learn" },
     { id: "author",    label: "Author studio",  icon: "author",   section: "Teach" },

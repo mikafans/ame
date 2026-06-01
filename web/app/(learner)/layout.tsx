@@ -1,5 +1,6 @@
 "use client";
 
+// NOTE: The `(learner)` directory name is a legacy label. It hosts both learner and authoring features now.
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Box from "@mui/material/Box";
@@ -19,12 +20,11 @@ export default function LearnerLayout({
     if (!loading && !user) router.push("/login");
   }, [loading, user, router]);
 
-  const role = user?.role ?? "learner";
-
   const getRouteId = () => {
     if (pathname.startsWith("/library")) return "library";
+    if (pathname.startsWith("/explore")) return "explore";
     if (pathname.startsWith("/exams")) return "exams";
-    if (pathname.startsWith("/practice")) return "quiz";
+    if (pathname.startsWith("/practice")) return "assessment";
     if (pathname.startsWith("/flashcards")) return "flashcards";
     if (pathname.startsWith("/questions")) return "questions";
     if (pathname.startsWith("/results")) return "results";
@@ -38,8 +38,9 @@ export default function LearnerLayout({
   const handleRouteChange = (route: string) => {
     const routeMap: Record<string, string> = {
       library: "/library",
+      explore: "/explore",
       exams: "/exams",
-      quiz: "/practice",
+      assessment: "/practice",
       flashcards: "/flashcards",
       questions: "/questions",
       results: "/results",
@@ -53,11 +54,7 @@ export default function LearnerLayout({
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      <Sidebar
-        route={getRouteId()}
-        setRoute={handleRouteChange}
-        showAgent={role !== "learner"}
-      />
+      <Sidebar route={getRouteId()} setRoute={handleRouteChange} />
       <Box component="main" sx={{ flex: 1, overflowY: "auto" }}>
         {children}
       </Box>

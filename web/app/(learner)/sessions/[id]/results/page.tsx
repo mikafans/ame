@@ -25,6 +25,7 @@ interface Answer {
   type: "mc" | "tf" | "short" | "essay" | "code";
   prompt: string;
   given: string;
+  correctAnswer?: string;
   note: string;
   gradeStatus: string;
   explanation?: string;
@@ -32,9 +33,7 @@ interface Answer {
 
 interface ResultData {
   id: string;
-  quiz_id?: string;
-  exam_id?: string;
-  quiz_title: string | null;
+  assessment_title: string | null;
   course: string | null;
   attempt_number: number | null;
   total_attempts: number | null;
@@ -46,8 +45,6 @@ interface ResultData {
 
 interface SessionSummary {
   id: string;
-  quizId?: string;
-  examId?: string;
   pointsAwarded?: number;
   maxPoints?: number;
   startedAt: string;
@@ -99,9 +96,7 @@ export default function ResultsPage({
         const result = session.result ?? {};
         setData({
           id: session.id,
-          quiz_id: session.quiz_id,
-          exam_id: session.exam_id,
-          quiz_title: session.quiz_title ?? null,
+          assessment_title: session.assessment_title ?? null,
           course: session.course_title ?? null,
           attempt_number: null,
           total_attempts: null,
@@ -110,12 +105,29 @@ export default function ResultsPage({
           answers: questions.map((q: any) => {
             const attempt = byQuestion.get(q.questionId);
             const r = attempt?.response as Record<string, unknown> | undefined;
+            const p = attempt?.presentation as
+              | Record<string, unknown>
+              | undefined;
+            const ca = attempt?.correct_answer as
+              | Record<string, unknown>
+              | undefined;
+
             let given = "";
+            let correctAnswer = "";
+
             if (r) {
               if ("selected_position" in r) {
                 const pos = r.selected_position as number;
-                given =
+                const label =
                   ["A", "B", "C", "D", "E", "F"][pos] ?? `Option ${pos + 1}`;
+                const optionOrder = p?.option_order as number[] | undefined;
+                if (optionOrder && q.options) {
+                  const canonicalIdx = optionOrder[pos];
+                  const optText = q.options[canonicalIdx]?.text ?? "";
+                  given = `${label}: ${optText}`;
+                } else {
+                  given = label;
+                }
               } else if ("answer" in r) {
                 const ans = r.answer;
                 given =
@@ -130,6 +142,27 @@ export default function ResultsPage({
                 given = String(r.source ?? "");
               }
             }
+
+            if (ca && !attempt?.is_correct) {
+              if ("correct_index" in ca) {
+                const cIdx = ca.correct_index as number;
+                const optionOrder = p?.option_order as number[] | undefined;
+                if (optionOrder) {
+                  const pos = optionOrder.indexOf(cIdx);
+                  const label =
+                    ["A", "B", "C", "D", "E", "F"][pos] ?? `Option ${pos + 1}`;
+                  const optText = q.options?.[cIdx]?.text ?? "";
+                  correctAnswer = `${label}: ${optText}`;
+                }
+              } else if ("correct" in ca) {
+                correctAnswer = ca.correct ? "True" : "False";
+              } else if ("accepted" in ca) {
+                correctAnswer = (ca.accepted as string[]).join(", ");
+              } else if ("exemplar" in ca) {
+                correctAnswer = String(ca.exemplar);
+              }
+            }
+
             const score = attempt?.score ?? 0;
             const points = Math.round(score * q.points);
             const status = attempt?.grade_status ?? "ungraded";
@@ -141,6 +174,7 @@ export default function ResultsPage({
               type: q.kind,
               prompt: q.prompt,
               given,
+              correctAnswer,
               gradeStatus: status,
               note:
                 status === "pending_manual"
@@ -152,9 +186,15 @@ export default function ResultsPage({
             };
           }),
         });
-        if (session.quiz_id) {
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL ??
+          (typeof window !== "undefined"
+            ? `http://${window.location.hostname}:28080`
+            : "http://localhost:28080");
+
+        if (session.assessment_id) {
           fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?quizId=${session.quiz_id}`,
+            `${apiUrl}/v1/me/cohort-stats?assessmentId=${session.assessment_id}`,
             { credentials: "include" },
           )
             .then((r) => (r.ok ? r.json() : null))
@@ -163,18 +203,15 @@ export default function ResultsPage({
             })
             .catch(() => {});
         }
-        // Attempt history for this quiz/exam — populates "Attempt N of M"
+        // Attempt history for this assessment — populates "Attempt N of M"
         // and the list of previous attempts.
-        const histQuery = session.quiz_id
-          ? `quizId=${session.quiz_id}`
-          : session.exam_id
-            ? `examId=${session.exam_id}`
-            : null;
+        const histQuery = session.assessment_id
+          ? `assessmentId=${session.assessment_id}`
+          : null;
         if (histQuery) {
-          fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/sessions?${histQuery}`,
-            { credentials: "include" },
-          )
+          fetch(`${apiUrl}/v1/sessions?${histQuery}`, {
+            credentials: "include",
+          })
             .then((r) => (r.ok ? r.json() : null))
             .then((h: { sessions?: SessionSummary[] } | null) => {
               const sessions = h?.sessions ?? [];
@@ -229,7 +266,7 @@ export default function ResultsPage({
   return (
     <Box sx={{ p: 4, maxWidth: 800, mx: "auto" }}>
       <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
-        Quiz Results — {data.quiz_title || "Results"}
+        Quiz Results — {data.assessment_title || "Results"}
       </Typography>
       {data.attempt_number != null && data.total_attempts != null && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -363,9 +400,20 @@ export default function ResultsPage({
                   )}
                 </Box>
               ) : (
-                <Typography variant="caption" color="text.secondary">
-                  Your answer: {a.given || "—"}
-                </Typography>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Your answer: {a.given || "—"}
+                  </Typography>
+                  {a.correctAnswer && (
+                    <Typography
+                      variant="caption"
+                      color="error.main"
+                      sx={{ display: "block", mt: 0.5, fontWeight: 500 }}
+                    >
+                      Correct answer: {a.correctAnswer}
+                    </Typography>
+                  )}
+                </Box>
               )}
               {a.explanation && (
                 <>
@@ -446,7 +494,7 @@ export default function ResultsPage({
       {/* Footer */}
       <Stack direction="row" spacing={2} sx={{ justifyContent: "center" }}>
         <Button variant="outlined" onClick={() => router.push("/library")}>
-          Back to library
+          Back to assessments
         </Button>
       </Stack>
     </Box>

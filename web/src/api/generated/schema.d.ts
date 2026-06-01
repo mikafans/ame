@@ -4,6 +4,202 @@
  */
 
 export interface paths {
+    "/v1/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/admin/audit — retrieve append-only audit trail logs */
+        get: operations["list_audit_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/moderate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private) */
+        post: operations["moderate_assessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/admin/users — list all users */
+        get: operations["list_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user */
+        patch: operations["patch_user_admin"];
+        trace?: never;
+    };
+    "/v1/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_assessments"];
+        put?: never;
+        post: operations["create_assessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["count_assessments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate_assessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_assessment"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_assessment"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_assessment"];
+        trace?: never;
+    };
+    "/v1/assessments/{id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["add_assessment_question"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove_assessment_question"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_assessment_section"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{id}/sections/{section_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_assessment_section"];
+        options?: never;
+        head?: never;
+        patch: operations["patch_assessment_section"];
+        trace?: never;
+    };
     "/v1/attempts/pending": {
         parameters: {
             query?: never;
@@ -36,46 +232,66 @@ export interface paths {
         patch: operations["grade_attempt"];
         trace?: never;
     };
-    "/v1/exams": {
+    "/v1/auth/login": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["list_exams"];
+        get?: never;
         put?: never;
-        post: operations["compose_exam"];
+        /** POST /v1/auth/login — authenticate with email and password. */
+        post: operations["login"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/exams/{id}": {
+    "/v1/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_exam"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** POST /v1/auth/logout — clear the HttpOnly token cookie. */
+        post: operations["logout"];
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["patch_exam_status"];
+        patch?: never;
         trace?: never;
     };
-    "/v1/exams/{id}/stats": {
+    "/v1/auth/register": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["exam_stats"];
+        get?: never;
+        put?: never;
+        /** POST /v1/auth/register — register a new user with email and password. */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/explore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/explore — searchable, paginated assessment exploration. */
+        get: operations["explore"];
         put?: never;
         post?: never;
         delete?: never;
@@ -99,6 +315,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/me/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_agents"];
+        put?: never;
+        post: operations["create_agent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_agent"];
+        options?: never;
+        head?: never;
+        patch: operations["update_agent"];
         trace?: never;
     };
     "/v1/me/attempts": {
@@ -128,38 +376,6 @@ export interface paths {
         get: operations["get_cohort_stats"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["me_stats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["send_message"];
         delete?: never;
         options?: never;
         head?: never;
@@ -278,108 +494,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/quizzes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List quizzes. */
-        get: operations["list_quizzes"];
-        put?: never;
-        /**
-         * Create a new quiz.
-         * @description Only instructors and admins may create quizzes. Learners receive 403.
-         */
-        post: operations["create_quiz"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/quizzes/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get quiz count with optional filters. */
-        get: operations["count_quizzes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/quizzes/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["generate_quiz"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/quizzes/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_quiz"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["patch_quiz"];
-        trace?: never;
-    };
-    "/v1/quizzes/{id}/questions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["add_quiz_question"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/quizzes/{id}/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["quiz_stats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/sessions": {
         parameters: {
             query?: never;
@@ -387,7 +501,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/sessions — the caller's finished attempt history, newest first. */
         get: operations["list_my_sessions"];
         put?: never;
         post: operations["create_session"];
@@ -429,22 +542,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/sessions/{id}/answers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["autosave_answers"];
-        trace?: never;
-    };
     "/v1/sessions/{id}/finish": {
         parameters: {
             query?: never;
@@ -470,7 +567,7 @@ export interface paths {
         };
         get: operations["list_tags"];
         put?: never;
-        post: operations["create_tag"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -481,7 +578,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AddQuizQuestionBody: {
+        ActivityEntry: {
+            /** Format: uuid */
+            id: string;
+            method: string;
+            note?: string | null;
+            path: string;
+            /** Format: int32 */
+            status: number;
+            /** Format: uuid */
+            targetId?: string | null;
+            toolName: string;
+            /** Format: date-time */
+            ts: string;
+        };
+        ActivityResponse: {
+            items: components["schemas"]["ActivityEntry"][];
+            /** Format: uuid */
+            nextCursor?: string | null;
+        };
+        AddAssessmentQuestionBody: {
             kind?: null | components["schemas"]["QuestionKind"];
             /** Format: int32 */
             pointsOverride?: number | null;
@@ -491,12 +607,28 @@ export interface components {
              * @description Link an existing bank question by ID.
              */
             questionId?: string | null;
+            /**
+             * Format: uuid
+             * @description Target section ID (defaults to first section if absent).
+             */
+            sectionId?: string | null;
         };
-        AddQuizQuestionResponse: {
+        AddAssessmentQuestionResponse: {
             /** Format: int32 */
             orderIndex: number;
             /** Format: uuid */
             questionId: string;
+        };
+        AgentSummary: {
+            /** Format: date-time */
+            createdAt: string;
+            focusTags: string[];
+            /** Format: uuid */
+            id: string;
+            label: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            scopes: string[];
         };
         AnswerSessionBody: {
             /** Format: uuid */
@@ -510,7 +642,141 @@ export interface components {
             grade: components["schemas"]["GradeOutcome"];
             replayed: boolean;
         };
+        ApiError: "Unauthorized" | {
+            ScopeRequired: string;
+        } | {
+            NotFound: {
+                resource: string;
+            };
+        } | {
+            Validation: components["schemas"]["FieldError"][];
+        } | {
+            InvalidPayload: {
+                kind: string;
+                reason: string;
+            };
+        } | {
+            ExamPoolInsufficient: {
+                available: number;
+                required: number;
+                section: string;
+            };
+        } | "SessionFinished" | "ExamExpired" | "IdempotencyConflict" | "ScoringUnavailable" | "TooManyRequests" | {
+            QuotaExceeded: {
+                kind: string;
+                /** Format: int64 */
+                limit: number;
+                /** Format: int64 */
+                usage: number;
+            };
+        } | {
+            Internal: string;
+        };
+        Assessment: {
+            affectsRating: boolean;
+            compositionTrace?: unknown;
+            course?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            /** Format: uuid */
+            id: string;
+            method: string;
+            mode: components["schemas"]["AssessmentMode"];
+            objectives: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            showResultsDuring: boolean;
+            status: components["schemas"]["AssessmentStatus"];
+            /** Format: int32 */
+            timeLimitSeconds?: number | null;
+            title: string;
+            /** Format: int32 */
+            totalPoints: number;
+            /** Format: date-time */
+            updatedAt: string;
+            visibility: components["schemas"]["AssessmentVisibility"];
+        };
+        AssessmentDetail: components["schemas"]["Assessment"] & {
+            questions: components["schemas"]["AssessmentQuestion"][];
+            sections: components["schemas"]["AssessmentSectionDetail"][];
+        };
+        /** @enum {string} */
+        AssessmentMode: "practice" | "graded";
+        AssessmentQuestion: {
+            codeSnippet?: unknown;
+            explanation?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: int32 */
+            orderIndex: number;
+            payload: unknown;
+            /** Format: int32 */
+            points: number;
+            prompt: string;
+            status: string;
+        };
+        AssessmentSectionDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            itemsCount: number;
+            mix?: unknown;
+            /** Format: int32 */
+            orderIndex: number;
+            questions: components["schemas"]["AssessmentQuestion"][];
+            title: string;
+            /** Format: double */
+            weight: number;
+        };
+        AssessmentStatsParams: {
+            /** Format: uuid */
+            cohortId?: string | null;
+            window?: string | null;
+        };
+        AssessmentStatsResponse: {
+            /** Format: double */
+            avg: number;
+            distribution: components["schemas"]["DistributionBucket"][];
+            items: components["schemas"]["ItemStats"][];
+            /** Format: double */
+            median: number;
+        };
+        /** @enum {string} */
+        AssessmentStatus: "draft" | "active" | "archived";
+        AssessmentSummary: {
+            completed: boolean;
+            course?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            lastSessionId?: string | null;
+            mode: string;
+            objectives: string[];
+            /** Format: int64 */
+            questionCount: number;
+            status: string;
+            title: string;
+            /** Format: int32 */
+            totalPoints: number;
+            /** Format: date-time */
+            updatedAt: string;
+            visibility: string;
+        };
+        /** @enum {string} */
+        AssessmentVisibility: "public" | "private" | "unlisted";
         Attempt: {
+            correct_answer?: Record<string, never>;
             /** Format: date-time */
             created_at: string;
             grade_status: string;
@@ -559,22 +825,22 @@ export interface components {
             language: string;
             source: string;
         };
-        CodePayload: {
-            exemplar?: string | null;
-            language: string;
-            starter: string;
-            tests?: components["schemas"]["CodeTest"][];
-            /** Format: int32 */
-            time_limit_ms?: number | null;
+        AuditLogEntry: {
+            action: string;
+            /** Format: uuid */
+            actorUserId?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            metadata: unknown;
+            /** Format: uuid */
+            targetId?: string | null;
+            targetType?: string | null;
         };
-        CodeSnippet: {
-            body: string;
-            caption?: string | null;
-            language: string;
-        };
-        CodeTest: {
-            body: string;
-            name: string;
+        AuthResponse: {
+            token: string;
+            user: components["schemas"]["UserInfo"];
         };
         CohortStatsBucket: {
             /** Format: double */
@@ -583,10 +849,6 @@ export interface components {
             bucketStart: number;
             /** Format: int64 */
             count: number;
-        };
-        CohortStatsQuery: {
-            /** Format: uuid */
-            quizId: string;
         };
         CohortStatsResponse: {
             /** Format: double */
@@ -597,45 +859,37 @@ export interface components {
             /** Format: int32 */
             percentile?: number | null;
         };
-        ComposeExamBody: {
-            affectsRating?: boolean | null;
-            description?: string | null;
-            /** Format: int32 */
-            duration?: number | null;
-            method?: string | null;
-            name: string;
-            objectives?: string[];
-            /** Format: int32 */
-            passingPoints?: number | null;
-            sections: components["schemas"]["SectionSpec"][];
-        };
-        ComposeExamResponse: {
-            /** Format: uuid */
-            examId: string;
-            sections: components["schemas"]["ExamSection"][];
-            /** Format: int32 */
-            totalPoints: number;
-            warnings?: string[];
-        };
-        CountQuizzesQuery: {
-            cats?: string | null;
-            diff?: string | null;
-            tags?: string | null;
-            types?: string | null;
-        };
-        CountQuizzesResponse: {
+        CountAssessmentsResponse: {
             /** Format: int64 */
             count: number;
         };
-        CreateKeyBody: {
+        CreateAgentBody: {
+            focusTags?: string[];
             label: string;
             scopes: string[];
         };
-        CreateKeyResponse: {
+        CreateAgentResponse: {
             apiKey: string;
             /** Format: uuid */
             id: string;
-            prefix: string;
+        };
+        CreateAssessmentRequest: {
+            affectsRating?: boolean;
+            course?: string | null;
+            description?: string | null;
+            /** Format: int32 */
+            durationMin?: number | null;
+            method?: string;
+            mode?: components["schemas"]["AssessmentMode"];
+            objectives?: string[];
+            /** Format: int32 */
+            passingPoints?: number | null;
+            questions?: components["schemas"]["QuestionImport"][];
+            showResultsDuring?: boolean;
+            /** Format: int32 */
+            timeLimitSeconds?: number | null;
+            title: string;
+            visibility?: components["schemas"]["AssessmentVisibility"];
         };
         CreatePlanBody: {
             goal: string;
@@ -648,29 +902,21 @@ export interface components {
         CreateQuestionsResponse: {
             questions: components["schemas"]["Question"][];
         };
-        CreateQuizBody: {
-            course?: string | null;
-            difficulty?: string | null;
-            /** Format: int32 */
-            duration?: number | null;
-            objectives?: string[] | null;
+        CreateSectionBody: {
+            mix?: unknown;
             title: string;
-        };
-        CreateQuizResponse: {
-            quiz: components["schemas"]["CreatedQuiz"];
-            quizId: string;
+            /** Format: double */
+            weight?: number | null;
         };
         CreateSessionBody: {
+            /** Format: uuid */
+            assessmentId?: string | null;
             cats?: string[];
             count?: number | null;
             diff?: string | null;
             /** Format: int64 */
             duration?: number | null;
-            /** Format: uuid */
-            examId?: string | null;
             mode?: string | null;
-            /** Format: uuid */
-            quizId?: string | null;
             tags?: string[];
             types?: components["schemas"]["QuestionKind"][];
         };
@@ -679,145 +925,40 @@ export interface components {
             /** Format: uuid */
             sessionId: string;
         };
-        CreateTagBody: {
-            description?: string | null;
-            name: string;
-        };
-        CreateWebhookBody: {
-            events: string[];
-            url: string;
-        };
-        CreateWebhookResponse: {
-            /** Format: uuid */
-            id: string;
-            secret: string;
-        };
-        CreatedQuiz: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            /** Format: uuid */
-            id: string;
-            objectives: string[];
-            status: string;
-            title: string;
-        };
         DistributionBucket: {
             /** Format: int32 */
             bucket: number;
             /** Format: int64 */
             count: number;
         };
-        EssayPayload: {
-            judge: components["schemas"]["Judge"];
-            /** Format: int32 */
-            min_words?: number | null;
-            rubric?: string | null;
+        ExploreResponse: {
+            items: unknown[];
+            nextCursor?: string | null;
         };
-        Exam: {
-            affectsRating: boolean;
-            blueprint: unknown;
-            compositionTrace?: unknown;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            description?: string | null;
-            /** Format: int32 */
-            durationMin?: number | null;
-            /** Format: uuid */
-            id: string;
-            method: components["schemas"]["ExamMethod"];
-            name: string;
-            objectives: string[];
-            /** Format: int32 */
-            passingPoints?: number | null;
-            showResultsDuring: boolean;
-            status: components["schemas"]["ExamStatus"];
-            /** Format: int32 */
-            totalPoints: number;
-            /** Format: date-time */
-            updatedAt: string;
+        FieldError: {
+            field: string;
+            message: string;
         };
-        ExamListItem: components["schemas"]["Exam"] & {
-            sections: components["schemas"]["ExamSection"][];
-        };
-        /** @enum {string} */
-        ExamMethod: "manual" | "agent";
-        /**
-         * @description A resolved section of an exam.
-         *
-         *     Exactly one of `question_ids` (static) or `mix` (dynamic) is non-null.
-         */
-        ExamSection: {
-            /** Format: uuid */
-            examId: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: int32 */
-            itemsCount: number;
-            mix?: unknown;
-            /** Format: int32 */
-            orderIndex: number;
-            questionIds?: string[] | null;
-            title: string;
-            /** Format: double */
-            weight: number;
-        };
-        ExamStatsResponse: {
-            /** Format: double */
-            passRate: number;
-            sectionAvgs: components["schemas"]["SectionAvg"][];
-            /** Format: double */
-            timeP50?: number | null;
-            /** Format: double */
-            timeP95?: number | null;
-        };
-        /** @enum {string} */
-        ExamStatus: "draft" | "published" | "archived";
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
             session: components["schemas"]["Session"];
         };
-        GenerateBody: {
+        GenerateAssessmentBody: {
             objectives?: string[] | null;
             /** Format: int32 */
             questionCount?: number;
             source: string;
             types?: components["schemas"]["QuestionKind"][] | null;
         };
-        GenerateResponse: {
+        GenerateAssessmentResponse: {
             candidates: unknown[];
             objectives: string[];
             warnings: string[];
-        };
-        GetExamResponse: {
-            exam: components["schemas"]["Exam"];
-            sections: components["schemas"]["ExamSection"][];
-        };
-        GetQuizResponse: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            /** Format: uuid */
-            id: string;
-            objectives: string[];
-            questions: components["schemas"]["QuizQuestion"][];
-            status: string;
-            title: string;
-            /** Format: date-time */
-            updatedAt: string;
         };
         GetSessionQuestion: {
             codeSnippet?: unknown;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
-            /**
-             * @description Grading language for code questions (from the question payload), so the
-             *     client submits a `Code` response whose language matches the grader.
-             */
             language?: string | null;
             optionOrder?: number[] | null;
             options?: unknown[] | null;
@@ -859,50 +1000,37 @@ export interface components {
             /** Format: uuid */
             questionId: string;
         };
-        /**
-         * @description Free-text judge. Only `exact` is supported in MVP; `llm` is reserved for
-         *     the deferred LLM-as-judge feature.
-         * @enum {string}
-         */
-        Judge: "exact" | "manual" | "llm";
-        KeySummary: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: date-time */
-            lastUsedAt?: string | null;
-            name: string;
-            scopes: string[];
+        ListAgentsResponse: {
+            agents: components["schemas"]["AgentSummary"][];
+        };
+        ListAssessmentsResponse: {
+            assessments: components["schemas"]["AssessmentSummary"][];
+            /** Format: int64 */
+            total: number;
         };
         ListAttemptsResponse: {
             attempts: components["schemas"]["Attempt"][];
             /** Format: int64 */
             total: number;
         };
-        ListExamsResponse: {
-            exams: components["schemas"]["ExamListItem"][];
-        };
-        ListKeysResponse: {
-            keys: components["schemas"]["KeySummary"][];
+        ListAuditLogsResponse: {
+            logs: components["schemas"]["AuditLogEntry"][];
         };
         ListMySessionsResponse: {
             sessions: components["schemas"]["SessionSummary"][];
         };
-        ListQuizzesResponse: {
-            quizzes: components["schemas"]["QuizSummary"][];
+        ListQuestionsResponse: {
+            nextCursor?: string | null;
+            questions: components["schemas"]["Question"][];
             /** Format: int64 */
             total: number;
         };
         ListUsersResponse: {
             users: components["schemas"]["User"][];
         };
-        ListWebhooksResponse: {
-            webhooks: components["schemas"]["WebhookSummary"][];
-        };
-        McPayload: {
-            correct_index: number;
-            options: string[];
+        LoginBody: {
+            email: string;
+            password: string;
         };
         MeResponse: {
             /** Format: date-time */
@@ -913,53 +1041,17 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
-        MeStatsResponse: {
-            /** Format: int64 */
-            attempts_this_week: number;
-            /** Format: int64 */
-            attempts_total: number;
-            /** Format: double */
-            avg_score: number;
-            /** Format: double */
-            avg_score_delta: number;
-            /** Format: int64 */
-            best_streak: number;
-            /** Format: int64 */
-            current_streak: number;
-            /** Format: double */
-            hours_spent: number;
-            /** Format: double */
-            hours_spent_delta: number;
-            /** Format: int64 */
-            mastered_topics: number;
-            mastered_topics_delta_since: string;
-            /** Format: int64 */
-            mastered_topics_total: number;
-        };
-        /**
-         * @description Normalization rule applied to *both* the stored accepted answers and the
-         *     user's response at grade time. See spec §"Normalize semantics".
-         * @enum {string}
-         */
-        Normalize: "exact" | "case_insensitive_strip_accents";
-        PatchExamStatusBody: {
-            status: components["schemas"]["ExamStatus"];
-        };
-        PatchExamStatusResponse: {
+        ModerateBody: {
             /** Format: uuid */
-            id: string;
-            status: string;
-        };
-        PatchQuizResponse: {
-            /** Format: uuid */
-            id: string;
-            objectives: string[];
-            status: string;
-            title: string;
-            warnings: string[];
+            assessmentId: string;
         };
         PatchSessionBody: {
             status: components["schemas"]["SessionStatus"];
+        };
+        PatchUserAdminBody: {
+            disabled?: boolean | null;
+            plan?: string | null;
+            role?: string | null;
         };
         PendingAttemptRow: {
             /** Format: uuid */
@@ -979,6 +1071,8 @@ export interface components {
             /** Format: uuid */
             user_id: string;
         };
+        /** @enum {string} */
+        Plan: "free" | "premium";
         PlanItem: {
             option_order?: number[] | null;
             /** Format: uuid */
@@ -989,17 +1083,17 @@ export interface components {
         };
         Question: {
             /** Format: int32 */
-            attempts_count: number;
-            code_snippet?: null | components["schemas"]["CodeSnippet"];
+            attemptsCount: number;
+            codeSnippet?: unknown;
             /** Format: date-time */
-            created_at: string;
+            createdAt: string;
             /** Format: uuid */
-            created_by: string;
+            createdBy: string;
             explanation?: string | null;
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["QuestionKind"];
-            payload: Record<string, never>;
+            payload: unknown;
             /** Format: int32 */
             points: number;
             prompt: string;
@@ -1007,52 +1101,36 @@ export interface components {
             rating: number;
             source?: string | null;
             status: components["schemas"]["QuestionStatus"];
+            tags?: string[];
             /** Format: date-time */
-            updated_at: string;
+            updatedAt: string;
             /** Format: int32 */
             version: number;
         };
-        QuestionFilter: {
-            kind?: string | null;
-            /** Format: int64 */
-            limit?: number;
-            /** Format: double */
-            max_rating?: number | null;
-            /** Format: double */
-            min_rating?: number | null;
-            /** Format: int64 */
-            offset?: number;
-            search?: string | null;
-            status?: null | components["schemas"]["QuestionStatus"];
-            tag?: string | null;
-        };
-        QuestionInsert: {
-            code_snippet?: null | components["schemas"]["CodeSnippet"];
+        QuestionImport: {
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
-            payload: Record<string, never>;
+            payload: unknown;
             /** Format: int32 */
-            points?: number;
+            points?: number | null;
             prompt: string;
-            source?: string | null;
             tags?: string[];
+        };
+        QuestionInsert: {
+            explanation?: string | null;
+            kind: components["schemas"]["QuestionKind"];
+            payload: unknown;
+            /** Format: int32 */
+            points?: number | null;
+            prompt: string;
+            status?: null | components["schemas"]["QuestionStatus"];
+            tags: string[];
         };
         /** @enum {string} */
         QuestionKind: "mc" | "tf" | "short" | "essay" | "code";
-        QuestionListResponse: {
-            questions: components["schemas"]["Question"][];
-        };
-        /**
-         * @description Partial update body for `PATCH /questions/:id`.
-         *
-         *     Field semantics: `None` means "leave unchanged", `Some(v)` means "set to v".
-         *     Clearing a nullable field (e.g. removing `explanation`) is not supported in
-         *     MVP — rewrite via a new question if you need to.
-         */
         QuestionPatch: {
-            code_snippet?: null | components["schemas"]["CodeSnippet"];
             explanation?: string | null;
-            payload?: Record<string, never>;
+            payload?: unknown;
             /** Format: int32 */
             points?: number | null;
             prompt?: string | null;
@@ -1061,122 +1139,62 @@ export interface components {
         QuestionPlan: {
             items: components["schemas"]["PlanItem"][];
         };
+        QuestionRating: {
+            /** Format: int32 */
+            attempts_count: number;
+            /** Format: double */
+            rating: number;
+        };
         /** @enum {string} */
         QuestionStatus: "draft" | "live" | "archived";
-        /**
-         * @description Historical snapshot of a question's editable fields, written when a `live`
-         *     question is edited (see spec §"Versioning rule").
-         */
         QuestionVersion: {
             /** Format: date-time */
-            archived_at: string;
-            code_snippet?: null | components["schemas"]["CodeSnippet"];
+            archivedAt?: string | null;
+            codeSnippet?: unknown;
+            /** Format: date-time */
+            createdAt: string;
             explanation?: string | null;
-            payload: Record<string, never>;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
             prompt: string;
             /** Format: uuid */
-            question_id: string;
+            questionId: string;
             /** Format: int32 */
             version: number;
         };
-        QuestionVersionsResponse: {
-            versions: components["schemas"]["QuestionVersion"][];
-        };
-        QuizPatch: {
-            objectives?: string[] | null;
-            status?: string | null;
-            title?: string | null;
-        };
-        QuizQuestion: {
-            codeSnippet?: unknown;
-            explanation?: string | null;
-            /** Format: uuid */
-            id: string;
-            kind: string;
-            /** Format: int32 */
-            orderIndex: number;
-            payload: unknown;
-            /** Format: int32 */
-            points: number;
-            prompt: string;
-            status: string;
-        };
-        QuizStatsResponse: {
-            /** Format: double */
-            avg: number;
-            distribution: components["schemas"]["DistributionBucket"][];
-            items: components["schemas"]["ItemStats"][];
-            /** Format: double */
-            median: number;
-        };
-        QuizSummary: {
-            /** @description True when the requesting user has at least one finished session for this quiz. */
-            completed: boolean;
-            course?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            /** Format: uuid */
-            id: string;
-            objectives: string[];
-            /** Format: int64 */
-            questionCount: number;
-            status: string;
-            title: string;
-            /** Format: date-time */
-            updatedAt: string;
+        RegisterBody: {
+            email: string;
+            name: string;
+            password: string;
+            role: string;
         };
         /** @enum {string} */
-        Role: "learner" | "instructor" | "admin" | "agent";
-        RotateKeyResponse: {
-            apiKey: string;
+        Role: "user" | "admin" | "agent";
+        RunResponse: {
+            error?: string | null;
+            ok: boolean;
+            result: unknown;
+            tool: string;
         };
-        SectionAvg: {
-            /** Format: double */
-            avgScore: number;
-            /** Format: uuid */
-            sectionId: string;
-            title: string;
-        };
-        SectionSpec: {
-            /** Format: double */
-            difficultyMax?: number | null;
-            /** Format: double */
-            difficultyMin?: number | null;
-            /**
-             * Format: int32
-             * @description Dynamic: draw `items` questions matching these filters.
-             */
-            items?: number | null;
-            /** @description Static: explicit question ids from the bank. */
-            questionIds?: string[];
-            tags?: string[];
-            title: string;
-            types?: string[];
-            /** Format: double */
-            weight: number;
-        };
-        SendMessageBody: {
-            body: string;
-            channel: string;
-            /** Format: uuid */
-            linkQuizId?: string | null;
-            /** Format: uuid */
-            userId: string;
-        };
-        SendMessageResponse: {
-            /** Format: uuid */
-            messageId: string;
-            status: string;
-        };
+        /**
+         * @description Token scope as enforced by the `api_tokens.scopes` CHECK constraint.
+         *
+         *     The wire strings (used in JSON and stored in Postgres `text[]`) must stay in
+         *     lock-step with the migration's CHECK list — see
+         *     `db/migrations/20260520210000_p7_stats_feedback_keys.sql`. `from_str` is the
+         *     single point of translation; anything not listed here is rejected as `UnknownScope`.
+         * @enum {string}
+         */
+        Scope: "assessment.read" | "assessment.write" | "attempt.read" | "attempt.write" | "stats.read" | "feedback.write" | "plan.read" | "plan.write" | "public.publish" | "admin";
         Session: {
             affects_rating: boolean;
+            /** Format: uuid */
+            assessment_id?: string | null;
+            assessment_title?: string | null;
             course_title?: string | null;
             /** Format: date-time */
             deadline_at?: string | null;
-            /** Format: uuid */
-            exam_id?: string | null;
             filter?: Record<string, never>;
             /** Format: date-time */
             finished_at?: string | null;
@@ -1184,9 +1202,6 @@ export interface components {
             id: string;
             kind: components["schemas"]["SessionKind"];
             question_plan: components["schemas"]["QuestionPlan"];
-            /** Format: uuid */
-            quiz_id?: string | null;
-            quiz_title?: string | null;
             rating_snapshot: Record<string, never>;
             result?: Record<string, never>;
             /** Format: date-time */
@@ -1196,7 +1211,7 @@ export interface components {
             user_id: string;
         };
         /** @enum {string} */
-        SessionKind: "quiz" | "exam" | "practice";
+        SessionKind: "assessment" | "exam" | "practice";
         SessionQuestion: {
             /** Format: uuid */
             id: string;
@@ -1210,10 +1225,8 @@ export interface components {
             version: number;
         };
         SessionResult: {
-            graded_count: number;
             /** Format: int32 */
             max_points: number;
-            pending_manual_count: number;
             /** Format: double */
             percent: number;
             /** Format: int32 */
@@ -1221,15 +1234,12 @@ export interface components {
         };
         /** @enum {string} */
         SessionStatus: "in_progress" | "finished" | "abandoned";
-        /** @description One row in a learner's attempt history. */
         SessionSummary: {
-            /**
-             * Format: int64
-             * @description 1-based position of this attempt within its quiz/exam (chronological).
-             */
-            attemptNumber: number;
             /** Format: uuid */
-            examId?: string | null;
+            assessmentId?: string | null;
+            assessmentTitle?: string | null;
+            /** Format: int64 */
+            attemptNumber: number;
             /** Format: date-time */
             finishedAt?: string | null;
             /** Format: uuid */
@@ -1239,22 +1249,11 @@ export interface components {
             maxPoints?: number | null;
             /** Format: double */
             pointsAwarded?: number | null;
-            /** Format: uuid */
-            quizId?: string | null;
-            quizTitle?: string | null;
             /** Format: date-time */
             startedAt: string;
             status: string;
-            /**
-             * Format: int64
-             * @description Total finished attempts the learner has for the same quiz/exam.
-             */
+            /** Format: int64 */
             totalAttempts: number;
-        };
-        ShortPayload: {
-            accepted: string[];
-            judge: components["schemas"]["Judge"];
-            normalize: components["schemas"]["Normalize"];
         };
         StudyPlan: {
             /** Format: date-time */
@@ -1281,34 +1280,56 @@ export interface components {
         };
         Tag: {
             /** Format: date-time */
-            created_at: string;
+            createdAt: string;
             description?: string | null;
             /** Format: uuid */
             id: string;
             name: string;
         };
-        TfPayload: {
-            correct: boolean;
+        UpdateAgentBody: {
+            focusTags?: string[] | null;
+            label?: string | null;
+            scopes?: string[] | null;
         };
-        UpdateUserRoleBody: {
-            role: string;
+        UpdateAssessmentRequest: {
+            description?: string | null;
+            objectives?: string[] | null;
+            status?: null | components["schemas"]["AssessmentStatus"];
+            title?: string | null;
+            visibility?: null | components["schemas"]["AssessmentVisibility"];
+        };
+        UpdateSectionBody: {
+            mix?: unknown;
+            title?: string | null;
+            /** Format: double */
+            weight?: number | null;
         };
         User: {
             /** Format: date-time */
-            created_at: string;
-            display_name: string;
+            createdAt: string;
+            displayName: string;
             email?: string | null;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            ownerUserId?: string | null;
+            plan: string;
             role: components["schemas"]["Role"];
         };
-        WebhookSummary: {
-            /** Format: date-time */
-            createdAt: string;
-            events: string[];
+        UserInfo: {
+            email: string;
             /** Format: uuid */
             id: string;
-            url: string;
+            name: string;
+            role: string;
+        };
+        UserTagRating: {
+            /** Format: int32 */
+            attempts_count: number;
+            /** Format: double */
+            rating: number;
+            /** Format: uuid */
+            tag_id: string;
         };
     };
     responses: never;
@@ -1319,6 +1340,642 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_audit_logs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audit trail successfully retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAuditLogsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    moderate_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModerateBody"];
+            };
+        };
+        responses: {
+            /** @description Public content moderated and unpublished successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Content not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User list successfully retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListUsersResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_user_admin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchUserAdminBody"];
+            };
+        };
+        responses: {
+            /** @description User successfully updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_assessments: {
+        parameters: {
+            query?: {
+                /** @description Filter by mode (practice or graded) */
+                mode?: string;
+                /** @description Filter by status (draft, active, archived). When absent, returns public-active + caller's own. */
+                status?: string;
+                /** @description Page size (default: 50) */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of assessments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAssessmentsResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assessment created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSummary"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    count_assessments: {
+        parameters: {
+            query?: {
+                /** @description Filter by mode */
+                mode?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountAssessmentsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generate_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateAssessmentBody"];
+            };
+        };
+        responses: {
+            /** @description Generated assessment candidates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateAssessmentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentDetail"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assessment updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Assessment"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_assessment_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAssessmentQuestionBody"];
+            };
+        };
+        responses: {
+            /** @description Question linked */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddAssessmentQuestionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or question */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_assessment_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+                /** @description Question ID */
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question removed from assessment */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or question */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_assessment_section: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSectionBody"];
+            };
+        };
+        responses: {
+            /** @description Section created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSectionDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_assessment_section: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+                /** @description Section ID */
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Section deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or section */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_assessment_section: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+                /** @description Section ID */
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSectionBody"];
+            };
+        };
+        responses: {
+            /** @description Section updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentSectionDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such assessment or section */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_pending_attempts: {
         parameters: {
             query?: never;
@@ -1337,8 +1994,8 @@ export interface operations {
                     "application/json": components["schemas"]["PendingAttemptRow"][];
                 };
             };
-            /** @description Not instructor or admin */
-            403: {
+            /** @description Agent role not allowed */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1371,8 +2028,8 @@ export interface operations {
                     "application/json": components["schemas"]["Attempt"];
                 };
             };
-            /** @description Not instructor or admin */
-            403: {
+            /** @description Agent role not allowed */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1401,27 +2058,7 @@ export interface operations {
             };
         };
     };
-    list_exams: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of exams */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListExamsResponse"];
-                };
-            };
-        };
-    };
-    compose_exam: {
+    login: {
         parameters: {
             query?: never;
             header?: never;
@@ -1430,34 +2067,69 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ComposeExamBody"];
+                "application/json": components["schemas"]["LoginBody"];
             };
         };
         responses: {
-            /** @description Exam composed */
+            /** @description Logged in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logged out */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterBody"];
+            };
+        };
+        responses: {
+            /** @description User registered */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ComposeExamResponse"];
+                    "application/json": components["schemas"]["AuthResponse"];
                 };
             };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed or pool insufficient */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1466,121 +2138,32 @@ export interface operations {
             };
         };
     };
-    get_exam: {
+    explore: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Exam id */
-                id: string;
+            query?: {
+                tags?: string;
+                kind?: string;
+                search?: string;
+                limit?: number;
+                after?: string;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Exam with sections */
+            /** @description Assessment list */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GetExamResponse"];
+                    "application/json": components["schemas"]["ExploreResponse"];
                 };
             };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_exam_status: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Exam id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchExamStatusBody"];
-            };
-        };
-        responses: {
-            /** @description Exam status updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatchExamStatusResponse"];
-                };
-            };
-            /** @description Missing or invalid token */
+            /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Exam not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid status value */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    exam_stats: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Exam id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Exam stats */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExamStatsResponse"];
-                };
-            };
-            /** @description Requires stats.read scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Exam not found */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1608,6 +2191,145 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentBody"];
+            };
+        };
+        responses: {
+            /** @description Agent created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateAgentResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agent deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such agent */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_agent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentBody"];
+            };
+        };
+        responses: {
+            /** @description Agent updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such agent */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1651,9 +2373,9 @@ export interface operations {
     };
     get_cohort_stats: {
         parameters: {
-            query: {
-                /** @description Quiz to compare against */
-                quizId: string;
+            query?: {
+                /** @description Assessment to compare against */
+                assessmentId?: string;
             };
             header?: never;
             path?: never;
@@ -1672,74 +2394,6 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    me_stats: {
-        parameters: {
-            query?: {
-                /** @description One of `last30d` (≈4 weeks), `last90d` (≈12 weeks), or `all`. */
-                window?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description User stats summary */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MeStatsResponse"];
-                };
-            };
-        };
-    };
-    send_message: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SendMessageBody"];
-            };
-        };
-        responses: {
-            /** @description Message queued */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SendMessageResponse"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Requires feedback.write scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1838,39 +2492,34 @@ export interface operations {
     };
     list_questions: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tag: string | null;
-                status: null | components["schemas"]["QuestionStatus"];
-                minRating: number | null;
-                maxRating: number | null;
-                limit: number | null;
-                offset: number | null;
-                search: string | null;
-                kind: string | null;
-                page: number | null;
-                pageSize: number | null;
-                /**
-                 * @description Keyset cursor from a prior response's `nextCursor`; when set, `page` is
-                 *     ignored and the next rows after the cursor are returned.
-                 */
-                cursor: string | null;
+            query?: {
+                /** @description Filter by tag name */
+                tag?: string;
+                /** @description Filter by status (draft, live, archived) */
+                status?: string;
+                /** @description Partial match on prompt */
+                search?: string;
+                /** @description Filter by question kind */
+                kind?: string;
+                /** @description Pagination cursor */
+                after?: string;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Filtered list of questions */
+            /** @description Question list */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuestionListResponse"];
+                    "application/json": components["schemas"]["ListQuestionsResponse"];
                 };
             };
-            /** @description Missing or invalid token */
+            /** @description Unauthorized */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1892,7 +2541,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Batch of created questions */
+            /** @description Questions created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1901,22 +2550,8 @@ export interface operations {
                     "application/json": components["schemas"]["CreateQuestionsResponse"];
                 };
             };
-            /** @description Missing or invalid token */
+            /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Idempotency key conflict */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1943,7 +2578,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Question by id */
+            /** @description Question details */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1952,7 +2587,7 @@ export interface operations {
                     "application/json": components["schemas"]["Question"];
                 };
             };
-            /** @description No such question */
+            /** @description Question not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1977,7 +2612,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Updated question */
+            /** @description Question updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1986,28 +2621,14 @@ export interface operations {
                     "application/json": components["schemas"]["Question"];
                 };
             };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such question */
+            /** @description Question not found */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Cannot edit archived question */
+            /** @description Validation failed */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2037,7 +2658,7 @@ export interface operations {
                     "application/json": components["schemas"]["Question"];
                 };
             };
-            /** @description No such question */
+            /** @description Question not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2067,7 +2688,7 @@ export interface operations {
                     "application/json": components["schemas"]["Question"];
                 };
             };
-            /** @description No such question */
+            /** @description Question not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2088,351 +2709,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Historical versions, newest first */
+            /** @description Question history */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuestionVersionsResponse"];
+                    "application/json": components["schemas"]["QuestionVersion"][];
                 };
             };
-            /** @description No such question */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_quizzes: {
-        parameters: {
-            query?: {
-                /** @description Filter by status (default: active) */
-                status?: string;
-                /** @description Page size (default: 50) */
-                limit?: number;
-                /** @description Page offset */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Quiz list */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListQuizzesResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_quiz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateQuizBody"];
-            };
-        };
-        responses: {
-            /** @description Quiz created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateQuizResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (learner cannot create) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    count_quizzes: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated categories */
-                cats?: string;
-                /** @description Comma-separated tags */
-                tags?: string;
-                /** @description Difficulty filter */
-                diff?: string;
-                /** @description Comma-separated types */
-                types?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Quiz count */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CountQuizzesResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    generate_quiz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerateBody"];
-            };
-        };
-        responses: {
-            /** @description Generated quiz candidates */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GenerateResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_quiz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Quiz id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Quiz detail */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GetQuizResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such quiz */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_quiz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Quiz id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuizPatch"];
-            };
-        };
-        responses: {
-            /** @description Quiz updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatchQuizResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such quiz */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    add_quiz_question: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Quiz id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddQuizQuestionBody"];
-            };
-        };
-        responses: {
-            /** @description Question linked */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AddQuizQuestionResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such quiz or question */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    quiz_stats: {
-        parameters: {
-            query?: {
-                /** @description Filter by cohort (future) */
-                cohortId?: string;
-                /** @description 'last30d' | 'all' */
-                window?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Quiz id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Quiz stats */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuizStatsResponse"];
-                };
-            };
-            /** @description Requires stats.read scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Quiz not found */
+            /** @description Question not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2444,9 +2730,9 @@ export interface operations {
     list_my_sessions: {
         parameters: {
             query?: {
-                /** @description Filter by quiz */
-                quizId?: string;
-                /** @description Filter by exam */
+                /** @description Filter by quiz (legacy) */
+                assessmentId?: string;
+                /** @description Filter by exam (legacy) */
                 examId?: string;
             };
             header?: never;
@@ -2623,27 +2909,6 @@ export interface operations {
             };
         };
     };
-    autosave_answers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Session id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Draft saved */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     finish: {
         parameters: {
             query?: never;
@@ -2694,44 +2959,6 @@ export interface operations {
             };
             /** @description Missing or invalid token */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_tag: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateTagBody"];
-            };
-        };
-        responses: {
-            /** @description Tag created (or already existed) */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Tag"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -21,7 +21,7 @@ import DialogActions from "@mui/material/DialogActions";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
-interface Quiz {
+interface Assessment {
   id: string;
   title: string;
   status: string;
@@ -33,35 +33,55 @@ interface Quiz {
 export default function AuthorIndexPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [drafts, setDrafts] = useState<Quiz[] | null>(null);
+  const [drafts, setDrafts] = useState<Assessment[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [confirmQuiz, setConfirmQuiz] = useState<Quiz | null>(null);
+  const [confirmAssessment, setConfirmAssessment] = useState<Assessment | null>(
+    null,
+  );
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)
-      .GET("/v1/quizzes", { params: { query: { status: "draft" } } })
-      .then(({ data }: { data?: { quizzes: Quiz[] } }) => {
-        setDrafts(data?.quizzes ?? []);
+    api
+      .GET("/v1/assessments", { params: { query: { status: "draft" } } })
+      .then(({ data }) => {
+        if (data) {
+          const list = "assessments" in data ? (data as any).assessments : data;
+          const mappedDrafts = (list as any[]).map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            status: d.status,
+            course: d.course ?? undefined,
+            questionCount: d.questionCount,
+          }));
+          setDrafts(mappedDrafts as any);
+        }
       })
       .catch(() => setDrafts([]));
   }, []);
 
   async function discardDraft(id: string) {
-    setConfirmQuiz(null);
+    setConfirmAssessment(null);
     setDeleting(id);
     setDrafts((d) => d?.filter((q) => q.id !== id) ?? d);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (api as any).DELETE(`/v1/quizzes/${id}`);
+      await api.DELETE("/v1/assessments/{id}", { params: { path: { id } } });
     } catch {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (api as any)
-        .GET("/v1/quizzes", { params: { query: { status: "draft" } } })
-        .then(({ data }: { data?: { quizzes: Quiz[] } }) =>
-          setDrafts(data?.quizzes ?? []),
-        )
+      api
+        .GET("/v1/assessments", { params: { query: { status: "draft" } } })
+        .then(({ data }) => {
+          if (data) {
+            const list =
+              "assessments" in data ? (data as any).assessments : data;
+            const mappedDrafts = (list as any[]).map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              status: d.status,
+              course: d.course ?? undefined,
+              questionCount: d.questionCount,
+            }));
+            setDrafts(mappedDrafts as any);
+          }
+        })
         .catch(() => {});
     } finally {
       setDeleting(null);
@@ -71,11 +91,22 @@ export default function AuthorIndexPage() {
   async function createNew() {
     setCreating(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (api as any).POST("/v1/quizzes", {
-        body: { title: "Untitled quiz" },
+      const { data } = await api.POST("/v1/assessments", {
+        body: {
+          title: "Untitled assessment",
+          description: null,
+          mode: "practice",
+          objectives: [],
+          course: null,
+          durationMin: null,
+          timeLimitSeconds: null,
+          passingPoints: null,
+          showResultsDuring: false,
+          affectsRating: true,
+          method: "manual",
+        },
       });
-      if (data?.quiz?.id) router.push(`/author/${data.quiz.id}`);
+      if (data?.id) router.push(`/author/${data.id}`);
     } finally {
       setCreating(false);
     }
@@ -113,7 +144,7 @@ export default function AuthorIndexPage() {
           onClick={createNew}
           disabled={creating}
         >
-          {creating ? "Creating…" : "New quiz"}
+          {creating ? "Creating…" : "New assessment"}
         </Button>
       </Box>
 
@@ -123,7 +154,7 @@ export default function AuthorIndexPage() {
         </Box>
       ) : drafts.length === 0 ? (
         <Typography color="text.secondary" variant="body2">
-          No drafts yet — create a new quiz to get started.
+          No drafts yet — create a new assessment to get started.
         </Typography>
       ) : (
         <Stack spacing={1.5}>
@@ -174,7 +205,7 @@ export default function AuthorIndexPage() {
                 </CardActionArea>
                 <Box
                   component="button"
-                  onClick={() => setConfirmQuiz(q)}
+                  onClick={() => setConfirmAssessment(q)}
                   disabled={deleting === q.id}
                   title="Discard draft"
                   sx={{
@@ -200,24 +231,26 @@ export default function AuthorIndexPage() {
       )}
 
       <Dialog
-        open={confirmQuiz !== null}
-        onClose={() => setConfirmQuiz(null)}
+        open={confirmAssessment !== null}
+        onClose={() => setConfirmAssessment(null)}
         maxWidth="xs"
         fullWidth
       >
         <DialogTitle>Discard draft?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            <strong>&ldquo;{confirmQuiz?.title}&rdquo;</strong> and all its
-            questions will be permanently deleted. This cannot be undone.
+            <strong>&ldquo;{confirmAssessment?.title}&rdquo;</strong> and all
+            its questions will be permanently deleted. This cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmQuiz(null)}>Cancel</Button>
+          <Button onClick={() => setConfirmAssessment(null)}>Cancel</Button>
           <Button
             color="error"
             variant="contained"
-            onClick={() => confirmQuiz && discardDraft(confirmQuiz.id)}
+            onClick={() =>
+              confirmAssessment && discardDraft(confirmAssessment.id)
+            }
           >
             Discard
           </Button>
