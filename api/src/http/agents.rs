@@ -214,8 +214,35 @@ fn build_skill_manifest(strict: bool) -> Value {
         ),
         tool(
             "assessment.create",
-            "Create a new assessment.",
-            json!({"type":"object","required":["title","mode"],"properties":{"title":{"type":"string"},"description":{"type":"string"},"mode":{"type":"string","enum":["practice","graded"]},"course":{"type":"string"},"objectives":{"type":"array","items":{"type":"string"}}}}),
+            "Create a new assessment, optionally importing questions.",
+            json!({
+                "type":"object",
+                "required":["title","mode","method"],
+                "properties":{
+                    "title":{"type":"string"},
+                    "description":{"type":"string"},
+                    "mode":{"type":"string","enum":["practice","graded"]},
+                    "course":{"type":"string"},
+                    "objectives":{"type":"array","items":{"type":"string"}},
+                    "visibility":{"type":"string","enum":["public","private","unlisted"]},
+                    "method":{"type":"string","enum":["manual","agent"]},
+                    "questions":{
+                        "type":"array",
+                        "items":{
+                            "type":"object",
+                            "required":["kind","prompt","payload"],
+                            "properties":{
+                                "kind":{"type":"string","enum":["mc","tf","short","essay","code"]},
+                                "prompt":{"type":"string"},
+                                "payload":{"type":"object"},
+                                "explanation":{"type":"string"},
+                                "tags":{"type":"array","items":{"type":"string"}},
+                                "points":{"type":"integer"}
+                            }
+                        }
+                    }
+                }
+            }),
             "POST",
             "/v1/assessments",
             Some("assessment.write"),
@@ -252,7 +279,7 @@ fn build_skill_manifest(strict: bool) -> Value {
         tool(
             "question.create",
             "Batch-create one or more questions in the bank.",
-            json!({"type":"object","required":["questions"],"properties":{"questions":{"type":"array","items":{"type":"object","required":["kind","prompt","payload"],"properties":{"kind":{"type":"string","enum":["mc","tf","short","essay","code"]},"prompt":{"type":"string"},"payload":{"type":"object"},"explanation":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"points":{"type":"integer"}}}}}}),
+            json!({"type":"object","required":["questions"],"properties":{"questions":{"type":"array","items":{"type":"object","required":["kind","prompt","payload"],"properties":{"kind":{"type":"string","enum":["mc","tf","short","essay","code"]},"prompt":{"type":"string"},"payload":{"type":"object"},"explanation":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"points":{"type":"integer"},"status":{"type":"string","enum":["draft","live","archived"]}}}}}}),
             "POST",
             "/v1/questions",
             Some("assessment.write"),

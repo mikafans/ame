@@ -87,10 +87,18 @@ pub struct CreateQuestionsResponse {
 )]
 pub async fn list_questions(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuestionReadScopes>,
+    auth: RequireAnyScope<QuestionReadScopes>,
     Query(q): Query<ListQuestionsQuery>,
 ) -> Result<Json<ListQuestionsResponse>, ApiError> {
     let kind = q.kind.and_then(|k| QuestionKind::from_str(&k).ok());
+
+    // Filter by owner unless admin
+    let created_by = if auth.0.user.role == crate::domain::user::Role::Admin {
+        None
+    } else {
+        Some(auth.0.owner_id)
+    };
+
     let filter = repo::QuestionFilter {
         tag: q.tag,
         status: q.status,
@@ -100,6 +108,7 @@ pub async fn list_questions(
         max_rating: q.max_rating,
         limit: q.limit,
         offset: q.offset,
+        created_by,
     };
 
     let after = match q.after {
@@ -134,7 +143,7 @@ pub async fn list_questions(
 )]
 pub async fn get_question(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuestionReadScopes>,
+    auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
     let question = repo::get_question(&state.pool, id)
@@ -142,6 +151,16 @@ pub async fn get_question(
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
+
+    // Check ownership if not admin
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && question.created_by != auth.0.owner_id
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     Ok(Json(question))
 }
 
@@ -158,14 +177,24 @@ pub async fn get_question(
 )]
 pub async fn list_versions(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuestionReadScopes>,
+    auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<QuestionVersion>>, ApiError> {
-    if repo::get_question(&state.pool, id).await?.is_none() {
+    let question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    // Check ownership if not admin
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && question.created_by != auth.0.owner_id
+    {
         return Err(ApiError::NotFound {
             resource: "question",
         });
     }
+
     let versions = repo::get_question_versions(&state.pool, id).await?;
     Ok(Json(versions))
 }
@@ -209,10 +238,24 @@ pub async fn create_questions(
 )]
 pub async fn update_question(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuestionWriteScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
     Json(patch): Json<repo::QuestionPatch>,
 ) -> Result<Json<Question>, ApiError> {
+    let question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && question.created_by != auth.0.owner_id
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     let updated = repo::update_question(&state.pool, id, patch).await?;
     Ok(Json(updated))
 }
@@ -230,9 +273,23 @@ pub async fn update_question(
 )]
 pub async fn promote_question(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuestionWriteScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
+    let question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && question.created_by != auth.0.owner_id
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     Ok(Json(repo::promote_question(&state.pool, id).await?))
 }
 
@@ -249,9 +306,23 @@ pub async fn promote_question(
 )]
 pub async fn archive_question(
     State(state): State<AppState>,
-    _auth: RequireAnyScope<QuestionWriteScopes>,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
+    let question = repo::get_question(&state.pool, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && question.created_by != auth.0.owner_id
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
     Ok(Json(repo::archive_question(&state.pool, id).await?))
 }
 

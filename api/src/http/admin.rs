@@ -107,6 +107,7 @@ pub async fn list_users(
                 email: r.get("email"),
                 display_name: r.get("display_name"),
                 role,
+                plan: r.get("plan"),
                 created_at: r.get("created_at"),
             }
         })

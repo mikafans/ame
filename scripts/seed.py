@@ -328,6 +328,24 @@ def seed_users(client: httpx.Client, result: SeedResult) -> None:
             console.print(f"  [green]✓[/green] {u['role']:12} {u['email']}")
 
 
+def upgrade_premium_users(client: httpx.Client, result: SeedResult) -> None:
+    """Explicitly upgrade the instructor to premium as requested."""
+    console.rule("[bold]Premium Upgrades")
+    admin = next((u for u in result.users if u["role"] == "admin"), None)
+    if not admin:
+        console.print("  [yellow]No admin user — skipping upgrades[/yellow]")
+        return
+    admin_auth = {"Authorization": f"Bearer {admin['token']}"}
+
+    for u in result.users:
+        if u["email"] == "instructor@example.com":
+            r = client.patch(f"/v1/admin/users/{u['id']}", json={"plan": "premium"}, headers=admin_auth)
+            if r.is_success:
+                console.print(f"  [green]✓[/green] Upgraded {u['email']} to PREMIUM")
+            else:
+                console.print(f"  [yellow]Failed to upgrade {u['email']}:[/yellow] {r.status_code}")
+
+
 def seed_tags(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     console.rule("[bold]Tags")
     for tag in TAGS:
@@ -628,16 +646,7 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
         return
     admin_auth = {"Authorization": f"Bearer {admin['token']}"}
 
-    # 1. Upgrade learner and instructor to premium
-    for u in result.users:
-        if u["role"] == "user":
-            r = client.patch(f"/v1/admin/users/{u['id']}", json={"plan": "premium"}, headers=admin_auth)
-            if r.is_success:
-                console.print(f"  Upgraded {u['email']} to PREMIUM")
-            else:
-                console.print(f"  [yellow]Failed to upgrade {u['email']}:[/yellow] {r.status_code}")
-
-    # 2. Create agent for learner
+    # 1. Create agent for learner
     learner = next((u for u in result.users if u["email"] == "learner@example.com"), None)
     if learner:
         learner_auth = {"Authorization": f"Bearer {learner['token']}"}
@@ -727,6 +736,8 @@ def main() -> None:
 
         admin = next((u for u in result.users if u["role"] == "admin"), None)
         admin_auth = {"Authorization": f"Bearer {admin['token']}"} if admin else auth
+
+        upgrade_premium_users(client, result)
 
         seed_tags(client, auth, result)
         seed_questions(client, auth, result)

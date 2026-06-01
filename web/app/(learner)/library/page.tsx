@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
+import { useAuth } from "@/hooks/useAuth";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -46,6 +47,7 @@ type VisibilityFilter = "all" | "public" | "mine";
 
 export default function LibraryPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<TabId>("all");
   const [visibilityFilter, setVisibilityFilter] =
     useState<VisibilityFilter>("all");
@@ -56,6 +58,7 @@ export default function LibraryPage() {
   const [startError, setStartError] = useState<string | null>(null);
 
   const fetchAssessments = useCallback(async () => {
+    if (authLoading || !user) return;
     setLoading(true);
     const fetchStatus = async (status: string): Promise<Assessment[]> => {
       const { data } = await api.GET("/v1/assessments", {
@@ -77,11 +80,11 @@ export default function LibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
   useEffect(() => {
-    fetchAssessments();
-  }, [fetchAssessments]);
+    if (!authLoading) fetchAssessments();
+  }, [fetchAssessments, authLoading]);
 
   async function startAssessment(assessmentId: string) {
     setStarting(assessmentId);
@@ -110,20 +113,9 @@ export default function LibraryPage() {
     if (visibilityFilter === "public")
       return list.filter((a) => a.visibility === "public");
     if (visibilityFilter === "mine") {
-      console.log(
-        "Mine filter input:",
-        list.map((a) => ({
-          id: a.id,
-          title: a.title,
-          visibility: a.visibility,
-          status: a.status,
-        })),
-      );
-      const filtered = list.filter(
+      return list.filter(
         (a) => a.visibility === "private" || a.status === "draft",
       );
-      console.log("Mine filter results:", filtered);
-      return filtered;
     }
     return list;
   };
@@ -135,16 +127,6 @@ export default function LibraryPage() {
   const completed = filteredActive.filter((a) => a.completed);
 
   const allAssessments = [...filteredActive, ...filteredDrafts];
-  console.log(
-    "Tab:",
-    tab,
-    "FilteredActive:",
-    filteredActive,
-    "FilteredDrafts:",
-    filteredDrafts,
-    "All:",
-    allAssessments,
-  );
 
   const listed =
     tab === "completed"
@@ -153,9 +135,14 @@ export default function LibraryPage() {
         ? filteredDrafts
         : allAssessments;
 
+  useEffect(() => {
+    if (tab === "completed" && completed.length === 0) setTab("all");
+    if (tab === "drafts" && filteredDrafts.length === 0) setTab("all");
+  }, [tab, completed.length, filteredDrafts.length]);
+
   const featuredAssessment = pending[0] ?? null;
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <Box
         sx={{

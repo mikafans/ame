@@ -170,6 +170,17 @@ db-shell: ## Open interactive pgcli session to local Postgres
 db-seed: ## Seed demo users, tags, questions, assessments, and exams (requires API running)
 	uv run scripts/seed.py --api http://localhost:$(API_PORT)
 
+db-bulk: ## Mint 10k questions and 1k exams via agent surface (requires API running)
+	uv run scripts/mint_bulk.py --api http://localhost:$(API_PORT)
+
+db-heavy: db-reset ## Wipe, migrate, seed, and mint 10k+1k (requires API running)
+	@if ! curl -sf http://localhost:$(API_PORT)/healthz > /dev/null 2>&1; then \
+		echo "API not running — please start it with 'make dev' in another terminal"; \
+		exit 1; \
+	fi
+	$(MAKE) db-seed
+	$(MAKE) db-bulk
+
 simulate: ## Run all three role simulation scripts against local API (requires make dev + make db-seed)
 	uv run scripts/simulate/instructor.py
 	uv run scripts/simulate/learner.py

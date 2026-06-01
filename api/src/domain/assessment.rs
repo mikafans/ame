@@ -86,7 +86,19 @@ pub struct Assessment {
     pub updated_at: OffsetDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionImport {
+    pub kind: crate::domain::question::QuestionKind,
+    pub prompt: String,
+    pub payload: serde_json::Value,
+    pub explanation: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub points: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAssessmentRequest {
     pub title: String,
@@ -104,6 +116,8 @@ pub struct CreateAssessmentRequest {
     #[serde(default)]
     pub visibility: AssessmentVisibility,
     pub method: String, // 'manual' or 'agent'
+    #[serde(default)]
+    pub questions: Vec<QuestionImport>,
 }
 
 fn default_true() -> bool {

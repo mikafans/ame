@@ -81,7 +81,7 @@ use crate::{
         crate::http::assessments::delete_assessment_section,
         crate::http::assessments::count_assessments,
         crate::http::assessments::generate_assessment,
-        crate::http::assessments::explore,
+        crate::http::explore::explore,
         crate::http::questions::list_questions,
         crate::http::questions::get_question,
         crate::http::questions::list_versions,

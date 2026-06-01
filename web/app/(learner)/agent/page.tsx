@@ -64,15 +64,29 @@ type TabId = "keys" | "tools" | "import" | "activity";
 
 const SAMPLE_IMPORT = JSON.stringify(
   {
-    title: "Sample assessment",
+    title: "Mastery of Rust Ownership",
+    description: "A deep dive into move semantics and borrowing.",
+    mode: "graded",
+    method: "agent",
+    objectives: ["Understand Move semantics", "Differentiate &T and &mut T"],
+    visibility: "public",
     questions: [
       {
         kind: "mc",
-        prompt: "What is 2 + 2?",
+        prompt: "Which keyword is used to transfer ownership in Rust?",
         payload: {
-          options: ["3", "4", "5"],
-          correct_index: 1,
+          options: ["copy", "clone", "move", "transfer"],
+          correct_index: 2,
         },
+        tags: ["rust", "ownership"],
+      },
+      {
+        kind: "tf",
+        prompt: "A value can have multiple mutable references at once.",
+        payload: {
+          correct: false,
+        },
+        tags: ["rust", "borrowing"],
       },
     ],
   },

@@ -12,7 +12,10 @@ use axum::{
 };
 use sqlx::Row;
 
-use crate::{auth::token::parse_bearer_token, http::AppState};
+use crate::{
+    auth::{extractor::AuthenticatedUser, token::parse_bearer_token},
+    http::AppState,
+};
 
 /// Mapping from (METHOD, matched-path-template) to MCP tool name.
 fn derive_tool_name(method: &str, path: &str) -> String {
@@ -69,10 +72,31 @@ pub async fn activity_log_middleware(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string());
 
+    let auth_extension = req.extensions().get::<AuthenticatedUser>().cloned();
+
     let response = next.run(req).await;
     let status = response.status().as_u16() as i32;
 
-    if let Some(auth_str) = auth_header
+    if let Some(auth) = auth_extension {
+        let pool = state.pool.clone();
+        let tool_name = derive_tool_name(&method, &path);
+        let path_clone = path.clone();
+        let agent_id = auth.user.id;
+
+        tokio::spawn(async move {
+            let _ = sqlx::query(
+                "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
+                         VALUES ($1, $2, $3, $4, $5)",
+            )
+            .bind(agent_id)
+            .bind(&tool_name)
+            .bind(&method)
+            .bind(&path_clone)
+            .bind(status)
+            .execute(&pool)
+            .await;
+        });
+    } else if let Some(auth_str) = auth_header
         && let Some(parsed) = parse_bearer_token(&auth_str)
     {
         let pool = state.pool.clone();

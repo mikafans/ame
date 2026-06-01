@@ -69,6 +69,7 @@ fn mc_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
         explanation: None,
         points: Some(1),
         tags: tags.iter().map(|tag| tag.to_string()).collect(),
+        status: None,
     }
 }
 
@@ -85,6 +86,7 @@ fn short_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
         explanation: None,
         points: Some(1),
         tags: tags.iter().map(|tag| tag.to_string()).collect(),
+        status: None,
     }
 }
 

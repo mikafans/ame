@@ -33,6 +33,7 @@ pub struct User {
     pub email: Option<String>,
     pub display_name: String,
     pub role: Role,
+    pub plan: String,
     pub owner_user_id: Option<Uuid>,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]

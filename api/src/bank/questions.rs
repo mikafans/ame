@@ -25,6 +25,7 @@ pub struct QuestionFilter {
     pub max_rating: Option<f64>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub created_by: Option<Uuid>,
 }
 
 pub struct PagedQuestions {
@@ -56,6 +57,9 @@ pub async fn list_questions(
                JOIN tb_tags t ON t.id = qt.tag_id
                WHERE qt.question_id = q.id AND t.name = $6
            ))
+           AND ($9::uuid IS NULL OR q.created_by = $9 OR EXISTS (
+               SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $9
+           ))
          ORDER BY q.created_at DESC
          LIMIT $7 OFFSET $8"
     )
@@ -67,6 +71,7 @@ pub async fn list_questions(
     .bind(filter.tag)
     .bind(limit)
     .bind(offset)
+    .bind(filter.created_by)
     .fetch_all(pool)
     .await
     .map_err(internal)?;
@@ -105,6 +110,9 @@ pub async fn list_questions_paged(
                WHERE qt.question_id = q.id AND t.name = $6
            ))
            AND ($9::timestamptz IS NULL OR (q.created_at, q.id) < ($9, $10))
+           AND ($11::uuid IS NULL OR q.created_by = $11 OR EXISTS (
+               SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $11
+           ))
          ORDER BY q.created_at DESC, q.id DESC
          LIMIT $7 OFFSET $8"
     )
@@ -118,6 +126,7 @@ pub async fn list_questions_paged(
     .bind(offset)
     .bind(after_ts)
     .bind(after_id)
+    .bind(filter.created_by)
     .fetch_all(pool)
     .await
     .map_err(internal)?;
@@ -222,7 +231,7 @@ pub async fn get_question_versions(
         .collect()
 }
 
-pub const MAX_BATCH: usize = 50;
+pub const MAX_BATCH: usize = 250;
 
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
 pub struct QuestionInsert {
@@ -232,6 +241,7 @@ pub struct QuestionInsert {
     pub explanation: Option<String>,
     pub tags: Vec<String>,
     pub points: Option<i32>,
+    pub status: Option<QuestionStatus>,
 }
 
 #[derive(Debug, Default, serde::Deserialize, utoipa::ToSchema)]
@@ -261,15 +271,18 @@ pub async fn create_questions(
 
     for q in questions {
         let id = Uuid::now_v7();
+        let status = q.status.unwrap_or(QuestionStatus::Draft);
+
         sqlx::query(
             "INSERT INTO tb_questions (id, kind, prompt, payload, explanation, status, points, created_by)
-             VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7)"
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
         )
         .bind(id)
         .bind(q.kind.as_str())
         .bind(&q.prompt)
         .bind(&q.payload)
         .bind(&q.explanation)
+        .bind(status.as_str())
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
         .execute(&mut *tx)

@@ -24,6 +24,7 @@ pub struct AuthenticatedUser {
     pub user: User,
     pub token_scopes: Vec<Scope>,
     pub owner_id: Uuid,
+    pub owner_plan: String,
 }
 
 impl AuthenticatedUser {
@@ -45,6 +46,11 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // 0. Check if already extracted by middleware
+        if let Some(auth) = parts.extensions.get::<Self>() {
+            return Ok(auth.clone());
+        }
+
         // Try to extract token from Authorization: Bearer header first,
         // then fall back to HttpOnly ame_token cookie.
         let parsed = parts
@@ -72,9 +78,10 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             r#"
             SELECT 
                 t.token_hash, t.scopes, t.revoked_at,
-                u.id as user_id, u.email, u.display_name, u.role, u.created_at, u.owner_user_id,
+                u.id as user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.owner_user_id,
                 u.deactivated_at as user_deactivated_at,
-                o.deactivated_at as owner_deactivated_at
+                o.deactivated_at as owner_deactivated_at,
+                COALESCE(o.plan, u.plan) as owner_plan
             FROM tb_api_tokens t
             JOIN tb_users u ON t.user_id = u.id
             LEFT JOIN tb_users o ON u.owner_user_id = o.id
@@ -134,6 +141,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             email: record.get("email"),
             display_name: record.get("display_name"),
             role,
+            plan: record.get("plan"),
             created_at: record.get("created_at"),
         };
         let owner_id = user.owner_user_id.unwrap_or(user.id);
@@ -153,6 +161,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             user,
             token_scopes,
             owner_id,
+            owner_plan: record.get("owner_plan"),
         })
     }
 }
@@ -177,10 +186,12 @@ mod tests {
                 email: Some("alice@example.com".into()),
                 display_name: "Alice".into(),
                 role: Role::User,
+                plan: "free".into(),
                 created_at: now,
             },
             token_scopes: vec![],
             owner_id: user_id,
+            owner_plan: "free".into(),
         };
         assert_eq!(human.owner_id(), user_id);
 
@@ -192,10 +203,12 @@ mod tests {
                 email: None,
                 display_name: "Agent 007".into(),
                 role: Role::Agent,
+                plan: "free".into(),
                 created_at: now,
             },
             token_scopes: vec![],
             owner_id: user_id,
+            owner_plan: "free".into(),
         };
         assert_eq!(agent.owner_id(), user_id);
     }

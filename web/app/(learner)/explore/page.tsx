@@ -6,8 +6,6 @@ import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
 import Stack from "@mui/material/Stack";
-import Checkbox from "@mui/material/Checkbox";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -16,11 +14,13 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
+import Link from "next/link";
 import { api } from "@/api/client";
 import { vibrantTagColor } from "@/lib/tagColor";
 
 export default function ExplorePage() {
   const [search, setSearch] = useState("");
+  const [tags, setTags] = useState("");
   const [items, setItems] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,10 +28,11 @@ export default function ExplorePage() {
   const fetchItems = useCallback(
     async (cursor: string | null = null) => {
       setLoading(true);
-      const { data, error } = await api.GET("/v1/explore", {
+      const { data } = await api.GET("/v1/explore", {
         params: {
           query: {
             search: search || undefined,
+            tags: tags || undefined,
             limit: 50,
             after: cursor ?? undefined,
           } as any,
@@ -43,8 +44,15 @@ export default function ExplorePage() {
         setNextCursor(data.nextCursor ?? null);
       }
     },
-    [search],
+    [search, tags],
   );
+
+  // Reset list when filters change
+  const applyFilters = () => {
+    setItems([]);
+    setNextCursor(null);
+    fetchItems();
+  };
 
   useEffect(() => {
     fetchItems();
@@ -59,18 +67,27 @@ export default function ExplorePage() {
         </Typography>
         <TextField
           fullWidth
-          label="Search"
+          label="Search Title"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") fetchItems();
+            if (e.key === "Enter") applyFilters();
           }}
           sx={{ mb: 2 }}
         />
-        <Stack>
-          <FormControlLabel control={<Checkbox />} label="Assessments" />
-          <FormControlLabel control={<Checkbox />} label="Exams" />
-        </Stack>
+        <TextField
+          fullWidth
+          label="Filter by Tags (comma separated)"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") applyFilters();
+          }}
+          sx={{ mb: 2 }}
+        />
+        <Button variant="contained" fullWidth onClick={applyFilters}>
+          Apply Filters
+        </Button>
       </Paper>
 
       {/* Main Table */}
@@ -90,13 +107,17 @@ export default function ExplorePage() {
               <TableRow key={item.id}>
                 <TableCell>{item.title}</TableCell>
                 <TableCell>
-                  <Stack direction="row" spacing={1}>
-                    {(item.tags as string[]).map((tag) => (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ flexWrap: "wrap", gap: 0.5 }}
+                  >
+                    {(item.tags as string[]).map((t) => (
                       <Chip
-                        key={tag}
-                        label={tag}
+                        key={t}
+                        label={t}
                         size="small"
-                        sx={vibrantTagColor(tag)}
+                        sx={vibrantTagColor(t)}
                       />
                     ))}
                   </Stack>
@@ -106,7 +127,13 @@ export default function ExplorePage() {
                 </TableCell>
                 <TableCell>{item.visibility}</TableCell>
                 <TableCell>
-                  <Button size="small">Preview</Button>
+                  <Button
+                    size="small"
+                    component={Link}
+                    href={`/assessments/${item.id}/preview`}
+                  >
+                    Preview
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

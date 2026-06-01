@@ -884,6 +884,7 @@ export interface components {
             objectives: string[];
             /** Format: int32 */
             passingPoints?: number | null;
+            questions?: components["schemas"]["QuestionImport"][];
             showResultsDuring?: boolean;
             /** Format: int32 */
             timeLimitSeconds?: number | null;
@@ -1106,6 +1107,15 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        QuestionImport: {
+            explanation?: string | null;
+            kind: components["schemas"]["QuestionKind"];
+            payload: unknown;
+            /** Format: int32 */
+            points?: number | null;
+            prompt: string;
+            tags?: string[];
+        };
         QuestionInsert: {
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
@@ -1113,6 +1123,7 @@ export interface components {
             /** Format: int32 */
             points?: number | null;
             prompt: string;
+            status?: null | components["schemas"]["QuestionStatus"];
             tags: string[];
         };
         /** @enum {string} */
@@ -1302,6 +1313,7 @@ export interface components {
             id: string;
             /** Format: uuid */
             ownerUserId?: string | null;
+            plan: string;
             role: components["schemas"]["Role"];
         };
         UserInfo: {
@@ -2129,7 +2141,7 @@ export interface operations {
     explore: {
         parameters: {
             query?: {
-                tag?: string;
+                tags?: string;
                 kind?: string;
                 search?: string;
                 limit?: number;

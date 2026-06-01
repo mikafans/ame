@@ -20,7 +20,7 @@ use axum::{
     routing::{delete, get, patch, post},
 };
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use sqlx::{Arguments, Row, postgres::PgArguments};
 use time::{OffsetDateTime, UtcOffset};
 use utoipa::ToSchema;
 // End of router
@@ -176,6 +176,8 @@ pub struct AddAssessmentQuestionResponse {
 pub struct ListParams {
     pub mode: Option<String>,
     pub status: Option<String>,
+    pub search: Option<String>,
+    pub tag: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]
@@ -242,76 +244,74 @@ pub async fn list_assessments(
 ) -> Result<Json<ListAssessmentsResponse>, ApiError> {
     let uid = user.owner_id;
 
-    let rows = if let Some(ref status) = params.status {
-        sqlx::query(
-            "SELECT a.id, a.title, a.description, a.mode, a.status, a.visibility,
-                    a.course, a.objectives, a.duration_min, a.total_points,
-                    a.created_at, a.updated_at,
-                    COUNT(*) OVER() AS total,
-                    COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections
-                               WHERE assessment_id = a.id), 0) AS question_count,
-                    EXISTS(
-                        SELECT 1 FROM tb_sessions s
-                        WHERE s.assessment_id = a.id AND s.user_id = $1
-                          AND s.status = 'finished'
-                    ) AS completed,
-                    (
-                        SELECT s.id FROM tb_sessions s
-                        WHERE s.assessment_id = a.id AND s.user_id = $1
-                          AND s.status = 'finished'
-                        ORDER BY s.finished_at DESC LIMIT 1
-                    ) AS last_session_id
-             FROM tb_assessments a
-             WHERE a.status = $2
-               AND (a.visibility = 'public' OR a.created_by = $1)
-               AND ($3::text IS NULL OR a.mode = $3)
-             ORDER BY a.updated_at DESC
-             LIMIT $4 OFFSET $5",
-        )
-        .bind(uid)
-        .bind(status)
-        .bind(params.mode.as_deref())
-        .bind(params.limit)
-        .bind(params.offset)
+    let mut sql = String::from(
+        "SELECT a.id, a.title, a.description, a.mode, a.status, a.visibility,
+                a.course, a.objectives, a.duration_min, a.total_points,
+                a.created_at, a.updated_at,
+                COUNT(*) OVER() AS total,
+                COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections
+                           WHERE assessment_id = a.id), 0) AS question_count,
+                EXISTS(
+                    SELECT 1 FROM tb_sessions s
+                    WHERE s.assessment_id = a.id AND s.user_id = $1
+                      AND s.status = 'finished'
+                ) AS completed,
+                (
+                    SELECT s.id FROM tb_sessions s
+                    WHERE s.assessment_id = a.id AND s.user_id = $1
+                      AND s.status = 'finished'
+                    ORDER BY s.finished_at DESC LIMIT 1
+                ) AS last_session_id
+         FROM tb_assessments a
+         WHERE (a.created_by = $1 OR EXISTS (
+             SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
+         ))",
+    );
+
+    let mut args = PgArguments::default();
+    args.add(uid)
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+    let mut param_idx = 2;
+
+    if let Some(status) = params.status {
+        sql.push_str(&format!(" AND a.status = ${}", param_idx));
+        args.add(status)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+        param_idx += 1;
+    }
+    if let Some(mode) = params.mode {
+        sql.push_str(&format!(" AND a.mode = ${}", param_idx));
+        args.add(mode)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+        param_idx += 1;
+    }
+    if let Some(tag) = params.tag {
+        sql.push_str(&format!(" AND a.tags @> ARRAY[${}]", param_idx));
+        args.add(tag)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+        param_idx += 1;
+    }
+    if let Some(search) = params.search {
+        sql.push_str(&format!(" AND a.title ILIKE ${}", param_idx));
+        args.add(format!("%{}%", search))
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+        param_idx += 1;
+    }
+
+    sql.push_str(&format!(
+        " ORDER BY a.updated_at DESC LIMIT ${} OFFSET ${}",
+        param_idx,
+        param_idx + 1
+    ));
+    args.add(params.limit)
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+    args.add(params.offset)
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+
+    let rows = sqlx::query_with(&sql, args)
         .fetch_all(&state.pool)
         .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
-    } else {
-        sqlx::query(
-            "SELECT a.id, a.title, a.description, a.mode, a.status, a.visibility,
-                    a.course, a.objectives, a.duration_min, a.total_points,
-                    a.created_at, a.updated_at,
-                    COUNT(*) OVER() AS total,
-                    COALESCE((SELECT SUM(items_count) FROM tb_assessment_sections
-                               WHERE assessment_id = a.id), 0) AS question_count,
-                    EXISTS(
-                        SELECT 1 FROM tb_sessions s
-                        WHERE s.assessment_id = a.id AND s.user_id = $1
-                          AND s.status = 'finished'
-                    ) AS completed,
-                    (
-                        SELECT s.id FROM tb_sessions s
-                        WHERE s.assessment_id = a.id AND s.user_id = $1
-                          AND s.status = 'finished'
-                        ORDER BY s.finished_at DESC LIMIT 1
-                    ) AS last_session_id
-             FROM tb_assessments a
-             WHERE (
-                 (a.visibility = 'public' AND a.status = 'active')
-                 OR a.created_by = $1
-             )
-             AND ($2::text IS NULL OR a.mode = $2)
-             ORDER BY a.updated_at DESC
-             LIMIT $3 OFFSET $4",
-        )
-        .bind(uid)
-        .bind(params.mode.as_deref())
-        .bind(params.limit)
-        .bind(params.offset)
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
-    };
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
     let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
     let assessments = rows
@@ -355,15 +355,33 @@ pub async fn create_assessment(
     State(state): State<AppState>,
     Json(payload): Json<CreateAssessmentRequest>,
 ) -> Result<(StatusCode, Json<AssessmentSummary>), ApiError> {
-    let assessment_id = Uuid::new_v4();
+    tracing::info!(
+        "Creating assessment: title='{}', questions={}",
+        payload.title,
+        payload.questions.len()
+    );
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let assessment_id = Uuid::now_v7();
     let visibility = payload.visibility.to_string();
+
+    let question_count = payload.questions.len() as i64;
+    let total_points: i32 = payload
+        .questions
+        .iter()
+        .map(|q| q.points.unwrap_or(1))
+        .sum();
 
     sqlx::query(
         "INSERT INTO tb_assessments \
          (id, title, description, mode, objectives, course, duration_min, \
           time_limit_seconds, passing_points, show_results_during, affects_rating, \
-          method, visibility, created_by) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+          method, visibility, created_by, total_points) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
     )
     .bind(assessment_id)
     .bind(payload.title.clone())
@@ -379,21 +397,77 @@ pub async fn create_assessment(
     .bind(&payload.method)
     .bind(&visibility)
     .bind(user.user.id)
-    .execute(&state.pool)
+    .bind(total_points)
+    .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
     // Create a default section
+    let section_id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO tb_assessment_sections (id, assessment_id, title, order_index, weight, items_count) \
-         VALUES ($1, $2, $3, 0, 1.0, 0)",
+         VALUES ($1, $2, $3, 0, 1.0, $4)",
     )
-    .bind(Uuid::new_v4())
+    .bind(section_id)
     .bind(assessment_id)
     .bind("Main Section")
-    .execute(&state.pool)
+    .bind(question_count as i32)
+    .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    // Import questions if any
+    for (i, q) in payload.questions.into_iter().enumerate() {
+        let question_id = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO tb_questions (id, kind, prompt, payload, explanation, status, points, created_by) \
+             VALUES ($1, $2, $3, $4, $5, 'live', $6, $7)"
+        )
+        .bind(question_id)
+        .bind(q.kind.as_str())
+        .bind(&q.prompt)
+        .bind(&q.payload)
+        .bind(&q.explanation)
+        .bind(q.points.unwrap_or(1))
+        .bind(user.user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        // Link to assessment
+        sqlx::query(
+            "INSERT INTO tb_assessment_items (section_id, question_id, order_index) \
+             VALUES ($1, $2, $3)",
+        )
+        .bind(section_id)
+        .bind(question_id)
+        .bind(i as i32)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        // Tags
+        for tag_name in q.tags {
+            let tag_id: Uuid = sqlx::query_scalar(
+                "INSERT INTO tb_tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"
+            )
+            .bind(&tag_name)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            sqlx::query("INSERT INTO tb_question_tags (question_id, tag_id) VALUES ($1, $2)")
+                .bind(question_id)
+                .bind(tag_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     Ok((
         StatusCode::CREATED,
@@ -407,8 +481,8 @@ pub async fn create_assessment(
             course: payload.course,
             objectives: payload.objectives,
             duration_min: payload.duration_min,
-            total_points: 0,
-            question_count: 0,
+            total_points,
+            question_count,
             completed: false,
             last_session_id: None,
             created_at: to_jst(OffsetDateTime::now_utc()),
@@ -1273,7 +1347,9 @@ pub async fn explore(
                    ORDER BY s.finished_at DESC LIMIT 1
                ) AS last_session_id
         FROM tb_assessments a
-        WHERE a.visibility = 'public' AND a.status = 'active'
+        WHERE (a.created_by = $1 OR EXISTS (
+            SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
+        ))
         ORDER BY a.updated_at DESC
         LIMIT $2 OFFSET $3
         "#,

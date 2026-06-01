@@ -12,7 +12,6 @@ import Alert from "@mui/material/Alert";
 import { api } from "@/api/client";
 import { FlashcardReview } from "@/components/flashcards/FlashcardReview";
 import { buildDeck, filterByTypes, type FlashQuestion } from "@/lib/flashcards";
-import { vibrantTagColor } from "@/lib/tagColor";
 
 interface TagItem {
   name: string;
@@ -168,12 +167,9 @@ export default function FlashcardsPage() {
                   label={t.name}
                   size="small"
                   onClick={() => setSelectedTag(t.name)}
-                  sx={{
-                    cursor: "pointer",
-                    ...(selectedTag === t.name
-                      ? vibrantTagColor(t.name)
-                      : { variant: "outlined" }),
-                  }}
+                  color={selectedTag === t.name ? "primary" : "default"}
+                  variant={selectedTag === t.name ? "filled" : "outlined"}
+                  sx={{ cursor: "pointer" }}
                 />
               ))}
             </Stack>

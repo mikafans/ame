@@ -25,6 +25,7 @@ dependencies = [
  "argon2",
  "axum",
  "axum-prometheus",
+ "base64",
  "criterion",
  "hex",
  "hmac",
