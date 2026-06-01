@@ -13,9 +13,9 @@ const extraConnectSrc = allowedDevOrigins
   .map((host) => `http://${host}:* ws://${host}:*`)
   .join(" ");
 
-// CSP is the main mitigation for the non-HttpOnly `ame_token` cookie. Until
-// auth moves server-side we keep the policy tight: no inline scripts beyond
-// what Next.js needs, connect only to the API origin we know about.
+// CSP provides defense-in-depth alongside our HttpOnly `ame_token` cookie.
+// We keep the policy tight: no inline scripts beyond what Next.js needs,
+// connect only to the API origin we know about.
 //
 // `'unsafe-inline'` for styles is required by MUI/Emotion in dev. Drop it once
 // nonce-based styles are wired (see https://mui.com/material-ui/guides/content-security-policy/).

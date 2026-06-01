@@ -96,7 +96,7 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 			echo "[e2e] API not running — starting..."; \
 			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
 			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
-			AME_RATELIMIT_BURST=100 AME_AGENT_ACCESS_CODE=e2e-access-code \
+			AME_GLOBAL_RATELIMIT_BURST=20000 AME_RATELIMIT_BURST=100 AME_AGENT_ACCESS_CODE=e2e-access-code \
 				mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api >> .tmp/ame-api-e2e.log 2>&1 & \
 			echo $$! > .tmp/ame-api-e2e.pid; \
 			_api_owned=1; \
@@ -210,6 +210,7 @@ dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override
 	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
 		AME_PORT=$(API_PORT) \
 		AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
+		AME_GLOBAL_RATELIMIT_BURST=20000 \
 		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
 		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee .tmp/ame-api.log &
 	@echo "Starting frontend on :$(WEB_PORT) targeting $(API_HOST):$(API_PORT) (logs → .tmp/ame-web.log)"

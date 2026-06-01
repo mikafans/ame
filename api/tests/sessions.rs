@@ -144,7 +144,8 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
 
     let pool = setup_db().await;
     let bearer = make_bearer(&pool).await;
-    let question_id = make_live_mc_question(&pool).await;
+    let unique_tag = format!("rust-{}", uuid::Uuid::now_v7());
+    let question_id = make_live_mc_question_with_tag(&pool, &unique_tag).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -152,7 +153,7 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
         .post(format!("{base_url}/v1/sessions"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&json!({
-            "tags": ["rust"],
+            "tags": [unique_tag],
             "types": ["mc"],
             "count": 1,
             "duration": 30,
