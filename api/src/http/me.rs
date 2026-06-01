@@ -474,6 +474,20 @@ pub async fn update_agent(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    // 1. Verify existence and ownership
+    let exists = sqlx::query(
+        "SELECT 1 FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'",
+    )
+    .bind(id)
+    .bind(user.user.id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if exists.is_none() {
+        return Err(ApiError::NotFound { resource: "agent" });
+    }
+
     if let Some(label) = &body.label {
         sqlx::query("UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3")
             .bind(label)
@@ -485,21 +499,33 @@ pub async fn update_agent(
     }
 
     if let Some(tags) = &body.focus_tags {
-        sqlx::query("UPDATE tb_agent_profiles SET focus_tags = $1 WHERE agent_user_id = $2")
-            .bind(tags)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+        sqlx::query(
+            "UPDATE tb_agent_profiles \
+             SET focus_tags = $1 \
+             WHERE agent_user_id = $2 \
+               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent')"
+        )
+        .bind(tags)
+        .bind(id)
+        .bind(user.user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
     if let Some(scopes) = &body.scopes {
-        sqlx::query("UPDATE tb_api_tokens SET scopes = $1 WHERE user_id = $2")
-            .bind(scopes)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+        sqlx::query(
+            "UPDATE tb_api_tokens \
+             SET scopes = $1 \
+             WHERE user_id = $2 \
+               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent')"
+        )
+        .bind(scopes)
+        .bind(id)
+        .bind(user.user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
     tx.commit()

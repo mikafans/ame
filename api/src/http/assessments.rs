@@ -378,6 +378,15 @@ pub async fn create_assessment(
     let assessment_id = Uuid::now_v7();
     let visibility = payload.visibility.to_string();
 
+    if payload.visibility == AssessmentVisibility::Public {
+        crate::http::quota::check_quota(
+            &state.pool,
+            user.owner_id(),
+            crate::http::quota::QuotaKind::PublicAssessment,
+        )
+        .await?;
+    }
+
     let question_count = payload.questions.len() as i64;
     let total_points: i32 = payload
         .questions
@@ -650,6 +659,33 @@ pub async fn patch_assessment(
 ) -> Result<Json<Assessment>, ApiError> {
     // Only the owner can patch
     let status = payload.status.as_ref().map(|s| s.to_string());
+
+    if payload.visibility == Some(AssessmentVisibility::Public) {
+        let current_visibility: Option<String> =
+            sqlx::query_scalar("SELECT visibility FROM tb_assessments WHERE id = $1")
+                .bind(id)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+
+        match current_visibility {
+            Some(v) if v != "public" => {
+                crate::http::quota::check_quota(
+                    &state.pool,
+                    user.owner_id(),
+                    crate::http::quota::QuotaKind::PublicAssessment,
+                )
+                .await?;
+            }
+            None => {
+                return Err(ApiError::NotFound {
+                    resource: "assessment",
+                });
+            }
+            _ => {}
+        }
+    }
+
     let row = sqlx::query(
         "UPDATE tb_assessments
            SET title       = COALESCE($1, title),
