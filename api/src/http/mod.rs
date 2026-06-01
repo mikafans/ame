@@ -14,6 +14,7 @@ use tower_governor::GovernorLayer;
 use tower_governor::errors::GovernorError;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::{KeyExtractor, PeerIpKeyExtractor};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -81,6 +82,39 @@ pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
 
 pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
+
+    // CORS: Default to localhost:23000 if AME_CORS_ORIGINS is unset.
+    // Use "*" to allow everything (prod preview).
+    let cors_origins =
+        std::env::var("AME_CORS_ORIGINS").unwrap_or_else(|_| "http://localhost:23000".to_string());
+
+    let cors = if cors_origins == "*" {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        let origins: Vec<axum::http::HeaderValue> = cors_origins
+            .split(',')
+            .filter_map(|s| s.parse().ok())
+            .collect();
+
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(origins))
+            .allow_methods([
+                axum::http::Method::GET,
+                axum::http::Method::POST,
+                axum::http::Method::PATCH,
+                axum::http::Method::DELETE,
+                axum::http::Method::OPTIONS,
+            ])
+            .allow_headers([
+                axum::http::header::CONTENT_TYPE,
+                axum::http::header::AUTHORIZATION,
+                axum::http::header::ACCEPT,
+            ])
+            .allow_credentials(true)
+    };
 
     // Global rate limit: per-token, applied to all authenticated routes.
     // Defaults: burst 100, refill 1 per 1s.
@@ -168,6 +202,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(public_limited)
         .merge(logged_router)
         .route("/healthz", get(healthz))
+        .layer(cors)
         .with_state(state)
 }
 

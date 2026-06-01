@@ -35,10 +35,12 @@ export default function GradingPage() {
   const [grades, setGrades] = useState<Record<string, GradeState>>({});
 
   useEffect(() => {
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/pending`,
-      { credentials: "include" },
-    )
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (typeof window !== "undefined"
+        ? `http://${window.location.hostname}:28080`
+        : "http://localhost:28080");
+    fetch(`${apiUrl}/v1/attempts/pending`, { credentials: "include" })
       .then((r) => r.json())
       .then((data: PendingAttempt[]) => {
         setAttempts(data);
@@ -66,21 +68,23 @@ export default function GradingPage() {
       ...prev,
       [attemptId]: { ...prev[attemptId], submitting: true },
     }));
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (typeof window !== "undefined"
+        ? `http://${window.location.hostname}:28080`
+        : "http://localhost:28080");
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/attempts/${attemptId}/grade`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            score: scoreNum / 100,
-            notes: g.notes || null,
-          }),
+      const res = await fetch(`${apiUrl}/v1/attempts/${attemptId}/grade`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        credentials: "include",
+        body: JSON.stringify({
+          score: scoreNum / 100,
+          notes: g.notes || null,
+        }),
+      });
       if (res.ok) {
         setGrades((prev) => ({
           ...prev,

@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
 
-const allowedDevOrigins =
-  process.env.NEXT_ALLOWED_ORIGINS?.split(",").filter(Boolean) ?? [];
+const allowedDevOrigins = [
+  "harus-mini",
+  ...(process.env.NEXT_ALLOWED_ORIGINS?.split(",").filter(Boolean) ?? []),
+];
 
-const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:28080";
+
+// Add both apiOrigin and any host in allowedDevOrigins to connect-src.
+// We map hosts to http/ws equivalents for dev.
+const extraConnectSrc = allowedDevOrigins
+  .map((host) => `http://${host}:* ws://${host}:*`)
+  .join(" ");
 
 // CSP is the main mitigation for the non-HttpOnly `ame_token` cookie. Until
 // auth moves server-side we keep the policy tight: no inline scripts beyond
@@ -17,7 +25,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${apiOrigin}`,
+  `connect-src 'self' ${apiOrigin} ${extraConnectSrc}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

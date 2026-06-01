@@ -35,7 +35,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ??
+    (typeof window !== "undefined"
+      ? `http://${window.location.hostname}:28080`
+      : "http://localhost:28080");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

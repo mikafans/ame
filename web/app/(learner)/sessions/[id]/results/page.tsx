@@ -186,9 +186,15 @@ export default function ResultsPage({
             };
           }),
         });
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL ??
+          (typeof window !== "undefined"
+            ? `http://${window.location.hostname}:28080`
+            : "http://localhost:28080");
+
         if (session.assessment_id) {
           fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/me/cohort-stats?assessmentId=${session.assessment_id}`,
+            `${apiUrl}/v1/me/cohort-stats?assessmentId=${session.assessment_id}`,
             { credentials: "include" },
           )
             .then((r) => (r.ok ? r.json() : null))
@@ -203,10 +209,9 @@ export default function ResultsPage({
           ? `assessmentId=${session.assessment_id}`
           : null;
         if (histQuery) {
-          fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/v1/sessions?${histQuery}`,
-            { credentials: "include" },
-          )
+          fetch(`${apiUrl}/v1/sessions?${histQuery}`, {
+            credentials: "include",
+          })
             .then((r) => (r.ok ? r.json() : null))
             .then((h: { sessions?: SessionSummary[] } | null) => {
               const sessions = h?.sessions ?? [];

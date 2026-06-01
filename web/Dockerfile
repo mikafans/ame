@@ -28,7 +28,7 @@ RUN if [ ! -f src/api/generated/schema.d.ts ]; then \
     fi
 
 # NEXT_PUBLIC_API_URL is baked into the client bundle at build time.
-ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_API_URL=http://localhost:28080
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 RUN bun run build

@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let port = std::env::var("AME_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(8080);
+        .unwrap_or(28080);
     let addr: SocketAddr = format!("0.0.0.0:{port}").parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, "ame-api listening");
