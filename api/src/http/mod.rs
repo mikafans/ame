@@ -28,11 +28,28 @@ struct TokenKeyExtractor;
 impl KeyExtractor for TokenKeyExtractor {
     type Key = String;
     fn extract<T>(&self, req: &axum::http::Request<T>) -> Result<Self::Key, GovernorError> {
-        req.headers()
-            .get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .ok_or(GovernorError::UnableToExtractKey)
+        let parsed = req
+            .headers()
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|h| h.to_str().ok())
+            .and_then(crate::auth::token::parse_bearer_token)
+            .or_else(|| {
+                req.headers()
+                    .get(axum::http::header::COOKIE)
+                    .and_then(|h| h.to_str().ok())
+                    .and_then(|cookies| {
+                        cookies.split(';').find_map(|c| {
+                            let c = c.trim();
+                            c.strip_prefix("ame_token=").map(|v| v.to_owned())
+                        })
+                    })
+                    .and_then(|v| crate::auth::token::parse_token_value(&v))
+            });
+
+        match parsed {
+            Some(p) => Ok(p.id.to_string()),
+            None => Ok("anonymous".to_string()),
+        }
     }
 }
 
@@ -89,6 +106,10 @@ pub fn router(pool: PgPool) -> Router {
         std::env::var("AME_CORS_ORIGINS").unwrap_or_else(|_| "http://localhost:23000".to_string());
 
     let cors = if cors_origins == "*" {
+        // Warning: `allow_origin(Any)` and `allow_credentials(true)` are mutually exclusive in CORS.
+        // If `AME_CORS_ORIGINS=*` is used (e.g. for prod preview), cookie-based auth will silently fail
+        // because the browser will refuse to send credentials to a wildcard origin.
+        // To use cookie auth, set AME_CORS_ORIGINS to specific explicit origins.
         CorsLayer::new()
             .allow_origin(Any)
             .allow_methods(Any)
@@ -119,6 +140,20 @@ pub fn router(pool: PgPool) -> Router {
     // Global rate limit: per-token, applied to all authenticated routes.
     // Defaults: burst 100, refill 1 per 1s.
     // Override with AME_GLOBAL_RATELIMIT_BURST and AME_GLOBAL_RATELIMIT_PERIOD_SECS.
+    let governor_error_handler = |e: GovernorError| -> axum::response::Response {
+        use axum::response::IntoResponse;
+        match e {
+            GovernorError::TooManyRequests { .. } => {
+                crate::domain::error::ApiError::TooManyRequests.into_response()
+            }
+            GovernorError::UnableToExtractKey => crate::domain::error::ApiError::Internal(
+                anyhow::anyhow!("Rate limit key extraction failed"),
+            )
+            .into_response(),
+            _ => crate::domain::error::ApiError::TooManyRequests.into_response(),
+        }
+    };
+
     let global_burst = env_u32("AME_GLOBAL_RATELIMIT_BURST", 100);
     let global_period_secs = env_u64("AME_GLOBAL_RATELIMIT_PERIOD_SECS", 1);
     let governor_conf = Arc::new(
@@ -126,6 +161,7 @@ pub fn router(pool: PgPool) -> Router {
             .per_second(global_period_secs)
             .burst_size(global_burst)
             .key_extractor(TokenKeyExtractor)
+            .error_handler(governor_error_handler)
             .finish()
             .expect("valid rate-limit config"),
     );
@@ -137,6 +173,7 @@ pub fn router(pool: PgPool) -> Router {
             .per_second(60)
             .burst_size(1)
             .key_extractor(TokenKeyExtractor)
+            .error_handler(governor_error_handler)
             .finish()
             .expect("valid export rate-limit config"),
     );
@@ -179,6 +216,7 @@ pub fn router(pool: PgPool) -> Router {
             .per_second(period_secs)
             .burst_size(burst)
             .key_extractor(PeerIpKeyExtractor)
+            .error_handler(governor_error_handler)
             .finish()
             .expect("valid rate-limit config"),
     );
