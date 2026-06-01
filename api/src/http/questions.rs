@@ -13,10 +13,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::{
-        extractor::AuthenticatedUser,
-        scope::{RequireAnyScope, ScopeOneOf},
-    },
+    auth::scope::{RequireAnyScope, ScopeOneOf},
     bank::questions as repo,
     domain::{
         error::ApiError,
@@ -154,7 +151,7 @@ pub async fn get_question(
 
     // Check ownership if not admin
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && question.created_by != auth.0.owner_id
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
@@ -180,7 +177,7 @@ pub async fn list_versions(
     auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<QuestionVersion>>, ApiError> {
-    let question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&state.pool, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
@@ -188,7 +185,7 @@ pub async fn list_versions(
 
     // Check ownership if not admin
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && question.created_by != auth.0.owner_id
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
@@ -213,10 +210,10 @@ pub async fn list_versions(
 )]
 pub async fn create_questions(
     State(state): State<AppState>,
-    auth: AuthenticatedUser,
+    auth: RequireAnyScope<QuestionWriteScopes>,
     Json(body): Json<CreateQuestionsBody>,
 ) -> Result<(StatusCode, Json<CreateQuestionsResponse>), ApiError> {
-    let questions = repo::create_questions(&state.pool, auth.user.id, body.questions).await?;
+    let questions = repo::create_questions(&state.pool, auth.0.user.id, body.questions).await?;
     Ok((
         StatusCode::CREATED,
         Json(CreateQuestionsResponse { questions }),
@@ -242,14 +239,14 @@ pub async fn update_question(
     Path(id): Path<Uuid>,
     Json(patch): Json<repo::QuestionPatch>,
 ) -> Result<Json<Question>, ApiError> {
-    let question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&state.pool, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
 
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && question.created_by != auth.0.owner_id
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
@@ -276,14 +273,14 @@ pub async fn promote_question(
     auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
-    let question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&state.pool, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
 
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && question.created_by != auth.0.owner_id
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
@@ -309,14 +306,14 @@ pub async fn archive_question(
     auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
-    let question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&state.pool, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
 
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && question.created_by != auth.0.owner_id
+        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",

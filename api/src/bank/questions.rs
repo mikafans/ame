@@ -231,6 +231,36 @@ pub async fn get_question_versions(
         .collect()
 }
 
+/// Returns true if the question with `question_id` is within `owner_id`'s
+/// scope: either the question was created directly by `owner_id`, or it was
+/// created by an agent whose `owner_user_id` is `owner_id`.
+///
+/// Mirrors the EXISTS predicate used in [`list_questions_paged`] so per-item
+/// access checks are consistent with the list view.
+pub async fn question_in_owner_scope(
+    pool: &PgPool,
+    question_id: Uuid,
+    owner_id: Uuid,
+) -> Result<bool, ApiError> {
+    let in_scope: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+             SELECT 1 FROM tb_questions q
+             WHERE q.id = $1
+               AND (q.created_by = $2 OR EXISTS (
+                   SELECT 1 FROM tb_users u
+                   WHERE u.id = q.created_by AND u.owner_user_id = $2
+               ))
+         )",
+    )
+    .bind(question_id)
+    .bind(owner_id)
+    .fetch_one(pool)
+    .await
+    .map_err(internal)?;
+
+    Ok(in_scope)
+}
+
 pub const MAX_BATCH: usize = 250;
 
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema)]

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Json, Router,
     extract::State,
@@ -8,13 +10,36 @@ use axum::{
 use axum_prometheus::PrometheusMetricLayer;
 use serde_json::json;
 use sqlx::PgPool;
+use tower_governor::GovernorLayer;
+use tower_governor::errors::GovernorError;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::{KeyExtractor, PeerIpKeyExtractor};
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
 }
 
-pub async fn auth_rate_limit_middleware(
+/// Key extractor that identifies requests by their Bearer token.
+/// Used for the global per-token rate limit on authenticated routes.
+#[derive(Clone)]
+struct TokenKeyExtractor;
+impl KeyExtractor for TokenKeyExtractor {
+    type Key = String;
+    fn extract<T>(&self, req: &axum::http::Request<T>) -> Result<Self::Key, GovernorError> {
+        req.headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .ok_or(GovernorError::UnableToExtractKey)
+    }
+}
+
+/// Middleware that pre-extracts and caches the [`AuthenticatedUser`] into request
+/// extensions, so downstream extractors skip the DB round-trip.
+///
+/// Note: this does NOT rate-limit — see the GovernorLayer applied to `logged_router`.
+pub async fn auth_extract_middleware(
     State(state): State<AppState>,
     req: axum::extract::Request,
     next: axum::middleware::Next,
@@ -57,7 +82,32 @@ pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
 pub fn router(pool: PgPool) -> Router {
     let state = AppState { pool };
 
-    // Endpoints that should be logged (activity_log)
+    // Global rate limit: per-token, applied to all authenticated routes.
+    // Defaults: burst 100, refill 1 per 1s.
+    // Override with AME_GLOBAL_RATELIMIT_BURST and AME_GLOBAL_RATELIMIT_PERIOD_SECS.
+    let global_burst = env_u32("AME_GLOBAL_RATELIMIT_BURST", 100);
+    let global_period_secs = env_u64("AME_GLOBAL_RATELIMIT_PERIOD_SECS", 1);
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(global_period_secs)
+            .burst_size(global_burst)
+            .key_extractor(TokenKeyExtractor)
+            .finish()
+            .expect("valid rate-limit config"),
+    );
+
+    // Export-specific governor: 1 request per 60s, burst 1, per token.
+    // Tighter than the global limit — export is an expensive full-bundle query.
+    let export_governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(60)
+            .burst_size(1)
+            .key_extractor(TokenKeyExtractor)
+            .finish()
+            .expect("valid export rate-limit config"),
+    );
+
+    // Endpoints that should be logged (activity_log) and rate-limited (governor)
     let logged_router = Router::new()
         .merge(assessments::router(state.clone()))
         .merge(sessions::router(state.clone()))
@@ -65,19 +115,49 @@ pub fn router(pool: PgPool) -> Router {
         .merge(plans::router(state.clone()))
         .merge(agents::logged_router(state.clone()))
         .merge(messages::router(state.clone()))
+        .route(
+            "/v1/me/export",
+            axum::routing::get(export::export_data).layer(GovernorLayer {
+                config: export_governor_conf,
+            }),
+        )
+        .layer(GovernorLayer {
+            config: governor_conf,
+        })
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth_rate_limit_middleware,
+            auth_extract_middleware,
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             activity::activity_log_middleware,
         ));
 
-    Router::new()
+    // Public, rate-limited endpoints. Credential-stuffing and key-faucet
+    // surface: limit harder than the rest of the API.
+    //
+    // Defaults: 10 req burst, refill 1 per 2s (≈30 req/min sustained per IP).
+    // Override with AME_RATELIMIT_BURST and AME_RATELIMIT_PERIOD_SECS.
+    let burst = env_u32("AME_RATELIMIT_BURST", 10);
+    let period_secs = env_u64("AME_RATELIMIT_PERIOD_SECS", 2);
+    let public_governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(period_secs)
+            .burst_size(burst)
+            .key_extractor(PeerIpKeyExtractor)
+            .finish()
+            .expect("valid rate-limit config"),
+    );
+    let public_limited = Router::new()
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/logout", post(auth::logout))
+        .layer(GovernorLayer {
+            config: public_governor_conf,
+        })
+        .with_state(state.clone());
+
+    Router::new()
         .merge(admin::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(explore::router(state.clone()))
@@ -85,6 +165,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(stats::router(state.clone()))
         .merge(tags::router(state.clone()))
         .merge(agents::public_router(state.clone()))
+        .merge(public_limited)
         .merge(logged_router)
         .route("/healthz", get(healthz))
         .with_state(state)
@@ -92,4 +173,18 @@ pub fn router(pool: PgPool) -> Router {
 
 async fn healthz() -> impl axum::response::IntoResponse {
     (StatusCode::OK, Json(json!({"status": "ok"})))
+}
+
+fn env_u32(key: &str, default: u32) -> u32 {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
+fn env_u64(key: &str, default: u64) -> u64 {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }

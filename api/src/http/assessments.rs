@@ -510,13 +510,16 @@ pub async fn get_assessment(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AssessmentDetail>, ApiError> {
-    // Visibility check: public/unlisted OR owner
+    // Visibility check: public/unlisted to anyone, otherwise scoped to the
+    // owner tree (the owner and any of their agents).
     let row = sqlx::query(
         "SELECT * FROM tb_assessments WHERE id = $1 \
-         AND (visibility IN ('public', 'unlisted') OR created_by = $2)",
+         AND (visibility IN ('public', 'unlisted') \
+              OR created_by = $2 \
+              OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2))",
     )
     .bind(id)
-    .bind(user.user.id)
+    .bind(user.owner_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
@@ -1209,8 +1212,9 @@ pub async fn count_assessments(
 ) -> Result<Json<CountAssessmentsResponse>, ApiError> {
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM tb_assessments a
-         WHERE (a.visibility = 'public' AND a.status = 'active')
-            OR a.created_by = $1
+         WHERE (a.created_by = $1 OR EXISTS (
+             SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
+         ))
            AND ($2::text IS NULL OR a.mode = $2)",
     )
     .bind(auth.owner_id)
