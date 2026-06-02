@@ -76,7 +76,15 @@ export default function LoginPage() {
         return;
       }
       await refresh();
-      router.push("/library");
+      const returnTo = new URLSearchParams(window.location.search).get(
+        "returnTo",
+      );
+      // Only honor same-origin relative paths to avoid open-redirect.
+      const dest =
+        returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+          ? returnTo
+          : "/library";
+      router.push(dest);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not reach the server",

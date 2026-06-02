@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::get,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -58,12 +58,6 @@ pub struct AuditLogEntry {
 #[serde(rename_all = "camelCase")]
 pub struct ListAuditLogsResponse {
     pub logs: Vec<AuditLogEntry>,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ModerateBody {
-    pub assessment_id: Uuid,
 }
 
 /// GET /v1/admin/users — list all users
@@ -299,58 +293,6 @@ pub async fn list_audit_logs(
     Ok(Json(ListAuditLogsResponse { logs }))
 }
 
-/// POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private)
-#[utoipa::path(
-    post,
-    path = "/v1/admin/moderate",
-    request_body = ModerateBody,
-    responses(
-        (status = 204, description = "Public content moderated and unpublished successfully"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden (Admin required)"),
-        (status = 404, description = "Content not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "admin"
-)]
-pub async fn moderate_assessment(
-    State(state): State<AppState>,
-    admin: RequireScope<AdminScope>,
-    Json(body): Json<ModerateBody>,
-) -> Result<impl IntoResponse, ApiError> {
-    // Verify assessment exists
-    let assessment_row = sqlx::query("SELECT id, title FROM tb_assessments WHERE id = $1")
-        .bind(body.assessment_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?
-        .ok_or(ApiError::NotFound {
-            resource: "assessment",
-        })?;
-
-    // Unpublish: set visibility to 'private'
-    sqlx::query("UPDATE tb_assessments SET visibility = 'private' WHERE id = $1")
-        .bind(body.assessment_id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    // Audit log moderation action
-    crate::audit::audit(
-        state.pool.clone(),
-        Some(admin.0.user.id),
-        "moderate.unpublish",
-        Some("assessment"),
-        Some(body.assessment_id),
-        serde_json::json!({
-            "title": assessment_row.get::<String, _>("title"),
-            "visibility": "private",
-        }),
-    );
-
-    Ok(StatusCode::NO_CONTENT)
-}
-
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/admin/users", get(list_users))
@@ -359,6 +301,5 @@ pub fn router(state: AppState) -> Router<AppState> {
             axum::routing::patch(patch_user_admin),
         )
         .route("/v1/admin/audit", get(list_audit_logs))
-        .route("/v1/admin/moderate", post(moderate_assessment))
         .with_state(state)
 }

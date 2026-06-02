@@ -94,8 +94,7 @@ async fn test_cross_owner_agent_visibility() {
             "title": "Agent Assessment",
             "mode": "graded",
             "method": "agent",
-            "objectives": [],
-            "visibility": "private"
+            "objectives": []
         }))
         .send()
         .await
@@ -113,9 +112,10 @@ async fn test_cross_owner_agent_visibility() {
     // question (see build_assessment_plan), so give it one and activate it. It stays
     // private — the access checks below are what we're exercising.
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('mc', 'What color?', $1, 'live', 2, $2) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $3) RETURNING id",
     )
+    .bind(owner_id)
     .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
     .bind(agent_id)
     .fetch_one(&pool)
@@ -187,7 +187,7 @@ async fn test_cross_owner_agent_visibility() {
         .bind(stranger_id)
         .bind("stranger-key")
         .bind(&hash)
-        .bind(vec!["assessment.read".to_string()])
+        .bind(vec!["assessment.read".to_string(), "attempt.write".to_string()])
         .execute(&pool)
         .await
         .unwrap();
@@ -220,6 +220,16 @@ async fn test_cross_owner_agent_visibility() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
+
+    // 7. Test: Stranger creates a session for private assessment -> 404
+    let res = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header("Authorization", format!("Bearer {stranger_auth}"))
+        .json(&json!({"assessmentId": qid}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
 /// Regression: the list/count endpoints must be strictly owner-scoped. A user
@@ -274,17 +284,16 @@ async fn test_cross_owner_list_isolation() {
         .unwrap();
     let a_auth = format!("{a_token}_{secret}");
 
-    // A creates an assessment, then we force it public + active — the exact shape
+    // A creates an assessment, then we force it active — the exact shape
     // the old count query leaked across owners.
     let res = client
         .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", format!("Bearer {a_auth}"))
         .json(&json!({
-            "title": "Owner A Public",
+            "title": "Owner A Assessment",
             "mode": "graded",
             "method": "agent",
-            "objectives": [],
-            "visibility": "public"
+            "objectives": []
         }))
         .send()
         .await
@@ -295,7 +304,7 @@ async fn test_cross_owner_list_isolation() {
     );
     let body: serde_json::Value = res.json().await.unwrap();
     let a_assessment_id = body["id"].as_str().unwrap().to_string();
-    sqlx::query("UPDATE tb_assessments SET visibility = 'public', status = 'active' WHERE id = $1")
+    sqlx::query("UPDATE tb_assessments SET status = 'active' WHERE id = $1")
         .bind(Uuid::parse_str(&a_assessment_id).unwrap())
         .execute(&pool)
         .await
@@ -303,11 +312,11 @@ async fn test_cross_owner_list_isolation() {
 
     // A owns a question.
     let a_question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('mc', 'A private question', $1, 'live', 1, $2) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'A private question', $2, 'live', 1, $1) RETURNING id",
     )
-    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
     .bind(owner_a)
+    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
     .fetch_one(&pool)
     .await
     .unwrap()
@@ -381,4 +390,389 @@ async fn test_cross_owner_list_isolation() {
         .iter()
         .any(|q| q["id"].as_str() == Some(a_question_id.to_string().as_str()));
     assert!(!leaked_q, "stranger saw owner A's question in the list");
+}
+
+/// Regression: GET /v1/tags must not leak tags from other owners' questions.
+#[tokio::test]
+async fn test_cross_owner_tags_isolation() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+    let secret = "tag-secret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+
+    // Owner A creates a question with a distinct tag.
+    let owner_a = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'OwnerA', 'user')",
+    )
+    .bind(owner_a)
+    .bind(format!("owner-a-{}@example.com", owner_a))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let a_token = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(a_token)
+        .bind(owner_a)
+        .bind("a-key")
+        .bind(&hash)
+        .bind(vec!["assessment.write".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create tag and question with that tag.
+    let tag_name = format!("owner-a-tag-{}", Uuid::now_v7());
+    let tag_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO tb_tags (name, description) VALUES ($1, 'Tag for owner A') RETURNING id",
+    )
+    .bind(&tag_name)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let question_id: Uuid = sqlx::query(
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'A question', $2, 'live', 1, $1) RETURNING id",
+    )
+    .bind(owner_a)
+    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .get("id");
+
+    sqlx::query("INSERT INTO tb_question_tags (question_id, tag_id) VALUES ($1, $2)")
+        .bind(question_id)
+        .bind(tag_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Owner B (stranger) tries to list tags.
+    let owner_b = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'OwnerB', 'user')",
+    )
+    .bind(owner_b)
+    .bind(format!("owner-b-{}@example.com", owner_b))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let b_token = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(b_token)
+        .bind(owner_b)
+        .bind("b-key")
+        .bind(&hash)
+        .bind(vec!["assessment.write".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let b_auth = format!("{b_token}_{secret}");
+
+    let res = client
+        .get(format!("{base_url}/v1/tags"))
+        .header("Authorization", format!("Bearer {b_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let tags = body.as_array().unwrap();
+    let leaked = tags
+        .iter()
+        .any(|t| t.get("id").and_then(|id| id.as_str()) == Some(&tag_id.to_string()));
+    assert!(
+        !leaked,
+        "owner B saw owner A's tag in GET /v1/tags; tag leak confirmed"
+    );
+}
+
+/// Regression: GET /v1/attempts/pending must not leak pending essays from other owners' questions.
+#[tokio::test]
+async fn test_cross_owner_pending_attempts_isolation() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+    let secret = "pending-secret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+
+    // Owner A with an essay question
+    let owner_a = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'OwnerA', 'user')",
+    )
+    .bind(owner_a)
+    .bind(format!("owner-a-{}@example.com", owner_a))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let a_token = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(a_token)
+        .bind(owner_a)
+        .bind("a-key")
+        .bind(&hash)
+        .bind(vec!["attempt.write".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create essay question
+    let question_id: Uuid = sqlx::query(
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'essay', 'Write an essay', '{}', 'live', 5, $1) RETURNING id",
+    )
+    .bind(owner_a)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .get("id");
+
+    // Create a session and a pending_manual attempt
+    let session_id = Uuid::now_v7();
+    let attempt_id = Uuid::now_v7();
+    let learner_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'Learner', 'user')",
+    )
+    .bind(learner_id)
+    .bind(format!("learner-{}@example.com", learner_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO tb_sessions (id, user_id, kind, question_plan, status, started_at) \
+         VALUES ($1, $2, 'practice', '{\"items\": []}'::jsonb, 'in_progress', now())",
+    )
+    .bind(session_id)
+    .bind(learner_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO tb_attempts (id, user_id, question_id, question_version, session_id, response, \
+                                  presentation, is_correct, score, rating_before_user_avg, \
+                                  rating_before_question, user_tag_deltas, question_delta, \
+                                  grade_status, created_at) \
+         VALUES ($1, $2, $3, 1, $4, $5, $6, false, 0, 0, 0, '{}'::jsonb, 0, 'pending_manual', now())",
+    )
+    .bind(attempt_id)
+    .bind(learner_id)
+    .bind(question_id)
+    .bind(session_id)
+    .bind(json!({"body": "my essay", "word_count": 10}))
+    .bind(json!({}))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Owner B (stranger) lists pending attempts — should not see A's essay
+    let owner_b = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'OwnerB', 'user')",
+    )
+    .bind(owner_b)
+    .bind(format!("owner-b-{}@example.com", owner_b))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let b_token = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(b_token)
+        .bind(owner_b)
+        .bind("b-key")
+        .bind(&hash)
+        .bind(vec!["attempt.write".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let b_auth = format!("{b_token}_{secret}");
+
+    let res = client
+        .get(format!("{base_url}/v1/attempts/pending"))
+        .header("Authorization", format!("Bearer {b_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let attempts = body.as_array().unwrap();
+    let leaked = attempts
+        .iter()
+        .any(|a| a.get("attempt_id").and_then(|id| id.as_str()) == Some(&attempt_id.to_string()));
+    assert!(
+        !leaked,
+        "owner B saw owner A's pending essay in GET /v1/attempts/pending"
+    );
+}
+
+/// Regression: PATCH /v1/attempts/{id}/grade must not allow grading another owner's attempt.
+#[tokio::test]
+async fn test_cross_owner_grade_isolation() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+    let secret = "grade-secret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+
+    // Owner A creates an essay question with a pending attempt
+    let owner_a = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'OwnerA', 'user')",
+    )
+    .bind(owner_a)
+    .bind(format!("owner-a-{}@example.com", owner_a))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let a_token = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(a_token)
+        .bind(owner_a)
+        .bind("a-key")
+        .bind(&hash)
+        .bind(vec!["attempt.write".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let question_id: Uuid = sqlx::query(
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'essay', 'Write an essay', '{}', 'live', 5, $1) RETURNING id",
+    )
+    .bind(owner_a)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .get("id");
+
+    let session_id = Uuid::now_v7();
+    let attempt_id = Uuid::now_v7();
+    let learner_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'Learner', 'user')",
+    )
+    .bind(learner_id)
+    .bind(format!("learner-{}@example.com", learner_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO tb_sessions (id, user_id, kind, question_plan, status, started_at) \
+         VALUES ($1, $2, 'practice', '{\"items\": []}'::jsonb, 'in_progress', now())",
+    )
+    .bind(session_id)
+    .bind(learner_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO tb_attempts (id, user_id, question_id, question_version, session_id, response, \
+                                  presentation, is_correct, score, rating_before_user_avg, \
+                                  rating_before_question, user_tag_deltas, question_delta, \
+                                  grade_status, created_at) \
+         VALUES ($1, $2, $3, 1, $4, $5, $6, false, 0, 0, 0, '{}'::jsonb, 0, 'pending_manual', now())",
+    )
+    .bind(attempt_id)
+    .bind(learner_id)
+    .bind(question_id)
+    .bind(session_id)
+    .bind(json!({"body": "my essay", "word_count": 10}))
+    .bind(json!({}))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Owner B (stranger) tries to grade the attempt — must get 404
+    let owner_b = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, 'OwnerB', 'user')",
+    )
+    .bind(owner_b)
+    .bind(format!("owner-b-{}@example.com", owner_b))
+    .execute(&pool)
+    .await
+    .unwrap();
+    let b_token = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+        .bind(b_token)
+        .bind(owner_b)
+        .bind("b-key")
+        .bind(&hash)
+        .bind(vec!["attempt.write".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let b_auth = format!("{b_token}_{secret}");
+
+    let res = client
+        .patch(format!("{base_url}/v1/attempts/{}/grade", attempt_id))
+        .header("Authorization", format!("Bearer {b_auth}"))
+        .json(&json!({"score": 0.8}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::NOT_FOUND,
+        "stranger should not be able to grade another owner's attempt"
+    );
 }

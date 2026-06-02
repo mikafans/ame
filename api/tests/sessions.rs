@@ -56,14 +56,25 @@ async fn serve(pool: PgPool) -> String {
     format!("http://{addr}")
 }
 
+static TEST_OWNER_ID: Uuid = uuid::uuid!("00000000-0000-0000-0000-000000000001");
+
+async fn ensure_test_owner(pool: &PgPool) {
+    let _ = sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, 'Test Owner', 'test-owner@example.com', 'user') ON CONFLICT DO NOTHING")
+        .bind(TEST_OWNER_ID)
+        .execute(pool)
+        .await;
+}
+
 async fn make_bearer(pool: &PgPool) -> String {
+    ensure_test_owner(pool).await;
     let user_id = Uuid::now_v7();
     let token_id = Uuid::now_v7();
     let secret = "session_secret_123";
     let hash = hash_secret(secret);
 
-    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
         .bind(user_id)
+        .bind(TEST_OWNER_ID)
         .bind(format!("session-user-{user_id}"))
         .bind(format!("session-{user_id}@example.com"))
         .execute(pool)
@@ -94,9 +105,11 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
 /// Insert a live MC question (correct_index = 1) tagged `tag`. Use a unique
 /// tag to make tag-filtered practice planning deterministic on a shared DB.
 async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
+    ensure_test_owner(pool).await;
     let author_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
         .bind(author_id)
+        .bind(TEST_OWNER_ID)
         .bind(format!("author-{author_id}"))
         .bind(format!("author-{author_id}@example.com"))
         .execute(pool)
@@ -104,10 +117,11 @@ async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
         .unwrap();
 
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('mc', 'What color?', $1, 'live', 2, $2) \
-         RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $3) \
+          RETURNING id",
     )
+    .bind(TEST_OWNER_ID)
     .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
     .bind(author_id)
     .fetch_one(pool)

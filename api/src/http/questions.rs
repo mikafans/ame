@@ -1,10 +1,10 @@
-//! Question bank HTTP routes.
+//! HTTP handlers for question bank management.
 
 use std::str::FromStr;
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::StatusCode,
     routing::{get, post},
 };
@@ -20,7 +20,7 @@ use crate::{
         question::{Question, QuestionKind, QuestionStatus, QuestionVersion},
         user::Scope,
     },
-    http::AppState,
+    http::{AppState, db::DbConn},
 };
 
 pub struct QuestionReadScopes;
@@ -33,11 +33,11 @@ impl ScopeOneOf for QuestionWriteScopes {
     const SCOPES: &'static [Scope] = &[Scope::AssessmentWrite, Scope::Admin];
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ListQuestionsQuery {
     pub tag: Option<String>,
-    pub status: Option<QuestionStatus>,
+    pub status: Option<String>,
     pub search: Option<String>,
     pub kind: Option<String>,
     pub min_rating: Option<f64>,
@@ -48,7 +48,6 @@ pub struct ListQuestionsQuery {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct ListQuestionsResponse {
     pub questions: Vec<Question>,
     pub total: i64,
@@ -68,22 +67,16 @@ pub struct CreateQuestionsResponse {
 #[utoipa::path(
     get,
     path = "/v1/questions",
-    params(
-        ("tag" = Option<String>, Query, description = "Filter by tag name"),
-        ("status" = Option<String>, Query, description = "Filter by status (draft, live, archived)"),
-        ("search" = Option<String>, Query, description = "Partial match on prompt"),
-        ("kind" = Option<String>, Query, description = "Filter by question kind"),
-        ("after" = Option<String>, Query, description = "Pagination cursor"),
-    ),
+    params(ListQuestionsQuery),
     responses(
-        (status = 200, description = "Question list", body = ListQuestionsResponse),
+        (status = 200, description = "List of questions", body = ListQuestionsResponse),
         (status = 401, description = "Unauthorized"),
     ),
     security(("bearer" = [])),
     tag = "questions"
 )]
 pub async fn list_questions(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionReadScopes>,
     Query(q): Query<ListQuestionsQuery>,
 ) -> Result<Json<ListQuestionsResponse>, ApiError> {
@@ -96,9 +89,19 @@ pub async fn list_questions(
         Some(auth.0.owner_id)
     };
 
+    let status = match q.status.as_deref() {
+        Some(s) => Some(QuestionStatus::from_str(s).map_err(|e| {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "status".into(),
+                message: e,
+            }])
+        })?),
+        None => None,
+    };
+
     let filter = repo::QuestionFilter {
         tag: q.tag,
-        status: q.status,
+        status,
         search: q.search,
         kind,
         min_rating: q.min_rating,
@@ -118,7 +121,7 @@ pub async fn list_questions(
         None => None,
     };
 
-    let paged = repo::list_questions_paged(&state.pool, &filter, after).await?;
+    let paged = repo::list_questions_paged(&mut db, &filter, after).await?;
 
     Ok(Json(ListQuestionsResponse {
         questions: paged.rows,
@@ -139,11 +142,11 @@ pub async fn list_questions(
     tag = "questions"
 )]
 pub async fn get_question(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
-    let question = repo::get_question(&state.pool, id)
+    let question = repo::get_question(&mut db, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
@@ -151,7 +154,7 @@ pub async fn get_question(
 
     // Check ownership if not admin
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
@@ -173,11 +176,11 @@ pub async fn get_question(
     tag = "questions"
 )]
 pub async fn list_versions(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionReadScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<QuestionVersion>>, ApiError> {
-    let _question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&mut db, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
@@ -185,14 +188,14 @@ pub async fn list_versions(
 
     // Check ownership if not admin
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
         });
     }
 
-    let versions = repo::get_question_versions(&state.pool, id).await?;
+    let versions = repo::get_question_versions(&mut db, id).await?;
     Ok(Json(versions))
 }
 
@@ -209,11 +212,12 @@ pub async fn list_versions(
     tag = "questions"
 )]
 pub async fn create_questions(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionWriteScopes>,
     Json(body): Json<CreateQuestionsBody>,
 ) -> Result<(StatusCode, Json<CreateQuestionsResponse>), ApiError> {
-    let questions = repo::create_questions(&state.pool, auth.0.user.id, body.questions).await?;
+    let questions =
+        repo::create_questions(&mut db, auth.0.user.id, auth.0.owner_id, body.questions).await?;
     Ok((
         StatusCode::CREATED,
         Json(CreateQuestionsResponse { questions }),
@@ -234,26 +238,26 @@ pub async fn create_questions(
     tag = "questions"
 )]
 pub async fn update_question(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
     Json(patch): Json<repo::QuestionPatch>,
 ) -> Result<Json<Question>, ApiError> {
-    let _question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&mut db, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
 
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
         });
     }
 
-    let updated = repo::update_question(&state.pool, id, patch).await?;
+    let updated = repo::update_question(&mut db, id, patch).await?;
     Ok(Json(updated))
 }
 
@@ -269,25 +273,25 @@ pub async fn update_question(
     tag = "questions"
 )]
 pub async fn promote_question(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
-    let _question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&mut db, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
 
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
         });
     }
 
-    Ok(Json(repo::promote_question(&state.pool, id).await?))
+    Ok(Json(repo::promote_question(&mut db, id).await?))
 }
 
 #[utoipa::path(
@@ -302,25 +306,25 @@ pub async fn promote_question(
     tag = "questions"
 )]
 pub async fn archive_question(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: RequireAnyScope<QuestionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Question>, ApiError> {
-    let _question = repo::get_question(&state.pool, id)
+    let _question = repo::get_question(&mut db, id)
         .await?
         .ok_or(ApiError::NotFound {
             resource: "question",
         })?;
 
     if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&state.pool, id, auth.0.owner_id).await?
+        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
     {
         return Err(ApiError::NotFound {
             resource: "question",
         });
     }
 
-    Ok(Json(repo::archive_question(&state.pool, id).await?))
+    Ok(Json(repo::archive_question(&mut db, id).await?))
 }
 
 pub fn router(state: AppState) -> Router<AppState> {

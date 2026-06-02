@@ -94,59 +94,7 @@ async fn test_quota_enforcement() {
     assert_eq!(error_body["error"]["details"]["kind"], "agent_creation");
     assert_eq!(error_body["error"]["details"]["limit"], 1);
 
-    // 3. Test Public Assessment Quota (Free plan: 5 limit)
-    // Create 5 public assessments (should succeed)
-    for i in 0..5 {
-        let res = client
-            .post(format!("{base_url}/v1/assessments"))
-            .header("Authorization", format!("Bearer {auth}"))
-            .json(&json!({"title": format!("Assessment {i}"), "visibility": "public"}))
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(res.status(), StatusCode::CREATED);
-    }
-
-    // 6th public assessment (should fail)
-    let res = client
-        .post(format!("{base_url}/v1/assessments"))
-        .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"title": "Assessment 6", "visibility": "public"}))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
-
-    // Create private assessment (should succeed, doesn't consume quota)
-    let res = client
-        .post(format!("{base_url}/v1/assessments"))
-        .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"title": "Private Assessment", "visibility": "private"}))
-        .send()
-        .await
-        .unwrap();
-    let status = res.status();
-    if !status.is_success() {
-        let body = res.text().await.unwrap();
-        panic!("Private Assessment creation failed ({status}): {body}");
-    }
-
-    let private_qid = res.json::<serde_json::Value>().await.unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    // Patching private assessment to public (should fail due to quota)
-    let res = client
-        .patch(format!("{base_url}/v1/assessments/{private_qid}"))
-        .header("Authorization", format!("Bearer {auth}"))
-        .json(&json!({"visibility": "public"}))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
-
-    // Test that Premium user has higher limits (up to 100 agents, 1000 public assessments)
+    // Test that Premium user has higher limits (up to 100 agents)
     // Create a premium user
     let prem_id = Uuid::now_v7();
     sqlx::query("INSERT INTO tb_users (id, email, display_name, role, plan) VALUES ($1, $2, 'Prem User', 'user', 'premium')")

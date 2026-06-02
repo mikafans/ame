@@ -11,8 +11,8 @@ use crate::{
     bank::questions::{QuestionInsert, QuestionPatch},
     domain::{
         assessment::{
-            Assessment, AssessmentMode, AssessmentStatus, AssessmentVisibility,
-            CreateAssessmentRequest, UpdateAssessmentRequest,
+            Assessment, AssessmentMode, AssessmentStatus, CreateAssessmentRequest,
+            UpdateAssessmentRequest,
         },
         attempt::{Attempt, AttemptPresentation, AttemptResponse},
         error::{ApiError, FieldError},
@@ -28,10 +28,7 @@ use crate::{
     },
     http::{
         AppState,
-        admin::{
-            AuditLogEntry, ListAuditLogsResponse, ListUsersResponse, ModerateBody,
-            PatchUserAdminBody,
-        },
+        admin::{AuditLogEntry, ListAuditLogsResponse, ListUsersResponse, PatchUserAdminBody},
         agents::{ActivityEntry, ActivityResponse as AgentActivityResponse, RunResponse},
         assessments::{
             AddAssessmentQuestionBody, AddAssessmentQuestionResponse, AssessmentDetail,
@@ -103,7 +100,6 @@ use crate::{
         crate::http::admin::list_users,
         crate::http::admin::patch_user_admin,
         crate::http::admin::list_audit_logs,
-        crate::http::admin::moderate_assessment,
     ),
     components(schemas(
         User,
@@ -126,7 +122,6 @@ use crate::{
         AssessmentSectionDetail,
         AssessmentMode,
         AssessmentStatus,
-        AssessmentVisibility,
         CreateAssessmentRequest,
         UpdateAssessmentRequest,
         AddAssessmentQuestionBody,
@@ -172,7 +167,6 @@ use crate::{
         PatchUserAdminBody,
         ListAuditLogsResponse,
         AuditLogEntry,
-        ModerateBody,
         AgentActivityResponse,
         ActivityEntry,
         RunResponse,

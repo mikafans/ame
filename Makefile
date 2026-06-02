@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -58,10 +58,10 @@ test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test cross_owner -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test sessions -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test quota_scope -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test quota -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test shares -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test planner -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test agent_manifest -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test export -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test admin -- --nocapture
 
@@ -102,6 +102,15 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 			_api_owned=1; \
 			echo "[e2e] Waiting for API on :$(API_PORT)..."; \
 			until curl -sf http://$(API_HOST):$(API_PORT)/healthz > /dev/null 2>&1; do sleep 1; done; \
+		fi; \
+		echo "[e2e] Promoting admin (db-admin)..."; \
+		if ! $(MAKE) --no-print-directory db-admin >> .tmp/ame-seed-e2e.log 2>&1; then \
+			echo "[e2e] FAILED: db-admin errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
+			tail -20 .tmp/ame-seed-e2e.log; \
+			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
+				kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; rm -f .tmp/ame-api-e2e.pid; \
+			fi; \
+			exit 1; \
 		fi; \
 		echo "[e2e] Seeding..."; \
 		if ! uv run scripts/seed.py --api http://$(API_HOST):$(API_PORT) >> .tmp/ame-seed-e2e.log 2>&1; then \
@@ -167,7 +176,18 @@ db-migrate: ## Run pending sqlx migrations
 db-shell: ## Open interactive pgcli session to local Postgres
 	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
 
-db-seed: ## Seed demo users, tags, questions, assessments, and exams (requires API running)
+db-admin: db-up ## Create/grant ADMIN_EMAIL (default admin@example.com) as admin directly in the DB
+	@until $(COMPOSE) -f db/docker-compose.yml exec -T postgres pg_isready -U postgres -d ame >/dev/null 2>&1; do sleep 1; done
+	@hash="$$(uvx --quiet --from argon2-cffi python -c \
+		"from argon2 import PasswordHasher; print(PasswordHasher().hash('$(ADMIN_PASSWORD)'))")"; \
+	$(COMPOSE) -f db/docker-compose.yml exec -T postgres \
+		psql -U postgres -d ame -v ON_ERROR_STOP=1 -c \
+		"INSERT INTO tb_users (email, display_name, role, password_hash) \
+		 VALUES ('$(ADMIN_EMAIL)', '$(ADMIN_NAME)', 'admin', '$$hash') \
+		 ON CONFLICT (email) DO UPDATE SET role = 'admin';"
+	@echo "[db-admin] $(ADMIN_EMAIL) is admin — new users log in with password '$(ADMIN_PASSWORD)'; existing accounts keep theirs."
+
+db-seed: db-admin ## Seed demo users, tags, questions, assessments, and exams (requires API running)
 	uv run scripts/seed.py --api http://localhost:$(API_PORT)
 
 db-bulk: ## Mint 10k questions and 1k exams via agent surface (requires API running)
@@ -201,6 +221,12 @@ API_HOST ?= localhost
 API_PORT ?= 28080
 WEB_PORT ?= 23000
 
+# Admin bootstrap (db-admin): registration only grants `user`, so the admin
+# role is set out-of-band in the DB. Override ADMIN_EMAIL to promote yourself.
+ADMIN_EMAIL ?= admin@example.com
+ADMIN_NAME ?= Carol Admin
+ADMIN_PASSWORD ?= password123
+
 dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override: make dev API_HOST=harus-mini
 	@fuser -k -9 $(API_PORT)/tcp $(WEB_PORT)/tcp 2>/dev/null || true
 	@sleep 1
@@ -210,7 +236,7 @@ dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override
 	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
 		AME_PORT=$(API_PORT) \
 		AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
-		AME_GLOBAL_RATELIMIT_BURST=20000 \
+		AME_GLOBAL_RATELIMIT_BURST=50000 \
 		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
 		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee .tmp/ame-api.log &
 	@echo "Starting frontend on :$(WEB_PORT) targeting $(API_HOST):$(API_PORT) (logs → .tmp/ame-web.log)"

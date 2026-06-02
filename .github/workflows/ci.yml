@@ -25,6 +25,11 @@ jobs:
         with:
           workspaces: api
 
+      # mise only reconciles components on a fresh install; with cache: true the
+      # toolchain is restored without re-running that hook, so install explicitly.
+      - name: Ensure rust components
+        run: mise exec -- rustup component add rustfmt clippy
+
       - name: Install web deps
         working-directory: web
         run: mise exec -- bun install --frozen-lockfile

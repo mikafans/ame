@@ -32,6 +32,7 @@ interface PreviewQuestion {
 interface AssessmentDetail {
   id: string;
   title: string;
+  status?: string;
   course?: string;
   objectives?: string[];
   questions: PreviewQuestion[];
@@ -145,9 +146,29 @@ export default function AssessmentPreviewPage({
             sx={{ mb: 1.25, ...tagColor(assessment.course) }}
           />
         )}
-        <Typography variant="h4" sx={{ fontWeight: 500, mb: 2 }}>
-          {assessment.title}
-        </Typography>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ alignItems: "center", mb: 2 }}
+        >
+          <Typography variant="h4" sx={{ fontWeight: 500 }}>
+            {assessment.title}
+          </Typography>
+          {assessment.status && (
+            <Chip
+              label={assessment.status.toUpperCase()}
+              size="small"
+              variant="outlined"
+              color={
+                assessment.status === "active" || assessment.status === "live"
+                  ? "success"
+                  : assessment.status === "draft"
+                    ? "warning"
+                    : "default"
+              }
+            />
+          )}
+        </Stack>
         {assessment.objectives && assessment.objectives.length > 0 && (
           <Box component="ul" sx={{ m: 0, pl: 2.25, color: "text.secondary" }}>
             {assessment.objectives.map((obj, i) => (
@@ -264,8 +285,22 @@ export default function AssessmentPreviewPage({
         <Button variant="outlined" onClick={() => router.push("/library")}>
           Back to assessments
         </Button>
-        <Button variant="contained" onClick={handleStart} disabled={starting}>
-          {starting ? "Starting…" : "Start assessment"}
+        <Button
+          variant="contained"
+          onClick={handleStart}
+          disabled={
+            starting ||
+            assessment.status === "draft" ||
+            assessment.questions.length === 0
+          }
+        >
+          {starting
+            ? "Starting…"
+            : assessment.status === "draft"
+              ? "Cannot start draft"
+              : assessment.questions.length === 0
+                ? "No questions available"
+                : "Start assessment"}
         </Button>
       </Box>
     </Box>

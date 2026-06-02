@@ -223,7 +223,7 @@ fn default_exclude_recent_hours() -> i64 {
 }
 
 pub async fn plan_assessment(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     request: &AssessmentPlanRequest,
 ) -> Result<AssessmentPlan, ApiError> {
@@ -268,7 +268,7 @@ pub async fn plan_assessment(
     } else {
         Some(request.exclude_recent_hours)
     })
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
 

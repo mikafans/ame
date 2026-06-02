@@ -17,7 +17,6 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
-import PublicIcon from "@mui/icons-material/Public";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
@@ -31,7 +30,6 @@ interface Assessment {
   title: string;
   description?: string;
   status: string;
-  visibility: "public" | "private";
   course?: string;
   difficulty?: string;
   objectives?: string[];
@@ -42,15 +40,12 @@ interface Assessment {
   createdAt: string;
 }
 
-type TabId = "all" | "completed" | "drafts";
-type VisibilityFilter = "all" | "public" | "mine";
+type TabId = "all" | "active" | "completed" | "drafts";
 
 export default function LibraryPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<TabId>("all");
-  const [visibilityFilter, setVisibilityFilter] =
-    useState<VisibilityFilter>("all");
   const [activeAssessments, setActiveAssessments] = useState<Assessment[]>([]);
   const [draftAssessments, setDraftAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,20 +103,8 @@ export default function LibraryPage() {
     }
   }
 
-  // Apply visibility filter client-side (data already includes both public + own)
-  const applyVisibility = (list: Assessment[]) => {
-    if (visibilityFilter === "public")
-      return list.filter((a) => a.visibility === "public");
-    if (visibilityFilter === "mine") {
-      return list.filter(
-        (a) => a.visibility === "private" || a.status === "draft",
-      );
-    }
-    return list;
-  };
-
-  const filteredActive = applyVisibility(activeAssessments);
-  const filteredDrafts = applyVisibility(draftAssessments);
+  const filteredActive = activeAssessments;
+  const filteredDrafts = draftAssessments;
 
   const pending = filteredActive.filter((a) => !a.completed);
   const completed = filteredActive.filter((a) => a.completed);
@@ -129,16 +112,19 @@ export default function LibraryPage() {
   const allAssessments = [...filteredActive, ...filteredDrafts];
 
   const listed =
-    tab === "completed"
-      ? completed
-      : tab === "drafts"
-        ? filteredDrafts
-        : allAssessments;
+    tab === "active"
+      ? filteredActive
+      : tab === "completed"
+        ? completed
+        : tab === "drafts"
+          ? filteredDrafts
+          : allAssessments;
 
   useEffect(() => {
+    if (tab === "active" && filteredActive.length === 0) setTab("all");
     if (tab === "completed" && completed.length === 0) setTab("all");
     if (tab === "drafts" && filteredDrafts.length === 0) setTab("all");
-  }, [tab, completed.length, filteredDrafts.length]);
+  }, [tab, filteredActive.length, completed.length, filteredDrafts.length]);
 
   const featuredAssessment = pending[0] ?? null;
 
@@ -187,7 +173,7 @@ export default function LibraryPage() {
                 passingPoints: null,
                 showResultsDuring: false,
                 affectsRating: true,
-                visibility: "private",
+
                 method: "manual",
               },
             });
@@ -304,6 +290,13 @@ export default function LibraryPage() {
             label={`All (${allAssessments.length})`}
             id="tab-all"
           />
+          {filteredActive.length > 0 && (
+            <Tab
+              value="active"
+              label={`Active (${filteredActive.length})`}
+              id="tab-active"
+            />
+          )}
           {completed.length > 0 && (
             <Tab
               value="completed"
@@ -319,40 +312,6 @@ export default function LibraryPage() {
             />
           )}
         </Tabs>
-
-        {/* Visibility segmented control */}
-        <ToggleButtonGroup
-          value={visibilityFilter}
-          exclusive
-          onChange={(_, v) => {
-            if (v !== null) {
-              setVisibilityFilter(v);
-              // Reset to "all" tab if currently on drafts and switching filter
-              if (tab === "drafts" && v === "public") setTab("all");
-            }
-          }}
-          size="small"
-          aria-label="visibility filter"
-          sx={{ mb: 0.5 }}
-        >
-          <ToggleButton value="all" id="vis-filter-all" sx={{ px: 1.5 }}>
-            <Typography variant="caption" sx={{ textTransform: "none" }}>
-              All sets
-            </Typography>
-          </ToggleButton>
-          <ToggleButton value="public" id="vis-filter-public" sx={{ px: 1.5 }}>
-            <PublicIcon sx={{ fontSize: 14, mr: 0.5 }} />
-            <Typography variant="caption" sx={{ textTransform: "none" }}>
-              Public
-            </Typography>
-          </ToggleButton>
-          <ToggleButton value="mine" id="vis-filter-mine" sx={{ px: 1.5 }}>
-            <LockOutlinedIcon sx={{ fontSize: 14, mr: 0.5 }} />
-            <Typography variant="caption" sx={{ textTransform: "none" }}>
-              Mine
-            </Typography>
-          </ToggleButton>
-        </ToggleButtonGroup>
       </Box>
 
       {startError && (
@@ -401,33 +360,6 @@ export default function LibraryPage() {
                           sx={tagColor(assessment.course)}
                         />
                       )}
-
-                      {/* Visibility chip */}
-                      <Chip
-                        icon={
-                          assessment.visibility === "public" ? (
-                            <PublicIcon
-                              sx={{ fontSize: "0.85rem !important" }}
-                            />
-                          ) : (
-                            <LockOutlinedIcon
-                              sx={{ fontSize: "0.85rem !important" }}
-                            />
-                          )
-                        }
-                        label={
-                          assessment.visibility === "public"
-                            ? "Public"
-                            : "Private"
-                        }
-                        size="small"
-                        variant="outlined"
-                        color={
-                          assessment.visibility === "public"
-                            ? "info"
-                            : "default"
-                        }
-                      />
 
                       {/* Completed badge */}
                       {assessment.completed && (

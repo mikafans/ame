@@ -117,7 +117,8 @@ async fn create_questions_batch_inserts_and_links_tags() {
         mc_insert("Q2", &["rust:async"]),
         mc_insert("Q3", &[]),
     ];
-    let created = q_repo::create_questions(&pool, user_id, batch)
+    let mut conn = pool.acquire().await.unwrap();
+    let created = q_repo::create_questions(&mut conn, user_id, user_id, batch)
         .await
         .unwrap();
 
@@ -142,7 +143,9 @@ async fn create_questions_batch_inserts_and_links_tags() {
         tag: Some("rust:async".into()),
         ..Default::default()
     };
-    let listed = q_repo::list_questions(&pool, filter, 100, 0).await.unwrap();
+    let listed = q_repo::list_questions(&mut conn, filter, 100, 0)
+        .await
+        .unwrap();
     let listed_ids: Vec<Uuid> = listed.into_iter().map(|q| q.id).collect();
 
     let mut found_count = 0;
@@ -170,7 +173,8 @@ async fn create_questions_rejects_oversized_batch() {
     let batch: Vec<_> = (0..MAX_BATCH + 1)
         .map(|i| mc_insert(&format!("over{}", i), &[]))
         .collect();
-    let err = q_repo::create_questions(&pool, user_id, batch)
+    let mut conn = pool.acquire().await.unwrap();
+    let err = q_repo::create_questions(&mut conn, user_id, user_id, batch)
         .await
         .unwrap_err();
 
@@ -191,24 +195,29 @@ async fn update_live_question_bumps_version_and_writes_history() {
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
 
-    let q = q_repo::create_questions(&pool, user_id, vec![mc_insert("live-q", &[])])
+    let mut conn = pool.acquire().await.unwrap();
+    let q = q_repo::create_questions(&mut conn, user_id, user_id, vec![mc_insert("live-q", &[])])
         .await
         .unwrap()
         .pop()
         .unwrap();
 
-    q_repo::promote_question(&pool, q.id).await.unwrap();
+    q_repo::promote_question(&mut conn, q.id).await.unwrap();
 
     let patch = QuestionPatch {
         prompt: Some("live-q updated".into()),
         ..Default::default()
     };
-    let updated = q_repo::update_question(&pool, q.id, patch).await.unwrap();
+    let updated = q_repo::update_question(&mut conn, q.id, patch)
+        .await
+        .unwrap();
 
     assert_eq!(updated.version, 2, "live edit must bump version");
     assert_eq!(updated.prompt, "live-q updated");
 
-    let versions = q_repo::get_question_versions(&pool, q.id).await.unwrap();
+    let versions = q_repo::get_question_versions(&mut conn, q.id)
+        .await
+        .unwrap();
     assert_eq!(
         versions.len(),
         1,
@@ -226,7 +235,8 @@ async fn update_draft_question_does_not_bump_version() {
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
 
-    let q = q_repo::create_questions(&pool, user_id, vec![mc_insert("draft-q", &[])])
+    let mut conn = pool.acquire().await.unwrap();
+    let q = q_repo::create_questions(&mut conn, user_id, user_id, vec![mc_insert("draft-q", &[])])
         .await
         .unwrap()
         .pop()
@@ -236,12 +246,16 @@ async fn update_draft_question_does_not_bump_version() {
         prompt: Some("draft-q updated".into()),
         ..Default::default()
     };
-    let updated = q_repo::update_question(&pool, q.id, patch).await.unwrap();
+    let updated = q_repo::update_question(&mut conn, q.id, patch)
+        .await
+        .unwrap();
 
     assert_eq!(updated.version, 1, "draft edit must not bump version");
     assert_eq!(updated.prompt, "draft-q updated");
 
-    let versions = q_repo::get_question_versions(&pool, q.id).await.unwrap();
+    let versions = q_repo::get_question_versions(&mut conn, q.id)
+        .await
+        .unwrap();
     assert!(versions.is_empty(), "draft edit must not snapshot");
 }
 
@@ -253,18 +267,24 @@ async fn cannot_edit_archived_question() {
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
 
-    let q = q_repo::create_questions(&pool, user_id, vec![mc_insert("archive-me", &[])])
-        .await
-        .unwrap()
-        .pop()
-        .unwrap();
-    q_repo::archive_question(&pool, q.id).await.unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+    let q = q_repo::create_questions(
+        &mut conn,
+        user_id,
+        user_id,
+        vec![mc_insert("archive-me", &[])],
+    )
+    .await
+    .unwrap()
+    .pop()
+    .unwrap();
+    q_repo::archive_question(&mut conn, q.id).await.unwrap();
 
     let patch = QuestionPatch {
         prompt: Some("nope".into()),
         ..Default::default()
     };
-    let err = q_repo::update_question(&pool, q.id, patch)
+    let err = q_repo::update_question(&mut conn, q.id, patch)
         .await
         .unwrap_err();
     match err {

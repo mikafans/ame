@@ -78,6 +78,7 @@ pub mod admin;
 pub mod agents;
 pub mod assessments;
 pub mod auth;
+pub mod db;
 pub mod explore;
 pub mod export;
 pub mod idempotency;
@@ -98,6 +99,7 @@ pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
 }
 
 pub fn router(pool: PgPool) -> Router {
+    let pool = db::convert_pool_to_ame_app(&pool);
     let state = AppState { pool };
 
     // CORS: Default to localhost:23000 if AME_CORS_ORIGINS is unset.

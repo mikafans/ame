@@ -23,9 +23,8 @@ POST /v1/me/agents
 Send the key on every request: `Authorization: Bearer <apiKey>`.
 
 **Valid scopes**: `assessment.read`, `assessment.write`, `attempt.read`,
-`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`,
-`public.publish`. Note: `public.publish` is only grantable on the premium plan
-(free plan returns 403). `admin` cannot be granted to agents.
+`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`.
+`admin` cannot be granted to agents.
 
 ## Discovery
 
@@ -53,10 +52,9 @@ Send the key on every request: `Authorization: Bearer <apiKey>`.
    - `assessment.create` — create an assessment (draft). REQUIRED params: `title`,
      `mode` ("practice"|"graded"), `objectives` (array), `method` ("agent").
      Optional: `description`, `course`, `durationMin`, `timeLimitSeconds`,
-     `passingPoints`, `showResultsDuring`, `affectsRating`, `visibility`
-     ("private"|"public").
+     `passingPoints`, `showResultsDuring`, `affectsRating`.
    - `assessment.update` — patch metadata / publish.
-     `params: { id, title?, status?, visibility?, objectives? }`. Publish with
+     `params: { id, title?, status?, objectives? }`. Publish with
      `status: "active"`.
    - `question.promote` — promote one draft question to live. `params: { id }`.
 
@@ -111,5 +109,122 @@ uv run agents/client.py --api http://localhost:28080 --token <owner-token>
 
 ## Task playbooks
 
-Worked, step-by-step recipes live in the repo under `agents/<name>/SKILL.md`:
-`generate-questions`, `adaptive-generation`, `analyze-performance`.
+Worked, step-by-step playbooks and recipes for performing diagnostic analyses and material adjustments on AME.
+
+### Playbook 1: Analyze Learner Performance (`analyze-performance`)
+
+Read a learner's tag-level stats and recent attempt history to surface learning gaps.
+
+1. **Get per-tag stats for an assessment**:
+   ```http
+   GET /v1/assessments/{assessmentId}/stats
+   Authorization: Bearer <your-key>
+   ```
+   Response:
+   ```json
+   {
+     "avg": 0.72,
+     "median": 0.75,
+     "distribution": [
+       { "bucket": 3, "count": 1 }
+     ],
+     "items": [
+       {
+         "questionId": "019...",
+         "correctRate": 0.31,
+         "avgTimeMs": 14200,
+         "discriminationIdx": 0.55
+       }
+     ]
+   }
+   ```
+   Items with `correctRate < 0.5` are struggle points.
+
+2. **Check agent activity log**:
+   ```http
+   GET /v1/agents/activity?limit=20
+   Authorization: Bearer <your-key>
+   ```
+   Review recent tool calls, status codes, and paths to audit what the agent has done.
+
+3. **Interpreting results**:
+   * `correctRate < 0.5`: Topic/tag needs more practice questions.
+   * `discriminationIdx < 0.2`: Question may be poorly written or confusing.
+   * `avgTimeMs > 30,000`: Question may be too complex or long.
+
+---
+
+### Playbook 2: Targeted Question Generation (`generate-questions`)
+
+Generate targeted questions for a learner's weakest topics and import them as a practice assessment.
+
+1. **Find weakest tags**:
+   Use the profile tool to fetch the ELO ratings:
+   ```http
+   POST /v1/agents/run
+   { "tool": "profile.get", "params": {} }
+   ```
+   The response returns `owner.ratings` sorted from highest to lowest. The lowest ratings are your primary targets.
+
+2. **Generate question candidates for the weakest tag**:
+   ```http
+   POST /v1/assessments/generate
+   Authorization: Bearer <your-key>
+   Content-Type: application/json
+   {
+     "source": "Explain binary search trees, including insertion, deletion, and traversal algorithms.",
+     "questionCount": 5,
+     "types": ["mc", "tf", "short"],
+     "objectives": ["binary-search-tree"]
+   }
+   ```
+   If `warnings` is non-empty, the source was too thin — add more context and retry.
+
+3. **Publish the assessment**:
+   Create the assessment draft, attach the generated questions, and publish:
+   ```http
+   POST /v1/agents/run
+   {
+     "tool": "assessment.update",
+     "params": { "id": "<assessmentId>", "status": "active" }
+   }
+   ```
+
+---
+
+### Playbook 3: Adaptive Generation Loop (`adaptive-generation`)
+
+The full adaptive loop: read weakest tags → check assessment pool gaps → generate targeted questions, handling `pool_insufficient` gracefully by reducing question count and retrying.
+
+1. **Identify struggle points**:
+   ```http
+   GET /v1/assessments/{assessmentId}/stats
+   Authorization: Bearer <your-key>
+   ```
+   Collect items where `correctRate < 0.5`.
+
+2. **For each weak tag, generate with retry**:
+   ```http
+   POST /v1/assessments/generate
+   Authorization: Bearer <your-key>
+   Content-Type: application/json
+   {
+     "source": "Rust ownership and borrowing rules: move semantics, references, lifetimes.",
+     "questionCount": 5,
+     "objectives": ["rust"]
+   }
+   ```
+   On `422 pool_insufficient`:
+   ```json
+   {
+     "error": {
+       "code": "exam_pool_insufficient",
+       "details": { "required": 5, "available": 3 }
+     }
+   }
+   ```
+   Retry with `questionCount: 3` (available count).
+
+3. **Activate and publish**:
+   Once attached, promote the assessment status to `"active"`.
+

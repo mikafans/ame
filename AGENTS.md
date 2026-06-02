@@ -74,11 +74,11 @@ bunx @playwright/cli console
 bunx @playwright/cli close
 ```
 
-### Getting a learner token
+### Getting a primary user token
 ```bash
 curl -s -X POST http://localhost:28080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"learner@example.com","password":"password123"}' | jq -r .token
+  -d '{"email":"ada@example.com","password":"password123"}' | jq -r .token
 ```
 
 ### jq tip (fish shell)

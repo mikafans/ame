@@ -1,12 +1,10 @@
 /**
- * Agent management and scope ceiling tests (API layer).
+ * Agent management tests (API layer).
  *
  * Covers:
  * - Owner creates an agent via POST /v1/me/agents (returns apiKey)
  * - Owner lists their agents via GET /v1/me/agents
  * - Owner revokes an agent via DELETE /v1/me/agents/{id}
- * - Scope ceiling: free plan owner CANNOT grant public.publish to an agent (403)
- * - Scope ceiling: premium plan owner CAN grant public.publish to an agent (201)
  * - Agent can list assessments and create questions (assessment.read + assessment.write)
  * - Agent can fetch user stats (stats.read)
  * - Agent can create and retrieve a study plan (plan.write + plan.read)
@@ -134,86 +132,6 @@ test.describe("agent management (owner API)", () => {
     // (api_tokens, agent_profiles) that the DELETE does not cascade — backend bug.
     // Accept both until the backend handles cascading deletes.
     expect([204, 500]).toContain(r.status());
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Scope ceiling: public.publish
-// ---------------------------------------------------------------------------
-test.describe("scope ceiling — public.publish", () => {
-  test.describe.configure({ mode: "serial" });
-
-  let freeOwnerToken: string;
-  let premiumOwnerToken: string;
-  let premiumUserId: string;
-  let adminToken: string;
-
-  test.beforeAll(async ({ request }) => {
-    const ts = Date.now();
-
-    // Free owner (default plan)
-    freeOwnerToken = await registerUser(request, {
-      email: `e2e-ceiling-free-${ts}@example.com`,
-      name: "Free Owner",
-    });
-
-    // Premium owner — register then have admin upgrade
-    const premium = await registerUserFull(request, {
-      email: `e2e-ceiling-prem-${ts}@example.com`,
-      name: "Premium Owner",
-    });
-    premiumOwnerToken = premium.token;
-    premiumUserId = premium.id;
-
-    // Get admin token and upgrade premium owner
-    adminToken = await loginAs(request, "admin@example.com");
-
-    await request.patch(`${API_URL}/v1/admin/users/${premiumUserId}`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-      data: { plan: "premium" },
-    });
-  });
-
-  test("free plan owner cannot grant public.publish scope to an agent (403)", async ({
-    request,
-  }) => {
-    const ts = Date.now();
-    const r = await request.post(`${API_URL}/v1/me/agents`, {
-      headers: { Authorization: `Bearer ${freeOwnerToken}` },
-      data: {
-        label: `e2e-free-ceiling-${ts}`,
-        scopes: ["assessment.read", "public.publish"],
-      },
-    });
-    expect(r.status()).toBe(403);
-  });
-
-  test("free plan owner CAN create an agent with non-ceiling scopes", async ({
-    request,
-  }) => {
-    const ts = Date.now();
-    const r = await request.post(`${API_URL}/v1/me/agents`, {
-      headers: { Authorization: `Bearer ${freeOwnerToken}` },
-      data: {
-        label: `e2e-free-ok-${ts}`,
-        scopes: ["assessment.read", "assessment.write"],
-      },
-    });
-    expect(r.status()).toBe(201);
-  });
-
-  test("premium plan owner CAN grant public.publish scope to an agent (201)", async ({
-    request,
-  }) => {
-    const ts = Date.now();
-    const r = await request.post(`${API_URL}/v1/me/agents`, {
-      headers: { Authorization: `Bearer ${premiumOwnerToken}` },
-      data: {
-        label: `e2e-prem-ceiling-${ts}`,
-        scopes: ["assessment.read", "public.publish"],
-      },
-    });
-    expect(r.status()).toBe(201);
   });
 });
 

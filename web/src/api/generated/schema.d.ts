@@ -21,23 +21,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/moderate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private) */
-        post: operations["moderate_assessment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -699,7 +682,6 @@ export interface components {
             totalPoints: number;
             /** Format: date-time */
             updatedAt: string;
-            visibility: components["schemas"]["AssessmentVisibility"];
         };
         AssessmentDetail: components["schemas"]["Assessment"] & {
             questions: components["schemas"]["AssessmentQuestion"][];
@@ -771,10 +753,7 @@ export interface components {
             totalPoints: number;
             /** Format: date-time */
             updatedAt: string;
-            visibility: string;
         };
-        /** @enum {string} */
-        AssessmentVisibility: "public" | "private" | "unlisted";
         Attempt: {
             correct_answer?: Record<string, never>;
             /** Format: date-time */
@@ -889,7 +868,6 @@ export interface components {
             /** Format: int32 */
             timeLimitSeconds?: number | null;
             title: string;
-            visibility?: components["schemas"]["AssessmentVisibility"];
         };
         CreatePlanBody: {
             goal: string;
@@ -1020,7 +998,7 @@ export interface components {
             sessions: components["schemas"]["SessionSummary"][];
         };
         ListQuestionsResponse: {
-            nextCursor?: string | null;
+            next_cursor?: string | null;
             questions: components["schemas"]["Question"][];
             /** Format: int64 */
             total: number;
@@ -1040,10 +1018,6 @@ export interface components {
             /** Format: uuid */
             id: string;
             role: components["schemas"]["Role"];
-        };
-        ModerateBody: {
-            /** Format: uuid */
-            assessmentId: string;
         };
         PatchSessionBody: {
             status: components["schemas"]["SessionStatus"];
@@ -1186,7 +1160,7 @@ export interface components {
          *     single point of translation; anything not listed here is rejected as `UnknownScope`.
          * @enum {string}
          */
-        Scope: "assessment.read" | "assessment.write" | "attempt.read" | "attempt.write" | "stats.read" | "feedback.write" | "plan.read" | "plan.write" | "public.publish" | "admin";
+        Scope: "assessment.read" | "assessment.write" | "attempt.read" | "attempt.write" | "stats.read" | "feedback.write" | "plan.read" | "plan.write" | "admin";
         Session: {
             affects_rating: boolean;
             /** Format: uuid */
@@ -1296,7 +1270,6 @@ export interface components {
             objectives?: string[] | null;
             status?: null | components["schemas"]["AssessmentStatus"];
             title?: string | null;
-            visibility?: null | components["schemas"]["AssessmentVisibility"];
         };
         UpdateSectionBody: {
             mix?: unknown;
@@ -1367,49 +1340,6 @@ export interface operations {
             };
             /** @description Forbidden (Admin required) */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    moderate_assessment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModerateBody"];
-            };
-        };
-        responses: {
-            /** @description Public content moderated and unpublished successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Content not found */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2493,15 +2423,14 @@ export interface operations {
     list_questions: {
         parameters: {
             query?: {
-                /** @description Filter by tag name */
                 tag?: string;
-                /** @description Filter by status (draft, live, archived) */
                 status?: string;
-                /** @description Partial match on prompt */
                 search?: string;
-                /** @description Filter by question kind */
                 kind?: string;
-                /** @description Pagination cursor */
+                min_rating?: number;
+                max_rating?: number;
+                limit?: number;
+                offset?: number;
                 after?: string;
             };
             header?: never;
@@ -2510,7 +2439,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Question list */
+            /** @description List of questions */
             200: {
                 headers: {
                     [name: string]: unknown;

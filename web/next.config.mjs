@@ -48,6 +48,22 @@ const nextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  async rewrites() {
+    return [
+      {
+        source: "/llms.txt",
+        destination: `${apiOrigin}/llms.txt`,
+      },
+      {
+        source: "/v1/agents/skill.json",
+        destination: `${apiOrigin}/v1/agents/skill.json`,
+      },
+      {
+        source: "/v1/agents/openapi.json",
+        destination: `${apiOrigin}/v1/agents/openapi.json`,
+      },
+    ];
+  },
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
 };
 

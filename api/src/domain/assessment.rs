@@ -40,25 +40,6 @@ impl std::fmt::Display for AssessmentStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AssessmentVisibility {
-    Public,
-    #[default]
-    Private,
-    Unlisted,
-}
-
-impl std::fmt::Display for AssessmentVisibility {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AssessmentVisibility::Public => write!(f, "public"),
-            AssessmentVisibility::Private => write!(f, "private"),
-            AssessmentVisibility::Unlisted => write!(f, "unlisted"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Assessment {
@@ -75,7 +56,6 @@ pub struct Assessment {
     pub passing_points: Option<i32>,
     pub show_results_during: bool,
     pub affects_rating: bool,
-    pub visibility: AssessmentVisibility,
     pub method: String,
     pub composition_trace: Option<serde_json::Value>,
     pub created_by: Uuid,
@@ -116,8 +96,6 @@ pub struct CreateAssessmentRequest {
     pub show_results_during: bool,
     #[serde(default = "default_true")]
     pub affects_rating: bool,
-    #[serde(default)]
-    pub visibility: AssessmentVisibility,
     #[serde(default = "default_method")]
     pub method: String, // 'manual' or 'agent'
     #[serde(default)]
@@ -138,6 +116,5 @@ pub struct UpdateAssessmentRequest {
     pub title: Option<String>,
     pub description: Option<Option<String>>,
     pub status: Option<AssessmentStatus>,
-    pub visibility: Option<AssessmentVisibility>,
     pub objectives: Option<Vec<String>>,
 }

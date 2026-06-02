@@ -80,8 +80,8 @@ pub async fn explore(
     // Build dynamic query
     // Strict isolation: only view own items (including agent's)
     let mut sql = String::from(
-        "SELECT id, title, visibility, status, objectives, created_at 
-         FROM tb_assessments 
+        "SELECT id, title, status, objectives, created_at
+         FROM tb_assessments
          WHERE (created_by = $1 OR EXISTS (
              SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
          ))",
@@ -152,7 +152,6 @@ pub async fn explore(
             serde_json::json!({
                 "id": row.get::<Uuid, _>("id"),
                 "title": row.get::<String, _>("title"),
-                "visibility": row.get::<String, _>("visibility"),
                 "status": row.get::<String, _>("status"),
                 "tags": row.get::<Vec<String>, _>("objectives"),
                 "createdAt": created_at.format(&time::format_description::well_known::Rfc3339).unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),

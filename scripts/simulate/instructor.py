@@ -9,8 +9,8 @@ import time
 import httpx
 
 BASE = "http://localhost:8080"
-INSTRUCTOR_EMAIL = "instructor@example.com"
-INSTRUCTOR_PASSWORD = "password123"
+OWNER_EMAIL = "ada@example.com"
+OWNER_PASSWORD = "password123"
 
 
 def step(label: str, ok: bool, detail: str = "") -> None:
@@ -21,15 +21,15 @@ def step(label: str, ok: bool, detail: str = "") -> None:
 
 
 def main() -> None:
-    print("=== Instructor simulation ===")
+    print("=== Primary user simulation ===")
     c = httpx.Client(base_url=BASE, timeout=15)
 
     # 1. Login
     r = c.post(
         "/v1/auth/login",
-        json={"email": INSTRUCTOR_EMAIL, "password": INSTRUCTOR_PASSWORD},
+        json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD},
     )
-    step("login as instructor", r.status_code == 200, str(r.status_code))
+    step("login as primary user", r.status_code == 200, str(r.status_code))
     token = r.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
 

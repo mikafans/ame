@@ -25,29 +25,6 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/moderate:
-    post:
-      tags:
-      - admin
-      summary: POST /v1/admin/moderate — moderate public content by unpublishing it (setting visibility private)
-      operationId: moderate_assessment
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ModerateBody'
-        required: true
-      responses:
-        '204':
-          description: Public content moderated and unpublished successfully
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-        '404':
-          description: Content not found
-      security:
-      - bearer: []
   /v1/admin/users:
     get:
       tags:
@@ -828,37 +805,56 @@ paths:
       parameters:
       - name: tag
         in: query
-        description: Filter by tag name
         required: false
         schema:
           type: string
       - name: status
         in: query
-        description: Filter by status (draft, live, archived)
         required: false
         schema:
           type: string
       - name: search
         in: query
-        description: Partial match on prompt
         required: false
         schema:
           type: string
       - name: kind
         in: query
-        description: Filter by question kind
         required: false
         schema:
           type: string
+      - name: min_rating
+        in: query
+        required: false
+        schema:
+          type: number
+          format: double
+      - name: max_rating
+        in: query
+        required: false
+        schema:
+          type: number
+          format: double
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
       - name: after
         in: query
-        description: Pagination cursor
         required: false
         schema:
           type: string
       responses:
         '200':
-          description: Question list
+          description: List of questions
           content:
             application/json:
               schema:
@@ -1473,7 +1469,6 @@ components:
       - totalPoints
       - showResultsDuring
       - affectsRating
-      - visibility
       - method
       - createdBy
       - createdAt
@@ -1534,8 +1529,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-        visibility:
-          $ref: '#/components/schemas/AssessmentVisibility'
     AssessmentDetail:
       allOf:
       - $ref: '#/components/schemas/Assessment'
@@ -1665,7 +1658,6 @@ components:
       - title
       - mode
       - status
-      - visibility
       - objectives
       - totalPoints
       - questionCount
@@ -1718,14 +1710,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-        visibility:
-          type: string
-    AssessmentVisibility:
-      type: string
-      enum:
-      - public
-      - private
-      - unlisted
     Attempt:
       type: object
       required:
@@ -2014,8 +1998,6 @@ components:
           format: int32
         title:
           type: string
-        visibility:
-          $ref: '#/components/schemas/AssessmentVisibility'
     CreatePlanBody:
       type: object
       required:
@@ -2373,7 +2355,7 @@ components:
       - questions
       - total
       properties:
-        nextCursor:
+        next_cursor:
           type:
           - string
           - 'null'
@@ -2425,14 +2407,6 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
-    ModerateBody:
-      type: object
-      required:
-      - assessmentId
-      properties:
-        assessmentId:
-          type: string
-          format: uuid
     PatchSessionBody:
       type: object
       required:
@@ -2788,7 +2762,6 @@ components:
       - feedback.write
       - plan.read
       - plan.write
-      - public.publish
       - admin
     Session:
       type: object
@@ -3075,10 +3048,6 @@ components:
           type:
           - string
           - 'null'
-        visibility:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/AssessmentVisibility'
     UpdateSectionBody:
       type: object
       properties:

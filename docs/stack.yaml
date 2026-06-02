@@ -104,8 +104,8 @@ make_targets:
 
 # --- Seed credentials (local dev) ---
 dev_accounts:
-  learner:  { email: learner@example.com,    password: password123 }
-  instructor: { email: instructor@example.com, password: password123 }
+  ada:  { email: ada@example.com,    password: password123 }
+  mira: { email: mira@example.com, password: password123 }
 
 # --- Key conventions ---
 conventions:

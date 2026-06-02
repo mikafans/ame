@@ -1,8 +1,7 @@
 //! Agent skill-manifest integration tests.
 //!
-//! The token-share/embed surface was removed in favour of the visibility-gated
-//! model (commit 2f0e223); the only checks that remain here cover the agent
-//! skill manifest exposed at `/v1/agents/skill.json`.
+//! Covers the agent skill manifest exposed at `/v1/agents/skill.json`: the
+//! tools it advertises and the field-stripping done in `?strict=1` mode.
 
 use serde_json::Value;
 use sqlx::PgPool;
@@ -36,7 +35,7 @@ async fn serve_lazy() -> String {
 }
 
 #[tokio::test]
-async fn skill_manifest_contains_all_share_tools() {
+async fn skill_manifest_contains_assessment_tools() {
     let base = serve_lazy().await;
     let client = reqwest::Client::new();
 

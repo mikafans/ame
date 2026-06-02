@@ -28,7 +28,10 @@ interface Props {
   total: number;
   onRate: (knew: boolean) => void;
   onSkip: () => void;
+  onFinish?: () => void;
 }
+
+export default function FlashcardReview_Placeholder() {} // dummy definition to align types cleanly if needed, but not needed
 
 export function FlashcardReview({
   question,
@@ -36,6 +39,7 @@ export function FlashcardReview({
   total,
   onRate,
   onSkip,
+  onFinish,
 }: Props) {
   const [revealed, setRevealed] = useState(false);
   const back = deriveBack(question);
@@ -52,7 +56,7 @@ export function FlashcardReview({
       if (e.key === " ") {
         e.preventDefault();
         setRevealed(true);
-      } else if (e.key === "s" || e.key === "S") {
+      } else if ((e.key === "s" || e.key === "S") && index + 1 < total) {
         onSkip();
       } else if (revealed && (e.key === "2" || e.key === "ArrowRight")) {
         onRate(true);
@@ -62,7 +66,7 @@ export function FlashcardReview({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [revealed, onRate, onSkip]);
+  }, [revealed, onRate, onSkip, index, total]);
 
   const snippet =
     question.code_snippet && typeof question.code_snippet === "object"
@@ -187,13 +191,26 @@ export function FlashcardReview({
             </Button>
           </Stack>
         )}
-        <Button
-          color="inherit"
-          onClick={onSkip}
-          sx={{ color: "text.secondary" }}
-        >
-          Skip (S)
-        </Button>
+        <Stack direction="row" spacing={1}>
+          {index + 1 < total && (
+            <Button
+              color="inherit"
+              onClick={onSkip}
+              sx={{ color: "text.secondary" }}
+            >
+              Skip (S)
+            </Button>
+          )}
+          {onFinish && (
+            <Button
+              color="inherit"
+              onClick={onFinish}
+              sx={{ color: "text.secondary" }}
+            >
+              Finish
+            </Button>
+          )}
+        </Stack>
       </Stack>
     </Box>
   );

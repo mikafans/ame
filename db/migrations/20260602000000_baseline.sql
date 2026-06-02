@@ -1,6 +1,14 @@
 -- Squashed baseline: consolidates all migrations up to 2026-06-01.
 -- Safe to apply on a fresh DB only. Run via: make db-reset
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'ame_app') THEN
+    CREATE ROLE ame_app WITH LOGIN PASSWORD 'postgres';
+  END IF;
+END
+$$;
+
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION uuid_generate_v7()
@@ -52,13 +60,14 @@ CREATE TABLE tb_api_tokens (
   scopes       text[]      NOT NULL,
   last_used_at timestamptz,
   revoked_at   timestamptz,
+  expires_at   timestamptz NOT NULL DEFAULT now() + INTERVAL '30 days',
   created_at   timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT tb_api_tokens_scopes_check
     CHECK (
       scopes <@ ARRAY[
         'assessment.read', 'assessment.write', 'attempt.read', 'attempt.write',
         'stats.read', 'feedback.write', 'plan.read', 'plan.write',
-        'public.publish', 'admin'
+        'admin'
       ]::text[]
       AND array_length(scopes, 1) >= 1
     )
@@ -79,6 +88,7 @@ CREATE TABLE tb_tags (
 
 CREATE TABLE tb_questions (
   id             uuid             PRIMARY KEY DEFAULT uuid_generate_v7(),
+  owner_id       uuid             NOT NULL REFERENCES tb_users(id),
   kind           text             NOT NULL,
   prompt         text             NOT NULL,
   code_snippet   jsonb,
@@ -101,6 +111,21 @@ CREATE TABLE tb_questions (
 CREATE INDEX tb_questions_live_created ON tb_questions(created_at DESC) WHERE status = 'live';
 CREATE INDEX tb_questions_status        ON tb_questions(status);
 CREATE INDEX idx_tb_questions_prompt_tsv ON tb_questions USING gin (prompt_tsv);
+CREATE INDEX idx_tb_questions_owner_id ON tb_questions(owner_id);
+
+ALTER TABLE tb_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tb_questions FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY tb_questions_owner_policy ON tb_questions
+  FOR ALL
+  USING (
+    owner_id = nullif(current_setting('app.owner', true), '')::uuid 
+    OR current_setting('app.is_admin', true) = 'true'
+  )
+  WITH CHECK (
+    owner_id = nullif(current_setting('app.owner', true), '')::uuid 
+    OR current_setting('app.is_admin', true) = 'true'
+  );
 
 CREATE TABLE tb_question_versions (
   id           uuid        PRIMARY KEY DEFAULT uuid_generate_v7(),
@@ -140,7 +165,6 @@ CREATE TABLE tb_assessments (
   description         text,
   mode                text             NOT NULL CHECK (mode IN ('practice','graded')),
   status              text             NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
-  visibility          text             NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'unlisted', 'public')),
   objectives          text[]           NOT NULL DEFAULT '{}',
   course              text,
   duration_min        integer,
@@ -155,7 +179,6 @@ CREATE TABLE tb_assessments (
   created_at          timestamptz      NOT NULL DEFAULT now(),
   updated_at          timestamptz      NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_assessments_visibility_status ON tb_assessments (visibility, status);
 CREATE INDEX idx_assessments_created_by_status ON tb_assessments (created_by, status);
 
 CREATE TABLE tb_assessment_sections (
@@ -379,3 +402,14 @@ CREATE TABLE tb_audit_log (
 );
 
 CREATE INDEX idx_audit_log_created ON tb_audit_log (created_at DESC);
+
+-- Grant schema-level permissions to ame_app
+GRANT USAGE ON SCHEMA public TO ame_app;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ame_app;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ame_app;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO ame_app;
+
+-- Ensure future tables/sequences/functions created by postgres are automatically accessible by ame_app
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO ame_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO ame_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL PRIVILEGES ON FUNCTIONS TO ame_app;

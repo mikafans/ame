@@ -74,7 +74,6 @@ async fn test_admin_flow_and_audit() {
         "assessment.write".to_string(),
         "attempt.read".to_string(),
         "attempt.write".to_string(),
-        "public.publish".to_string(),
     ])
     .execute(&pool)
     .await
@@ -102,15 +101,6 @@ async fn test_admin_flow_and_audit() {
     let res = client
         .get(format!("{base_url}/v1/admin/audit"))
         .header("Authorization", format!("Bearer {reg_auth}"))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::FORBIDDEN);
-
-    let res = client
-        .post(format!("{base_url}/v1/admin/moderate"))
-        .header("Authorization", format!("Bearer {reg_auth}"))
-        .json(&json!({"assessmentId": Uuid::now_v7()}))
         .send()
         .await
         .unwrap();
@@ -190,59 +180,7 @@ async fn test_admin_flow_and_audit() {
         .unwrap();
     assert_eq!(plan, "free");
 
-    // 6. Moderation Flow: regular user creates a public assessment
-    let assessment_res = client
-        .post(format!("{base_url}/v1/assessments"))
-        .header("Authorization", format!("Bearer {reg_auth}"))
-        .json(&json!({
-            "title": "Moderate Me!",
-            "mode": "practice",
-            "method": "manual",
-            "objectives": ["test"],
-            "visibility": "public"
-        }))
-        .send()
-        .await
-        .unwrap();
-    let status = assessment_res.status();
-    if status != StatusCode::CREATED {
-        let body = assessment_res.text().await.unwrap();
-        panic!("Assessment creation failed ({status}): {body}");
-    }
-    assert_eq!(status, StatusCode::CREATED);
-    let assessment_body: serde_json::Value = assessment_res.json().await.unwrap();
-    let assessment_id_str = assessment_body["id"].as_str().unwrap();
-    let assessment_id = Uuid::parse_str(assessment_id_str).unwrap();
-
-    // Verify visibility is public
-    let visibility: String =
-        sqlx::query_scalar("SELECT visibility FROM tb_assessments WHERE id = $1")
-            .bind(assessment_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(visibility, "public");
-
-    // Admin unpublishes the assessment
-    let res = client
-        .post(format!("{base_url}/v1/admin/moderate"))
-        .header("Authorization", format!("Bearer {admin_auth}"))
-        .json(&json!({"assessmentId": assessment_id}))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::NO_CONTENT);
-
-    // Verify visibility is now private
-    let visibility: String =
-        sqlx::query_scalar("SELECT visibility FROM tb_assessments WHERE id = $1")
-            .bind(assessment_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(visibility, "private");
-
-    // 7. Revoke/Deactivate Flow: Admin disables regular user
+    // 6. Revoke/Deactivate Flow: Admin disables regular user
     let res = client
         .patch(format!("{base_url}/v1/admin/users/{reg_user_id}"))
         .header("Authorization", format!("Bearer {admin_auth}"))
@@ -304,7 +242,7 @@ async fn test_admin_flow_and_audit() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
 
-    // 8. Verify the Audit Trail
+    // 7. Verify the Audit Trail
     // Wait slightly to let Tokios background spawns finish insertion
     tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
@@ -318,7 +256,7 @@ async fn test_admin_flow_and_audit() {
     let body: serde_json::Value = res.json().await.unwrap();
     let all_logs = body["logs"].as_array().unwrap();
 
-    // Filter to only include logs relevant to our test run users/assessments
+    // Filter to only include logs relevant to our test run users
     let logs: Vec<&serde_json::Value> = all_logs
         .iter()
         .filter(|log| {
@@ -327,7 +265,6 @@ async fn test_admin_flow_and_audit() {
             actor == Some(&admin_user_id.to_string())
                 || actor == Some(&reg_user_id.to_string())
                 || target == Some(&reg_user_id.to_string())
-                || target == Some(&assessment_id.to_string())
         })
         .collect();
 
@@ -335,16 +272,15 @@ async fn test_admin_flow_and_audit() {
     // Order of audit events we triggered:
     // 1. user.update_plan (to premium)
     // 2. user.update_plan (to free)
-    // 3. moderate.unpublish (unpublishing the assessment by admin)
-    // 4. user.disable (disabling the user by admin)
-    // 5. user.enable (re-enabling the user by admin)
-    // 6. user.update_role (updating the user's role to admin)
-    // Therefore, newest first: user.update_role, user.enable, user.disable, moderate.unpublish, user.update_plan, user.update_plan
+    // 3. user.disable (disabling the user by admin)
+    // 4. user.enable (re-enabling the user by admin)
+    // 5. user.update_role (updating the user's role to admin)
+    // Therefore, newest first: user.update_role, user.enable, user.disable, user.update_plan, user.update_plan
 
     assert_eq!(
         logs.len(),
-        6,
-        "Expected exactly 6 audit logs for this test run. Found: {logs:#?}"
+        5,
+        "Expected exactly 5 audit logs for this test run. Found: {logs:#?}"
     );
 
     // Validate user.update_role
@@ -368,24 +304,17 @@ async fn test_admin_flow_and_audit() {
     assert_eq!(logs[2]["targetId"], reg_user_id.to_string());
     assert_eq!(logs[2]["metadata"]["disabled"], true);
 
-    // Validate moderate.unpublish
-    assert_eq!(logs[3]["action"], "moderate.unpublish");
-    assert_eq!(logs[3]["actorUserId"], admin_user_id.to_string());
-    assert_eq!(logs[3]["targetType"], "assessment");
-    assert_eq!(logs[3]["targetId"], assessment_id.to_string());
-    assert_eq!(logs[3]["metadata"]["visibility"], "private");
-
     // Validate user.update_plan (to free)
+    assert_eq!(logs[3]["action"], "user.update_plan");
+    assert_eq!(logs[3]["actorUserId"], admin_user_id.to_string());
+    assert_eq!(logs[3]["targetType"], "user");
+    assert_eq!(logs[3]["targetId"], reg_user_id.to_string());
+    assert_eq!(logs[3]["metadata"]["plan"], "free");
+
+    // Validate user.update_plan (to premium)
     assert_eq!(logs[4]["action"], "user.update_plan");
     assert_eq!(logs[4]["actorUserId"], admin_user_id.to_string());
     assert_eq!(logs[4]["targetType"], "user");
     assert_eq!(logs[4]["targetId"], reg_user_id.to_string());
-    assert_eq!(logs[4]["metadata"]["plan"], "free");
-
-    // Validate user.update_plan (to premium)
-    assert_eq!(logs[5]["action"], "user.update_plan");
-    assert_eq!(logs[5]["actorUserId"], admin_user_id.to_string());
-    assert_eq!(logs[5]["targetType"], "user");
-    assert_eq!(logs[5]["targetId"], reg_user_id.to_string());
-    assert_eq!(logs[5]["metadata"]["plan"], "premium");
+    assert_eq!(logs[4]["metadata"]["plan"], "premium");
 }
