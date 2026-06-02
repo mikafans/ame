@@ -738,6 +738,7 @@ pub async fn list_attempts(
     auth: RequireAnyScope<AttemptReadScopes>,
     Query(q): Query<ListAttemptsQuery>,
 ) -> Result<Json<ListAttemptsResponse>, ApiError> {
+    let limit = q.limit.clamp(1, 50);
     let rows = if let Some(sid) = q.session_id {
         sqlx::query(
             "SELECT id, user_id, question_id, question_version, session_id, response,
@@ -752,7 +753,7 @@ pub async fn list_attempts(
         )
         .bind(auth.0.user.id)
         .bind(sid)
-        .bind(q.limit)
+        .bind(limit)
         .bind(q.offset)
         .fetch_all(&state.pool)
         .await
@@ -770,7 +771,7 @@ pub async fn list_attempts(
              LIMIT $2 OFFSET $3",
         )
         .bind(auth.0.user.id)
-        .bind(q.limit)
+        .bind(limit)
         .bind(q.offset)
         .fetch_all(&state.pool)
         .await

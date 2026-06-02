@@ -1050,20 +1050,20 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: assessmentId
+      - name: limit
         in: query
-        description: Filter by quiz (legacy)
+        description: 'Page size (default: 50)'
         required: false
         schema:
-          type: string
-          format: uuid
-      - name: examId
+          type: integer
+          format: int64
+      - name: offset
         in: query
-        description: Filter by exam (legacy)
+        description: Page offset
         required: false
         schema:
-          type: string
-          format: uuid
+          type: integer
+          format: int64
       responses:
         '200':
           description: Attempt history
@@ -1234,11 +1234,19 @@ components:
       required:
       - id
       - ts
+      - agentId
       - toolName
       - method
       - path
       - status
       properties:
+        agentId:
+          type: string
+          format: uuid
+        agentName:
+          type:
+          - string
+          - 'null'
         id:
           type: string
           format: uuid
@@ -2390,11 +2398,15 @@ components:
       type: object
       required:
       - sessions
+      - total
       properties:
         sessions:
           type: array
           items:
             $ref: '#/components/schemas/SessionSummary'
+        total:
+          type: integer
+          format: int64
     ListQuestionsResponse:
       type: object
       required:

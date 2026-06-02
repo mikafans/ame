@@ -580,6 +580,9 @@ export interface components {
     schemas: {
         ActivityEntry: {
             /** Format: uuid */
+            agentId: string;
+            agentName?: string | null;
+            /** Format: uuid */
             id: string;
             method: string;
             note?: string | null;
@@ -1023,6 +1026,8 @@ export interface components {
         };
         ListMySessionsResponse: {
             sessions: components["schemas"]["SessionSummary"][];
+            /** Format: int64 */
+            total: number;
         };
         ListQuestionsResponse: {
             next_cursor?: string | null;
@@ -2714,10 +2719,12 @@ export interface operations {
     list_my_sessions: {
         parameters: {
             query?: {
-                /** @description Filter by quiz (legacy) */
+                /** @description Filter by assessment */
                 assessmentId?: string;
-                /** @description Filter by exam (legacy) */
-                examId?: string;
+                /** @description Page size (default: 50) */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
             };
             header?: never;
             path?: never;

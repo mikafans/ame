@@ -41,6 +41,8 @@ pub struct ActivityEntry {
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub ts: OffsetDateTime,
+    pub agent_id: Uuid,
+    pub agent_name: Option<String>,
     pub tool_name: String,
     pub method: String,
     pub path: String,
@@ -101,14 +103,15 @@ pub async fn activity(
     user: RequireAnyScope<AgentReadScopes>,
     Query(q): Query<ActivityQuery>,
 ) -> Result<Json<ActivityResponse>, ApiError> {
-    let limit = q.limit.unwrap_or(50).min(200);
+    let limit = q.limit.unwrap_or(50).min(50);
 
     let rows = if let Some(cursor) = q.cursor {
         sqlx::query(
-            "SELECT id, ts, tool_name, method, path, status, note, target_id
-             FROM tb_activity_log
-             WHERE agent_id = $1 AND id < $2
-             ORDER BY id DESC
+            "SELECT a.id, a.ts, a.agent_id, u.display_name as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+             FROM tb_activity_log a
+             LEFT JOIN tb_users u ON a.agent_id = u.id
+             WHERE (a.agent_id = $1 OR a.agent_id IN (SELECT id FROM tb_users WHERE owner_user_id = $1)) AND a.id < $2
+             ORDER BY a.id DESC
              LIMIT $3",
         )
         .bind(user.0.user.id)
@@ -118,10 +121,11 @@ pub async fn activity(
         .await
     } else {
         sqlx::query(
-            "SELECT id, ts, tool_name, method, path, status, note, target_id
-             FROM tb_activity_log
-             WHERE agent_id = $1
-             ORDER BY id DESC
+            "SELECT a.id, a.ts, a.agent_id, u.display_name as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+             FROM tb_activity_log a
+             LEFT JOIN tb_users u ON a.agent_id = u.id
+             WHERE (a.agent_id = $1 OR a.agent_id IN (SELECT id FROM tb_users WHERE owner_user_id = $1))
+             ORDER BY a.id DESC
              LIMIT $2",
         )
         .bind(user.0.user.id)
@@ -138,6 +142,8 @@ pub async fn activity(
         .map(|row| ActivityEntry {
             id: row.get("id"),
             ts: row.get("ts"),
+            agent_id: row.get("agent_id"),
+            agent_name: row.get("agent_name"),
             tool_name: row.get("tool_name"),
             method: row.get("method"),
             path: row.get("path"),
@@ -330,6 +336,39 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("attempt.write"),
             strict,
         ),
+        tool(
+            "attempts.list",
+            "List the user's recent assessment attempt results.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "limit": { "type": "integer" },
+                    "offset": { "type": "integer" },
+                    "sessionId": { "type": "string", "format": "uuid" }
+                }
+            }),
+            "GET",
+            "/v1/me/attempts",
+            Some("attempt.read"),
+            strict,
+        ),
+        tool(
+            "attempt.grade",
+            "Grade a pending essay or code attempt.",
+            json!({
+                "type": "object",
+                "required": ["id", "score"],
+                "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "score": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+                    "notes": { "type": "string" }
+                }
+            }),
+            "PATCH",
+            "/v1/attempts/{id}/grade",
+            Some("attempt.write"),
+            strict,
+        ),
     ];
 
     json!({
@@ -346,7 +385,8 @@ fn build_skill_manifest(strict: bool) -> Value {
                 "assessment.create",
                 "assessment.update",
                 "question.create",
-                "question.promote"
+                "question.promote",
+                "attempt.grade"
             ],
             "description": "Execute a composite or write tool.",
         },
@@ -394,6 +434,10 @@ pub async fn run(
         "question.promote" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_question_promote(&state, &user_id, body.params).await
+        }
+        "attempt.grade" => {
+            require_scope(&auth, Scope::AttemptWrite)?;
+            run_attempt_grade(&state, &auth, body.params).await
         }
         "profile.get" => run_profile_get(&state, &auth).await,
         "memory.set" => run_memory_set(&state, &user_id, body.params).await,
@@ -689,6 +733,86 @@ async fn run_target_set(
             "currentGoal": row.get::<Option<String>, _>("current_goal"),
             "nextTarget": row.get::<Option<String>, _>("next_target"),
         }),
+        error: None,
+    }))
+}
+
+async fn run_attempt_grade(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    #[derive(Debug, Deserialize)]
+    struct GradeParams {
+        id: Uuid,
+        score: f64,
+        notes: Option<String>,
+    }
+    let p: GradeParams = serde_json::from_value(params).map_err(|e| {
+        ApiError::Validation(vec![crate::domain::error::FieldError {
+            field: "params".into(),
+            message: e.to_string(),
+        }])
+    })?;
+
+    if p.score < 0.0 || p.score > 1.0 {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "score".into(),
+                message: "must be between 0.0 and 1.0".into(),
+            },
+        ]));
+    }
+
+    let row = sqlx::query(
+        "SELECT a.grade_status \
+          FROM tb_attempts a \
+          JOIN tb_questions q ON q.id = a.question_id \
+          WHERE a.id = $1 \
+            AND (q.created_by = $2 \
+                 OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $2))",
+    )
+    .bind(p.id)
+    .bind(auth.owner_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let row = row.ok_or(ApiError::NotFound {
+        resource: "attempt",
+    })?;
+
+    let grade_status: String = row.get("grade_status");
+    if grade_status != "pending_manual" {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "grade_status".into(),
+                message: "attempt is not pending manual grading".into(),
+            },
+        ]));
+    }
+
+    let updated = sqlx::query(
+        "UPDATE tb_attempts \
+         SET score = $2, is_correct = ($2 > 0), grade_status = 'graded', grader_notes = $3 \
+         WHERE id = $1 \
+         RETURNING id, user_id, question_id, question_version, session_id, response, presentation, \
+                   is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
+                   rating_before_user_avg, rating_before_question, user_tag_deltas, \
+                   question_delta, created_at",
+    )
+    .bind(p.id)
+    .bind(p.score)
+    .bind(&p.notes)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let attempt = crate::http::sessions::row_to_attempt(updated)?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "attempt.grade".into(),
+        result: serde_json::to_value(attempt).unwrap_or(Value::Null),
         error: None,
     }))
 }

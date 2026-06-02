@@ -199,11 +199,11 @@ pub fn router(pool: PgPool) -> Router {
         })
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            auth_extract_middleware,
+            activity::activity_log_middleware,
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            activity::activity_log_middleware,
+            auth_extract_middleware,
         ));
 
     // Public, rate-limited endpoints. Credential-stuffing and key-faucet

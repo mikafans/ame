@@ -833,7 +833,7 @@ async fn list_session_attempts(
     rows.into_iter().map(row_to_attempt).collect()
 }
 
-fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
+pub(crate) fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
     let response: serde_json::Value = row.get("response");
     let presentation: serde_json::Value = row.get("presentation");
     let user_tag_deltas: serde_json::Value = row.get("user_tag_deltas");
@@ -1100,7 +1100,7 @@ pub async fn grade_attempt(
     Path(id): Path<Uuid>,
     Json(body): Json<GradeAttemptBody>,
 ) -> Result<Json<Attempt>, ApiError> {
-    if matches!(user.user.role, Role::Agent) {
+    if matches!(user.user.role, Role::Agent) && !user.token_scopes.contains(&Scope::AttemptWrite) {
         return Err(ApiError::Unauthorized);
     }
 
@@ -1155,11 +1155,19 @@ pub async fn grade_attempt(
     Ok(Json(row_to_attempt(updated)?))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListMySessionsQuery {
     #[serde(default)]
     pub assessment_id: Option<Uuid>,
+    #[serde(default = "default_sessions_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub offset: i64,
+}
+
+fn default_sessions_limit() -> i64 {
+    50
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -1193,6 +1201,7 @@ pub struct SessionSummary {
 #[serde(rename_all = "camelCase")]
 pub struct ListMySessionsResponse {
     pub sessions: Vec<SessionSummary>,
+    pub total: i64,
 }
 
 #[utoipa::path(
@@ -1200,8 +1209,8 @@ pub struct ListMySessionsResponse {
     path = "/v1/sessions",
     params(
         ("assessmentId" = Option<Uuid>, Query, description = "Filter by assessment"),
-        ("assessmentId" = Option<Uuid>, Query, description = "Filter by quiz (legacy)"),
-        ("examId" = Option<Uuid>, Query, description = "Filter by exam (legacy)"),
+        ("limit" = Option<i64>, Query, description = "Page size (default: 50)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
     ),
     responses(
         (status = 200, description = "Attempt history", body = ListMySessionsResponse),
@@ -1215,33 +1224,58 @@ pub async fn list_my_sessions(
     user: AuthenticatedUser,
     Query(q): Query<ListMySessionsQuery>,
 ) -> Result<Json<ListMySessionsResponse>, ApiError> {
+    let limit = q.limit.clamp(1, 100);
+
+    // 1. Fetch total count of matching sessions (extremely fast index scan)
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) \
+         FROM tb_sessions \
+         WHERE user_id = $1 AND status = 'finished' \
+           AND ($2::uuid IS NULL OR assessment_id = $2)",
+    )
+    .bind(user.user.id)
+    .bind(q.assessment_id)
+    .fetch_one(&mut *db)
+    .await
+    .map_err(internal)?;
+
+    // 2. Fetch paginated session list with scalar subqueries for attempt number / totals
     let rows = sqlx::query(
         "SELECT s.id, s.kind, s.status, s.assessment_id, s.result, \
-                s.started_at, s.finished_at, a.title AS assessment_title \
+                s.started_at, s.finished_at, a.title AS assessment_title, \
+                ( \
+                    SELECT COUNT(*) \
+                    FROM tb_sessions s2 \
+                    WHERE s2.user_id = s.user_id \
+                      AND s2.assessment_id = s.assessment_id \
+                      AND s2.status = 'finished' \
+                      AND s2.started_at <= s.started_at \
+                ) AS attempt_number, \
+                ( \
+                    SELECT COUNT(*) \
+                    FROM tb_sessions s3 \
+                    WHERE s3.user_id = s.user_id \
+                      AND s3.assessment_id = s.assessment_id \
+                      AND s3.status = 'finished' \
+                ) AS total_attempts \
          FROM tb_sessions s \
          LEFT JOIN tb_assessments a ON a.id = s.assessment_id \
          WHERE s.user_id = $1 AND s.status = 'finished' \
            AND ($2::uuid IS NULL OR s.assessment_id = $2) \
-         ORDER BY s.started_at ASC",
+         ORDER BY s.started_at DESC \
+         LIMIT $3 OFFSET $4",
     )
     .bind(user.user.id)
     .bind(q.assessment_id)
+    .bind(limit)
+    .bind(q.offset)
     .fetch_all(&mut *db)
     .await
     .map_err(internal)?;
 
-    let mut seen: HashMap<Uuid, i64> = HashMap::new();
-    let mut totals: HashMap<Uuid, i64> = HashMap::new();
-    let mut summaries: Vec<SessionSummary> = rows
+    let summaries: Vec<SessionSummary> = rows
         .into_iter()
         .map(|r| {
-            let assessment_id: Option<Uuid> = r.get("assessment_id");
-            let group = assessment_id.unwrap_or(Uuid::nil());
-            let n = seen.entry(group).or_insert(0);
-            *n += 1;
-            let attempt_number = *n;
-            *totals.entry(group).or_insert(0) += 1;
-
             let result: Option<serde_json::Value> = r.get("result");
             let points_awarded = result
                 .as_ref()
@@ -1252,34 +1286,25 @@ pub async fn list_my_sessions(
                 .and_then(|v| v.get("max_points"))
                 .and_then(|v| v.as_f64());
 
-            (
-                group,
-                SessionSummary {
-                    id: r.get("id"),
-                    kind: r.get("kind"),
-                    status: r.get("status"),
-                    assessment_id,
-                    assessment_title: r.try_get("assessment_title").ok(),
-                    points_awarded,
-                    max_points,
-                    started_at: r.get("started_at"),
-                    finished_at: r.get("finished_at"),
-                    attempt_number,
-                    total_attempts: 0,
-                },
-            )
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .map(|(group, mut s)| {
-            s.total_attempts = *totals.get(&group).unwrap_or(&0);
-            s
+            SessionSummary {
+                id: r.get("id"),
+                kind: r.get("kind"),
+                status: r.get("status"),
+                assessment_id: r.get("assessment_id"),
+                assessment_title: r.try_get("assessment_title").ok(),
+                points_awarded,
+                max_points,
+                started_at: r.get("started_at"),
+                finished_at: r.get("finished_at"),
+                attempt_number: r.get("attempt_number"),
+                total_attempts: r.get("total_attempts"),
+            }
         })
         .collect();
 
-    summaries.reverse();
     Ok(Json(ListMySessionsResponse {
         sessions: summaries,
+        total,
     }))
 }
 
