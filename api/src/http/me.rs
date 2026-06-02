@@ -371,20 +371,6 @@ pub async fn create_agent(
     user: AuthenticatedUser,
     Json(body): Json<CreateAgentBody>,
 ) -> Result<(StatusCode, Json<CreateAgentResponse>), ApiError> {
-    // F3 scope ceiling: free plan may not grant public.publish
-    if body.scopes.iter().any(|s| s == "public.publish") {
-        let plan: String = sqlx::query_scalar("SELECT plan FROM tb_users WHERE id = $1")
-            .bind(user.user.id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-        if plan != "premium" {
-            return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
-                "public.publish",
-            )));
-        }
-    }
-
     // Check quota
     crate::http::quota::check_quota(
         &state.pool,

@@ -224,7 +224,6 @@ fn build_skill_manifest(strict: bool) -> Value {
                     "mode":{"type":"string","enum":["practice","graded"]},
                     "course":{"type":"string"},
                     "objectives":{"type":"array","items":{"type":"string"}},
-                    "visibility":{"type":"string","enum":["public","private","unlisted"]},
                     "method":{"type":"string","enum":["manual","agent"]},
                     "questions":{
                         "type":"array",
@@ -251,7 +250,7 @@ fn build_skill_manifest(strict: bool) -> Value {
         tool(
             "assessment.update",
             "Update assessment metadata.",
-            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"status":{"type":"string"},"visibility":{"type":"string","enum":["public","private"]}}}),
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"status":{"type":"string"}}}),
             "PATCH",
             "/v1/assessments/{id}",
             Some("assessment.write"),

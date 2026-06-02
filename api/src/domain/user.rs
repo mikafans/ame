@@ -72,9 +72,6 @@ pub enum Scope {
     /// Create and edit study plans.
     #[serde(rename = "plan.write")]
     PlanWrite,
-    /// Publish an assessment to the public gallery (enforces quota).
-    #[serde(rename = "public.publish")]
-    PublicPublish,
     /// Full access.
     #[serde(rename = "admin")]
     Admin,
@@ -91,7 +88,6 @@ impl Scope {
             Scope::FeedbackWrite => "feedback.write",
             Scope::PlanRead => "plan.read",
             Scope::PlanWrite => "plan.write",
-            Scope::PublicPublish => "public.publish",
             Scope::Admin => "admin",
         }
     }
@@ -120,7 +116,6 @@ impl FromStr for Scope {
             "feedback.write" => Ok(Scope::FeedbackWrite),
             "plan.read" => Ok(Scope::PlanRead),
             "plan.write" => Ok(Scope::PlanWrite),
-            "public.publish" => Ok(Scope::PublicPublish),
             "admin" => Ok(Scope::Admin),
             _ => Err(UnknownScope(s.to_string())),
         }

@@ -58,7 +58,7 @@ CREATE TABLE tb_api_tokens (
       scopes <@ ARRAY[
         'assessment.read', 'assessment.write', 'attempt.read', 'attempt.write',
         'stats.read', 'feedback.write', 'plan.read', 'plan.write',
-        'public.publish', 'admin'
+        'admin'
       ]::text[]
       AND array_length(scopes, 1) >= 1
     )
@@ -140,7 +140,6 @@ CREATE TABLE tb_assessments (
   description         text,
   mode                text             NOT NULL CHECK (mode IN ('practice','graded')),
   status              text             NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
-  visibility          text             NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'unlisted', 'public')),
   objectives          text[]           NOT NULL DEFAULT '{}',
   course              text,
   duration_min        integer,
@@ -155,7 +154,6 @@ CREATE TABLE tb_assessments (
   created_at          timestamptz      NOT NULL DEFAULT now(),
   updated_at          timestamptz      NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_assessments_visibility_status ON tb_assessments (visibility, status);
 CREATE INDEX idx_assessments_created_by_status ON tb_assessments (created_by, status);
 
 CREATE TABLE tb_assessment_sections (
