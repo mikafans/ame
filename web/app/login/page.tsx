@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useColorMode } from "@/components/ThemeRegistry";
 import Box from "@mui/material/Box";
@@ -23,10 +23,17 @@ type TabId = "signup" | "login";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
   const { mode, toggle } = useColorMode();
   const theme = useTheme();
   const isDark = mode === "dark";
+
+  // Redirect to explore page if the user is already authenticated
+  useEffect(() => {
+    if (user) {
+      router.push("/explore");
+    }
+  }, [user, router]);
 
   const [tab, setTab] = useState<TabId>("login");
   const [fullName, setFullName] = useState("");

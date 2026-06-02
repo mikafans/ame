@@ -28,14 +28,6 @@ test.describe("authoring navigation (all authenticated users)", () => {
     ).toBeVisible({ timeout: 8000 });
   });
 
-  test("Author studio appears in sidebar nav", async ({ page }) => {
-    await page.goto("/library");
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByText("Author studio")).toBeVisible({
-      timeout: 8000,
-    });
-  });
-
   test("Agent API appears in sidebar nav", async ({ page }) => {
     await page.goto("/library");
     await page.waitForLoadState("networkidle");

@@ -23,6 +23,7 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import Link from "next/link";
 import { api } from "@/api/client";
+import { useAuth } from "@/hooks/useAuth";
 import { vibrantTagColor } from "@/lib/tagColor";
 
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
@@ -32,6 +33,7 @@ import LaunchOutlinedIcon from "@mui/icons-material/LaunchOutlined";
 
 export default function ExplorePage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -47,7 +49,8 @@ export default function ExplorePage() {
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
 
-  const fetchFacets = async () => {
+  const fetchFacets = useCallback(async () => {
+    if (authLoading || !user) return;
     try {
       const { data } = await api.GET("/v1/explore/facets");
       if (data) {
@@ -56,34 +59,41 @@ export default function ExplorePage() {
     } catch (err) {
       console.error("Failed to fetch facets:", err);
     }
-  };
+  }, [authLoading, user]);
 
   useEffect(() => {
     fetchFacets();
-  }, []);
+  }, [fetchFacets]);
 
   const fetchItems = useCallback(
     async (cursor: string | null = null) => {
+      if (authLoading || !user) return;
       setLoading(true);
       const tagsParam = selectedTags.join(",");
-      const { data } = await api.GET("/v1/explore", {
-        params: {
-          query: {
-            search: search || undefined,
-            tags: tagsParam || undefined,
-            mode: mode === "all" ? undefined : mode,
-            limit: 50,
-            after: cursor ?? undefined,
-          } as any,
-        },
-      });
-      setLoading(false);
-      if (data) {
-        setItems((prev) => (cursor ? [...prev, ...data.items] : data.items));
-        setNextCursor(data.nextCursor ?? null);
+      try {
+        const { data } = await api.GET("/v1/explore", {
+          params: {
+            query: {
+              search: search || undefined,
+              tags: tagsParam || undefined,
+              mode: mode === "all" ? undefined : mode,
+              kind: "active",
+              limit: 50,
+              after: cursor ?? undefined,
+            } as any,
+          },
+        });
+        setLoading(false);
+        if (data) {
+          setItems((prev) => (cursor ? [...prev, ...data.items] : data.items));
+          setNextCursor(data.nextCursor ?? null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch items:", err);
+        setLoading(false);
       }
     },
-    [search, selectedTags, mode],
+    [search, selectedTags, mode, authLoading, user],
   );
 
   const applyFilters = () => {
@@ -91,10 +101,11 @@ export default function ExplorePage() {
   };
 
   useEffect(() => {
+    if (authLoading || !user) return;
     setItems([]);
     setNextCursor(null);
     fetchItems();
-  }, [search, selectedTags, mode, fetchItems]);
+  }, [search, selectedTags, mode, fetchItems, authLoading, user]);
 
   async function startAssessment(assessmentId: string) {
     setStarting(assessmentId);

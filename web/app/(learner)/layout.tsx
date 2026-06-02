@@ -17,8 +17,12 @@ export default function LearnerLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user, router]);
+    console.log("LearnerLayout auth check:", { loading, hasUser: !!user });
+    if (!loading && !user) {
+      console.log("LearnerLayout redirecting to /login...");
+      window.location.href = "/login";
+    }
+  }, [loading, user]);
 
   const getRouteId = () => {
     if (pathname.startsWith("/library")) return "library";

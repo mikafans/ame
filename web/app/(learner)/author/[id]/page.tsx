@@ -646,7 +646,12 @@ export default function AuthorStudioPage({
                       width: "100%",
                       px: 2,
                       py: 1.5,
-                      bgcolor: sel ? "primary.50" : "transparent",
+                      bgcolor: sel
+                        ? (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(25, 118, 210, 0.16)"
+                              : "rgba(25, 118, 210, 0.08)"
+                        : "transparent",
                       borderLeft: `2px solid`,
                       borderLeftColor: sel ? "primary.main" : "transparent",
                       borderBottom: 1,
@@ -1130,7 +1135,13 @@ function McOptionsEditor({
               gap: 1.25,
               alignItems: "center",
               p: "6px 12px 6px 10px",
-              bgcolor: i === p.correct_index ? "primary.50" : "action.hover",
+              bgcolor:
+                i === p.correct_index
+                  ? (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(25, 118, 210, 0.16)"
+                        : "rgba(25, 118, 210, 0.08)"
+                  : "action.hover",
               border: 1,
               borderColor: i === p.correct_index ? "primary.main" : "divider",
               borderRadius: 0.5,
@@ -1213,7 +1224,13 @@ function TfOptionsEditor({
               border: 1,
               borderColor: correct === val ? "primary.main" : "divider",
               borderRadius: 0.5,
-              bgcolor: correct === val ? "primary.50" : "action.hover",
+              bgcolor:
+                correct === val
+                  ? (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(25, 118, 210, 0.16)"
+                        : "rgba(25, 118, 210, 0.08)"
+                  : "action.hover",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",

@@ -57,8 +57,9 @@ interface ActivityEntry {
   id: string;
   toolName: string;
   agentId?: string;
+  agentName?: string;
   status: number;
-  createdAt: string;
+  ts: string;
 }
 
 type TabId = "keys" | "tools" | "import" | "activity";
@@ -602,7 +603,10 @@ function KeysTab() {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          bgcolor: "primary.50",
+                          bgcolor: (theme) =>
+                            theme.palette.mode === "dark"
+                              ? "rgba(25, 118, 210, 0.16)"
+                              : "rgba(25, 118, 210, 0.08)",
                           color: "primary.main",
                           borderRadius: "10px",
                         }}
@@ -703,7 +707,10 @@ function KeysTab() {
                               fontSize: 10,
                               borderColor: "primary.light",
                               color: "primary.main",
-                              bgcolor: "primary.50",
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(25, 118, 210, 0.16)"
+                                  : "rgba(25, 118, 210, 0.08)",
                             }}
                           />
                         ))}
@@ -857,7 +864,10 @@ function KeysTab() {
                           ? "primary.light"
                           : "divider",
                         bgcolor: newAgentScopes.includes(s.value)
-                          ? "primary.50"
+                          ? (theme) =>
+                              theme.palette.mode === "dark"
+                                ? "rgba(25, 118, 210, 0.16)"
+                                : "rgba(25, 118, 210, 0.08)"
                           : "transparent",
                         transition: "all 0.2s",
                         "&:hover": { borderColor: "primary.main" },
@@ -1363,7 +1373,12 @@ function ToolsTab() {
                 width: "100%",
                 px: 2.25,
                 py: 1.5,
-                bgcolor: sel ? "primary.50" : "transparent",
+                bgcolor: sel
+                  ? (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(25, 118, 210, 0.16)"
+                        : "rgba(25, 118, 210, 0.08)"
+                  : "transparent",
                 border: "none",
                 borderLeft: `2px solid`,
                 borderLeftColor: sel ? "primary.main" : "transparent",
@@ -1669,8 +1684,8 @@ function ActivityTab() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)
       .GET("/v1/agents/activity", { params: { query: { limit: 50 } } })
-      .then(({ data }: { data?: { entries: ActivityEntry[] } }) => {
-        if (data?.entries) setEntries(data.entries);
+      .then(({ data }: { data?: { items: ActivityEntry[] } }) => {
+        if (data?.items) setEntries(data.items);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -1700,7 +1715,7 @@ function ActivityTab() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "160px 1fr 80px",
+              gridTemplateColumns: "160px 180px 1fr 80px",
               px: 2.5,
               py: 1,
               borderBottom: 1,
@@ -1708,7 +1723,7 @@ function ActivityTab() {
               bgcolor: "action.hover",
             }}
           >
-            {["Time", "Tool", "Status"].map((h) => (
+            {["Time", "Agent", "Tool", "Status"].map((h) => (
               <Typography
                 key={h}
                 variant="caption"
@@ -1729,7 +1744,7 @@ function ActivityTab() {
               key={e.id}
               sx={{
                 display: "grid",
-                gridTemplateColumns: "160px 1fr 80px",
+                gridTemplateColumns: "160px 180px 1fr 80px",
                 px: 2.5,
                 py: 1.5,
                 borderBottom: i < entries.length - 1 ? 1 : 0,
@@ -1742,7 +1757,22 @@ function ActivityTab() {
                 color="text.secondary"
                 sx={{ fontFamily: "monospace", letterSpacing: 0.5 }}
               >
-                {formatTime(e.createdAt)}
+                {formatTime(e.ts)}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.primary"
+                sx={{
+                  fontFamily: "monospace",
+                  fontWeight: 500,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  pr: 1,
+                }}
+              >
+                {e.agentName ||
+                  (e.agentId ? `${e.agentId.substring(0, 8)}…` : "System")}
               </Typography>
               <Typography
                 variant="caption"

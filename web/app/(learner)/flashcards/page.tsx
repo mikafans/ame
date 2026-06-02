@@ -167,10 +167,10 @@ export default function FlashcardsPage() {
           Review deck
         </Typography>
 
-        <SetupBlock label="Topic" kicker="Filter by tag (optional)">
+        <SetupBlock label="Topic" kicker="Filter by topic (optional)">
           {tags === null ? (
             <Typography variant="body2" color="text.secondary">
-              Loading tags…
+              Loading topics…
             </Typography>
           ) : (
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
