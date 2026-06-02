@@ -101,7 +101,7 @@ def main():
             console.print("[bold cyan]Creating/Getting agent key...[/bold cyan]")
             agent_resp = request_with_retry(client, "POST", "/v1/me/agents", json={
                 "label": f"Mega Minter {random.randint(1000, 9999)}",
-                "scopes": ["assessment.read", "assessment.write", "public.publish"],
+                "scopes": ["assessment.read", "assessment.write"],
                 "focusTags": TOPICS[:10]
             }, headers=headers)
             
@@ -142,7 +142,6 @@ def main():
                             "mode": mode,
                             "objectives": [f"Master {topic}", f"Understand {random.choice(TOPICS)}"],
                             "course": "Mega Scale 2026",
-                            "visibility": "public",
                             "method": "agent",
                             "questions": qs
                         }
@@ -154,14 +153,13 @@ def main():
                     
                     exam_id = resp.json()["result"]["id"]
                     
-                    # Occasionally publish some to test Explore (not all, to keep some as drafts)
+                    # Occasionally publish some (not all, to keep some as drafts)
                     if i % 2 == 0:
                         request_with_retry(client, "POST", "/v1/agents/run", json={
                             "tool": "assessment.update",
                             "params": {
                                 "id": exam_id,
-                                "status": "active",
-                                "visibility": "public"
+                                "status": "active"
                             }
                         }, headers=agent_headers)
                     

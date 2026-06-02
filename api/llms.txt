@@ -23,9 +23,8 @@ POST /v1/me/agents
 Send the key on every request: `Authorization: Bearer <apiKey>`.
 
 **Valid scopes**: `assessment.read`, `assessment.write`, `attempt.read`,
-`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`,
-`public.publish`. Note: `public.publish` is only grantable on the premium plan
-(free plan returns 403). `admin` cannot be granted to agents.
+`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`.
+`admin` cannot be granted to agents.
 
 ## Discovery
 
@@ -53,10 +52,9 @@ Send the key on every request: `Authorization: Bearer <apiKey>`.
    - `assessment.create` — create an assessment (draft). REQUIRED params: `title`,
      `mode` ("practice"|"graded"), `objectives` (array), `method` ("agent").
      Optional: `description`, `course`, `durationMin`, `timeLimitSeconds`,
-     `passingPoints`, `showResultsDuring`, `affectsRating`, `visibility`
-     ("private"|"public").
+     `passingPoints`, `showResultsDuring`, `affectsRating`.
    - `assessment.update` — patch metadata / publish.
-     `params: { id, title?, status?, visibility?, objectives? }`. Publish with
+     `params: { id, title?, status?, objectives? }`. Publish with
      `status: "active"`.
    - `question.promote` — promote one draft question to live. `params: { id }`.
 

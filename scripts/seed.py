@@ -32,7 +32,7 @@ USERS = [
     {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "user"},
     {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "user"},
     
-    {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "admin"},
+    {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "user"},
 ]
 
 TAGS = [
@@ -188,7 +188,6 @@ QUESTIONS = [
 QUIZ = {
     "title": "Algorithms and Data Structures — Fundamentals",
     "course": "Computer Science",
-    "visibility": "public",
     "objectives": [
         "Understand time complexity of common algorithms",
         "Distinguish between core data structures",
@@ -199,7 +198,6 @@ QUIZ = {
 QUIZ_PYTHON = {
     "title": "Python Essentials",
     "course": "Programming",
-    "visibility": "public",
     "difficulty": "beginner",
     "objectives": [
         "Use Python built-in functions correctly",
@@ -210,7 +208,6 @@ QUIZ_PYTHON = {
 QUIZ_DRAFT = {
     "title": "Algorithmic Complexity & Graph Theory (Draft)",
     "course": "Computer Science",
-    "visibility": "private",
     "objectives": [
         "Analyze recurrence relations",
         "Implement DFS and BFS graph traversals",
@@ -413,7 +410,6 @@ def _create_and_publish_assessment(
         "passingPoints": None,
         "showResultsDuring": False,
         "affectsRating": True,
-        "visibility": meta.get("visibility", "private"),
         "method": "manual",
     }
     resp = client.post("/v1/assessments", json=body, headers=auth)
@@ -436,11 +432,11 @@ def _create_and_publish_assessment(
 
     pub = client.patch(
         f"/v1/assessments/{assessment_id}",
-        json={"status": "active", "visibility": meta.get("visibility", "private")},
+        json={"status": "active"},
         headers=auth,
     )
     if pub.is_success:
-        console.print(f"  Published → active  (visibility={meta.get('visibility', 'private')})")
+        console.print(f"  Published → active")
     else:
         console.print(f"  [yellow]Could not publish:[/yellow] {pub.text[:200]}")
     return assessment_id
@@ -460,7 +456,7 @@ def seed_assessments(client: httpx.Client, auth: dict, result: SeedResult) -> No
     if python_qs:
         result.assessment_python_id = _create_and_publish_assessment(client, auth, QUIZ_PYTHON, python_qs, result)
 
-    # Draft assessment (private) for Author studio
+    # Draft assessment for Author studio
     draft_body = {
         "title": QUIZ_DRAFT["title"],
         "description": None,
@@ -472,7 +468,6 @@ def seed_assessments(client: httpx.Client, auth: dict, result: SeedResult) -> No
         "passingPoints": None,
         "showResultsDuring": False,
         "affectsRating": True,
-        "visibility": "private",
         "method": "manual",
     }
     draft_resp = client.post("/v1/assessments", json=draft_body, headers=auth)
@@ -498,7 +493,6 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     body = {
         **EXAM_BLUEPRINT,
         "mode": "graded",
-        "visibility": "public",
         "method": "manual",
     }
     resp = client.post("/v1/assessments", json=body, headers=auth)
@@ -674,7 +668,7 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
             "/v1/me/agents",
             json={
                 "label": "Bob's Content Generator",
-                "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write", "public.publish"],
+                "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
                 "focusTags": ["data-structures", "sorting"],
             },
             headers=instructor_auth,

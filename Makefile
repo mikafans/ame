@@ -58,10 +58,9 @@ test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test cross_owner -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test sessions -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test quota_scope -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test quota -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test shares -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test agent_manifest -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test export -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test admin -- --nocapture
 
@@ -210,7 +209,7 @@ dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override
 	@DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame \
 		AME_PORT=$(API_PORT) \
 		AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
-		AME_GLOBAL_RATELIMIT_BURST=20000 \
+		AME_GLOBAL_RATELIMIT_BURST=50000 \
 		RUST_LOG=ame_api=debug,tower_http=info,sqlx=warn \
 		mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api 2>&1 | tee .tmp/ame-api.log &
 	@echo "Starting frontend on :$(WEB_PORT) targeting $(API_HOST):$(API_PORT) (logs → .tmp/ame-web.log)"
