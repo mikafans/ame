@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { formatDate, formatTime } from "@/utils/format";
 import { api } from "@/api/client";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -127,10 +128,25 @@ export default function AgentPage() {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" size="small">
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => window.open("/llms.txt", "_blank")}
+          >
+            llms.txt
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => window.open("/v1/agents/openapi.json", "_blank")}
+          >
             OpenAPI
           </Button>
-          <Button variant="outlined" size="small">
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => window.open("/v1/agents/skill.json", "_blank")}
+          >
             MCP manifest
           </Button>
         </Stack>
@@ -605,11 +621,9 @@ function KeysTab() {
                           color="text.secondary"
                           sx={{ display: "block", mt: 0.25 }}
                         >
-                          Created on{" "}
-                          {new Date(agent.createdAt).toLocaleDateString()} ·
-                          Last used{" "}
+                          Created on {formatDate(agent.createdAt)} · Last used{" "}
                           {agent.lastUsedAt
-                            ? new Date(agent.lastUsedAt).toLocaleDateString()
+                            ? formatDate(agent.lastUsedAt)
                             : "never"}
                         </Typography>
                       </Box>
@@ -925,6 +939,98 @@ function KeysTab() {
             ceilings.
           </Typography>
         </Card>
+
+        {/* Onboarding Guide Card */}
+        <Card variant="outlined" sx={{ p: 2.5 }}>
+          <Typography
+            variant="caption"
+            color="secondary.main"
+            sx={{
+              fontFamily: "monospace",
+              letterSpacing: 1.3,
+              textTransform: "uppercase",
+              display: "block",
+              mb: 1.25,
+              fontWeight: 600,
+            }}
+          >
+            Zero-Knowledge Discovery
+          </Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            How do agents learn AME?
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ lineHeight: 1.55, mb: 1.5 }}
+          >
+            You don't need to manually teach external agents. AME exposes
+            public-facing discovery endpoints that allow any LLM assistant to
+            learn all API scopes, structures, and workflows dynamically:
+          </Typography>
+          <Stack spacing={1.25}>
+            <Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontFamily: "monospace",
+                  fontWeight: 600,
+                  display: "block",
+                }}
+              >
+                1. /llms.txt (Developer Specs)
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", ml: 1.5, lineHeight: 1.3 }}
+              >
+                A structured overview of architecture, scopes, data models, and
+                step-by-step performance diagnostic recipes.
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontFamily: "monospace",
+                  fontWeight: 600,
+                  display: "block",
+                }}
+              >
+                2. /v1/agents/skill.json (Tool Manifest)
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", ml: 1.5, lineHeight: 1.3 }}
+              >
+                A machine-readable MCP-compatible tool schema mapping capability
+                names directly to REST endpoints and body definitions.
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontFamily: "monospace",
+                  fontWeight: 600,
+                  display: "block",
+                }}
+              >
+                3. /v1/agents/openapi.json (OpenAPI 3.1)
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", ml: 1.5, lineHeight: 1.3 }}
+              >
+                Standard OpenAPI snapshot for deep integration with client
+                generators and API brokers.
+              </Typography>
+            </Box>
+          </Stack>
+        </Card>
       </Stack>
 
       {/* Secret Shown Once Modal */}
@@ -932,17 +1038,17 @@ function KeysTab() {
         <Dialog
           open={!!createdSecret}
           onClose={() => setCreatedSecret(null)}
-          maxWidth="xs"
+          maxWidth="sm"
           fullWidth
         >
           <DialogTitle sx={{ fontWeight: 600 }}>
-            API Token Generated
+            API Token Generated Successfully
           </DialogTitle>
           <DialogContent>
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ mb: 2, lineHeight: 1.6 }}
+              sx={{ mb: 1.5, lineHeight: 1.6 }}
             >
               Copy this token secret now. **For security, it will never be
               displayed again.**
@@ -958,23 +1064,100 @@ function KeysTab() {
                 fontSize: 13,
                 color: "primary.main",
                 wordBreak: "break-all",
-                mb: 1,
+                mb: 3,
                 userSelect: "all",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              {createdSecret}
+              <Box
+                component="span"
+                sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+              >
+                {createdSecret}
+              </Box>
+              <Button
+                size="small"
+                onClick={() =>
+                  navigator.clipboard.writeText(createdSecret).catch(() => {})
+                }
+                sx={{ minWidth: 0, ml: 1, p: 0.5 }}
+              >
+                Copy
+              </Button>
+            </Box>
+
+            <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2.5 }}>
+              <Chip
+                label="Agent UX"
+                color="secondary"
+                size="small"
+                sx={{ mb: 1.25, fontWeight: 600, fontSize: 10, height: 20 }}
+              />
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                🚀 AI Assistant Boot Prompt
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 2, lineHeight: 1.4 }}
+              >
+                Copy and paste this starter prompt directly into your AI chat
+                window (Claude, ChatGPT, Gemini, etc.). It points the agent
+                directly to AME's public discovery schemas, enabling it to learn
+                the platform from scratch and start helping you grow.
+              </Typography>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  bgcolor: "action.hover",
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  maxHeight: 180,
+                  overflowY: "auto",
+                  color: "text.secondary",
+                  whiteSpace: "pre-wrap",
+                  borderRadius: 1,
+                  mb: 1,
+                }}
+              >
+                {`You are an AI assistant helping me with my study on AME. AME has a first-class agent surface. To learn how to use it, please fetch and read the platform capabilities at:
+${window.location.origin}/llms.txt
+
+The machine-readable tool schemas are available at:
+${window.location.origin}/v1/agents/skill.json
+
+Authenticate all your requests using this API Key:
+Bearer ${createdSecret}
+
+Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`}
+              </Paper>
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
             <Button
               variant="outlined"
               size="small"
-              onClick={() =>
-                navigator.clipboard.writeText(createdSecret).catch(() => {})
-              }
+              onClick={() => {
+                const promptText = `You are an AI assistant helping me with my study on AME. AME has a first-class agent surface. To learn how to use it, please fetch and read the platform capabilities at:
+${window.location.origin}/llms.txt
+
+The machine-readable tool schemas are available at:
+${window.location.origin}/v1/agents/skill.json
+
+Authenticate all your requests using this API Key:
+Bearer ${createdSecret}
+
+Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`;
+                navigator.clipboard.writeText(promptText).catch(() => {});
+              }}
               startIcon={<ContentCopyOutlinedIcon />}
+              sx={{ mr: "auto" }}
             >
-              Copy
+              Copy Boot Prompt
             </Button>
             <Button
               variant="contained"
@@ -1559,7 +1742,7 @@ function ActivityTab() {
                 color="text.secondary"
                 sx={{ fontFamily: "monospace", letterSpacing: 0.5 }}
               >
-                {new Date(e.createdAt).toLocaleTimeString()}
+                {formatTime(e.createdAt)}
               </Typography>
               <Typography
                 variant="caption"

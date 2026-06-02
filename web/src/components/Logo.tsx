@@ -22,10 +22,11 @@ export function Logo({ size = 24 }: LogoProps) {
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
         <rect x="2" y="2" width="28" height="28" rx="6" fill="#1976d2" />
         <path
-          d="M10 9v14M22 9v14M10 16h12"
+          d="M9 23 16 9 23 23M12 18h8"
           stroke="#ffffff"
           strokeWidth="2.5"
           strokeLinecap="round"
+          strokeLinejoin="round"
         />
       </svg>
       <Typography

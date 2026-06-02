@@ -33,6 +33,17 @@ import { useColorMode } from "@/components/ThemeRegistry";
 
 const DRAWER_WIDTH = 232;
 
+// Deterministic avatar color: same name always maps to the same hue, so the
+// default (initials) avatar is distinguishable per-user instead of one flat
+// theme color. Fixed saturation/lightness keep white initials legible.
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return `hsl(${Math.abs(hash) % 360}, 55%, 45%)`;
+}
+
 const ICON_MAP: Record<string, React.ReactElement> = {
   library: <LibraryBooksOutlinedIcon fontSize="small" />,
   explore: <ExploreOutlinedIcon fontSize="small" />,
@@ -184,11 +195,22 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
 
       <Divider />
       <Box sx={{ p: 1.75, display: "flex", alignItems: "center", gap: 1.25 }}>
-        <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>{initials}</Avatar>
+        <Avatar
+          sx={{
+            width: 32,
+            height: 32,
+            fontSize: 14,
+            bgcolor: stringToColor(displayName || user?.email || "?"),
+          }}
+        >
+          {initials}
+        </Avatar>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-            {displayName}
-          </Typography>
+          <Tooltip title={displayName} disableHoverListener={!displayName}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+              {displayName}
+            </Typography>
+          </Tooltip>
           <Typography variant="caption" color="text.secondary">
             {user?.role ?? ""}
           </Typography>

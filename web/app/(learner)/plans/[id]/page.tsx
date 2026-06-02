@@ -12,7 +12,7 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
-import { formatDuration } from "@/utils/format";
+import { formatDuration, formatDate } from "@/utils/format";
 
 interface PlanItem {
   kind: string;
@@ -116,8 +116,8 @@ export default function PlanPage({
           {plan.goal}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Generated {new Date(plan.generated_at).toLocaleDateString()} · based
-          on last {plan.lookback_days} days
+          Generated {formatDate(plan.generated_at)} · based on last{" "}
+          {plan.lookback_days} days
         </Typography>
       </Box>
 

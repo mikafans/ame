@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatDate } from "@/utils/format";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -216,7 +217,7 @@ export default function GradingPage() {
                       color="text.disabled"
                       sx={{ display: "block" }}
                     >
-                      {new Date(attempt.created_at).toLocaleDateString()}
+                      {formatDate(attempt.created_at)}
                     </Typography>
                   </Box>
                 </Box>

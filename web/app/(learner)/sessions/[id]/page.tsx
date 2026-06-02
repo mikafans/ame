@@ -11,6 +11,11 @@ import Button from "@mui/material/Button";
 import LinearProgress from "@mui/material/LinearProgress";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
@@ -79,6 +84,11 @@ export default function ActiveQuizPage({
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
   const autosaveScheduled = useRef(false);
+  const [quitDialogOpen, setQuitDialogOpen] = useState(false);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+
+  const questions = session?.questions ?? [];
+  const answered = Object.keys(answers).length;
 
   useEffect(() => {
     api
@@ -220,6 +230,14 @@ export default function ActiveQuizPage({
     }
   }, [id, router]);
 
+  const handleQuitClick = useCallback(() => {
+    setQuitDialogOpen(true);
+  }, []);
+
+  const handleSubmitClick = useCallback(() => {
+    setSubmitDialogOpen(true);
+  }, []);
+
   // Enter advances to the next question (or submits on the last one). In
   // multiline fields (essay/code) plain Enter inserts a newline, so advancing
   // there requires Ctrl/Cmd+Enter.
@@ -253,9 +271,7 @@ export default function ActiveQuizPage({
     );
   }
 
-  const questions = session.questions;
   const cur = questions[idx];
-  const answered = Object.keys(answers).length;
   const curAnswer = cur ? (answers[cur.questionId] ?? null) : null;
 
   const mm = timeLeft !== null ? Math.floor(timeLeft / 60) : null;
@@ -293,14 +309,26 @@ export default function ActiveQuizPage({
           {answered}/{questions.length} answered
           {mm !== null && ss !== null && ` · ${mm}:${ss}`}
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<ExitToAppOutlinedIcon />}
-          onClick={handleSaveExit}
-        >
-          Save &amp; exit
-        </Button>
+        <Stack direction="row" spacing={1.5}>
+          <Button
+            size="small"
+            variant="contained"
+            color="success"
+            disabled={finishing}
+            onClick={handleSubmitClick}
+          >
+            {finishing ? "Submitting…" : "Submit"}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<ExitToAppOutlinedIcon />}
+            onClick={handleQuitClick}
+          >
+            Quit
+          </Button>
+        </Stack>
       </Paper>
 
       {/* Progress bar */}
@@ -388,12 +416,73 @@ export default function ActiveQuizPage({
             variant="contained"
             color="success"
             disabled={finishing}
-            onClick={handleFinish}
+            onClick={handleSubmitClick}
           >
             {finishing ? "Submitting…" : "Submit"}
           </Button>
         )}
       </Paper>
+
+      {/* Quit Confirmation Dialog */}
+      <Dialog
+        open={quitDialogOpen}
+        onClose={() => setQuitDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Quit Assessment?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to quit? Your progress will not be saved and
+            you cannot resume this assessment later.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQuitDialogOpen(false)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setQuitDialogOpen(false);
+              handleSaveExit();
+            }}
+          >
+            Quit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Submit Confirmation Dialog */}
+      <Dialog
+        open={submitDialogOpen}
+        onClose={() => setSubmitDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Submit Assessment?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {questions.length - answered > 0
+              ? `You have ${questions.length - answered} unanswered question${
+                  questions.length - answered !== 1 ? "s" : ""
+                }. Are you sure you want to submit and finish this assessment?`
+              : "Are you sure you want to submit and finish this assessment?"}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubmitDialogOpen(false)}>Cancel</Button>
+          <Button
+            color="success"
+            variant="contained"
+            onClick={() => {
+              setSubmitDialogOpen(false);
+              handleFinish();
+            }}
+          >
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

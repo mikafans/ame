@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { formatDate } from "@/utils/format";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
@@ -97,6 +98,7 @@ export default function ExplorePage() {
             <TableRow>
               <TableCell>Title</TableCell>
               <TableCell>Tags</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>Created</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -122,8 +124,20 @@ export default function ExplorePage() {
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  {new Date(item.createdAt).toLocaleDateString()}
+                  <Chip
+                    label={item.status ? item.status.toUpperCase() : "UNKNOWN"}
+                    size="small"
+                    variant="outlined"
+                    color={
+                      item.status === "active" || item.status === "live"
+                        ? "success"
+                        : item.status === "draft"
+                          ? "warning"
+                          : "default"
+                    }
+                  />
                 </TableCell>
+                <TableCell>{formatDate(item.createdAt)}</TableCell>
                 <TableCell>
                   <Button
                     size="small"

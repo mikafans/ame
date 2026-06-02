@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { formatDate } from "@/utils/format";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -469,13 +470,7 @@ export default function ResultsPage({
                         {isCurrent && " (this one)"}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(
-                          s.finishedAt ?? s.startedAt,
-                        ).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                        {formatDate(s.finishedAt ?? s.startedAt)}
                       </Typography>
                     </Box>
                     <Chip

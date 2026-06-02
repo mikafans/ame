@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateTime } from "@/utils/format";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
 import Box from "@mui/material/Box";
@@ -185,13 +186,7 @@ export default function ResultsHistoryPage() {
                         : "error";
 
                 const dateStr = s.finishedAt
-                  ? new Date(s.finishedAt).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
+                  ? formatDateTime(s.finishedAt)
                   : "—";
 
                 const modeLabel = s.kind === "exam" ? "Exam" : "Practice";

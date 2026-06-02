@@ -40,7 +40,7 @@ interface Assessment {
   createdAt: string;
 }
 
-type TabId = "all" | "completed" | "drafts";
+type TabId = "all" | "active" | "completed" | "drafts";
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -112,16 +112,19 @@ export default function LibraryPage() {
   const allAssessments = [...filteredActive, ...filteredDrafts];
 
   const listed =
-    tab === "completed"
-      ? completed
-      : tab === "drafts"
-        ? filteredDrafts
-        : allAssessments;
+    tab === "active"
+      ? filteredActive
+      : tab === "completed"
+        ? completed
+        : tab === "drafts"
+          ? filteredDrafts
+          : allAssessments;
 
   useEffect(() => {
+    if (tab === "active" && filteredActive.length === 0) setTab("all");
     if (tab === "completed" && completed.length === 0) setTab("all");
     if (tab === "drafts" && filteredDrafts.length === 0) setTab("all");
-  }, [tab, completed.length, filteredDrafts.length]);
+  }, [tab, filteredActive.length, completed.length, filteredDrafts.length]);
 
   const featuredAssessment = pending[0] ?? null;
 
@@ -287,6 +290,13 @@ export default function LibraryPage() {
             label={`All (${allAssessments.length})`}
             id="tab-all"
           />
+          {filteredActive.length > 0 && (
+            <Tab
+              value="active"
+              label={`Active (${filteredActive.length})`}
+              id="tab-active"
+            />
+          )}
           {completed.length > 0 && (
             <Tab
               value="completed"

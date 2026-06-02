@@ -45,6 +45,7 @@ export default function FlashcardsPage() {
   const [cursor, setCursor] = useState(0);
   const [missed, setMissed] = useState<FlashQuestion[]>([]);
   const [knewCount, setKnewCount] = useState(0);
+  const [skipped, setSkipped] = useState<FlashQuestion[]>([]);
 
   useEffect(() => {
     api
@@ -66,6 +67,7 @@ export default function FlashcardsPage() {
     setCursor(0);
     setMissed([]);
     setKnewCount(0);
+    setSkipped([]);
     setPhase("review");
   }
 
@@ -113,28 +115,47 @@ export default function FlashcardsPage() {
     } else {
       setMissed((m) => [...m, current]);
     }
-    if (cursor + 1 >= deck.length) {
-      setPhase("summary");
-    } else {
+
+    if (cursor + 1 < deck.length) {
       setCursor((c) => c + 1);
+    } else {
+      if (skipped.length > 0) {
+        setDeck(skipped);
+        setCursor(0);
+        setSkipped([]);
+      } else {
+        setPhase("summary");
+      }
     }
   }
 
   // Skip-for-now: re-queue the current card to the end of the deck without
   // counting it. No-op on the last remaining card (nothing left to defer past).
   function handleSkip() {
-    setDeck((d) => {
-      if (d.length <= 1 || cursor >= d.length) return d;
-      const next = [...d];
-      const [card] = next.splice(cursor, 1);
-      next.push(card);
-      return next;
-    });
+    const current = deck[cursor];
+    const nextSkipped = [...skipped, current];
+
+    if (cursor + 1 < deck.length) {
+      setSkipped(nextSkipped);
+      setCursor((c) => c + 1);
+    } else {
+      if (nextSkipped.length > 0) {
+        setDeck(nextSkipped);
+        setCursor(0);
+        setSkipped([]);
+      } else {
+        setPhase("summary");
+      }
+    }
   }
 
   function reviewMissed() {
     if (missed.length === 0) return;
     startReview(buildDeck(missed, missed.length));
+  }
+
+  function handleFinish() {
+    setPhase("summary");
   }
 
   // ---- Setup phase ----
@@ -243,6 +264,7 @@ export default function FlashcardsPage() {
           total={deck.length}
           onRate={handleRate}
           onSkip={handleSkip}
+          onFinish={handleFinish}
         />
       </Box>
     );
@@ -253,12 +275,14 @@ export default function FlashcardsPage() {
     <Box sx={{ p: "28px 36px 56px", maxWidth: 640 }}>
       <Kicker>Deck complete</Kicker>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
-        You knew {knewCount} of {deck.length}
+        You knew {knewCount} of {knewCount + missed.length}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-        {missed.length === 0
-          ? "Clean sweep — nothing missed."
-          : `${missed.length} to review again.`}
+        {knewCount + missed.length === 0
+          ? "No cards rated in this session."
+          : missed.length === 0
+            ? "Clean sweep — nothing missed."
+            : `${missed.length} to review again.`}
       </Typography>
       <Stack direction="row" spacing={1.5}>
         <Button
