@@ -805,37 +805,56 @@ paths:
       parameters:
       - name: tag
         in: query
-        description: Filter by tag name
         required: false
         schema:
           type: string
       - name: status
         in: query
-        description: Filter by status (draft, live, archived)
         required: false
         schema:
           type: string
       - name: search
         in: query
-        description: Partial match on prompt
         required: false
         schema:
           type: string
       - name: kind
         in: query
-        description: Filter by question kind
         required: false
         schema:
           type: string
+      - name: min_rating
+        in: query
+        required: false
+        schema:
+          type: number
+          format: double
+      - name: max_rating
+        in: query
+        required: false
+        schema:
+          type: number
+          format: double
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
       - name: after
         in: query
-        description: Pagination cursor
         required: false
         schema:
           type: string
       responses:
         '200':
-          description: Question list
+          description: List of questions
           content:
             application/json:
               schema:
@@ -2336,7 +2355,7 @@ components:
       - questions
       - total
       properties:
-        nextCursor:
+        next_cursor:
           type:
           - string
           - 'null'

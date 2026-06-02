@@ -393,7 +393,7 @@ pub async fn run(
         }
         "question.promote" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
-            run_question_promote(&state, body.params).await
+            run_question_promote(&state, &user_id, body.params).await
         }
         "profile.get" => run_profile_get(&state, &auth).await,
         "memory.set" => run_memory_set(&state, &user_id, body.params).await,
@@ -476,7 +476,22 @@ async fn run_question_create(
             }])
         })?
         .unwrap_or_default();
-    let created = repo::create_questions(&state.pool, *user_id, questions).await?;
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    let owner_id: Uuid =
+        sqlx::query_scalar("SELECT COALESCE(owner_user_id, id) FROM tb_users WHERE id = $1")
+            .bind(*user_id)
+            .fetch_one(&mut *conn)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    crate::http::db::set_rls_guc(conn, owner_id, false).await?;
+
+    let created = repo::create_questions(conn, *user_id, owner_id, questions).await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "question.create".into(),
@@ -487,10 +502,26 @@ async fn run_question_create(
 
 async fn run_question_promote(
     state: &AppState,
+    user_id: &Uuid,
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
     let id = parse_id(&params)?;
-    let question = crate::bank::questions::promote_question(&state.pool, id).await?;
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    let owner_id: Uuid =
+        sqlx::query_scalar("SELECT COALESCE(owner_user_id, id) FROM tb_users WHERE id = $1")
+            .bind(*user_id)
+            .fetch_one(&mut *conn)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    crate::http::db::set_rls_guc(conn, owner_id, false).await?;
+
+    let question = crate::bank::questions::promote_question(conn, id).await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "question.promote".into(),

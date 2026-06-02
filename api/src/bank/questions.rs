@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use sqlx::{PgPool, Row};
+use sqlx::{Connection, Row};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -35,7 +35,7 @@ pub struct PagedQuestions {
 }
 
 pub async fn list_questions(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     filter: QuestionFilter,
     limit: i64,
     offset: i64,
@@ -72,7 +72,7 @@ pub async fn list_questions(
     .bind(limit)
     .bind(offset)
     .bind(filter.created_by)
-    .fetch_all(pool)
+    .fetch_all(conn)
     .await
     .map_err(internal)?;
 
@@ -80,7 +80,7 @@ pub async fn list_questions(
 }
 
 pub async fn list_questions_paged(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     filter: &QuestionFilter,
     after: Option<(OffsetDateTime, Uuid)>,
 ) -> Result<PagedQuestions, ApiError> {
@@ -127,7 +127,7 @@ pub async fn list_questions_paged(
     .bind(after_ts)
     .bind(after_id)
     .bind(filter.created_by)
-    .fetch_all(pool)
+    .fetch_all(conn)
     .await
     .map_err(internal)?;
 
@@ -150,14 +150,17 @@ pub async fn list_questions_paged(
     })
 }
 
-pub async fn get_question(pool: &PgPool, id: Uuid) -> Result<Option<Question>, ApiError> {
+pub async fn get_question(
+    conn: &mut sqlx::PgConnection,
+    id: Uuid,
+) -> Result<Option<Question>, ApiError> {
     let row = sqlx::query(
         "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
                 COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
          FROM tb_questions q WHERE q.id = $1"
     )
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(conn)
     .await
     .map_err(internal)?;
 
@@ -200,7 +203,7 @@ fn row_to_question(row: sqlx::postgres::PgRow) -> Result<Question, ApiError> {
 }
 
 pub async fn get_question_versions(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     question_id: Uuid,
 ) -> Result<Vec<QuestionVersion>, ApiError> {
     let rows = sqlx::query(
@@ -210,7 +213,7 @@ pub async fn get_question_versions(
          ORDER BY version DESC"
     )
     .bind(question_id)
-    .fetch_all(pool)
+    .fetch_all(conn)
     .await
     .map_err(internal)?;
 
@@ -238,7 +241,7 @@ pub async fn get_question_versions(
 /// Mirrors the EXISTS predicate used in [`list_questions_paged`] so per-item
 /// access checks are consistent with the list view.
 pub async fn question_in_owner_scope(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     question_id: Uuid,
     owner_id: Uuid,
 ) -> Result<bool, ApiError> {
@@ -254,7 +257,7 @@ pub async fn question_in_owner_scope(
     )
     .bind(question_id)
     .bind(owner_id)
-    .fetch_one(pool)
+    .fetch_one(conn)
     .await
     .map_err(internal)?;
 
@@ -284,8 +287,9 @@ pub struct QuestionPatch {
 }
 
 pub async fn create_questions(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     user_id: Uuid,
+    owner_id: Uuid,
     questions: Vec<QuestionInsert>,
 ) -> Result<Vec<Question>, ApiError> {
     if questions.len() > MAX_BATCH {
@@ -297,17 +301,18 @@ pub async fn create_questions(
         ]));
     }
     let mut created = Vec::new();
-    let mut tx = pool.begin().await.map_err(internal)?;
+    let mut tx = conn.begin().await.map_err(internal)?;
 
     for q in questions {
         let id = Uuid::now_v7();
         let status = q.status.unwrap_or(QuestionStatus::Draft);
 
         sqlx::query(
-            "INSERT INTO tb_questions (id, kind, prompt, payload, explanation, status, points, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
         )
         .bind(id)
+        .bind(owner_id)
         .bind(q.kind.as_str())
         .bind(&q.prompt)
         .bind(&q.payload)
@@ -349,11 +354,11 @@ pub async fn create_questions(
 }
 
 pub async fn update_question(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     id: Uuid,
     patch: QuestionPatch,
 ) -> Result<Question, ApiError> {
-    let mut tx = pool.begin().await.map_err(internal)?;
+    let mut tx = conn.begin().await.map_err(internal)?;
 
     // Fetch current state and check if editable.
     let current_row = sqlx::query(
@@ -464,29 +469,35 @@ pub async fn update_question(
     }
 
     tx.commit().await.map_err(internal)?;
-    get_question(pool, id).await?.ok_or(ApiError::NotFound {
+    get_question(conn, id).await?.ok_or(ApiError::NotFound {
         resource: "question",
     })
 }
 
-pub async fn promote_question(pool: &PgPool, id: Uuid) -> Result<Question, ApiError> {
+pub async fn promote_question(
+    conn: &mut sqlx::PgConnection,
+    id: Uuid,
+) -> Result<Question, ApiError> {
     sqlx::query("UPDATE tb_questions SET status = 'live' WHERE id = $1")
         .bind(id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await
         .map_err(internal)?;
-    get_question(pool, id).await?.ok_or(ApiError::NotFound {
+    get_question(conn, id).await?.ok_or(ApiError::NotFound {
         resource: "question",
     })
 }
 
-pub async fn archive_question(pool: &PgPool, id: Uuid) -> Result<Question, ApiError> {
+pub async fn archive_question(
+    conn: &mut sqlx::PgConnection,
+    id: Uuid,
+) -> Result<Question, ApiError> {
     sqlx::query("UPDATE tb_questions SET status = 'archived' WHERE id = $1")
         .bind(id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await
         .map_err(internal)?;
-    get_question(pool, id).await?.ok_or(ApiError::NotFound {
+    get_question(conn, id).await?.ok_or(ApiError::NotFound {
         resource: "question",
     })
 }

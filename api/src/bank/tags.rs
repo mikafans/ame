@@ -10,7 +10,7 @@
 //! that runs alongside question writes goes through the tx variant so the
 //! whole batch commits (or rolls back) atomically.
 
-use sqlx::{PgPool, Postgres, Row, Transaction};
+use sqlx::{Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use crate::domain::error::ApiError;
@@ -30,18 +30,15 @@ fn row_to_tag(row: sqlx::postgres::PgRow) -> Tag {
 }
 
 /// Return tags owned by the caller, ordered by name. Used by `GET /tags`.
-pub async fn list_tags(pool: &PgPool, owner_id: uuid::Uuid) -> Result<Vec<Tag>, ApiError> {
+pub async fn list_tags(conn: &mut sqlx::PgConnection) -> Result<Vec<Tag>, ApiError> {
     let rows = sqlx::query(
         "SELECT DISTINCT t.id, t.name, t.description, t.created_at \
          FROM tb_tags t \
          JOIN tb_question_tags qt ON qt.tag_id = t.id \
          JOIN tb_questions q ON q.id = qt.question_id \
-         WHERE q.created_by = $1 \
-            OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $1) \
          ORDER BY t.name ASC",
     )
-    .bind(owner_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
     Ok(rows.into_iter().map(row_to_tag).collect())
@@ -51,7 +48,7 @@ pub async fn list_tags(pool: &PgPool, owner_id: uuid::Uuid) -> Result<Vec<Tag>, 
 /// if a tag with the lowercased name already exists, its current row is
 /// returned and `description` is left as-is.
 pub async fn create_tag(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     name: &str,
     description: Option<&str>,
 ) -> Result<Tag, ApiError> {
@@ -62,13 +59,13 @@ pub async fn create_tag(
     )
     .bind(&lower)
     .bind(description)
-    .execute(pool)
+    .execute(&mut *conn)
     .await
     .map_err(internal)?;
 
     let row = sqlx::query("SELECT id, name, description, created_at FROM tb_tags WHERE name = $1")
         .bind(&lower)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
         .map_err(internal)?;
 

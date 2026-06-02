@@ -998,7 +998,7 @@ export interface components {
             sessions: components["schemas"]["SessionSummary"][];
         };
         ListQuestionsResponse: {
-            nextCursor?: string | null;
+            next_cursor?: string | null;
             questions: components["schemas"]["Question"][];
             /** Format: int64 */
             total: number;
@@ -2423,15 +2423,14 @@ export interface operations {
     list_questions: {
         parameters: {
             query?: {
-                /** @description Filter by tag name */
                 tag?: string;
-                /** @description Filter by status (draft, live, archived) */
                 status?: string;
-                /** @description Partial match on prompt */
                 search?: string;
-                /** @description Filter by question kind */
                 kind?: string;
-                /** @description Pagination cursor */
+                min_rating?: number;
+                max_rating?: number;
+                limit?: number;
+                offset?: number;
                 after?: string;
             };
             header?: never;
@@ -2440,7 +2439,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Question list */
+            /** @description List of questions */
             200: {
                 headers: {
                     [name: string]: unknown;

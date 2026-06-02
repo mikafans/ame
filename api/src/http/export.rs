@@ -2,7 +2,11 @@ use axum::{Json, extract::State};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{auth::extractor::AuthenticatedUser, domain::error::ApiError, http::AppState};
+use crate::{
+    auth::extractor::AuthenticatedUser,
+    domain::error::ApiError,
+    http::{AppState, db::DbConn},
+};
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +37,7 @@ pub struct ExportResponse {
 pub async fn export_data(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
+    mut db: DbConn,
 ) -> Result<Json<ExportResponse>, ApiError> {
     // 1. Premium plan gating (Premium-only)
     let plan = crate::http::quota::resolve_plan(&state.pool, auth.owner_id()).await?;
@@ -60,12 +65,12 @@ pub async fn export_data(
     // 3. Export questions
     let questions: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
-             SELECT * FROM tb_questions 
+             SELECT * FROM tb_questions
              WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
          ) q",
     )
     .bind(owner_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *db)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 

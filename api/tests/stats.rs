@@ -46,14 +46,22 @@ async fn serve(pool: PgPool) -> String {
     format!("http://{addr}")
 }
 
+static TEST_OWNER_ID: Uuid = uuid::uuid!("00000000-0000-0000-0000-000000000001");
+
 /// Create a user + token with given scopes. Returns (user_id, bearer_string).
 async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String) {
+    let _ = sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, 'Test Owner', 'test-owner@example.com', 'user') ON CONFLICT DO NOTHING")
+        .bind(TEST_OWNER_ID)
+        .execute(pool)
+        .await;
+
     let user_id = Uuid::now_v7();
     let token_id = Uuid::now_v7();
     let secret = format!("secret_{}", token_id.simple());
     let hash = hash_secret(&secret);
-    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
         .bind(user_id)
+        .bind(TEST_OWNER_ID)
         .bind(format!("test-user-{user_id}"))
         .bind(format!("stats-{user_id}@example.com"))
         .execute(pool)
@@ -81,9 +89,10 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
         _ => json!({ "accepted": ["42"], "normalize": "exact", "judge": "exact" }),
     };
     sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ($1, $2, $3, 'live', 1, $4) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, $2, $3, $4, 'live', 1, $5) RETURNING id",
     )
+    .bind(TEST_OWNER_ID)
     .bind(kind)
     .bind(format!("Q {kind}"))
     .bind(payload)

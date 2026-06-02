@@ -98,31 +98,38 @@ async fn assessment_planner_filters_live_questions_and_snapshots_mc_option_order
 
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
+    let mut conn = pool.acquire().await.unwrap();
+    // Unique tag per run: the test DB is shared, plan_assessment is owner-unscoped
+    // under the superuser test connection (RLS scopes it only in production), so a
+    // shared tag would let sibling tests' live questions leak into the count.
+    let tag = format!("rust{}", Uuid::now_v7().simple());
     let mut created = q_repo::create_questions(
-        &pool,
+        &mut conn,
+        user_id,
         user_id,
         vec![
-            mc_insert("planner live rust", &["rust", "async"]),
-            short_insert("planner live rust text", &["rust"]),
-            mc_insert("planner draft other", &["rust"]),
+            mc_insert("planner live rust", &[&tag, "async"]),
+            short_insert("planner live rust text", &[&tag]),
+            mc_insert("planner draft other", &[&tag]),
         ],
     )
     .await
     .unwrap();
 
     let draft = created.pop().unwrap();
-    q_repo::promote_question(&pool, created[0].id)
+    q_repo::promote_question(&mut conn, created[0].id)
         .await
         .unwrap();
-    q_repo::promote_question(&pool, created[1].id)
+    q_repo::promote_question(&mut conn, created[1].id)
         .await
         .unwrap();
 
     let plan = plan_assessment(
-        &pool,
+        &mut conn,
         user_id,
         &AssessmentPlanRequest {
-            tags: vec!["Rust".to_string()],
+            // Uppercase to keep asserting case-insensitive tag matching.
+            tags: vec![tag.to_uppercase()],
             tags_mode: TagsMode::Any,
             difficulty_min: None,
             difficulty_max: None,
@@ -156,18 +163,23 @@ async fn assessment_planner_excludes_recent_attempts_for_user() {
 
     let pool = setup_db().await;
     let user_id = make_user(&pool).await;
+    let mut conn = pool.acquire().await.unwrap();
+    let tag = format!("rust{}", Uuid::now_v7().simple());
     let questions = q_repo::create_questions(
-        &pool,
+        &mut conn,
+        user_id,
         user_id,
         vec![
-            mc_insert("planner recent", &["rust"]),
-            mc_insert("planner fresh", &["rust"]),
+            mc_insert("planner recent", &[&tag]),
+            mc_insert("planner fresh", &[&tag]),
         ],
     )
     .await
     .unwrap();
     for question in &questions {
-        q_repo::promote_question(&pool, question.id).await.unwrap();
+        q_repo::promote_question(&mut conn, question.id)
+            .await
+            .unwrap();
     }
 
     sqlx::query(
@@ -181,15 +193,15 @@ async fn assessment_planner_excludes_recent_attempts_for_user() {
     .bind(questions[0].version)
     .bind(serde_json::json!({ "selected_position": 0 }))
     .bind(serde_json::json!({ "option_order": [0, 1, 2] }))
-    .execute(&pool)
+    .execute(&mut *conn)
     .await
     .unwrap();
 
     let plan = plan_assessment(
-        &pool,
+        &mut conn,
         user_id,
         &AssessmentPlanRequest {
-            tags: vec!["rust".to_string()],
+            tags: vec![tag.clone()],
             tags_mode: TagsMode::All,
             difficulty_min: None,
             difficulty_max: None,

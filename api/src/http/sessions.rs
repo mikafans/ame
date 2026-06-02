@@ -11,7 +11,7 @@ use axum::{
 };
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -36,6 +36,7 @@ use crate::{
         },
     },
     http::AppState,
+    http::db::DbConn,
 };
 
 pub struct SessionWriteScopes;
@@ -151,7 +152,8 @@ struct PlannedQuestion {
     security(("bearer_auth" = []))
 )]
 pub async fn create_session(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     auth: AuthenticatedUser,
     Json(body): Json<CreateSessionBody>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -162,6 +164,8 @@ pub async fn create_session(
             "attempt.write",
         )));
     }
+
+    let conn = &mut *db;
 
     if let Some(assessment_id) = body.assessment_id {
         // Owner-scoped: only the owner (or their agents) may start a session on an
@@ -174,7 +178,7 @@ pub async fn create_session(
         )
         .bind(assessment_id)
         .bind(auth.owner_id)
-        .fetch_optional(&state.pool)
+        .fetch_optional(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?
         .ok_or(ApiError::NotFound {
@@ -187,7 +191,7 @@ pub async fn create_session(
         filter,
         questions,
         affects_rating: ar_override,
-    } = build_plan(&state.pool, auth.user.id, &body).await?;
+    } = build_plan(conn, auth.user.id, &body).await?;
 
     let question_plan = QuestionPlan {
         items: questions
@@ -212,7 +216,7 @@ pub async fn create_session(
         duration_min: body.duration,
         now: started_at,
     })?;
-    insert_session(&state.pool, &session).await?;
+    insert_session(conn, &session).await?;
 
     Ok((
         StatusCode::CREATED,
@@ -237,18 +241,20 @@ pub async fn create_session(
     security(("bearer_auth" = []))
 )]
 pub async fn get_session(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetSessionResponse>, ApiError> {
-    let mut session = get_owned_session(&state.pool, id, user.user.id).await?;
-    let attempts = list_session_attempts(&state.pool, session.id).await?;
-    let questions = hydrate_session_questions(&state.pool, &session).await?;
+    let conn = &mut *db;
+    let mut session = get_owned_session(conn, id, user.user.id).await?;
+    let attempts = list_session_attempts(conn, session.id).await?;
+    let questions = hydrate_session_questions(conn, &session).await?;
 
     if let Some(aid) = session.assessment_id {
         let row = sqlx::query("SELECT title, course FROM tb_assessments WHERE id = $1")
             .bind(aid)
-            .fetch_optional(&state.pool)
+            .fetch_optional(&mut *conn)
             .await
             .map_err(internal)?;
         if let Some(r) = row {
@@ -265,7 +271,7 @@ pub async fn get_session(
 }
 
 async fn hydrate_session_questions(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     session: &Session,
 ) -> Result<Vec<GetSessionQuestion>, ApiError> {
     let plan_ids: Vec<Uuid> = session
@@ -284,7 +290,7 @@ async fn hydrate_session_questions(
          FROM tb_questions WHERE id = ANY($1)",
     )
     .bind(&plan_ids)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
 
@@ -354,12 +360,14 @@ pub struct PatchSessionBody {
     security(("bearer_auth" = []))
 )]
 pub async fn patch_session(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: RequireAnyScope<SessionWriteScopes>,
     Path(id): Path<Uuid>,
     Json(body): Json<PatchSessionBody>,
 ) -> Result<Json<Session>, ApiError> {
-    let mut session = get_owned_session(&state.pool, id, user.0.user.id).await?;
+    let conn = &mut *db;
+    let mut session = get_owned_session(conn, id, user.0.user.id).await?;
 
     match (session.status, body.status) {
         (SessionStatus::InProgress, SessionStatus::Abandoned)
@@ -383,7 +391,7 @@ pub async fn patch_session(
     sqlx::query("UPDATE tb_sessions SET status = $1 WHERE id = $2")
         .bind(session.status.as_str())
         .bind(session.id)
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .map_err(internal)?;
 
@@ -403,15 +411,16 @@ pub async fn patch_session(
     security(("bearer_auth" = []))
 )]
 pub async fn answer(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: RequireAnyScope<SessionWriteScopes>,
     Path(id): Path<Uuid>,
     Json(body): Json<AnswerSessionBody>,
 ) -> Result<Json<AnswerSessionResponse>, ApiError> {
-    let session = get_owned_session(&state.pool, id, user.0.user.id).await?;
-    let existing = existing_attempts_by_question(&state.pool, session.id).await?;
-    let runtime_question =
-        load_runtime_question(&state.pool, user.0.user.id, body.question_id).await?;
+    let conn = &mut *db;
+    let session = get_owned_session(conn, id, user.0.user.id).await?;
+    let existing = existing_attempts_by_question(conn, session.id).await?;
+    let runtime_question = load_runtime_question(conn, user.0.user.id, body.question_id).await?;
     let outcome = answer_session(
         AnswerInput {
             session,
@@ -424,9 +433,9 @@ pub async fn answer(
     )?;
 
     if !outcome.replayed {
-        insert_attempt(&state.pool, &outcome).await?;
+        insert_attempt(conn, &outcome).await?;
         if let Some(ref elo) = outcome.elo {
-            persist_elo(&state.pool, user.0.user.id, body.question_id, elo).await?;
+            persist_elo(conn, user.0.user.id, body.question_id, elo).await?;
         }
     }
 
@@ -448,15 +457,17 @@ pub async fn answer(
     security(("bearer_auth" = []))
 )]
 pub async fn finish(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: RequireAnyScope<SessionWriteScopes>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<FinishSessionResponse>, ApiError> {
-    let session = get_owned_session(&state.pool, id, user.0.user.id).await?;
-    let attempts = list_session_attempts(&state.pool, session.id).await?;
-    let max_points = max_points_by_question(&state.pool, &attempts).await?;
+    let conn = &mut *db;
+    let session = get_owned_session(conn, id, user.0.user.id).await?;
+    let attempts = list_session_attempts(conn, session.id).await?;
+    let max_points = max_points_by_question(conn, &attempts).await?;
     let finished = finish_session(session, &attempts, &max_points, OffsetDateTime::now_utc())?;
-    update_finished_session(&state.pool, &finished).await?;
+    update_finished_session(conn, &finished).await?;
     let result = serde_json::from_value(
         finished
             .result
@@ -480,12 +491,12 @@ struct CreatePlan {
 }
 
 async fn build_plan(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     body: &CreateSessionBody,
 ) -> Result<CreatePlan, ApiError> {
     if let Some(assessment_id) = body.assessment_id {
-        return build_assessment_plan(pool, assessment_id).await;
+        return build_assessment_plan(conn, assessment_id).await;
     }
 
     let count = body.count.unwrap_or(10).clamp(1, 100);
@@ -517,7 +528,7 @@ async fn build_plan(
     .bind(&tags)
     .bind(user_id)
     .bind(count as i64)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
 
@@ -566,12 +577,15 @@ async fn build_plan(
     })
 }
 
-async fn build_assessment_plan(pool: &PgPool, assessment_id: Uuid) -> Result<CreatePlan, ApiError> {
+async fn build_assessment_plan(
+    conn: &mut sqlx::PgConnection,
+    assessment_id: Uuid,
+) -> Result<CreatePlan, ApiError> {
     let row = sqlx::query(
         "SELECT mode, affects_rating FROM tb_assessments WHERE id = $1 AND status = 'active'",
     )
     .bind(assessment_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(internal)?
     .ok_or(ApiError::NotFound {
@@ -596,7 +610,7 @@ async fn build_assessment_plan(pool: &PgPool, assessment_id: Uuid) -> Result<Cre
          ORDER BY sec.order_index ASC, ai.order_index ASC",
     )
     .bind(assessment_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
 
@@ -653,7 +667,7 @@ fn option_order(
     Ok(Some(order))
 }
 
-async fn insert_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
+async fn insert_session(conn: &mut sqlx::PgConnection, session: &Session) -> Result<(), ApiError> {
     sqlx::query(
         "INSERT INTO tb_sessions \
          (id, user_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
@@ -673,21 +687,25 @@ async fn insert_session(pool: &PgPool, session: &Session) -> Result<(), ApiError
     .bind(session.deadline_at)
     .bind(session.started_at)
     .bind(session.finished_at)
-    .execute(pool)
+    .execute(&mut *conn)
     .await
     .map_err(internal)?;
     Ok(())
 }
 
-async fn get_owned_session(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<Session, ApiError> {
+async fn get_owned_session(
+    conn: &mut sqlx::PgConnection,
+    id: Uuid,
+    user_id: Uuid,
+) -> Result<Session, ApiError> {
     let row = sqlx::query(
         "SELECT id, user_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
-                rating_snapshot, result, deadline_at, started_at, finished_at \
-         FROM tb_sessions WHERE id = $1 AND user_id = $2",
+                 rating_snapshot, result, deadline_at, started_at, finished_at \
+          FROM tb_sessions WHERE id = $1 AND user_id = $2",
     )
     .bind(id)
     .bind(user_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(internal)?
     .ok_or(ApiError::NotFound {
@@ -724,7 +742,7 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
 }
 
 async fn load_runtime_question(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     question_id: Uuid,
 ) -> Result<RuntimeQuestion, ApiError> {
@@ -733,7 +751,7 @@ async fn load_runtime_question(
          FROM tb_questions WHERE id = $1",
     )
     .bind(question_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(internal)?
     .ok_or(ApiError::NotFound {
@@ -752,26 +770,26 @@ async fn load_runtime_question(
             rating: row.get("rating"),
             attempts_count: row.get("attempts_count"),
         },
-        user_tag_ratings: load_user_tag_ratings(pool, user_id, question_id).await?,
+        user_tag_ratings: load_user_tag_ratings(conn, user_id, question_id).await?,
     })
 }
 
 async fn load_user_tag_ratings(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     question_id: Uuid,
 ) -> Result<Vec<UserTagRating>, ApiError> {
     let rows = sqlx::query(
         "SELECT t.id, COALESCE(utr.rating, 1200::double precision) AS rating, \
-                COALESCE(utr.attempts_count, 0) AS attempts_count \
-         FROM tb_question_tags qt \
-         JOIN tb_tags t ON t.id = qt.tag_id \
-         LEFT JOIN tb_user_tag_ratings utr ON utr.tag_id = t.id AND utr.user_id = $1 \
-         WHERE qt.question_id = $2",
+                 COALESCE(utr.attempts_count, 0) AS attempts_count \
+          FROM tb_question_tags qt \
+          JOIN tb_tags t ON t.id = qt.tag_id \
+          LEFT JOIN tb_user_tag_ratings utr ON utr.tag_id = t.id AND utr.user_id = $1 \
+          WHERE qt.question_id = $2",
     )
     .bind(user_id)
     .bind(question_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
 
@@ -786,26 +804,29 @@ async fn load_user_tag_ratings(
 }
 
 async fn existing_attempts_by_question(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     session_id: Uuid,
 ) -> Result<HashMap<Uuid, Attempt>, ApiError> {
-    Ok(list_session_attempts(pool, session_id)
+    Ok(list_session_attempts(conn, session_id)
         .await?
         .into_iter()
         .map(|attempt| (attempt.question_id, attempt))
         .collect())
 }
 
-async fn list_session_attempts(pool: &PgPool, session_id: Uuid) -> Result<Vec<Attempt>, ApiError> {
+async fn list_session_attempts(
+    conn: &mut sqlx::PgConnection,
+    session_id: Uuid,
+) -> Result<Vec<Attempt>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, user_id, question_id, question_version, session_id, response, presentation, \
-                is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
-                rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
-                created_at \
-         FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
+                 is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
+                 rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
+                 created_at \
+          FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
     )
     .bind(session_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(internal)?;
 
@@ -838,7 +859,10 @@ fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiError> {
     })
 }
 
-async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), ApiError> {
+async fn insert_attempt(
+    conn: &mut sqlx::PgConnection,
+    outcome: &AnswerOutcome,
+) -> Result<(), ApiError> {
     let attempt = &outcome.attempt;
     sqlx::query(
         "INSERT INTO tb_attempts \
@@ -864,14 +888,14 @@ async fn insert_attempt(pool: &PgPool, outcome: &AnswerOutcome) -> Result<(), Ap
     .bind(serde_json::to_value(&attempt.user_tag_deltas).map_err(anyhow::Error::from)?)
     .bind(attempt.question_delta)
     .bind(attempt.created_at)
-    .execute(pool)
+    .execute(&mut *conn)
     .await
     .map_err(internal)?;
     Ok(())
 }
 
 async fn max_points_by_question(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     attempts: &[Attempt],
 ) -> Result<HashMap<Uuid, i32>, ApiError> {
     if attempts.is_empty() {
@@ -880,7 +904,7 @@ async fn max_points_by_question(
     let ids: Vec<Uuid> = attempts.iter().map(|attempt| attempt.question_id).collect();
     let rows = sqlx::query("SELECT id, points FROM tb_questions WHERE id = ANY($1::uuid[])")
         .bind(&ids)
-        .fetch_all(pool)
+        .fetch_all(&mut *conn)
         .await
         .map_err(internal)?;
 
@@ -890,20 +914,23 @@ async fn max_points_by_question(
         .collect())
 }
 
-async fn update_finished_session(pool: &PgPool, session: &Session) -> Result<(), ApiError> {
+async fn update_finished_session(
+    conn: &mut sqlx::PgConnection,
+    session: &Session,
+) -> Result<(), ApiError> {
     sqlx::query("UPDATE tb_sessions SET status = $2, result = $3, finished_at = $4 WHERE id = $1")
         .bind(session.id)
         .bind(session.status.as_str())
         .bind(&session.result)
         .bind(session.finished_at)
-        .execute(pool)
+        .execute(&mut *conn)
         .await
         .map_err(internal)?;
     Ok(())
 }
 
 async fn persist_elo(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     question_id: Uuid,
     elo: &EloUpdate,
@@ -912,7 +939,7 @@ async fn persist_elo(
         .bind(question_id)
         .bind(elo.question.rating_after)
         .bind(elo.question.attempts_after)
-        .execute(pool)
+        .execute(&mut *conn)
         .await
         .map_err(internal)?;
 
@@ -929,7 +956,7 @@ async fn persist_elo(
         .bind(tag.tag_id)
         .bind(tag.rating_after)
         .bind(tag.attempts_after)
-        .execute(pool)
+        .execute(&mut *conn)
         .await
         .map_err(internal)?;
     }
@@ -994,7 +1021,8 @@ pub struct PendingAttemptRow {
     security(("bearer_auth" = []))
 )]
 pub async fn list_pending_attempts(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<PendingAttemptRow>>, ApiError> {
     if matches!(user.user.role, Role::Agent) {
@@ -1003,21 +1031,21 @@ pub async fn list_pending_attempts(
 
     let rows = sqlx::query(
         "SELECT a.id AS attempt_id, a.session_id, a.user_id, \
-                u.email AS user_email, u.display_name AS user_display_name, \
-                a.question_id, q.prompt AS question_prompt, \
-                (a.response->>'body') AS response_body, \
-                (a.response->>'word_count')::int AS response_word_count, \
-                a.created_at \
-         FROM tb_attempts a \
-         JOIN tb_users u ON u.id = a.user_id \
-         JOIN tb_questions q ON q.id = a.question_id \
-         WHERE a.grade_status = 'pending_manual' \
-           AND (q.created_by = $1 \
-                OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $1)) \
-         ORDER BY a.created_at ASC",
+                 u.email AS user_email, u.display_name AS user_display_name, \
+                 a.question_id, q.prompt AS question_prompt, \
+                 (a.response->>'body') AS response_body, \
+                 (a.response->>'word_count')::int AS response_word_count, \
+                 a.created_at \
+          FROM tb_attempts a \
+          JOIN tb_users u ON u.id = a.user_id \
+          JOIN tb_questions q ON q.id = a.question_id \
+          WHERE a.grade_status = 'pending_manual' \
+            AND (q.created_by = $1 \
+                 OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $1)) \
+          ORDER BY a.created_at ASC",
     )
     .bind(user.owner_id)
-    .fetch_all(&state.pool)
+    .fetch_all(&mut *db)
     .await
     .map_err(internal)?;
 
@@ -1066,7 +1094,8 @@ pub struct GradeAttemptBody {
     security(("bearer_auth" = []))
 )]
 pub async fn grade_attempt(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(body): Json<GradeAttemptBody>,
@@ -1084,15 +1113,15 @@ pub async fn grade_attempt(
 
     let row = sqlx::query(
         "SELECT a.grade_status \
-         FROM tb_attempts a \
-         JOIN tb_questions q ON q.id = a.question_id \
-         WHERE a.id = $1 \
-           AND (q.created_by = $2 \
-                OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $2))",
+          FROM tb_attempts a \
+          JOIN tb_questions q ON q.id = a.question_id \
+          WHERE a.id = $1 \
+            AND (q.created_by = $2 \
+                 OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $2))",
     )
     .bind(id)
     .bind(user.owner_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *db)
     .await
     .map_err(internal)?
     .ok_or(ApiError::NotFound {
@@ -1119,7 +1148,7 @@ pub async fn grade_attempt(
     .bind(id)
     .bind(body.score)
     .bind(&body.notes)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *db)
     .await
     .map_err(internal)?;
 
@@ -1181,7 +1210,8 @@ pub struct ListMySessionsResponse {
     security(("bearer_auth" = []))
 )]
 pub async fn list_my_sessions(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     user: AuthenticatedUser,
     Query(q): Query<ListMySessionsQuery>,
 ) -> Result<Json<ListMySessionsResponse>, ApiError> {
@@ -1196,7 +1226,7 @@ pub async fn list_my_sessions(
     )
     .bind(user.user.id)
     .bind(q.assessment_id)
-    .fetch_all(&state.pool)
+    .fetch_all(&mut *db)
     .await
     .map_err(internal)?;
 

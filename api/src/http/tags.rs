@@ -5,18 +5,15 @@
 //! idempotent on `name` — repeated POSTs with the same name return the
 //! existing row.
 
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse, routing::get};
+use axum::{Json, http::StatusCode, response::IntoResponse, routing::get};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
 use crate::{
-    auth::{
-        extractor::AuthenticatedUser,
-        scope::{RequireScope, ScopeConstraint},
-    },
+    auth::scope::{RequireScope, ScopeConstraint},
     bank::tags as repo,
     domain::{error::ApiError, question::Tag, user::Scope},
-    http::AppState,
+    http::{AppState, db::DbConn},
 };
 
 pub struct TagWriteScope;
@@ -40,11 +37,8 @@ pub struct CreateTagBody {
     ),
     security(("bearer_auth" = []))
 )]
-pub async fn list_tags(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-) -> Result<Json<Vec<Tag>>, ApiError> {
-    let tags = repo::list_tags(&state.pool, user.owner_id).await?;
+pub async fn list_tags(mut db: DbConn) -> Result<Json<Vec<Tag>>, ApiError> {
+    let tags = repo::list_tags(&mut db).await?;
     Ok(Json(tags))
 }
 
@@ -60,11 +54,11 @@ pub async fn list_tags(
     security(("bearer_auth" = []))
 )]
 pub async fn create_tag(
-    State(state): State<AppState>,
+    mut db: DbConn,
     _user: RequireScope<TagWriteScope>,
     Json(body): Json<CreateTagBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let tag = repo::create_tag(&state.pool, &body.name, body.description.as_deref()).await?;
+    let tag = repo::create_tag(&mut db, &body.name, body.description.as_deref()).await?;
     Ok((StatusCode::CREATED, Json(tag)))
 }
 

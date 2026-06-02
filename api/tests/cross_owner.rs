@@ -112,9 +112,10 @@ async fn test_cross_owner_agent_visibility() {
     // question (see build_assessment_plan), so give it one and activate it. It stays
     // private — the access checks below are what we're exercising.
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('mc', 'What color?', $1, 'live', 2, $2) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $3) RETURNING id",
     )
+    .bind(owner_id)
     .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
     .bind(agent_id)
     .fetch_one(&pool)
@@ -311,11 +312,11 @@ async fn test_cross_owner_list_isolation() {
 
     // A owns a question.
     let a_question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('mc', 'A private question', $1, 'live', 1, $2) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'A private question', $2, 'live', 1, $1) RETURNING id",
     )
-    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
     .bind(owner_a)
+    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
     .fetch_one(&pool)
     .await
     .unwrap()
@@ -449,11 +450,11 @@ async fn test_cross_owner_tags_isolation() {
     .unwrap();
 
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('mc', 'A question', $1, 'live', 1, $2) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'A question', $2, 'live', 1, $1) RETURNING id",
     )
-    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
     .bind(owner_a)
+    .bind(json!({ "options": ["x", "y"], "correct_index": 0 }))
     .fetch_one(&pool)
     .await
     .unwrap()
@@ -555,8 +556,8 @@ async fn test_cross_owner_pending_attempts_isolation() {
 
     // Create essay question
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('essay', 'Write an essay', '{}', 'live', 5, $1) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'essay', 'Write an essay', '{}', 'live', 5, $1) RETURNING id",
     )
     .bind(owner_a)
     .fetch_one(&pool)
@@ -692,8 +693,8 @@ async fn test_cross_owner_grade_isolation() {
         .unwrap();
 
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by) \
-         VALUES ('essay', 'Write an essay', '{}', 'live', 5, $1) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'essay', 'Write an essay', '{}', 'live', 5, $1) RETURNING id",
     )
     .bind(owner_a)
     .fetch_one(&pool)

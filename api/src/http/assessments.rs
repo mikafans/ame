@@ -11,7 +11,7 @@ use crate::{
         error::{ApiError, FieldError},
         question::QuestionKind,
     },
-    http::AppState,
+    http::{AppState, db::DbConn},
 };
 use axum::{
     Json, Router,
@@ -744,11 +744,13 @@ pub async fn delete_assessment(
     tag = "assessments"
 )]
 pub async fn add_assessment_question(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     auth: AuthenticatedUser,
     Path(assessment_id): Path<Uuid>,
     Json(body): Json<AddAssessmentQuestionBody>,
 ) -> Result<(StatusCode, Json<AddAssessmentQuestionResponse>), ApiError> {
+    let conn = &mut *db;
     // Resolve target section: use provided section_id or default to first section
     let section_id: Uuid = if let Some(sid) = body.section_id {
         // Validate that the section belongs to this assessment and is owned by the user
@@ -760,7 +762,7 @@ pub async fn add_assessment_question(
         .bind(sid)
         .bind(assessment_id)
         .bind(auth.user.id)
-        .fetch_optional(&state.pool)
+        .fetch_optional(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
         .ok_or(ApiError::NotFound {
@@ -776,7 +778,7 @@ pub async fn add_assessment_question(
         )
         .bind(assessment_id)
         .bind(auth.user.id)
-        .fetch_optional(&state.pool)
+        .fetch_optional(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
         .ok_or(ApiError::NotFound {
@@ -789,7 +791,7 @@ pub async fn add_assessment_question(
         let qexists: bool =
             sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tb_questions WHERE id = $1)")
                 .bind(qid)
-                .fetch_one(&state.pool)
+                .fetch_one(&mut *conn)
                 .await
                 .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
         if !qexists {
@@ -809,15 +811,16 @@ pub async fn add_assessment_question(
         let default_payload = default_payload_for_kind(kind);
 
         sqlx::query_scalar(
-            "INSERT INTO tb_questions (kind, prompt, payload, status, points, created_by)
-             VALUES ($1, $2, $3, 'draft', 1, $4)
+            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by)
+             VALUES ($1, $2, $3, $4, 'draft', 1, $5)
              RETURNING id",
         )
+        .bind(auth.owner_id)
         .bind(kind.as_str())
         .bind(&prompt)
         .bind(&default_payload)
         .bind(auth.user.id)
-        .fetch_one(&state.pool)
+        .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
     };
@@ -827,7 +830,7 @@ pub async fn add_assessment_question(
         "SELECT COALESCE(MAX(order_index) + 1, 0) FROM tb_assessment_items WHERE section_id = $1",
     )
     .bind(section_id)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *conn)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
@@ -840,7 +843,7 @@ pub async fn add_assessment_question(
     .bind(question_id)
     .bind(next_order)
     .bind(body.points_override)
-    .execute(&state.pool)
+    .execute(&mut *conn)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
@@ -849,7 +852,7 @@ pub async fn add_assessment_question(
             "UPDATE tb_assessment_sections SET items_count = items_count + 1 WHERE id = $1",
         )
         .bind(section_id)
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
     }
@@ -1253,7 +1256,7 @@ pub struct GenerateAssessmentResponse {
     tag = "assessments"
 )]
 pub async fn generate_assessment(
-    State(state): State<AppState>,
+    mut db: DbConn,
     auth: AuthenticatedUser,
     Json(body): Json<GenerateAssessmentBody>,
 ) -> Result<Json<GenerateAssessmentResponse>, ApiError> {
@@ -1270,12 +1273,12 @@ pub async fn generate_assessment(
         count: body.question_count.max(1) as usize,
         exclude_recent_hours: 0,
     };
-    let plan = planner::plan_assessment(&state.pool, auth.user.id, &req).await?;
+    let conn = &mut *db;
+    let plan = planner::plan_assessment(conn, auth.user.id, &req).await?;
 
     let mut candidates = Vec::new();
     for item in &plan.question_plan.items {
-        if let Some(q) = crate::bank::questions::get_question(&state.pool, item.question_id).await?
-        {
+        if let Some(q) = crate::bank::questions::get_question(conn, item.question_id).await? {
             if let Some(types) = &body.types
                 && !types.is_empty()
                 && !types.contains(&q.kind)
