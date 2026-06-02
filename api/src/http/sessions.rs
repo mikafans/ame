@@ -1012,8 +1012,11 @@ pub async fn list_pending_attempts(
          JOIN tb_users u ON u.id = a.user_id \
          JOIN tb_questions q ON q.id = a.question_id \
          WHERE a.grade_status = 'pending_manual' \
+           AND (q.created_by = $1 \
+                OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $1)) \
          ORDER BY a.created_at ASC",
     )
+    .bind(user.owner_id)
     .fetch_all(&state.pool)
     .await
     .map_err(internal)?;
@@ -1079,14 +1082,22 @@ pub async fn grade_attempt(
         }]));
     }
 
-    let row = sqlx::query("SELECT grade_status FROM tb_attempts WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(internal)?
-        .ok_or(ApiError::NotFound {
-            resource: "attempt",
-        })?;
+    let row = sqlx::query(
+        "SELECT a.grade_status \
+         FROM tb_attempts a \
+         JOIN tb_questions q ON q.id = a.question_id \
+         WHERE a.id = $1 \
+           AND (q.created_by = $2 \
+                OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $2))",
+    )
+    .bind(id)
+    .bind(user.owner_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(internal)?
+    .ok_or(ApiError::NotFound {
+        resource: "attempt",
+    })?;
 
     let grade_status: String = row.get("grade_status");
     if grade_status != "pending_manual" {

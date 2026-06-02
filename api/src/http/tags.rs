@@ -42,9 +42,9 @@ pub struct CreateTagBody {
 )]
 pub async fn list_tags(
     State(state): State<AppState>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
 ) -> Result<Json<Vec<Tag>>, ApiError> {
-    let tags = repo::list_tags(&state.pool).await?;
+    let tags = repo::list_tags(&state.pool, user.owner_id).await?;
     Ok(Json(tags))
 }
 
