@@ -94,8 +94,7 @@ async fn test_cross_owner_agent_visibility() {
             "title": "Agent Assessment",
             "mode": "graded",
             "method": "agent",
-            "objectives": [],
-            "visibility": "private"
+            "objectives": []
         }))
         .send()
         .await
@@ -274,17 +273,16 @@ async fn test_cross_owner_list_isolation() {
         .unwrap();
     let a_auth = format!("{a_token}_{secret}");
 
-    // A creates an assessment, then we force it public + active — the exact shape
+    // A creates an assessment, then we force it active — the exact shape
     // the old count query leaked across owners.
     let res = client
         .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", format!("Bearer {a_auth}"))
         .json(&json!({
-            "title": "Owner A Public",
+            "title": "Owner A Assessment",
             "mode": "graded",
             "method": "agent",
-            "objectives": [],
-            "visibility": "public"
+            "objectives": []
         }))
         .send()
         .await
@@ -295,7 +293,7 @@ async fn test_cross_owner_list_isolation() {
     );
     let body: serde_json::Value = res.json().await.unwrap();
     let a_assessment_id = body["id"].as_str().unwrap().to_string();
-    sqlx::query("UPDATE tb_assessments SET visibility = 'public', status = 'active' WHERE id = $1")
+    sqlx::query("UPDATE tb_assessments SET status = 'active' WHERE id = $1")
         .bind(Uuid::parse_str(&a_assessment_id).unwrap())
         .execute(&pool)
         .await
