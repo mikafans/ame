@@ -364,6 +364,9 @@ pub async fn create_assessment(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    let is_admin = user.user.role == crate::domain::user::Role::Admin;
+    crate::http::db::set_rls_guc(&mut tx, user.owner_id, is_admin).await?;
+
     let assessment_id = Uuid::now_v7();
 
     let question_count = payload.questions.len() as i64;
@@ -416,10 +419,11 @@ pub async fn create_assessment(
     for (i, q) in payload.questions.into_iter().enumerate() {
         let question_id = Uuid::now_v7();
         sqlx::query(
-            "INSERT INTO tb_questions (id, kind, prompt, payload, explanation, status, points, created_by) \
-             VALUES ($1, $2, $3, $4, $5, 'live', $6, $7)"
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by) \
+             VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8)"
         )
         .bind(question_id)
+        .bind(user.owner_id)
         .bind(q.kind.as_str())
         .bind(&q.prompt)
         .bind(&q.payload)
@@ -502,9 +506,10 @@ pub async fn create_assessment(
 )]
 pub async fn get_assessment(
     user: AuthenticatedUser,
-    State(state): State<AppState>,
+    mut db: DbConn,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AssessmentDetail>, ApiError> {
+    let conn = &mut *db;
     // Owner-scoped access: the owner and any of their agents.
     let row = sqlx::query(
         "SELECT * FROM tb_assessments WHERE id = $1 \
@@ -513,7 +518,7 @@ pub async fn get_assessment(
     )
     .bind(id)
     .bind(user.owner_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
     .ok_or(ApiError::NotFound {
@@ -548,7 +553,7 @@ pub async fn get_assessment(
         "SELECT * FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index ASC",
     )
     .bind(id)
-    .fetch_all(&state.pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
@@ -565,7 +570,7 @@ pub async fn get_assessment(
              ORDER BY ai.order_index ASC",
         )
         .bind(sec_id)
-        .fetch_all(&state.pool)
+        .fetch_all(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 

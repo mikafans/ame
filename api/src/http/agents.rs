@@ -718,6 +718,7 @@ fn parse_id(params: &Value) -> Result<Uuid, ApiError> {
 
 pub fn public_router(state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/llms.txt", get(llms_txt))
         .route("/v1/agents/skill.json", get(skill_manifest))
         .route("/v1/agents/openapi.json", get(openapi_json))
         .with_state(state)
