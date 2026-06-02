@@ -2,7 +2,7 @@
  * Admin surface tests (pure API, no browser navigation required).
  *
  * Covers: GET /v1/admin/users, PATCH /v1/admin/users/{id} (plan/role/disable),
- * GET /v1/admin/audit, POST /v1/admin/moderate.
+ * GET /v1/admin/audit.
  *
  * All endpoints require the admin scope — 403 is asserted for non-admin callers.
  */
@@ -134,20 +134,6 @@ test.describe("admin API surface", () => {
     // cycle above which revokes existing tokens). Both correctly deny admin access.
     const r = await request.get(`${API_URL}/v1/admin/audit`, {
       headers: { Authorization: `Bearer ${userToken}` },
-    });
-    expect([401, 403]).toContain(r.status());
-  });
-
-  // --- Moderation ---
-
-  test("POST /v1/admin/moderate is inaccessible to non-admin (401/403)", async ({
-    request,
-  }) => {
-    // Use a bogus UUID — we just want the 401/403, not a real unpublish.
-    // Token may be revoked after the disable/re-enable cycle → 401 is expected.
-    const r = await request.post(`${API_URL}/v1/admin/moderate`, {
-      headers: { Authorization: `Bearer ${userToken}` },
-      data: { assessmentId: "00000000-0000-0000-0000-000000000000" },
     });
     expect([401, 403]).toContain(r.status());
   });

@@ -69,7 +69,7 @@ const SAMPLE_IMPORT = JSON.stringify(
     mode: "graded",
     method: "agent",
     objectives: ["Understand Move semantics", "Differentiate &T and &mut T"],
-    visibility: "public",
+
     questions: [
       {
         kind: "mc",
@@ -411,11 +411,6 @@ function KeysTab() {
       value: "plan.write",
       label: "plan.write",
       desc: "Generate and configure study plans",
-    },
-    {
-      value: "public.publish",
-      label: "public.publish",
-      desc: "Publish assessments publicly (Premium only)",
     },
   ];
 

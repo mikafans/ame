@@ -153,7 +153,7 @@ export async function finishSession(
  * AND has at least minQuestions total questions (default 5).
  *
  * The minimum count avoids matching small e2e test-fixture assessments (e.g.,
- * visibility-spec assessments with 1 question) and ensures the returned assessment
+ * isolation-spec assessments with 1 question) and ensures the returned assessment
  * has enough content for a meaningful session round-trip.
  */
 export async function firstMcqAssessmentId(

@@ -98,7 +98,6 @@ export default function ExplorePage() {
               <TableCell>Title</TableCell>
               <TableCell>Tags</TableCell>
               <TableCell>Created</TableCell>
-              <TableCell>Visibility</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -125,7 +124,6 @@ export default function ExplorePage() {
                 <TableCell>
                   {new Date(item.createdAt).toLocaleDateString()}
                 </TableCell>
-                <TableCell>{item.visibility}</TableCell>
                 <TableCell>
                   <Button
                     size="small"
