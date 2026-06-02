@@ -102,6 +102,15 @@ e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not runnin
 			echo "[e2e] Waiting for API on :$(API_PORT)..."; \
 			until curl -sf http://$(API_HOST):$(API_PORT)/healthz > /dev/null 2>&1; do sleep 1; done; \
 		fi; \
+		echo "[e2e] Promoting admin (db-admin)..."; \
+		if ! $(MAKE) --no-print-directory db-admin >> .tmp/ame-seed-e2e.log 2>&1; then \
+			echo "[e2e] FAILED: db-admin errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
+			tail -20 .tmp/ame-seed-e2e.log; \
+			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
+				kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; rm -f .tmp/ame-api-e2e.pid; \
+			fi; \
+			exit 1; \
+		fi; \
 		echo "[e2e] Seeding..."; \
 		if ! uv run scripts/seed.py --api http://$(API_HOST):$(API_PORT) >> .tmp/ame-seed-e2e.log 2>&1; then \
 			echo "[e2e] FAILED: seeding errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \

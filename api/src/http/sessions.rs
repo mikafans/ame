@@ -164,14 +164,22 @@ pub async fn create_session(
     }
 
     if let Some(assessment_id) = body.assessment_id {
-        let _row = sqlx::query("SELECT status, created_by FROM tb_assessments WHERE id = $1")
-            .bind(assessment_id)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?
-            .ok_or(ApiError::NotFound {
-                resource: "assessment",
-            })?;
+        // Owner-scoped: only the owner (or their agents) may start a session on an
+        // assessment. Non-owners get 404 so existence is not leaked.
+        sqlx::query(
+            "SELECT 1 FROM tb_assessments \
+             WHERE id = $1 \
+               AND (created_by = $2 \
+                    OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2))",
+        )
+        .bind(assessment_id)
+        .bind(auth.owner_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .ok_or(ApiError::NotFound {
+            resource: "assessment",
+        })?;
     }
 
     let CreatePlan {

@@ -186,7 +186,7 @@ async fn test_cross_owner_agent_visibility() {
         .bind(stranger_id)
         .bind("stranger-key")
         .bind(&hash)
-        .bind(vec!["assessment.read".to_string()])
+        .bind(vec!["assessment.read".to_string(), "attempt.write".to_string()])
         .execute(&pool)
         .await
         .unwrap();
@@ -219,6 +219,16 @@ async fn test_cross_owner_agent_visibility() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
+
+    // 7. Test: Stranger creates a session for private assessment -> 404
+    let res = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header("Authorization", format!("Bearer {stranger_auth}"))
+        .json(&json!({"assessmentId": qid}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
 /// Regression: the list/count endpoints must be strictly owner-scoped. A user

@@ -1,25 +1,28 @@
 import { expect, test } from "@playwright/test";
+import { loginAs, setAuthCookie } from "./helpers";
 
-test("explore page loads and shows data with empty filters", async ({
-  page,
-}) => {
-  // Assuming the user is already authenticated via setup
-  await page.goto("/explore");
+test.describe("explore page", () => {
+  let token: string;
 
-  // Wait for loading to finish
-  const loading = page.getByText("Loading...");
-  await expect(loading).not.toBeVisible();
+  test.beforeAll(async ({ request }) => {
+    token = await loginAs(request, "ada@example.com");
+  });
 
-  // Verify the table loads (either rows or a "No data" message)
-  // If the user reports "no data", let's check for the empty table body
-  const tableRows = page.locator("table tbody tr");
+  test.beforeEach(async ({ page }) => {
+    await setAuthCookie(page, token);
+  });
 
-  // If the user is correct, we should see an empty message or no rows
-  const rowCount = await tableRows.count();
-  console.log(`Explore page rows: ${rowCount}`);
+  test("explore page loads and shows data with empty filters", async ({
+    page,
+  }) => {
+    await page.goto("/explore");
 
-  // If count is 0, verify if it's because of the filter or no data
-  if (rowCount === 0) {
-    await expect(page.getByText(/No assessments/i)).toBeVisible();
-  }
+    // Wait for loading to finish
+    const loading = page.getByText("Loading...");
+    await expect(loading).not.toBeVisible();
+
+    // Verify the table loads and rows are visible
+    const firstRow = page.locator("table tbody tr").first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
+  });
 });

@@ -143,7 +143,7 @@ def bench(base, token):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", default=DEFAULT_API)
-    ap.add_argument("--email", default="instructor@example.com")
+    ap.add_argument("--email", default="ada@example.com")
     ap.add_argument("--password", default="password123")
     ap.add_argument("--total", type=int, default=1_000_000)
     ap.add_argument("--batch", type=int, default=50)

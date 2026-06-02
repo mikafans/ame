@@ -14,7 +14,7 @@ test("agent-authored assessment renders and is answerable in the UI", async ({
   page,
   request,
 }) => {
-  const token = await loginAs(request, "learner@example.com");
+  const token = await loginAs(request, "ada@example.com");
 
   const listed = await request.get(`${API_URL}/v1/assessments`, {
     headers: { Authorization: `Bearer ${token}` },

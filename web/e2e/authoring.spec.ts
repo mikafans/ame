@@ -14,7 +14,7 @@ test.describe("authoring navigation (all authenticated users)", () => {
 
   test.beforeAll(async ({ request }) => {
     // Any authenticated user — use the seeded learner (no special role needed)
-    token = await loginAs(request, "learner@example.com");
+    token = await loginAs(request, "ada@example.com");
   });
 
   test.beforeEach(async ({ page }) => {

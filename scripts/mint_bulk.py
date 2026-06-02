@@ -84,18 +84,18 @@ def main():
 
     try:
         with httpx.Client(base_url=args.api, timeout=120.0) as client:
-            # 1. Login as instructor
-            console.print("[bold cyan]Logging in as instructor...[/bold cyan]")
+            # 1. Login as primary user
+            console.print("[bold cyan]Logging in as primary user...[/bold cyan]")
             login_resp = request_with_retry(client, "POST", "/v1/auth/login", json={
-                "email": "instructor@example.com",
+                "email": "ada@example.com",
                 "password": "password123"
             })
             if not login_resp.is_success:
                 console.print("[red]Login failed. Make sure 'make db-seed' was run.[/red]")
                 sys.exit(1)
             
-            instructor_token = login_resp.json()["token"]
-            headers = {"Authorization": f"Bearer {instructor_token}"}
+            primary_token = login_resp.json()["token"]
+            headers = {"Authorization": f"Bearer {primary_token}"}
             
             # 2. Get Agent
             console.print("[bold cyan]Creating/Getting agent key...[/bold cyan]")

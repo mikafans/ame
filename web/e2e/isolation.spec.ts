@@ -124,6 +124,48 @@ test("owner isolation: stranger cannot create session for other owner's assessme
   const assessmentData = await createResp.json();
   const assessmentId = assessmentData.id as string;
 
+  // Add a live question to make the assessment valid and startable
+  const qResp = await request.post(`${API_URL}/v1/questions`, {
+    headers: { Authorization: `Bearer ${ownerA}` },
+    data: {
+      questions: [
+        {
+          kind: "mc",
+          prompt: "Owner A Question",
+          payload: { options: ["yes", "no"], correct_index: 0 },
+          points: 1,
+          tags: [],
+          explanation: "Owner A Explanation",
+        },
+      ],
+    },
+  });
+  if (!qResp.ok()) {
+    console.error(
+      `Question creation failed: ${qResp.status()} ${await qResp.text()}`,
+    );
+  }
+  expect(qResp.ok()).toBeTruthy();
+  const qData = await qResp.json();
+  const questionId = qData.questions[0].id;
+
+  const promoteResp = await request.post(
+    `${API_URL}/v1/questions/${questionId}/promote`,
+    {
+      headers: { Authorization: `Bearer ${ownerA}` },
+    },
+  );
+  expect(promoteResp.ok()).toBeTruthy();
+
+  const linkResp = await request.post(
+    `${API_URL}/v1/assessments/${assessmentId}/questions`,
+    {
+      headers: { Authorization: `Bearer ${ownerA}` },
+      data: { questionId },
+    },
+  );
+  expect(linkResp.ok()).toBeTruthy();
+
   // Activate it
   await request.patch(`${API_URL}/v1/assessments/${assessmentId}`, {
     headers: { Authorization: `Bearer ${ownerA}` },

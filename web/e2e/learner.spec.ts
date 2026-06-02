@@ -6,13 +6,7 @@
  * is intentional so that session-creation and finish steps stay ordered.
  */
 import { test, expect } from "@playwright/test";
-import {
-  API_URL,
-  loginAs,
-  registerUser,
-  setAuthCookie,
-  makeResponse,
-} from "./helpers";
+import { API_URL, loginAs, setAuthCookie, makeResponse } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Auth: login / redirect behaviour
@@ -41,13 +35,13 @@ test.describe("authentication", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Learner UI — uses the seeded learner@example.com account
+// Learner UI — uses the seeded ada@example.com account
 // ---------------------------------------------------------------------------
 test.describe("learner UI (seeded account)", () => {
   let token: string;
 
   test.beforeAll(async ({ request }) => {
-    token = await loginAs(request, "learner@example.com");
+    token = await loginAs(request, "ada@example.com");
   });
 
   test.beforeEach(async ({ page }) => {
@@ -56,7 +50,7 @@ test.describe("learner UI (seeded account)", () => {
 
   test("library page loads and shows sidebar identity", async ({ page }) => {
     await page.goto("/library");
-    await expect(page.getByText(/Alice Learner/i)).toBeVisible({
+    await expect(page.getByText(/Ada Lovelace/i)).toBeVisible({
       timeout: 10000,
     });
     await expect(
@@ -86,20 +80,16 @@ test.describe("learner UI (seeded account)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Learner session flow — register a fresh user so state is clean
+// Learner session flow — uses primary user so we own seeded content
 // ---------------------------------------------------------------------------
-test.describe("learner session flow (fresh user)", () => {
+test.describe("learner session flow (primary user)", () => {
   test.describe.configure({ mode: "serial" });
 
   let token: string;
   let sessionId: string;
 
   test.beforeAll(async ({ request }) => {
-    const ts = Date.now();
-    token = await registerUser(request, {
-      email: `e2e-learner-${ts}@example.com`,
-      name: "E2E Learner",
-    });
+    token = await loginAs(request, "ada@example.com");
   });
 
   test("can start a assessment session", async ({ page, request }) => {

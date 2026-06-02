@@ -73,17 +73,22 @@ pub struct ItemStats {
 )]
 pub async fn assessment_stats(
     State(state): State<AppState>,
-    _user: RequireScope<StatsReadScope>,
+    user: RequireScope<StatsReadScope>,
     Path(id): Path<Uuid>,
     Query(params): Query<AssessmentStatsParams>,
 ) -> Result<Json<AssessmentStatsResponse>, ApiError> {
-    // Verify assessment exists
+    // Verify assessment exists and is owner-scoped
     let exists: bool =
-        sqlx::query_scalar("SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1)")
-            .bind(id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+        sqlx::query_scalar(
+            "SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1 \
+             AND (created_by = $2 \
+                  OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2)))"
+        )
+        .bind(id)
+        .bind(user.0.owner_id())
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
     if !exists {
         return Err(ApiError::NotFound {
             resource: "assessment",

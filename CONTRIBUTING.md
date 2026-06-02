@@ -11,7 +11,7 @@ make dev           # API on :28080, frontend on :23000
 make db-seed       # seed demo users, quizzes, questions
 ```
 
-Demo credentials after seeding: `learner@example.com / password123`, `instructor@example.com / password123`.
+Demo credentials after seeding: `ada@example.com / password123` (primary user), `mira@example.com / password123` (second user).
 
 Copy `.env.example` to `.env` if you need to override defaults.
 

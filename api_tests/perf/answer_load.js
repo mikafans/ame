@@ -62,8 +62,7 @@ function authHeaders(token) {
 }
 
 export function setup() {
-  const instructorToken = login("instructor@example.com", "password123");
-  const learnerToken = login("learner@example.com", "password123");
+  const token = login("ada@example.com", "password123");
 
   const create = http.post(
     `${BASE_URL}/v1/questions`,
@@ -81,7 +80,7 @@ export function setup() {
         },
       ],
     }),
-    authHeaders(instructorToken),
+    authHeaders(token),
   );
   if (create.status !== 201) {
     fail(`question create failed: ${create.status} ${create.body}`);
@@ -91,13 +90,13 @@ export function setup() {
   const promote = http.post(
     `${BASE_URL}/v1/questions/${questionId}/promote`,
     null,
-    authHeaders(instructorToken),
+    authHeaders(token),
   );
   if (promote.status !== 200) {
     fail(`question promote failed: ${promote.status} ${promote.body}`);
   }
 
-  return { learnerToken };
+  return { learnerToken: token };
 }
 
 export default function (data) {

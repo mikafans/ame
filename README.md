@@ -16,7 +16,7 @@ make dev            # API on :28080, frontend on :23000
 make db-seed        # seed demo users, quizzes, questions (requires API running)
 ```
 
-Demo credentials after seeding: `learner@example.com / password123`, `instructor@example.com / password123`, `admin@example.com / password123` (admin).
+Demo credentials after seeding: `ada@example.com / password123` (primary user), `mira@example.com / password123` (second user), `admin@example.com / password123` (admin).
 
 ### Admin users
 

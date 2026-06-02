@@ -41,7 +41,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - Scheduled exams are not supported — no `opens_at`/`closes_at` fields in the API or DB.
 - SSO/SAML is not implemented — login supports email + password only.
 - Quiz lifecycle: draft → active (publish auto-promotes draft questions to live).
-- **Admin is DB-granted only.** Registration always creates `role: user` (`POST /v1/auth/register` rejects `role: admin`); there is no in-app privilege escalation. Grant admin with `make db-admin` (a direct SQL write — `make db-admin ADMIN_EMAIL=...` to promote a specific account, preserving its password). `db-seed` depends on `db-admin` because seeding needs an admin to upgrade the instructor to premium (premium unlocks the agent-creation quota that `make db-bulk` relies on). Re-login after promotion — token scopes are fixed at login.
+- **Admin is DB-granted only.** Registration always creates `role: user` (`POST /v1/auth/register` rejects `role: admin`); there is no in-app privilege escalation. Grant admin with `make db-admin` (a direct SQL write — `make db-admin ADMIN_EMAIL=...` to promote a specific account, preserving its password). `db-seed` depends on `db-admin` because seeding needs an admin to upgrade the primary user (Ada) to premium (premium unlocks the agent-creation quota that `make db-bulk` relies on). Re-login after promotion — token scopes are fixed at login.
 - Sharing/public-visibility was removed — no `visibility` field or `public.publish` scope anywhere. Cross-account access is owner-scoped (sub-accounts), not public sharing.
 
 ## Shell Habits

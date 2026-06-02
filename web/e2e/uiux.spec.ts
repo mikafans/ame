@@ -43,13 +43,13 @@ test.describe("UI/UX spec alignment", () => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
 
-    const token = await loginAs(request, "learner@example.com");
+    const token = await loginAs(request, "ada@example.com");
     await setAuthCookie(page, token);
 
     // --- Library ---
     await page.goto("/library");
     // Wait for the auth loading to finish and user to be visible in sidebar
-    await expect(page.getByText(/Alice Learner/i)).toBeVisible({
+    await expect(page.getByText(/Ada Lovelace/i)).toBeVisible({
       timeout: 10000,
     });
 

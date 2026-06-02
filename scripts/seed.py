@@ -29,8 +29,8 @@ console = Console()
 DEFAULT_API = os.environ.get("AME_API_URL", "http://localhost:8080")
 
 USERS = [
-    {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "user"},
-    {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "user"},
+    {"email": "ada@example.com", "name": "Ada Lovelace", "password": "password123", "role": "user"},
+    {"email": "mira@example.com", "name": "Mira Okafor", "password": "password123", "role": "user"},
     
     {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "admin"},
 ]
@@ -326,7 +326,7 @@ def seed_users(client: httpx.Client, result: SeedResult) -> None:
 
 
 def upgrade_premium_users(client: httpx.Client, result: SeedResult) -> None:
-    """Explicitly upgrade the instructor to premium as requested."""
+    """Explicitly upgrade the primary user (Ada) to premium as requested."""
     console.rule("[bold]Premium Upgrades")
     admin = next((u for u in result.users if u["role"] == "admin"), None)
     if not admin:
@@ -335,7 +335,7 @@ def upgrade_premium_users(client: httpx.Client, result: SeedResult) -> None:
     admin_auth = {"Authorization": f"Bearer {admin['token']}"}
 
     for u in result.users:
-        if u["email"] == "instructor@example.com":
+        if u["email"] == "ada@example.com":
             r = client.patch(f"/v1/admin/users/{u['id']}", json={"plan": "premium"}, headers=admin_auth)
             if r.is_success:
                 console.print(f"  [green]✓[/green] Upgraded {u['email']} to PREMIUM")
@@ -529,7 +529,7 @@ def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     result.cohort_id = cohort_id
     console.print(f"  Created cohort {cohort_id}")
 
-    learners = [u for u in result.users if u["email"] == "learner@example.com"]
+    learners = [u for u in result.users if u["email"] == "ada@example.com"]
     enrolled = sum(
         1 for u in learners
         if client.post(f"/v1/cohorts/{cohort_id}/members", json={"userId": u["id"]}, headers=auth).is_success
@@ -544,7 +544,7 @@ def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
         console.print("  [yellow]No assessment — skipping attempts[/yellow]")
         return
 
-    learner = next((u for u in result.users if u["email"] == "learner@example.com"), None)
+    learner = next((u for u in result.users if u["email"] == "ada@example.com"), None)
     if not learner:
         console.print("  [yellow]No learner user — skipping attempts[/yellow]")
         return
@@ -640,45 +640,121 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
         return
     admin_auth = {"Authorization": f"Bearer {admin['token']}"}
 
-    # 1. Create agent for learner
-    learner = next((u for u in result.users if u["email"] == "learner@example.com"), None)
-    if learner:
-        learner_auth = {"Authorization": f"Bearer {learner['token']}"}
+    # 1. Create agent for primary user (Ada)
+    primary = next((u for u in result.users if u["email"] == "ada@example.com"), None)
+    if primary:
+        primary_auth = {"Authorization": f"Bearer {primary['token']}"}
         agent_resp = client.post(
             "/v1/me/agents",
             json={
-                "label": "Alice's Study Assistant",
+                "label": "Ada's Study Assistant",
                 "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
                 "focusTags": ["algorithms", "python"],
             },
-            headers=learner_auth,
+            headers=primary_auth,
         )
         if agent_resp.is_success:
             agent_data = agent_resp.json()
-            console.print(f"  [green]✓[/green] Created agent for Learner: [cyan]{agent_data.get('id')}[/cyan]")
+            console.print(f"  [green]✓[/green] Created agent for Primary: [cyan]{agent_data.get('id')}[/cyan]")
             console.print(f"    Key: {agent_data.get('secret')}")
         else:
-            console.print(f"  [yellow]Failed to create learner agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
+            console.print(f"  [yellow]Failed to create primary agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
 
-    # 3. Create agent for instructor
-    instructor = next((u for u in result.users if u["email"] == "instructor@example.com"), None)
-    if instructor:
-        instructor_auth = {"Authorization": f"Bearer {instructor['token']}"}
+    # 2. Create agent for second user (Mira)
+    second = next((u for u in result.users if u["email"] == "mira@example.com"), None)
+    if second:
+        second_auth = {"Authorization": f"Bearer {second['token']}"}
         agent_resp = client.post(
             "/v1/me/agents",
             json={
-                "label": "Bob's Content Generator",
+                "label": "Mira's Content Generator",
                 "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
                 "focusTags": ["data-structures", "sorting"],
             },
-            headers=instructor_auth,
+            headers=second_auth,
         )
         if agent_resp.is_success:
             agent_data = agent_resp.json()
-            console.print(f"  [green]✓[/green] Created agent for Instructor: [cyan]{agent_data.get('id')}[/cyan]")
+            console.print(f"  [green]✓[/green] Created agent for Second User: [cyan]{agent_data.get('id')}[/cyan]")
             console.print(f"    Key: {agent_data.get('secret')}")
         else:
-            console.print(f"  [yellow]Failed to create instructor agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
+            console.print(f"  [yellow]Failed to create second user agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
+
+
+def seed_second_user_content(client: httpx.Client, result: SeedResult) -> None:
+    console.rule("[bold]Mira's Content")
+    mira = next((u for u in result.users if u["email"] == "mira@example.com"), None)
+    if not mira:
+        console.print("  [yellow]No second user (Mira) — skipping second user content[/yellow]")
+        return
+    auth = {"Authorization": f"Bearer {mira['token']}"}
+
+    # Create 5 distinct questions
+    mira_questions = []
+    for i, q in enumerate(QUESTIONS[:5]):
+        q_copy = q.copy()
+        q_copy["prompt"] = f"Mira's Question: {q['prompt']}"
+        mira_questions.append(q_copy)
+
+    resp = client.post("/v1/questions", json={"questions": mira_questions}, headers=auth)
+    if resp.status_code != 201:
+        console.print(f"  [yellow]Failed to create Mira's questions:[/yellow] {resp.text[:400]}")
+        return
+
+    created = resp.json()["questions"]
+    promoted = 0
+    for q in created:
+        r = client.post(f"/v1/questions/{q['id']}/promote", headers=auth)
+        if r.is_success:
+            promoted += 1
+
+    console.print(f"  Created and promoted {promoted} questions for Mira")
+
+    # Create and publish active assessment with those questions
+    meta = {
+        "title": "Mira's Algorithm Practice",
+        "description": "Assessment owned by Mira for testing isolation.",
+        "course": "CS 102",
+        "duration": 45,
+    }
+    body = {
+        "title": meta["title"],
+        "description": meta["description"],
+        "mode": "practice",
+        "objectives": ["algorithms"],
+        "course": meta["course"],
+        "durationMin": meta["duration"],
+        "timeLimitSeconds": None,
+        "passingPoints": None,
+        "showResultsDuring": False,
+        "affectsRating": True,
+        "method": "manual",
+    }
+    resp = client.post("/v1/assessments", json=body, headers=auth)
+    if not resp.is_success:
+        console.print(f"  [yellow]Failed to create Mira's assessment:[/yellow] {resp.text[:200]}")
+        return
+
+    assessment_id = resp.json()["id"]
+    console.print(f"  Created Mira's assessment {assessment_id[:8]}…")
+
+    added = 0
+    for q in created:
+        if client.post(
+            f"/v1/assessments/{assessment_id}/questions",
+            json={"questionId": q["id"]},
+            headers=auth,
+        ).is_success:
+            added += 1
+    console.print(f"  Linked {added}/{len(created)} questions to Mira's assessment")
+
+    pub = client.patch(
+        f"/v1/assessments/{assessment_id}",
+        json={"status": "active"},
+        headers=auth,
+    )
+    if pub.is_success:
+        console.print(f"  Published Mira's assessment")
 
 
 def print_summary(result: SeedResult) -> None:
@@ -722,11 +798,11 @@ def main() -> None:
 
         seed_users(client, result)
 
-        instructor = next((u for u in result.users if u["email"] == "instructor@example.com"), None)
-        if not instructor:
-            console.print("[red]No instructor user — cannot seed content[/red]")
+        primary = next((u for u in result.users if u["email"] == "ada@example.com"), None)
+        if not primary:
+            console.print("[red]No primary user (Ada) — cannot seed content[/red]")
             sys.exit(1)
-        auth = {"Authorization": f"Bearer {instructor['token']}"}
+        auth = {"Authorization": f"Bearer {primary['token']}"}
 
         admin = next((u for u in result.users if u["role"] == "admin"), None)
         admin_auth = {"Authorization": f"Bearer {admin['token']}"} if admin else auth
@@ -737,6 +813,7 @@ def main() -> None:
         seed_questions(client, auth, result)
         seed_assessments(client, auth, result)
         seed_exam(client, auth, result)
+        seed_second_user_content(client, result)
         seed_cohort(client, admin_auth, result)
         seed_attempts(client, result)
         seed_agents(client, result)
