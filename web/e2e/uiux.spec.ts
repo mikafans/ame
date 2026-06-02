@@ -71,7 +71,7 @@ test.describe("UI/UX spec alignment", () => {
     // --- Assessment preview (use a assessment with MCQ questions for the session test) ---
     const assessmentId = await firstMcqAssessmentId(request, token);
     await page.goto(`/assessments/${assessmentId}/preview`);
-    await expect(page.getByText("Assessments")).toBeVisible();
+    await expect(page.getByText("Assessments", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Back to assessments" }),
     ).toBeVisible();

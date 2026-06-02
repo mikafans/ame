@@ -72,9 +72,7 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
   }
 
   const items = [
-    { id: "library", label: "Assessments", icon: "library", section: "Learn" },
-    { id: "explore", label: "Explore", icon: "explore", section: "Learn" },
-    { id: "exams", label: "Exams", icon: "stack", section: "Learn" },
+    { id: "explore", label: "Explore", icon: "explore", section: "Browse" },
     {
       id: "assessment",
       label: "Take assessment",
@@ -110,7 +108,7 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
     },
   ];
 
-  const sections = ["Learn", "Teach", "Integrate"];
+  const sections = ["Browse", "Learn", "Teach", "Integrate"];
   const initials =
     user?.displayName
       ?.split(" ")

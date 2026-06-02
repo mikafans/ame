@@ -21,7 +21,7 @@ export function middleware(req: NextRequest) {
 
   // Already signed in but sitting on /login → send them into the app.
   if (hasToken && pathname === "/login") {
-    return NextResponse.redirect(new URL("/library", req.url));
+    return NextResponse.redirect(new URL("/explore", req.url));
   }
 
   // Protected route without a token → bounce to /login, remembering where they

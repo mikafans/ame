@@ -29,8 +29,10 @@ test.describe("authentication", () => {
     context,
   }) => {
     await context.clearCookies();
-    await page.goto("/");
-    await page.waitForURL("**/login", { timeout: 5000 });
+    await page.goto("/explore");
+    await page.waitForURL((url) => url.pathname === "/login", {
+      timeout: 5000,
+    });
   });
 });
 

@@ -32,7 +32,7 @@ export default function LearnerLayout({
     if (pathname.startsWith("/author")) return "author";
     if (pathname.startsWith("/grading")) return "grading";
     if (pathname.startsWith("/agent")) return "agent";
-    return "library";
+    return "explore";
   };
 
   const handleRouteChange = (route: string) => {
@@ -49,7 +49,7 @@ export default function LearnerLayout({
       grading: "/grading",
       agent: "/agent",
     };
-    router.push(routeMap[route] || "/library");
+    router.push(routeMap[route] || "/explore");
   };
 
   return (

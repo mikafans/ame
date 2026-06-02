@@ -548,6 +548,11 @@ paths:
         required: false
         schema:
           type: string
+      - name: mode
+        in: query
+        required: false
+        schema:
+          type: string
       - name: search
         in: query
         required: false
@@ -571,6 +576,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExploreResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer_auth: []
+  /v1/explore/facets:
+    get:
+      tags:
+      - assessments
+      summary: GET /v1/explore/facets — facets for filtering.
+      operationId: explore_facets
+      responses:
+        '200':
+          description: Explore facets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreFacetsResponse'
         '401':
           description: Unauthorized
       security:
@@ -2104,6 +2126,30 @@ components:
         count:
           type: integer
           format: int64
+    ExploreCounts:
+      type: object
+      required:
+      - practice
+      - graded
+      properties:
+        graded:
+          type: integer
+          format: int64
+        practice:
+          type: integer
+          format: int64
+    ExploreFacetsResponse:
+      type: object
+      required:
+      - tags
+      - counts
+      properties:
+        counts:
+          $ref: '#/components/schemas/ExploreCounts'
+        tags:
+          type: array
+          items:
+            type: string
     ExploreResponse:
       type: object
       required:

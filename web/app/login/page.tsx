@@ -83,7 +83,7 @@ export default function LoginPage() {
       const dest =
         returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
           ? returnTo
-          : "/library";
+          : "/explore";
       router.push(dest);
     } catch (err) {
       setError(

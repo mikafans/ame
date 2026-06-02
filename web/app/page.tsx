@@ -33,8 +33,8 @@ export default function LandingPage() {
   // signed-out visitors are sent to login. While useAuth is still resolving,
   // `user` is null so we default to the logged-out label.
   const signedIn = !!user;
-  const ctaLabel = signedIn ? "Open Library" : "Use Now";
-  const ctaHref = signedIn ? "/library" : "/login";
+  const ctaLabel = signedIn ? "Open Explore" : "Use Now";
+  const ctaHref = signedIn ? "/explore" : "/login";
 
   // Resolve the origin only after mount. Computing it during render would
   // diverge between server (no window) and client and break hydration, so we

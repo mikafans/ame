@@ -283,6 +283,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/explore/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/explore/facets — facets for filtering. */
+        get: operations["explore_facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -908,6 +925,16 @@ export interface components {
             bucket: number;
             /** Format: int64 */
             count: number;
+        };
+        ExploreCounts: {
+            /** Format: int64 */
+            graded: number;
+            /** Format: int64 */
+            practice: number;
+        };
+        ExploreFacetsResponse: {
+            counts: components["schemas"]["ExploreCounts"];
+            tags: string[];
         };
         ExploreResponse: {
             items: unknown[];
@@ -2073,6 +2100,7 @@ export interface operations {
             query?: {
                 tags?: string;
                 kind?: string;
+                mode?: string;
                 search?: string;
                 limit?: number;
                 after?: string;
@@ -2090,6 +2118,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExploreResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    explore_facets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Explore facets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExploreFacetsResponse"];
                 };
             };
             /** @description Unauthorized */
