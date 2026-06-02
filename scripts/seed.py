@@ -43,6 +43,11 @@ TAGS = [
     {"name": "dynamic-programming", "description": "Optimal substructure, memoization"},
     {"name": "math", "description": "Mathematics and discrete math"},
     {"name": "python", "description": "Python language and stdlib"},
+    {"name": "music-theory", "description": "Fundamental music theory and notation"},
+    {"name": "harmony", "description": "Chords, progressions, and voice leading"},
+    {"name": "scales", "description": "Major, minor, and chromatic scales"},
+    {"name": "intervals", "description": "Identification and analysis of melodic and harmonic intervals"},
+    {"name": "ear-training", "description": "Aural recognition of musical elements"},
 ]
 
 QUESTIONS = [
@@ -185,6 +190,69 @@ QUESTIONS = [
     },
 ]
 
+MIRA_QUESTIONS = [
+    {
+        "kind": "mc",
+        "prompt": "Which of the following intervals is the inversion of a major third?",
+        "payload": {
+            "options": ["Minor sixth", "Major sixth", "Minor seventh", "Perfect fifth"],
+            "correct_index": 0,
+        },
+        "explanation": "Inverting an interval changes its quality to the opposite (major becomes minor) and its number to 9 minus the original number (9 - 3 = 6).",
+        "tags": ["music-theory", "intervals"],
+        "points": 1,
+    },
+    {
+        "kind": "tf",
+        "prompt": "A harmonic minor scale contains a raised seventh scale degree compared to the natural minor scale.",
+        "payload": {"correct": True},
+        "explanation": "The harmonic minor scale is characterized by a raised 7th scale degree (leading tone), which creates a distinctive augmented second interval between the 6th and 7th degrees.",
+        "tags": ["music-theory", "scales"],
+        "points": 1,
+    },
+    {
+        "kind": "short",
+        "prompt": "Identify the minor key that shares the same key signature as C major (also known as its relative minor).",
+        "payload": {
+            "accepted": ["a minor", "A minor", "a-minor", "A-minor"],
+            "normalize": "case_insensitive_strip_accents",
+            "judge": "exact",
+        },
+        "explanation": "C major and A minor are relative keys, meaning they share the same key signature (no sharps or flats).",
+        "tags": ["music-theory", "scales"],
+        "points": 1,
+    },
+    {
+        "kind": "essay",
+        "prompt": "Explain the difference between homophonic and polyphonic textures in musical composition, and give an example of where each is commonly found.",
+        "payload": {
+            "min_words": 60,
+            "rubric": "Award marks for: accurate definition of homophonic texture (2), accurate definition of polyphonic texture (2), clear comparison of their differences (2), representative examples for each (2).",
+            "judge": "manual",
+        },
+        "explanation": "Homophonic texture features a single dominant melody accompanied by chords (common in pop songs and chorales). Polyphonic texture features multiple independent melody lines intertwining simultaneously (common in baroque fugues).",
+        "tags": ["music-theory", "harmony"],
+        "points": 6,
+    },
+    {
+        "kind": "code",
+        "prompt": "Write a Python function `semitones_in_interval(interval_name)` that returns the number of semitones in a basic musical interval. It should support: 'unison' (0), 'minor second' (1), 'major second' (2), 'minor third' (3), 'major third' (4), 'perfect fourth' (5), 'tritone' (6), and 'perfect fifth' (7).",
+        "payload": {
+            "language": "python",
+            "starter": "def semitones_in_interval(interval_name):\n    pass",
+            "tests": [
+                {"name": "major third is 4", "body": "assert semitones_in_interval('major third') == 4"},
+                {"name": "perfect fifth is 7", "body": "assert semitones_in_interval('perfect fifth') == 7"},
+                {"name": "minor second is 1", "body": "assert semitones_in_interval('minor second') == 1"},
+            ],
+            "exemplar": "def semitones_in_interval(interval_name):\n    intervals = {\n        'unison': 0, 'minor second': 1, 'major second': 2,\n        'minor third': 3, 'major third': 4, 'perfect fourth': 5,\n        'tritone': 6, 'perfect fifth': 7\n    }\n    return intervals.get(interval_name.lower())",
+        },
+        "explanation": "A dictionary lookup maps each interval name to its standard number of semitones.",
+        "tags": ["music-theory", "intervals"],
+        "points": 3,
+    }
+]
+
 QUIZ = {
     "title": "Algorithms and Data Structures — Fundamentals",
     "course": "Computer Science",
@@ -288,6 +356,7 @@ class SeedResult:
     exam_id: str | None = None
     cohort_id: str | None = None
     attempts_seeded: int = 0
+    mira_agent_key: str | None = None
 
 
 def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None, label: str = "") -> dict:
@@ -335,7 +404,7 @@ def upgrade_premium_users(client: httpx.Client, result: SeedResult) -> None:
     admin_auth = {"Authorization": f"Bearer {admin['token']}"}
 
     for u in result.users:
-        if u["email"] == "ada@example.com":
+        if u["email"] in ("ada@example.com", "mira@example.com"):
             r = client.patch(f"/v1/admin/users/{u['id']}", json={"plan": "premium"}, headers=admin_auth)
             if r.is_success:
                 console.print(f"  [green]✓[/green] Upgraded {u['email']} to PREMIUM")
@@ -640,43 +709,53 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
         return
     admin_auth = {"Authorization": f"Bearer {admin['token']}"}
 
+    # Helper to create an agent, deleting existing ones if we hit a quota limit
+    def create_agent_for_user(user_dict, body):
+        auth = {"Authorization": f"Bearer {user_dict['token']}"}
+        resp = client.post("/v1/me/agents", json=body, headers=auth)
+        if resp.status_code == 429:
+            list_resp = client.get("/v1/me/agents", headers=auth)
+            if list_resp.is_success:
+                agents = list_resp.json().get("agents", [])
+                console.print(f"  [yellow]Quota exceeded (usage: {len(agents)}). Deleting existing agents...[/yellow]")
+                for a in agents:
+                    del_resp = client.delete(f"/v1/me/agents/{a['id']}", headers=auth)
+                    console.print(f"  [yellow]Deleted agent {a['id'][:8]}: {del_resp.status_code}[/yellow]")
+                # Retry creation
+                resp = client.post("/v1/me/agents", json=body, headers=auth)
+        return resp
+
     # 1. Create agent for primary user (Ada)
     primary = next((u for u in result.users if u["email"] == "ada@example.com"), None)
     if primary:
-        primary_auth = {"Authorization": f"Bearer {primary['token']}"}
-        agent_resp = client.post(
-            "/v1/me/agents",
-            json={
-                "label": "Ada's Study Assistant",
-                "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
-                "focusTags": ["algorithms", "python"],
-            },
-            headers=primary_auth,
-        )
+        body = {
+            "label": "Ada's Study Assistant",
+            "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
+            "focusTags": ["algorithms", "python"],
+        }
+        agent_resp = create_agent_for_user(primary, body)
         if agent_resp.is_success:
             agent_data = agent_resp.json()
+            result.ada_agent_key = agent_data.get("apiKey")
             console.print(f"  [green]✓[/green] Created agent for Primary: [cyan]{agent_data.get('id')}[/cyan]")
-            console.print(f"    Key: {agent_data.get('secret')}")
+            console.print(f"    Key: {result.ada_agent_key}")
         else:
             console.print(f"  [yellow]Failed to create primary agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
 
     # 2. Create agent for second user (Mira)
     second = next((u for u in result.users if u["email"] == "mira@example.com"), None)
     if second:
-        second_auth = {"Authorization": f"Bearer {second['token']}"}
-        agent_resp = client.post(
-            "/v1/me/agents",
-            json={
-                "label": "Mira's Content Generator",
-                "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
-                "focusTags": ["data-structures", "sorting"],
-            },
-            headers=second_auth,
-        )
+        body = {
+            "label": "Mira's Music Theory Assistant",
+            "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
+            "focusTags": ["music-theory", "harmony", "scales", "ear-training", "intervals"],
+        }
+        agent_resp = create_agent_for_user(second, body)
         if agent_resp.is_success:
             agent_data = agent_resp.json()
+            result.mira_agent_key = agent_data.get("apiKey")
             console.print(f"  [green]✓[/green] Created agent for Second User: [cyan]{agent_data.get('id')}[/cyan]")
-            console.print(f"    Key: {agent_data.get('secret')}")
+            console.print(f"    Key: {result.mira_agent_key}")
         else:
             console.print(f"  [yellow]Failed to create second user agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
 
@@ -687,74 +766,89 @@ def seed_second_user_content(client: httpx.Client, result: SeedResult) -> None:
     if not mira:
         console.print("  [yellow]No second user (Mira) — skipping second user content[/yellow]")
         return
-    auth = {"Authorization": f"Bearer {mira['token']}"}
 
-    # Create 5 distinct questions
-    mira_questions = []
-    for i, q in enumerate(QUESTIONS[:5]):
-        q_copy = q.copy()
-        q_copy["prompt"] = f"Mira's Question: {q['prompt']}"
-        mira_questions.append(q_copy)
-
-    resp = client.post("/v1/questions", json={"questions": mira_questions}, headers=auth)
-    if resp.status_code != 201:
-        console.print(f"  [yellow]Failed to create Mira's questions:[/yellow] {resp.text[:400]}")
-        return
-
-    created = resp.json()["questions"]
-    promoted = 0
-    for q in created:
-        r = client.post(f"/v1/questions/{q['id']}/promote", headers=auth)
-        if r.is_success:
-            promoted += 1
-
-    console.print(f"  Created and promoted {promoted} questions for Mira")
-
-    # Create and publish active assessment with those questions
-    meta = {
-        "title": "Mira's Algorithm Practice",
-        "description": "Assessment owned by Mira for testing isolation.",
-        "course": "CS 102",
-        "duration": 45,
-    }
-    body = {
-        "title": meta["title"],
-        "description": meta["description"],
-        "mode": "practice",
-        "objectives": ["algorithms"],
-        "course": meta["course"],
-        "durationMin": meta["duration"],
-        "timeLimitSeconds": None,
-        "passingPoints": None,
-        "showResultsDuring": False,
-        "affectsRating": True,
-        "method": "manual",
-    }
-    resp = client.post("/v1/assessments", json=body, headers=auth)
-    if not resp.is_success:
-        console.print(f"  [yellow]Failed to create Mira's assessment:[/yellow] {resp.text[:200]}")
-        return
-
-    assessment_id = resp.json()["id"]
-    console.print(f"  Created Mira's assessment {assessment_id[:8]}…")
-
-    added = 0
-    for q in created:
-        if client.post(
-            f"/v1/assessments/{assessment_id}/questions",
-            json={"questionId": q["id"]},
-            headers=auth,
-        ).is_success:
-            added += 1
-    console.print(f"  Linked {added}/{len(created)} questions to Mira's assessment")
-
-    pub = client.patch(
-        f"/v1/assessments/{assessment_id}",
-        json={"status": "active"},
-        headers=auth,
-    )
-    if pub.is_success:
-        console.print(f"  Published Mira's assessment")
+    # Leverage the AME agent platform tools to mint Mira's music theory data!
+    agent_key = getattr(result, "mira_agent_key", None)
+    if agent_key:
+        console.print("  [cyan]Leveraging AME platform agent tools to mint Mira's music theory content...[/cyan]")
+        headers = {"Authorization": f"Bearer {agent_key}"}
+        resp = client.post(
+            "/v1/agents/run",
+            json={
+                "tool": "assessment.create",
+                "params": {
+                    "title": "Introduction to Music Theory",
+                    "description": "Assessment owned by Mira covering fundamental concepts of intervals, scales, and harmony.",
+                    "mode": "practice",
+                    "objectives": [
+                        "Understand scale structures and relative keys",
+                        "Identify musical intervals and their inversions",
+                        "Distinguish musical textures like homophony and polyphony"
+                    ],
+                    "course": "Music Theory I",
+                    "method": "agent",
+                    "questions": MIRA_QUESTIONS
+                }
+            },
+            headers=headers
+        )
+        if resp.is_success and resp.json().get("ok"):
+            res_data = resp.json()["result"]
+            assessment_id = res_data["id"]
+            console.print(f"  [green]✓[/green] Minted Mira's assessment via agent: {assessment_id[:8]}…")
+            
+            # Publish Mira's assessment via agent assessment.update tool
+            pub_resp = client.post(
+                "/v1/agents/run",
+                json={
+                    "tool": "assessment.update",
+                    "params": {
+                        "id": assessment_id,
+                        "status": "active"
+                    }
+                },
+                headers=headers
+            )
+            if pub_resp.is_success and pub_resp.json().get("ok"):
+                console.print("  [green]✓[/green] Published Mira's assessment via agent")
+            else:
+                console.print(f"  [yellow]Failed to publish assessment via agent:[/yellow] {pub_resp.text}")
+        else:
+            console.print(f"  [yellow]Failed to mint assessment via agent:[/yellow] {resp.text}")
+    else:
+        # Fallback to direct HTTP API if agent key is somehow not available
+        console.print("  [yellow]No agent key found — falling back to direct HTTP API...[/yellow]")
+        auth = {"Authorization": f"Bearer {mira['token']}"}
+        body = {
+            "title": "Introduction to Music Theory",
+            "description": "Assessment owned by Mira covering fundamental concepts of intervals, scales, and harmony.",
+            "mode": "practice",
+            "objectives": [
+                "Understand scale structures and relative keys",
+                "Identify musical intervals and their inversions",
+                "Distinguish musical textures like homophony and polyphony"
+            ],
+            "course": "Music Theory I",
+            "method": "manual",
+        }
+        resp = client.post("/v1/assessments", json=body, headers=auth)
+        if not resp.is_success:
+            console.print(f"  [yellow]Failed to create Mira's assessment:[/yellow] {resp.text[:200]}")
+            return
+        
+        assessment_id = resp.json()["id"]
+        console.print(f"  Created Mira's assessment {assessment_id[:8]}…")
+        
+        # Create questions
+        resp_q = client.post("/v1/questions", json={"questions": MIRA_QUESTIONS}, headers=auth)
+        if resp_q.is_success:
+            created = resp_q.json()["questions"]
+            for q in created:
+                client.post(f"/v1/questions/{q['id']}/promote", headers=auth)
+                client.post(f"/v1/assessments/{assessment_id}/questions", json={"questionId": q["id"]}, headers=auth)
+                
+            client.patch(f"/v1/assessments/{assessment_id}", json={"status": "active"}, headers=auth)
+            console.print("  [green]✓[/green] Completed Mira's content via direct HTTP API fallback")
 
 
 def print_summary(result: SeedResult) -> None:
@@ -813,10 +907,10 @@ def main() -> None:
         seed_questions(client, auth, result)
         seed_assessments(client, auth, result)
         seed_exam(client, auth, result)
+        seed_agents(client, result)
         seed_second_user_content(client, result)
         seed_cohort(client, admin_auth, result)
         seed_attempts(client, result)
-        seed_agents(client, result)
 
     print_summary(result)
 
