@@ -32,7 +32,7 @@ USERS = [
     {"email": "learner@example.com", "name": "Alice Learner", "password": "password123", "role": "user"},
     {"email": "instructor@example.com", "name": "Bob Instructor", "password": "password123", "role": "user"},
     
-    {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "user"},
+    {"email": "admin@example.com", "name": "Carol Admin", "password": "password123", "role": "admin"},
 ]
 
 TAGS = [

@@ -16,7 +16,23 @@ make dev            # API on :28080, frontend on :23000
 make db-seed        # seed demo users, quizzes, questions (requires API running)
 ```
 
-Demo credentials after seeding: `learner@example.com / password123`, `instructor@example.com / password123`.
+Demo credentials after seeding: `learner@example.com / password123`, `instructor@example.com / password123`, `admin@example.com / password123` (admin).
+
+### Admin users
+
+Registration only ever grants the `user` role — there is no API path to self-register
+as an admin (`POST /v1/auth/register` rejects `role: admin`). Admins are granted
+**directly in the database**:
+
+```bash
+make db-admin                                  # create/grant admin@example.com (default)
+make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
+```
+
+`db-seed` depends on `db-admin`, so the demo admin exists before seeding runs (the
+seed needs an admin to upgrade the instructor to premium, which in turn unlocks the
+agent-creation quota used by `make db-bulk`). After being promoted, log out and back
+in — token scopes are fixed at login.
 
 Copy `.env.example` to `.env` if you need to override defaults.
 

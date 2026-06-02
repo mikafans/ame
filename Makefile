@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-seed simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -166,7 +166,18 @@ db-migrate: ## Run pending sqlx migrations
 db-shell: ## Open interactive pgcli session to local Postgres
 	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
 
-db-seed: ## Seed demo users, tags, questions, assessments, and exams (requires API running)
+db-admin: db-up ## Create/grant ADMIN_EMAIL (default admin@example.com) as admin directly in the DB
+	@until $(COMPOSE) -f db/docker-compose.yml exec -T postgres pg_isready -U postgres -d ame >/dev/null 2>&1; do sleep 1; done
+	@hash="$$(uvx --quiet --from argon2-cffi python -c \
+		"from argon2 import PasswordHasher; print(PasswordHasher().hash('$(ADMIN_PASSWORD)'))")"; \
+	$(COMPOSE) -f db/docker-compose.yml exec -T postgres \
+		psql -U postgres -d ame -v ON_ERROR_STOP=1 -c \
+		"INSERT INTO tb_users (email, display_name, role, password_hash) \
+		 VALUES ('$(ADMIN_EMAIL)', '$(ADMIN_NAME)', 'admin', '$$hash') \
+		 ON CONFLICT (email) DO UPDATE SET role = 'admin';"
+	@echo "[db-admin] $(ADMIN_EMAIL) is admin — new users log in with password '$(ADMIN_PASSWORD)'; existing accounts keep theirs."
+
+db-seed: db-admin ## Seed demo users, tags, questions, assessments, and exams (requires API running)
 	uv run scripts/seed.py --api http://localhost:$(API_PORT)
 
 db-bulk: ## Mint 10k questions and 1k exams via agent surface (requires API running)
@@ -199,6 +210,12 @@ stop: ## Stop API, frontend, and Postgres
 API_HOST ?= localhost
 API_PORT ?= 28080
 WEB_PORT ?= 23000
+
+# Admin bootstrap (db-admin): registration only grants `user`, so the admin
+# role is set out-of-band in the DB. Override ADMIN_EMAIL to promote yourself.
+ADMIN_EMAIL ?= admin@example.com
+ADMIN_NAME ?= Carol Admin
+ADMIN_PASSWORD ?= password123
 
 dev: db-up ## Kill stale processes, migrate, then start API + frontend. Override: make dev API_HOST=harus-mini
 	@fuser -k -9 $(API_PORT)/tcp $(WEB_PORT)/tcp 2>/dev/null || true
