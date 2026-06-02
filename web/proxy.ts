@@ -14,15 +14,10 @@ import { NextRequest, NextResponse } from "next/server";
 // is treated as an authenticated app route.
 const PUBLIC_PATHS = new Set(["/", "/login"]);
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasToken = req.cookies.has("ame_token");
   const isPublic = PUBLIC_PATHS.has(pathname);
-
-  // Already signed in but sitting on /login → send them into the app.
-  if (hasToken && pathname === "/login") {
-    return NextResponse.redirect(new URL("/explore", req.url));
-  }
 
   // Protected route without a token → bounce to /login, remembering where they
   // were headed so login can return them after authenticating.
