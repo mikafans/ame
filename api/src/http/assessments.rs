@@ -202,7 +202,7 @@ fn parse_mode(s: &str) -> Result<AssessmentMode, String> {
     }
 }
 
-fn parse_status(s: &str) -> Result<AssessmentStatus, String> {
+pub(super) fn parse_status(s: &str) -> Result<AssessmentStatus, String> {
     match s {
         "draft" => Ok(AssessmentStatus::Draft),
         "active" => Ok(AssessmentStatus::Active),
