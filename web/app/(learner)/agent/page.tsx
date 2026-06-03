@@ -1715,7 +1715,7 @@ function ActivityTab() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "160px 180px 1fr 80px",
+              gridTemplateColumns: "160px 240px 1fr 80px",
               px: 2.5,
               py: 1,
               borderBottom: 1,
@@ -1744,7 +1744,7 @@ function ActivityTab() {
               key={e.id}
               sx={{
                 display: "grid",
-                gridTemplateColumns: "160px 180px 1fr 80px",
+                gridTemplateColumns: "160px 240px 1fr 80px",
                 px: 2.5,
                 py: 1.5,
                 borderBottom: i < entries.length - 1 ? 1 : 0,
@@ -1759,21 +1759,25 @@ function ActivityTab() {
               >
                 {formatTime(e.ts)}
               </Typography>
-              <Typography
-                variant="caption"
-                color="text.primary"
-                sx={{
-                  fontFamily: "monospace",
-                  fontWeight: 500,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  pr: 1,
-                }}
+              <Tooltip
+                title={e.agentName || (e.agentId ? e.agentId : "System")}
               >
-                {e.agentName ||
-                  (e.agentId ? `${e.agentId.substring(0, 8)}…` : "System")}
-              </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.primary"
+                  sx={{
+                    fontFamily: "monospace",
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    pr: 1,
+                  }}
+                >
+                  {e.agentName ||
+                    (e.agentId ? `${e.agentId.substring(0, 8)}…` : "System")}
+                </Typography>
+              </Tooltip>
               <Typography
                 variant="caption"
                 color="primary.main"
