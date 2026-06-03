@@ -2,7 +2,7 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
@@ -30,6 +30,16 @@ impl ScopeConstraint for AdminScope {
 #[serde(rename_all = "camelCase")]
 pub struct ListUsersResponse {
     pub users: Vec<User>,
+    pub total: i64,
+}
+
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub struct ListUsersQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub q: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -58,12 +68,25 @@ pub struct AuditLogEntry {
 #[serde(rename_all = "camelCase")]
 pub struct ListAuditLogsResponse {
     pub logs: Vec<AuditLogEntry>,
+    pub total: i64,
+}
+
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAuditLogsQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub action: Option<String>,
+    pub actor_id: Option<Uuid>,
+    pub target_id: Option<Uuid>,
 }
 
 /// GET /v1/admin/users — list all users
 #[utoipa::path(
     get,
     path = "/v1/admin/users",
+    params(ListUsersQuery),
     responses(
         (status = 200, description = "User list successfully retrieved", body = ListUsersResponse),
         (status = 401, description = "Unauthorized"),
@@ -75,16 +98,48 @@ pub struct ListAuditLogsResponse {
 pub async fn list_users(
     State(state): State<AppState>,
     _admin: RequireScope<AdminScope>,
+    Query(query): Query<ListUsersQuery>,
 ) -> Result<Json<ListUsersResponse>, ApiError> {
-    let rows = sqlx::query(
-        "SELECT id, owner_user_id, email, display_name, role, plan, created_at
-         FROM tb_users
-         ORDER BY created_at DESC
-         LIMIT 500",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    // 1. Get total count
+    let mut count_qb = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM tb_users");
+    if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
+        let search_pat = format!("%{}%", search.trim());
+        count_qb.push(" WHERE email ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR display_name ILIKE ");
+        count_qb.push_bind(search_pat);
+    }
+    let total: i64 = count_qb
+        .build_query_as::<(i64,)>()
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .0;
+
+    // 2. Get paginated users
+    let mut users_qb = sqlx::QueryBuilder::new(
+        "SELECT id, owner_user_id, email, display_name, role, plan, created_at FROM tb_users",
+    );
+    if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
+        let search_pat = format!("%{}%", search.trim());
+        users_qb.push(" WHERE email ILIKE ");
+        users_qb.push_bind(search_pat.clone());
+        users_qb.push(" OR display_name ILIKE ");
+        users_qb.push_bind(search_pat);
+    }
+    users_qb.push(" ORDER BY created_at DESC LIMIT ");
+    users_qb.push_bind(limit);
+    users_qb.push(" OFFSET ");
+    users_qb.push_bind(offset);
+
+    let rows = users_qb
+        .build()
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     let users = rows
         .iter()
@@ -107,7 +162,7 @@ pub async fn list_users(
         })
         .collect();
 
-    Ok(Json(ListUsersResponse { users }))
+    Ok(Json(ListUsersResponse { users, total }))
 }
 
 /// PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user
@@ -256,6 +311,7 @@ pub async fn patch_user_admin(
 #[utoipa::path(
     get,
     path = "/v1/admin/audit",
+    params(ListAuditLogsQuery),
     responses(
         (status = 200, description = "Audit trail successfully retrieved", body = ListAuditLogsResponse),
         (status = 401, description = "Unauthorized"),
@@ -267,16 +323,84 @@ pub async fn patch_user_admin(
 pub async fn list_audit_logs(
     State(state): State<AppState>,
     _admin: RequireScope<AdminScope>,
+    Query(query): Query<ListAuditLogsQuery>,
 ) -> Result<Json<ListAuditLogsResponse>, ApiError> {
-    let rows = sqlx::query(
-        "SELECT id, actor_user_id, action, target_type, target_id, metadata, created_at
-         FROM tb_audit_log
-         ORDER BY created_at DESC
-         LIMIT 1000",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    // 1. Get total count
+    let mut count_qb = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM tb_audit_log");
+    let mut has_where = false;
+
+    if let Some(action) = query.action.as_deref().filter(|s| !s.trim().is_empty()) {
+        count_qb.push(" WHERE action = ");
+        count_qb.push_bind(action.trim());
+        has_where = true;
+    }
+    if let Some(actor_id) = query.actor_id {
+        if has_where {
+            count_qb.push(" AND actor_user_id = ");
+        } else {
+            count_qb.push(" WHERE actor_user_id = ");
+            has_where = true;
+        }
+        count_qb.push_bind(actor_id);
+    }
+    if let Some(target_id) = query.target_id {
+        if has_where {
+            count_qb.push(" AND target_id = ");
+        } else {
+            count_qb.push(" WHERE target_id = ");
+        }
+        count_qb.push_bind(target_id);
+    }
+
+    let total: i64 = count_qb
+        .build_query_as::<(i64,)>()
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .0;
+
+    // 2. Get paginated audit logs
+    let mut logs_qb = sqlx::QueryBuilder::new(
+        "SELECT id, actor_user_id, action, target_type, target_id, metadata, created_at FROM tb_audit_log",
+    );
+    let mut has_where = false;
+
+    if let Some(action) = query.action.as_deref().filter(|s| !s.trim().is_empty()) {
+        logs_qb.push(" WHERE action = ");
+        logs_qb.push_bind(action.trim());
+        has_where = true;
+    }
+    if let Some(actor_id) = query.actor_id {
+        if has_where {
+            logs_qb.push(" AND actor_user_id = ");
+        } else {
+            logs_qb.push(" WHERE actor_user_id = ");
+            has_where = true;
+        }
+        logs_qb.push_bind(actor_id);
+    }
+    if let Some(target_id) = query.target_id {
+        if has_where {
+            logs_qb.push(" AND target_id = ");
+        } else {
+            logs_qb.push(" WHERE target_id = ");
+        }
+        logs_qb.push_bind(target_id);
+    }
+
+    logs_qb.push(" ORDER BY created_at DESC LIMIT ");
+    logs_qb.push_bind(limit);
+    logs_qb.push(" OFFSET ");
+    logs_qb.push_bind(offset);
+
+    let rows = logs_qb
+        .build()
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     let logs = rows
         .iter()
@@ -291,7 +415,7 @@ pub async fn list_audit_logs(
         })
         .collect();
 
-    Ok(Json(ListAuditLogsResponse { logs }))
+    Ok(Json(ListAuditLogsResponse { logs, total }))
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
