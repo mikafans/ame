@@ -1,13 +1,12 @@
 "use client";
 
-// NOTE: The `(learner)` directory name is a legacy label. It hosts both learner and authoring features now.
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Box from "@mui/material/Box";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/Sidebar";
 
-export default function LearnerLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -17,12 +16,14 @@ export default function LearnerLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    console.log("LearnerLayout auth check:", { loading, hasUser: !!user });
-    if (!loading && !user) {
-      console.log("LearnerLayout redirecting to /login...");
-      window.location.href = "/login";
+    if (!loading) {
+      if (!user) {
+        window.location.href = "/login";
+      } else if (user.role !== "admin") {
+        router.push("/");
+      }
     }
-  }, [loading, user]);
+  }, [loading, user, router]);
 
   const getRouteId = () => {
     if (pathname.startsWith("/admin/users")) return "admin-users";
@@ -30,17 +31,7 @@ export default function LearnerLayout({
     if (pathname.startsWith("/admin/audit")) return "admin-audit";
     if (pathname.startsWith("/admin/health")) return "admin-health";
     if (pathname.startsWith("/admin")) return "admin-dashboard";
-    if (pathname.startsWith("/explore")) return "explore";
-    if (pathname.startsWith("/exams")) return "exams";
-    if (pathname.startsWith("/practice")) return "assessment";
-    if (pathname.startsWith("/flashcards")) return "flashcards";
-    if (pathname.startsWith("/questions")) return "questions";
-    if (pathname.startsWith("/results")) return "results";
-    if (pathname.startsWith("/progress")) return "dashboard";
-    if (pathname.startsWith("/author")) return "author";
-    if (pathname.startsWith("/grading")) return "grading";
-    if (pathname.startsWith("/agent")) return "agent";
-    return "explore";
+    return "admin-dashboard";
   };
 
   const handleRouteChange = (route: string) => {
@@ -51,7 +42,6 @@ export default function LearnerLayout({
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
       explore: "/explore",
-      exams: "/exams",
       assessment: "/practice",
       flashcards: "/flashcards",
       questions: "/questions",
@@ -61,8 +51,12 @@ export default function LearnerLayout({
       grading: "/grading",
       agent: "/agent",
     };
-    router.push(routeMap[route] || "/explore");
+    router.push(routeMap[route] || "/admin");
   };
+
+  if (loading || !user || user.role !== "admin") {
+    return null;
+  }
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>

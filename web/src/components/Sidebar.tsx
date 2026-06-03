@@ -24,6 +24,10 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { Logo } from "@/components/Logo";
@@ -54,6 +58,11 @@ const ICON_MAP: Record<string, React.ReactElement> = {
   questions: <FormatListBulletedOutlinedIcon fontSize="small" />,
   flashcards: <StyleOutlinedIcon fontSize="small" />,
   agent: <SmartToyOutlinedIcon fontSize="small" />,
+  "admin-dashboard": <ShieldOutlinedIcon fontSize="small" />,
+  "admin-users": <PeopleOutlinedIcon fontSize="small" />,
+  "admin-assessments": <AssessmentOutlinedIcon fontSize="small" />,
+  "admin-audit": <HistoryOutlinedIcon fontSize="small" />,
+  "admin-health": <MonitorHeartOutlinedIcon fontSize="small" />,
 };
 
 interface SidebarProps {
@@ -68,6 +77,42 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
   async function handleLogout() {
     await logoutContext();
   }
+
+  const adminItems =
+    user?.role === "admin"
+      ? [
+          {
+            id: "admin-dashboard",
+            label: "Admin Console",
+            icon: "admin-dashboard",
+            section: "Admin",
+          },
+          {
+            id: "admin-users",
+            label: "Manage Users",
+            icon: "admin-users",
+            section: "Admin",
+          },
+          {
+            id: "admin-assessments",
+            label: "Manage Assessments",
+            icon: "admin-assessments",
+            section: "Admin",
+          },
+          {
+            id: "admin-audit",
+            label: "Audit Logs",
+            icon: "admin-audit",
+            section: "Admin",
+          },
+          {
+            id: "admin-health",
+            label: "System Health",
+            icon: "admin-health",
+            section: "Admin",
+          },
+        ]
+      : [];
 
   const items = [
     { id: "explore", label: "Explore", icon: "explore", section: "Browse" },
@@ -103,9 +148,16 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
       icon: "agent",
       section: "Integrate",
     },
+    ...adminItems,
   ];
 
-  const sections = ["Browse", "Learn", "Manage", "Integrate"];
+  const sections = [
+    "Browse",
+    "Learn",
+    "Manage",
+    "Integrate",
+    ...(user?.role === "admin" ? ["Admin"] : []),
+  ];
   const initials =
     user?.displayName
       ?.split(" ")
