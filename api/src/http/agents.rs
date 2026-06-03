@@ -545,6 +545,9 @@ async fn run_assessment_batch_create(
     auth: &AuthenticatedUser,
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
+    use sqlx::QueryBuilder;
+    use uuid::Uuid;
+
     #[derive(Debug, Deserialize)]
     struct BatchParams {
         items: Vec<crate::domain::assessment::CreateAssessmentRequest>,
@@ -572,25 +575,310 @@ async fn run_assessment_batch_create(
         }]));
     }
 
-    let mut created = Vec::new();
+    // Validate all items upfront and collect precomputed values
+    #[derive(Debug)]
+    struct ValidatedItem {
+        title: String,
+        description: Option<String>,
+        mode: String,
+        status: String,
+        objectives: Vec<String>,
+        course: Option<String>,
+        duration_min: Option<i32>,
+        time_limit_seconds: Option<i32>,
+        passing_points: Option<i32>,
+        show_results_during: bool,
+        affects_rating: bool,
+        method: String,
+        questions: Vec<crate::domain::assessment::QuestionImport>,
+        assessment_id: Uuid,
+        section_id: Uuid,
+        total_points: i32,
+        question_count: i64,
+    }
+
+    let mut validated = Vec::new();
     for (idx, item) in batch.items.into_iter().enumerate() {
-        match super::assessments::create_assessment(auth.clone(), State(state.clone()), Json(item))
+        if item.title.trim().is_empty() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "title".into(),
+                message: format!("batch item {}: title must not be empty", idx),
+            }]));
+        }
+
+        let status = if let Some(ref s) = item.status {
+            super::assessments::parse_status(s).map_err(|e| {
+                ApiError::Validation(vec![FieldError {
+                    field: "status".into(),
+                    message: format!("batch item {}: {}", idx, e),
+                }])
+            })?;
+            s.clone()
+        } else {
+            "draft".to_string()
+        };
+
+        let question_count = item.questions.len() as i64;
+        let total_points: i32 = item.questions.iter().map(|q| q.points.unwrap_or(1)).sum();
+
+        validated.push(ValidatedItem {
+            title: item.title,
+            description: item.description,
+            mode: item.mode.to_string(),
+            status,
+            objectives: item.objectives,
+            course: item.course,
+            duration_min: item.duration_min,
+            time_limit_seconds: item.time_limit_seconds,
+            passing_points: item.passing_points,
+            show_results_during: item.show_results_during,
+            affects_rating: item.affects_rating,
+            method: item.method,
+            questions: item.questions,
+            assessment_id: Uuid::now_v7(),
+            section_id: Uuid::now_v7(),
+            total_points,
+            question_count,
+        });
+    }
+
+    // Open transaction
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let is_admin = auth.user.role == crate::domain::user::Role::Admin;
+    crate::http::db::set_rls_guc(&mut tx, auth.owner_id, is_admin).await?;
+
+    // Bulk insert assessments (15 columns)
+    {
+        let mut qb = QueryBuilder::new(
+            "INSERT INTO tb_assessments \
+             (id, title, description, mode, status, objectives, course, duration_min, \
+              time_limit_seconds, passing_points, show_results_during, affects_rating, \
+              method, created_by, total_points) ",
+        );
+
+        qb.push_values(&validated, |mut b, item| {
+            b.push_bind(item.assessment_id)
+                .push_bind(&item.title)
+                .push_bind(&item.description)
+                .push_bind(&item.mode)
+                .push_bind(&item.status)
+                .push_bind(&item.objectives)
+                .push_bind(&item.course)
+                .push_bind(item.duration_min)
+                .push_bind(item.time_limit_seconds)
+                .push_bind(item.passing_points)
+                .push_bind(item.show_results_during)
+                .push_bind(item.affects_rating)
+                .push_bind(&item.method)
+                .push_bind(auth.user.id)
+                .push_bind(item.total_points);
+        });
+
+        qb.build()
+            .execute(&mut *tx)
             .await
-        {
-            Ok((_, Json(summary))) => {
-                created.push(json!({
-                    "id": summary.id,
-                    "status": summary.status,
-                }));
-            }
-            Err(e) => {
-                return Err(ApiError::Internal(anyhow::anyhow!(
-                    "batch item {}: {}",
-                    idx,
-                    e
-                )));
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    }
+
+    // Bulk insert sections (one default section per assessment)
+    {
+        let mut qb = QueryBuilder::new(
+            "INSERT INTO tb_assessment_sections (id, assessment_id, title, order_index, weight, items_count) ",
+        );
+
+        qb.push_values(&validated, |mut b, item| {
+            b.push_bind(item.section_id)
+                .push_bind(item.assessment_id)
+                .push_bind("Main Section")
+                .push_bind(0i32)
+                .push_bind(1.0f64)
+                .push_bind(item.question_count as i32);
+        });
+
+        qb.build()
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    }
+
+    // Flatten all questions: collect (question_id, assessment_item) tuples
+    #[derive(Debug)]
+    struct QuestionRecord {
+        question_id: Uuid,
+        owner_id: Uuid,
+        kind: String,
+        prompt: String,
+        payload: serde_json::Value,
+        explanation: Option<String>,
+        points: i32,
+        created_by: Uuid,
+    }
+
+    #[derive(Debug)]
+    struct AssessmentItemRecord {
+        section_id: Uuid,
+        question_id: Uuid,
+        order_index: i32,
+    }
+
+    let mut all_questions = Vec::new();
+    let mut all_assessment_items = Vec::new();
+    let mut all_tags: std::collections::HashMap<String, Vec<Uuid>> =
+        std::collections::HashMap::new();
+
+    for validated_item in &validated {
+        for (q_idx, q) in validated_item.questions.iter().enumerate() {
+            let question_id = Uuid::now_v7();
+            all_questions.push(QuestionRecord {
+                question_id,
+                owner_id: auth.owner_id,
+                kind: q.kind.as_str().to_string(),
+                prompt: q.prompt.clone(),
+                payload: q.payload.clone(),
+                explanation: q.explanation.clone(),
+                points: q.points.unwrap_or(1),
+                created_by: auth.user.id,
+            });
+
+            all_assessment_items.push(AssessmentItemRecord {
+                section_id: validated_item.section_id,
+                question_id,
+                order_index: q_idx as i32,
+            });
+
+            // Collect tags: map tag_name -> [question_ids]
+            for tag_name in &q.tags {
+                all_tags
+                    .entry(tag_name.clone())
+                    .or_default()
+                    .push(question_id);
             }
         }
+    }
+
+    // Bulk insert questions (9 columns: id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
+    if !all_questions.is_empty() {
+        let mut qb = QueryBuilder::new(
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by) ",
+        );
+
+        qb.push_values(&all_questions, |mut b, q| {
+            b.push_bind(q.question_id)
+                .push_bind(q.owner_id)
+                .push_bind(&q.kind)
+                .push_bind(&q.prompt)
+                .push_bind(&q.payload)
+                .push_bind(&q.explanation)
+                .push_bind("live")
+                .push_bind(q.points)
+                .push_bind(q.created_by);
+        });
+
+        qb.build()
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    }
+
+    // Bulk insert assessment items
+    if !all_assessment_items.is_empty() {
+        let mut qb = QueryBuilder::new(
+            "INSERT INTO tb_assessment_items (section_id, question_id, order_index) ",
+        );
+
+        qb.push_values(&all_assessment_items, |mut b, item| {
+            b.push_bind(item.section_id)
+                .push_bind(item.question_id)
+                .push_bind(item.order_index);
+        });
+
+        qb.build()
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+    }
+
+    // Handle tags: collect all unique tag names, upsert into tb_tags, then bulk insert tb_question_tags
+    if !all_tags.is_empty() {
+        let tag_names: Vec<&String> = all_tags.keys().collect();
+
+        // Upsert tags (insert or do nothing if exists)
+        {
+            let mut qb = QueryBuilder::new("INSERT INTO tb_tags (name) ");
+            qb.push_values(&tag_names, |mut b, name| {
+                b.push_bind(name);
+            });
+            qb.push(" ON CONFLICT (name) DO NOTHING");
+
+            qb.build()
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+        }
+
+        // Fetch tag id -> name mapping
+        let tag_rows: Vec<(Uuid, String)> =
+            sqlx::query_as("SELECT id, name FROM tb_tags WHERE name = ANY($1::text[])")
+                .bind(&tag_names)
+                .fetch_all(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+        let tag_id_map: std::collections::HashMap<String, Uuid> =
+            tag_rows.into_iter().map(|(id, name)| (name, id)).collect();
+
+        // Build question_tags records
+        #[derive(Debug)]
+        struct QuestionTagRecord {
+            question_id: Uuid,
+            tag_id: Uuid,
+        }
+
+        let mut all_question_tags = Vec::new();
+        for (tag_name, question_ids) in &all_tags {
+            if let Some(&tag_id) = tag_id_map.get(tag_name) {
+                for &question_id in question_ids {
+                    all_question_tags.push(QuestionTagRecord {
+                        question_id,
+                        tag_id,
+                    });
+                }
+            }
+        }
+
+        // Bulk insert question tags with conflict handling
+        if !all_question_tags.is_empty() {
+            let mut qb = QueryBuilder::new("INSERT INTO tb_question_tags (question_id, tag_id) ");
+
+            qb.push_values(&all_question_tags, |mut b, qt| {
+                b.push_bind(qt.question_id).push_bind(qt.tag_id);
+            });
+            qb.push(" ON CONFLICT (question_id, tag_id) DO NOTHING");
+
+            qb.build()
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+        }
+    }
+
+    // Commit transaction
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    // Build response: created array in same order as input
+    let mut created = Vec::new();
+    for item in &validated {
+        created.push(json!({
+            "id": item.assessment_id,
+            "status": item.status,
+        }));
     }
 
     Ok(Json(RunResponse {
