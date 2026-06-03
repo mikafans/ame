@@ -79,6 +79,7 @@ use crate::{
         crate::http::assessments::count_assessments,
         crate::http::assessments::generate_assessment,
         crate::http::explore::explore,
+        crate::http::explore::explore_facets,
         crate::http::questions::list_questions,
         crate::http::questions::get_question,
         crate::http::questions::list_versions,
@@ -177,7 +178,10 @@ use crate::{
         AssessmentStatsResponse,
         ListAttemptsResponse,
         CohortStatsResponse,
-        QuotaPlan
+        QuotaPlan,
+        crate::http::explore::ExploreResponse,
+        crate::http::explore::ExploreFacetsResponse,
+        crate::http::explore::ExploreCounts
     )),
     info(
         title = "ame API",

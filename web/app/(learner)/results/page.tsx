@@ -17,6 +17,7 @@ import TableRow from "@mui/material/TableRow";
 import TablePagination from "@mui/material/TablePagination";
 import Paper from "@mui/material/Paper";
 import Chip from "@mui/material/Chip";
+import Skeleton from "@mui/material/Skeleton";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
@@ -46,20 +47,32 @@ export default function ResultsHistoryPage() {
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [total, setTotal] = useState(0);
 
-  const paginatedSessions = sessions.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage,
-  );
+  const paginatedSessions = sessions;
 
   useEffect(() => {
+    setLoading(true);
     api
-      .GET("/v1/sessions" as never)
+      .GET(
+        "/v1/sessions" as never,
+        {
+          params: {
+            query: {
+              limit: rowsPerPage,
+              offset: page * rowsPerPage,
+            },
+          },
+        } as never,
+      )
       .then(({ data, error }) => {
         if (error) {
-          setError("Failed to load attempt history.");
-        } else if (data && (data as any).sessions) {
-          setSessions((data as any).sessions);
+          if ((error as any).status !== 401) {
+            setError("Failed to load attempt history.");
+          }
+        } else if (data) {
+          setSessions((data as any).sessions || []);
+          setTotal((data as any).total || 0);
         }
       })
       .catch((err) => {
@@ -67,7 +80,7 @@ export default function ResultsHistoryPage() {
         setError("Could not establish connection to the API.");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, rowsPerPage]);
 
   if (loading) {
     return (
@@ -147,135 +160,168 @@ export default function ResultsHistoryPage() {
           </Button>
         </Paper>
       ) : (
-        <TableContainer
-          component={Paper}
-          variant="outlined"
-          sx={{ bgcolor: "transparent" }}
-        >
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: "action.hover" }}>
-                <TableCell sx={{ fontWeight: 600 }}>Assessment</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Mode</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Attempt</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">
-                  Score
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">
-                  Completed
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="center">
-                  Action
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedSessions.map((s) => {
-                const percentage =
-                  s.pointsAwarded != null && s.maxPoints
-                    ? (s.pointsAwarded / s.maxPoints) * 100
-                    : null;
+        <Box sx={{ overflowX: "auto", mb: 3 }}>
+          <TableContainer>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Assessment</TableCell>
+                  <TableCell>Mode</TableCell>
+                  <TableCell>Attempt</TableCell>
+                  <TableCell align="right">Score</TableCell>
+                  <TableCell align="right">Completed</TableCell>
+                  <TableCell align="center">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Skeleton variant="text" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton variant="text" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton variant="text" />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Skeleton variant="text" />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Skeleton variant="text" />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Skeleton variant="text" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  : paginatedSessions.map((s) => {
+                      const percentage =
+                        s.pointsAwarded != null && s.maxPoints
+                          ? (s.pointsAwarded / s.maxPoints) * 100
+                          : null;
 
-                const scoreColor =
-                  percentage == null
-                    ? "default"
-                    : percentage >= 80
-                      ? "success"
-                      : percentage >= 60
-                        ? "warning"
-                        : "error";
+                      const scoreColor =
+                        percentage == null
+                          ? "default"
+                          : percentage >= 80
+                            ? "success"
+                            : percentage >= 60
+                              ? "warning"
+                              : "error";
 
-                const dateStr = s.finishedAt
-                  ? formatDateTime(s.finishedAt)
-                  : "—";
+                      const dateStr = s.finishedAt
+                        ? formatDateTime(s.finishedAt)
+                        : "—";
 
-                const modeLabel = s.kind === "exam" ? "Exam" : "Practice";
-                const modeColors = tagColor(modeLabel);
+                      const modeLabel = s.kind === "exam" ? "Exam" : "Practice";
+                      const modeColors = tagColor(modeLabel);
 
-                return (
-                  <TableRow key={s.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {s.assessmentTitle || "Untitled Assessment"}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={modeLabel}
-                        size="small"
-                        variant="outlined"
-                        sx={modeColors}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="caption" color="text.secondary">
-                        {s.attemptNumber} of {s.totalAttempts}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      {s.pointsAwarded != null && s.maxPoints != null ? (
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          sx={{
-                            justifyContent: "flex-end",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {s.pointsAwarded} / {s.maxPoints} pts
-                          </Typography>
-                          <Chip
-                            label={`${Math.round(percentage || 0)}%`}
-                            size="small"
-                            color={scoreColor}
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: "0.75rem" }}
-                          />
-                        </Stack>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          {s.pointsAwarded != null
-                            ? `${s.pointsAwarded} pts`
-                            : "—"}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        sx={{
-                          justifyContent: "flex-end",
-                          alignItems: "center",
-                          color: "text.secondary",
-                        }}
-                      >
-                        <CalendarMonthOutlinedIcon sx={{ fontSize: 16 }} />
-                        <Typography variant="caption">{dateStr}</Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        endIcon={
-                          <OpenInNewOutlinedIcon sx={{ fontSize: 14 }} />
-                        }
-                        onClick={() => router.push(`/sessions/${s.id}/results`)}
-                      >
-                        Review
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      return (
+                        <TableRow key={s.id} hover>
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 500 }}
+                            >
+                              {s.assessmentTitle || "Untitled Assessment"}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={modeLabel}
+                              size="small"
+                              variant="outlined"
+                              sx={modeColors}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {s.attemptNumber} of {s.totalAttempts}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            {s.pointsAwarded != null && s.maxPoints != null ? (
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                sx={{
+                                  justifyContent: "flex-end",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 500 }}
+                                >
+                                  {s.pointsAwarded} / {s.maxPoints} pts
+                                </Typography>
+                                <Chip
+                                  label={`${Math.round(percentage || 0)}%`}
+                                  size="small"
+                                  color={scoreColor}
+                                  variant="outlined"
+                                  sx={{ height: 20, fontSize: "0.75rem" }}
+                                />
+                              </Stack>
+                            ) : (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {s.pointsAwarded != null
+                                  ? `${s.pointsAwarded} pts`
+                                  : "—"}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack
+                              direction="row"
+                              spacing={0.75}
+                              sx={{
+                                justifyContent: "flex-end",
+                                alignItems: "center",
+                                color: "text.secondary",
+                              }}
+                            >
+                              <CalendarMonthOutlinedIcon
+                                sx={{ fontSize: 16 }}
+                              />
+                              <Typography variant="caption">
+                                {dateStr}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              endIcon={
+                                <OpenInNewOutlinedIcon sx={{ fontSize: 14 }} />
+                              }
+                              onClick={() =>
+                                router.push(`/sessions/${s.id}/results`)
+                              }
+                            >
+                              Review
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+              </TableBody>
+            </Table>
+          </TableContainer>
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50]}
             component="div"
-            count={sessions.length}
+            count={total}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={(_, newPage) => setPage(newPage)}
@@ -285,7 +331,7 @@ export default function ResultsHistoryPage() {
             }}
             sx={{ borderTop: 1, borderColor: "divider" }}
           />
-        </TableContainer>
+        </Box>
       )}
     </Box>
   );

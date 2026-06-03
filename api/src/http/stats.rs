@@ -239,6 +239,12 @@ pub struct MeStatsResponse {
     pub mastered_topics: i64,
     pub mastered_topics_total: i64,
     pub mastered_topics_delta_since: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_active_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_graded_attempts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_curated_assessments: Option<i64>,
 }
 
 #[utoipa::path(
@@ -347,6 +353,31 @@ pub async fn me_stats(
     let mastered_topics: i64 = mastery_row.get("mastered");
     let mastered_topics_total: i64 = mastery_row.get("total");
 
+    // Agent metrics
+    let agent_active_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent' AND deactivated_at IS NULL"
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    let agent_graded_attempts: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tb_activity_log WHERE tool_name = 'attempt.grade' AND status = 200 AND agent_id IN (SELECT id FROM tb_users WHERE owner_user_id = $1)"
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+
+    let agent_curated_assessments: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND (created_by = $1 OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1))"
+    )
+    .bind(uid)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal)?;
+
     Ok(Json(MeStatsResponse {
         avg_score,
         avg_score_delta,
@@ -359,6 +390,9 @@ pub async fn me_stats(
         mastered_topics,
         mastered_topics_total,
         mastered_topics_delta_since: "last 4 weeks".to_string(),
+        agent_active_count: Some(agent_active_count),
+        agent_graded_attempts: Some(agent_graded_attempts),
+        agent_curated_assessments: Some(agent_curated_assessments),
     }))
 }
 

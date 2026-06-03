@@ -53,13 +53,21 @@ export function McqRenderer({
                   : "none",
               borderBottom: `1px solid ${theme.palette.divider}`,
               borderLeft: `3px solid ${selected ? theme.palette.primary.main : "transparent"}`,
-              bgcolor: selected ? "primary.50" : "background.paper",
+              bgcolor: selected
+                ? theme.palette.mode === "dark"
+                  ? "rgba(25, 118, 210, 0.16)"
+                  : "rgba(25, 118, 210, 0.08)"
+                : "background.paper",
               cursor: disabled ? "default" : "pointer",
               transition: "background-color 0.15s, border-left-color 0.15s",
               "&:hover": disabled
                 ? {}
                 : {
-                    bgcolor: selected ? "primary.50" : "action.hover",
+                    bgcolor: selected
+                      ? theme.palette.mode === "dark"
+                        ? "rgba(25, 118, 210, 0.2)"
+                        : "rgba(25, 118, 210, 0.12)"
+                      : "action.hover",
                   },
             }}
           >

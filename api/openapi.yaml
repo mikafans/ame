@@ -548,6 +548,11 @@ paths:
         required: false
         schema:
           type: string
+      - name: mode
+        in: query
+        required: false
+        schema:
+          type: string
       - name: search
         in: query
         required: false
@@ -571,6 +576,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExploreResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer_auth: []
+  /v1/explore/facets:
+    get:
+      tags:
+      - assessments
+      summary: GET /v1/explore/facets — facets for filtering.
+      operationId: explore_facets
+      responses:
+        '200':
+          description: Explore facets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreFacetsResponse'
         '401':
           description: Unauthorized
       security:
@@ -1028,20 +1050,20 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: assessmentId
+      - name: limit
         in: query
-        description: Filter by quiz (legacy)
+        description: 'Page size (default: 50)'
         required: false
         schema:
-          type: string
-          format: uuid
-      - name: examId
+          type: integer
+          format: int64
+      - name: offset
         in: query
-        description: Filter by exam (legacy)
+        description: Page offset
         required: false
         schema:
-          type: string
-          format: uuid
+          type: integer
+          format: int64
       responses:
         '200':
           description: Attempt history
@@ -1212,11 +1234,19 @@ components:
       required:
       - id
       - ts
+      - agentId
       - toolName
       - method
       - path
       - status
       properties:
+        agentId:
+          type: string
+          format: uuid
+        agentName:
+          type:
+          - string
+          - 'null'
         id:
           type: string
           format: uuid
@@ -2104,6 +2134,30 @@ components:
         count:
           type: integer
           format: int64
+    ExploreCounts:
+      type: object
+      required:
+      - practice
+      - graded
+      properties:
+        graded:
+          type: integer
+          format: int64
+        practice:
+          type: integer
+          format: int64
+    ExploreFacetsResponse:
+      type: object
+      required:
+      - tags
+      - counts
+      properties:
+        counts:
+          $ref: '#/components/schemas/ExploreCounts'
+        tags:
+          type: array
+          items:
+            type: string
     ExploreResponse:
       type: object
       required:
@@ -2344,11 +2398,15 @@ components:
       type: object
       required:
       - sessions
+      - total
       properties:
         sessions:
           type: array
           items:
             $ref: '#/components/schemas/SessionSummary'
+        total:
+          type: integer
+          format: int64
     ListQuestionsResponse:
       type: object
       required:

@@ -9,6 +9,11 @@ This project is pre-1.0; releases are not yet tagged.
 
 ### Added
 
+- UI Styling: Added sticky header and skeleton loading to Results table.
+- Sidebar: Updated branding title to "AME".
+
+### Changed
+...
 - OSS substrate: GitHub Actions CI, PR template, `CONTRIBUTING.md`, `SECURITY.md`,
   `CODE_OF_CONDUCT.md`, `.env.example`.
 - Container artifacts: API and web Dockerfiles, prod-shape `docker-compose.prod.yml`.

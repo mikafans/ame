@@ -109,14 +109,14 @@ export default function PracticePage() {
 
       <Box component="form" onSubmit={handleStart}>
         {/* Tags */}
-        <SetupBlock label="Topics" kicker="Filter by tag">
+        <SetupBlock label="Topics" kicker="Filter by topic">
           {tags === null ? (
             <Typography variant="body2" color="text.secondary">
-              Loading tags…
+              Loading topics…
             </Typography>
           ) : tags.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              No tags yet — all questions will be included.
+              No topics yet — all questions will be included.
             </Typography>
           ) : (
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>

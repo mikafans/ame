@@ -29,8 +29,10 @@ test.describe("authentication", () => {
     context,
   }) => {
     await context.clearCookies();
-    await page.goto("/");
-    await page.waitForURL("**/login", { timeout: 5000 });
+    await page.goto("/explore");
+    await page.waitForURL((url) => url.pathname === "/login", {
+      timeout: 5000,
+    });
   });
 });
 
@@ -68,7 +70,7 @@ test.describe("learner UI (seeded account)", () => {
   test("practice setup form renders", async ({ page }) => {
     await page.goto("/practice");
     await expect(page.getByText("Practice")).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText("Topics")).toBeVisible();
+    await expect(page.getByText("Topics", { exact: true })).toBeVisible();
   });
 
   test("progress page renders", async ({ page }) => {

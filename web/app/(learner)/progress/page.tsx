@@ -12,6 +12,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import ToggleButton from "@mui/material/ToggleButton";
 import { formatScore, formatDuration } from "@/utils/format";
+import { useTheme } from "@mui/material/styles";
 
 type WindowType = "4w" | "all";
 
@@ -27,6 +28,9 @@ interface StatsResponse {
   mastered_topics: number;
   mastered_topics_total: number;
   mastered_topics_delta_since: string;
+  agent_active_count?: number;
+  agent_graded_attempts?: number;
+  agent_curated_assessments?: number;
 }
 
 interface Attempt {
@@ -78,7 +82,7 @@ export default function ProgressPage() {
       api
         .GET(
           "/v1/me/attempts" as never,
-          { params: { query: { limit: 500 } } } as never,
+          { params: { query: { limit: 50 } } } as never,
         )
         .then(
           ({ data }: { data?: { attempts: Attempt[]; total: number } }) =>
@@ -183,6 +187,61 @@ export default function ProgressPage() {
         </Stack>
       ) : null}
 
+      {stats && (stats.agent_active_count ?? 0) > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              letterSpacing: 1.4,
+              textTransform: "uppercase",
+              display: "block",
+              mb: 1.5,
+            }}
+          >
+            Agent Insights
+          </Typography>
+          <Stack direction="row" spacing={2}>
+            {[
+              {
+                label: "Active agents",
+                value: String(stats.agent_active_count ?? 0),
+              },
+              {
+                label: "Agent-graded attempts",
+                value: String(stats.agent_graded_attempts ?? 0),
+              },
+              {
+                label: "Agent-curated assessments",
+                value: String(stats.agent_curated_assessments ?? 0),
+              },
+            ].map(({ label, value }) => (
+              <Card key={label} variant="outlined" sx={{ flex: 1 }}>
+                <CardContent sx={{ py: 2, "&:last-child": { pb: 2 } }}>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 600, color: "secondary.main" }}
+                  >
+                    {value}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      textTransform: "uppercase",
+                      letterSpacing: 0.8,
+                      fontSize: 10,
+                    }}
+                  >
+                    {label}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        </Box>
+      )}
+
       <Stack direction="row" spacing={2}>
         <Card variant="outlined" sx={{ flex: 1 }}>
           <CardContent>
@@ -242,6 +301,7 @@ export default function ProgressPage() {
 }
 
 function ScoreLineChart({ data }: { data: WeeklyAvg[] }) {
+  const theme = useTheme();
   const width = 600;
   const height = 180;
   const padding = 40;
@@ -263,18 +323,25 @@ function ScoreLineChart({ data }: { data: WeeklyAvg[] }) {
       <polyline
         points={points.map((p) => `${p.x},${p.y}`).join(" ")}
         fill="none"
-        stroke="#1976d2"
+        stroke={theme.palette.primary.main}
         strokeWidth={2}
       />
       {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#1976d2" opacity="0.8" />
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={3}
+          fill={theme.palette.primary.main}
+          opacity="0.8"
+        />
       ))}
       <line
         x1={padding}
         y1={padding + innerHeight}
         x2={width - padding}
         y2={padding + innerHeight}
-        stroke="#e0e0e0"
+        stroke={theme.palette.divider}
         strokeWidth={1}
       />
     </svg>

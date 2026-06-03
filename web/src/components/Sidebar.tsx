@@ -72,9 +72,7 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
   }
 
   const items = [
-    { id: "library", label: "Assessments", icon: "library", section: "Learn" },
-    { id: "explore", label: "Explore", icon: "explore", section: "Learn" },
-    { id: "exams", label: "Exams", icon: "stack", section: "Learn" },
+    { id: "explore", label: "Explore", icon: "explore", section: "Browse" },
     {
       id: "assessment",
       label: "Take assessment",
@@ -99,9 +97,8 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
       id: "author",
       label: "Author studio",
       icon: "author",
-      section: "Teach",
+      section: "Manage",
     },
-    { id: "grading", label: "Grading", icon: "grade", section: "Teach" },
     {
       id: "agent",
       label: "Agent API",
@@ -110,7 +107,7 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
     },
   ];
 
-  const sections = ["Learn", "Teach", "Integrate"];
+  const sections = ["Browse", "Learn", "Manage", "Integrate"];
   const initials =
     user?.displayName
       ?.split(" ")
@@ -141,12 +138,12 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
           color="text.secondary"
           sx={{
             letterSpacing: 1.2,
-            textTransform: "uppercase",
+            textTransform: "none",
             display: "block",
             mt: 0.5,
           }}
         >
-          ame
+          AME
         </Typography>
       </Box>
 
@@ -211,9 +208,6 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
               {displayName}
             </Typography>
           </Tooltip>
-          <Typography variant="caption" color="text.secondary">
-            {user?.role ?? ""}
-          </Typography>
         </Box>
         <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
           <IconButton size="small" onClick={toggle}>

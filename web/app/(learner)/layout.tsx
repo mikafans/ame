@@ -17,8 +17,12 @@ export default function LearnerLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [loading, user, router]);
+    console.log("LearnerLayout auth check:", { loading, hasUser: !!user });
+    if (!loading && !user) {
+      console.log("LearnerLayout redirecting to /login...");
+      window.location.href = "/login";
+    }
+  }, [loading, user]);
 
   const getRouteId = () => {
     if (pathname.startsWith("/library")) return "library";
@@ -32,7 +36,7 @@ export default function LearnerLayout({
     if (pathname.startsWith("/author")) return "author";
     if (pathname.startsWith("/grading")) return "grading";
     if (pathname.startsWith("/agent")) return "agent";
-    return "library";
+    return "explore";
   };
 
   const handleRouteChange = (route: string) => {
@@ -49,7 +53,7 @@ export default function LearnerLayout({
       grading: "/grading",
       agent: "/agent",
     };
-    router.push(routeMap[route] || "/library");
+    router.push(routeMap[route] || "/explore");
   };
 
   return (

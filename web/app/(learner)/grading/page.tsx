@@ -42,11 +42,15 @@ export default function GradingPage() {
         ? `http://${window.location.hostname}:28080`
         : "http://localhost:28080");
     fetch(`${apiUrl}/v1/attempts/pending`, { credentials: "include" })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch pending attempts");
+        return r.json();
+      })
       .then((data: PendingAttempt[]) => {
-        setAttempts(data);
+        const attemptsArray = Array.isArray(data) ? data : [];
+        setAttempts(attemptsArray);
         const initial: Record<string, GradeState> = {};
-        for (const a of data) {
+        for (const a of attemptsArray) {
           initial[a.attempt_id] = {
             score: "",
             notes: "",

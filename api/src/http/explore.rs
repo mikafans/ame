@@ -20,6 +20,7 @@ pub struct ExploreQuery {
     pub tags: Option<String>,
     #[serde(default)]
     pub kind: Option<String>,
+    pub mode: Option<String>,
     pub search: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
@@ -37,9 +38,23 @@ pub struct ExploreResponse {
     pub next_cursor: Option<String>,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExploreFacetsResponse {
+    pub tags: Vec<String>,
+    pub counts: ExploreCounts,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ExploreCounts {
+    pub practice: i64,
+    pub graded: i64,
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/explore", get(explore))
+        .route("/v1/explore/facets", get(explore_facets))
         .with_state(state)
 }
 
@@ -80,7 +95,7 @@ pub async fn explore(
     // Build dynamic query
     // Strict isolation: only view own items (including agent's)
     let mut sql = String::from(
-        "SELECT id, title, status, objectives, created_at
+        "SELECT id, title, status, mode, objectives, created_at
          FROM tb_assessments
          WHERE (created_by = $1 OR EXISTS (
              SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
@@ -94,6 +109,13 @@ pub async fn explore(
     if let Some(status) = q.kind {
         sql.push_str(&format!(" AND status = ${}", param_idx));
         args.add(status)
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+        param_idx += 1;
+    }
+
+    if let Some(mode) = q.mode {
+        sql.push_str(&format!(" AND mode = ${}", param_idx));
+        args.add(mode)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
         param_idx += 1;
     }
@@ -153,6 +175,7 @@ pub async fn explore(
                 "id": row.get::<Uuid, _>("id"),
                 "title": row.get::<String, _>("title"),
                 "status": row.get::<String, _>("status"),
+                "mode": row.get::<String, _>("mode"),
                 "tags": row.get::<Vec<String>, _>("objectives"),
                 "createdAt": created_at.format(&time::format_description::well_known::Rfc3339).unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
             })
@@ -171,4 +194,74 @@ pub async fn explore(
     };
 
     Ok(Json(ExploreResponse { items, next_cursor }))
+}
+
+/// GET /v1/explore/facets — facets for filtering.
+#[utoipa::path(
+    get,
+    path = "/v1/explore/facets",
+    responses(
+        (status = 200, description = "Explore facets", body = ExploreFacetsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "assessments"
+)]
+pub async fn explore_facets(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<ExploreFacetsResponse>, ApiError> {
+    let pool = &state.pool;
+    let uid = auth.owner_id;
+
+    // 1. Get counts grouped by mode
+    let count_rows = sqlx::query(
+        "SELECT mode, count(*) as cnt
+         FROM tb_assessments
+         WHERE (created_by = $1 OR EXISTS (
+             SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
+         ))
+         GROUP BY mode",
+    )
+    .bind(uid)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let mut practice = 0;
+    let mut graded = 0;
+    for row in count_rows {
+        let mode = row.get::<String, _>("mode");
+        let cnt = row.get::<i64, _>("cnt");
+        if mode == "practice" {
+            practice = cnt;
+        } else if mode == "graded" {
+            graded = cnt;
+        }
+    }
+
+    // 2. Get distinct tags (objectives) capped at 200
+    let tag_rows = sqlx::query(
+        "SELECT DISTINCT unnest(objectives) AS t
+         FROM tb_assessments
+         WHERE (created_by = $1 OR EXISTS (
+             SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
+         ))
+         ORDER BY t
+         LIMIT 200",
+    )
+    .bind(uid)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let tags: Vec<String> = tag_rows
+        .iter()
+        .map(|row| row.get::<String, _>("t"))
+        .collect();
+
+    Ok(Json(ExploreFacetsResponse {
+        tags,
+        counts: ExploreCounts { practice, graded },
+    }))
 }
