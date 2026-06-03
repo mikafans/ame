@@ -155,8 +155,8 @@ export default function ResultsHistoryPage() {
             It looks like you haven't taken any quizzes or exams yet. Once you
             complete an assessment, your scores and logs will show up here.
           </Typography>
-          <Button variant="contained" onClick={() => router.push("/library")}>
-            Go to Assessments
+          <Button variant="contained" onClick={() => router.push("/explore")}>
+            Go to Explore
           </Button>
         </Paper>
       ) : (

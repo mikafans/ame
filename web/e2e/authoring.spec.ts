@@ -29,7 +29,7 @@ test.describe("authoring navigation (all authenticated users)", () => {
   });
 
   test("Agent API appears in sidebar nav", async ({ page }) => {
-    await page.goto("/library");
+    await page.goto("/explore");
     await page.waitForLoadState("networkidle");
     await expect(page.getByText("Agent API")).toBeVisible({ timeout: 8000 });
   });

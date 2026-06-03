@@ -29,7 +29,7 @@ test("agent-authored assessment renders and is answerable in the UI", async ({
     `assessment '${QUIZ_TITLE}' not found via API`,
   ).toBeTruthy();
 
-  // Start a session the same way the library "Start" button does
+  // Start a session the same way the explore "Start" button does
   const started = await request.post(`${API_URL}/v1/sessions`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { assessmentId: assessment!.id },
@@ -38,8 +38,8 @@ test("agent-authored assessment renders and is answerable in the UI", async ({
 
   await setAuthCookie(page, token);
 
-  // 1. The assessment appears in the learner library
-  await page.goto("/library");
+  // 1. The assessment appears in the learner explore
+  await page.goto("/explore");
   await page.waitForLoadState("networkidle");
   await expect(page.getByText(QUIZ_TITLE).first()).toBeVisible({
     timeout: 10000,
