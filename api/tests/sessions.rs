@@ -59,7 +59,11 @@ async fn serve(pool: PgPool) -> String {
 static TEST_OWNER_ID: Uuid = uuid::uuid!("00000000-0000-0000-0000-000000000001");
 
 async fn ensure_test_owner(pool: &PgPool) {
-    let _ = sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, 'Test Owner', 'test-owner@example.com', 'user') ON CONFLICT DO NOTHING")
+    let _ = sqlx::query("INSERT INTO tb_users (id, display_name, email, role, plan) VALUES ($1, 'Test Owner', 'test-owner@example.com', 'user', 'premium') ON CONFLICT DO NOTHING")
+        .bind(TEST_OWNER_ID)
+        .execute(pool)
+        .await;
+    let _ = sqlx::query("UPDATE tb_users SET plan = 'premium' WHERE id = $1")
         .bind(TEST_OWNER_ID)
         .execute(pool)
         .await;

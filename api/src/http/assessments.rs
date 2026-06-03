@@ -371,6 +371,27 @@ pub async fn create_assessment(
         payload.questions.len(),
         status
     );
+    crate::http::quota::check_quota(
+        &state.pool,
+        &state.config,
+        user.owner_id,
+        crate::http::quota::QuotaKind::Assessment,
+        1,
+    )
+    .await?;
+
+    let question_count = payload.questions.len() as i64;
+    if question_count > 0 {
+        crate::http::quota::check_quota(
+            &state.pool,
+            &state.config,
+            user.owner_id,
+            crate::http::quota::QuotaKind::Question,
+            question_count,
+        )
+        .await?;
+    }
+
     let mut tx = state
         .pool
         .begin()
@@ -763,7 +784,7 @@ pub async fn delete_assessment(
     tag = "assessments"
 )]
 pub async fn add_assessment_question(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     mut db: DbConn,
     auth: AuthenticatedUser,
     Path(assessment_id): Path<Uuid>,
@@ -828,6 +849,15 @@ pub async fn add_assessment_question(
         })?;
         let prompt = body.prompt.unwrap_or_default();
         let default_payload = default_payload_for_kind(kind);
+
+        crate::http::quota::check_quota(
+            &state.pool,
+            &state.config,
+            auth.owner_id,
+            crate::http::quota::QuotaKind::Question,
+            1,
+        )
+        .await?;
 
         sqlx::query_scalar(
             "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by)

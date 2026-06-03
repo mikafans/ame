@@ -325,10 +325,11 @@ pub async fn create_questions(
         .map_err(internal)?;
 
         for tag_name in q.tags {
+            let normalized = crate::bank::tags::normalize_tag(&tag_name);
             let tag_id: Uuid = sqlx::query_scalar(
                 "INSERT INTO tb_tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"
             )
-            .bind(&tag_name)
+            .bind(&normalized)
             .fetch_one(&mut *tx)
             .await
             .map_err(internal)?;
@@ -452,10 +453,11 @@ pub async fn update_question(
             .await
             .map_err(internal)?;
         for tag_name in tags {
+            let normalized = crate::bank::tags::normalize_tag(tag_name);
             let tag_id: Uuid = sqlx::query_scalar(
                 "INSERT INTO tb_tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"
             )
-            .bind(tag_name)
+            .bind(&normalized)
             .fetch_one(&mut *tx)
             .await
             .map_err(internal)?;

@@ -12,9 +12,11 @@ pub enum Plan {
     Premium,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuotaKind {
     AgentCreation,
+    Assessment,
+    Question,
 }
 
 pub async fn resolve_plan(pool: &PgPool, owner_id: Uuid) -> Result<Plan, ApiError> {
@@ -55,31 +57,64 @@ pub fn plan_scope_ceiling(plan: Plan) -> Vec<Scope> {
         ],
     }
 }
+
 /// Checks if the owner has quota available for the given kind of action.
-pub async fn check_quota(pool: &PgPool, owner_id: Uuid, kind: QuotaKind) -> Result<(), ApiError> {
+pub async fn check_quota(
+    pool: &PgPool,
+    config: &crate::config::Config,
+    owner_id: Uuid,
+    kind: QuotaKind,
+    add_count: i64,
+) -> Result<(), ApiError> {
     // 1. Resolve owner plan
     let plan = resolve_plan(pool, owner_id).await?;
 
-    // 2. Define quota limits
+    // 2. Define quota limits from config
     let limit = match (plan, kind) {
-        (Plan::Premium, QuotaKind::AgentCreation) => 100,
-        (Plan::Free, QuotaKind::AgentCreation) => 1,
+        (Plan::Premium, QuotaKind::AgentCreation) => config.quota.agents.premium,
+        (Plan::Free, QuotaKind::AgentCreation) => config.quota.agents.free,
+        (Plan::Premium, QuotaKind::Assessment) => config.quota.assessments.premium,
+        (Plan::Free, QuotaKind::Assessment) => config.quota.assessments.free,
+        (Plan::Premium, QuotaKind::Question) => config.quota.questions.premium,
+        (Plan::Free, QuotaKind::Question) => config.quota.questions.free,
     };
 
     // 3. Count current usage
+    let mut conn = pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    crate::http::db::set_rls_guc(&mut conn, owner_id, false).await?;
+
     let usage: i64 = match kind {
         QuotaKind::AgentCreation => sqlx::query_scalar(
             "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent'",
         )
         .bind(owner_id)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?,
+        QuotaKind::Assessment => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM tb_assessments WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)",
+        )
+        .bind(owner_id)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?,
+        QuotaKind::Question => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM tb_questions WHERE owner_id = $1",
+        )
+        .bind(owner_id)
+        .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?,
     };
 
-    if usage >= limit {
+    if usage + add_count > limit {
         let kind_str = match kind {
             QuotaKind::AgentCreation => "agent_creation",
+            QuotaKind::Assessment => "assessment",
+            QuotaKind::Question => "question",
         };
         return Err(ApiError::QuotaExceeded {
             kind: kind_str.to_string(),

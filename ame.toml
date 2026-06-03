@@ -30,3 +30,15 @@ write = 5
 [batch]
 free = 50
 premium = 500
+
+[quota.agents]
+free = 1
+premium = 100
+
+[quota.assessments]
+free = 50
+premium = 5000
+
+[quota.questions]
+free = 50
+premium = 5000

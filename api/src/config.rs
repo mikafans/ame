@@ -51,9 +51,23 @@ pub struct BatchConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct TierQuotaConfig {
+    pub free: i64,
+    pub premium: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct QuotaConfig {
+    pub agents: TierQuotaConfig,
+    pub assessments: TierQuotaConfig,
+    pub questions: TierQuotaConfig,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
     pub ratelimit: RateLimitConfig,
+    pub quota: QuotaConfig,
     pub batch: BatchConfig,
 }
 
