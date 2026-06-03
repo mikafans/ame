@@ -49,6 +49,8 @@ spec:
                 secretKeyRef:
                   name: ame-secrets
                   key: AME_AGENT_ACCESS_CODE
+            - name: AME_VALKEY_URL
+              value: redis://ame-valkey:6379
           envFrom:
             - configMapRef:
                 name: ame-config
