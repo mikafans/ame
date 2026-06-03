@@ -9,6 +9,8 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
 import { api } from "@/api/client";
 import { FlashcardReview } from "@/components/flashcards/FlashcardReview";
 import { buildDeck, filterByTypes, type FlashQuestion } from "@/lib/flashcards";
@@ -33,7 +35,7 @@ export default function FlashcardsPage() {
   const [phase, setPhase] = useState<Phase>("setup");
 
   const [tags, setTags] = useState<TagItem[] | null>(null);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [deckSize, setDeckSize] = useState(10);
 
@@ -76,20 +78,43 @@ export default function FlashcardsPage() {
     setNote(null);
     setLoading(true);
     try {
-      const params: Record<string, string | number> = {
-        status: "live",
-        limit: 200,
-      };
-      if (selectedTag) params.tag = selectedTag;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error: apiErr } = await (api as any).GET("/v1/questions", {
-        params: { query: params },
-      });
-      if (apiErr) {
-        setError("Could not load questions.");
-        return;
+      let all: FlashQuestion[] = [];
+      if (selectedTags.length > 0) {
+        // Query for each selected tag concurrently
+        const queries = selectedTags.map(async (tag) => {
+          const { data } = await (api as any).GET("/v1/questions", {
+            params: {
+              query: {
+                status: "live",
+                limit: 200,
+                tag,
+              },
+            },
+          });
+          return ((data?.questions ?? []) as FlashQuestion[]) ?? [];
+        });
+        const results = await Promise.all(queries);
+        const seen = new Set<string>();
+        for (const list of results) {
+          for (const q of list) {
+            if (!seen.has(q.id)) {
+              seen.add(q.id);
+              all.push(q);
+            }
+          }
+        }
+      } else {
+        const { data } = await (api as any).GET("/v1/questions", {
+          params: {
+            query: {
+              status: "live",
+              limit: 200,
+            },
+          },
+        });
+        all = ((data?.questions ?? []) as FlashQuestion[]) ?? [];
       }
-      const all = ((data?.questions ?? []) as FlashQuestion[]) ?? [];
+
       const filtered = filterByTypes(all, selectedTypes);
       if (filtered.length === 0) {
         setError("No live questions match those filters.");
@@ -161,39 +186,52 @@ export default function FlashcardsPage() {
   // ---- Setup phase ----
   if (phase === "setup") {
     return (
-      <Box sx={{ p: "28px 36px 56px", maxWidth: 640 }}>
+      <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 640 }}>
         <Kicker>Flashcards</Kicker>
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
           Review deck
         </Typography>
 
-        <SetupBlock label="Topic" kicker="Filter by topic (optional)">
+        <SetupBlock label="Topics" kicker="Filter by topics (optional)">
           {tags === null ? (
             <Typography variant="body2" color="text.secondary">
               Loading topics…
             </Typography>
           ) : (
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-              <Chip
-                label="All topics"
-                size="small"
-                onClick={() => setSelectedTag(null)}
-                color={selectedTag === null ? "primary" : "default"}
-                variant={selectedTag === null ? "filled" : "outlined"}
-                sx={{ cursor: "pointer" }}
-              />
-              {tags.map((t) => (
-                <Chip
-                  key={t.name}
-                  label={t.name}
+            <Autocomplete
+              multiple
+              id="topics-autocomplete"
+              options={tags}
+              getOptionLabel={(option) => option.name}
+              value={tags.filter((t) => selectedTags.includes(t.name))}
+              onChange={(event, newValue) => {
+                setSelectedTags(newValue.map((t) => t.name));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={
+                    selectedTags.length === 0 ? "Select topics..." : ""
+                  }
                   size="small"
-                  onClick={() => setSelectedTag(t.name)}
-                  color={selectedTag === t.name ? "primary" : "default"}
-                  variant={selectedTag === t.name ? "filled" : "outlined"}
-                  sx={{ cursor: "pointer" }}
                 />
-              ))}
-            </Stack>
+              )}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => {
+                  const { key, ...tagProps } = getTagProps({ index });
+                  return (
+                    <Chip
+                      key={key}
+                      label={option.name}
+                      size="small"
+                      color="primary"
+                      {...tagProps}
+                    />
+                  );
+                })
+              }
+              sx={{ bgcolor: "background.paper", borderRadius: 1 }}
+            />
           )}
         </SetupBlock>
 
@@ -203,7 +241,7 @@ export default function FlashcardsPage() {
               <Chip
                 key={qt.value}
                 label={qt.label}
-                size="small"
+                size="medium"
                 onClick={() => toggleType(qt.value)}
                 color={selectedTypes.includes(qt.value) ? "primary" : "default"}
                 variant={
@@ -221,7 +259,7 @@ export default function FlashcardsPage() {
               <Chip
                 key={n}
                 label={n}
-                size="small"
+                size="medium"
                 onClick={() => setDeckSize(n)}
                 color={deckSize === n ? "primary" : "default"}
                 variant={deckSize === n ? "filled" : "outlined"}
@@ -252,7 +290,7 @@ export default function FlashcardsPage() {
   // ---- Review phase ----
   if (phase === "review") {
     return (
-      <Box sx={{ p: "28px 36px 56px" }}>
+      <Box sx={{ pt: 5, px: 5, pb: 8 }}>
         {note && (
           <Alert severity="info" sx={{ mb: 2, maxWidth: 680 }}>
             {note}
@@ -272,7 +310,7 @@ export default function FlashcardsPage() {
 
   // ---- Summary phase ----
   return (
-    <Box sx={{ p: "28px 36px 56px", maxWidth: 640 }}>
+    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 640 }}>
       <Kicker>Deck complete</Kicker>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
         You knew {knewCount} of {knewCount + missed.length}

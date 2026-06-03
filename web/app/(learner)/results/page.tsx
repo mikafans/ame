@@ -24,6 +24,8 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import { tagColor } from "@/lib/tagColor";
+import { useColorMode } from "@/components/ThemeRegistry";
+import { PageShell } from "@/components/PageShell";
 
 interface SessionSummary {
   id: string;
@@ -41,6 +43,8 @@ interface SessionSummary {
 
 export default function ResultsHistoryPage() {
   const router = useRouter();
+  const { mode: colorMode } = useColorMode();
+  const isDark = colorMode === "dark";
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -98,16 +102,11 @@ export default function ResultsHistoryPage() {
   }
 
   return (
-    <Box sx={{ p: "32px 40px", maxWidth: 1100 }}>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 500, mb: 1 }}>
-          Attempt History
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Review your recent practice sessions, quiz attempts, and exam results.
-        </Typography>
-      </Box>
+    <PageShell
+      kicker="History"
+      title="Attempt History"
+      subtitle="Review your recent practice sessions, quiz attempts, and exam results."
+    >
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -217,7 +216,7 @@ export default function ResultsHistoryPage() {
                         : "—";
 
                       const modeLabel = s.kind === "exam" ? "Exam" : "Practice";
-                      const modeColors = tagColor(modeLabel);
+                      const modeColors = tagColor(modeLabel, isDark);
 
                       return (
                         <TableRow key={s.id} hover>
@@ -333,6 +332,6 @@ export default function ResultsHistoryPage() {
           />
         </Box>
       )}
-    </Box>
+    </PageShell>
   );
 }

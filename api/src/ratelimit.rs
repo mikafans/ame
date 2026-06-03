@@ -209,6 +209,7 @@ pub async fn rate_limit_middleware(
     {
         Ok(next.run(req).await)
     } else {
+        metrics::counter!("ratelimit_rejection_total").increment(1);
         Err(crate::domain::error::ApiError::TooManyRequests)
     }
 }

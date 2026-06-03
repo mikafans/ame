@@ -159,3 +159,27 @@ Storing backups on a PVC is simple but carries risk if the underlying storage no
    ```
 4. **Clean up Local Storage**:
    You can either keep the local backup directory as a secondary cache or remove the local volume mounting entirely.
+
+---
+
+## 6. Business Metrics & Observability
+
+The AME API exposes key business metrics on `/metrics` under the standard Prometheus format.
+
+### Exposed Metrics
+
+| Metric Name | Type | Labels | Description |
+|---|---|---|---|
+| `signup_total` | Counter | None | Total number of successful user registrations |
+| `login_total` | Counter | `result` (`success` / `failure`) | Total authenticated login attempts |
+| `session_start_total` | Counter | None | Total number of practice/graded sessions started |
+| `session_submit_total` | Counter | None | Total number of completed sessions submitted |
+| `grader_latency_seconds` | Histogram | None | Latency of automatic grading evaluations |
+| `quota_rejection_total` | Counter | `kind` (`agent_creation` / `assessment` / `question`) | Rejections due to quota limit enforcement |
+| `ratelimit_rejection_total` | Counter | None | Requests blocked by the rate limiter middleware |
+
+### Scraping
+The `ame-api` Pod is annotated for automatic Prometheus scraping:
+- `prometheus.io/scrape: "true"`
+- `prometheus.io/port: "8080"`
+- `prometheus.io/path: "/metrics"`

@@ -55,9 +55,13 @@ pub struct PatchUserAdminBody {
 pub struct AuditLogEntry {
     pub id: Uuid,
     pub actor_user_id: Option<Uuid>,
+    pub actor_email: Option<String>,
+    pub actor_name: Option<String>,
     pub action: String,
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,
+    pub target_email: Option<String>,
+    pub target_name: Option<String>,
     pub metadata: serde_json::Value,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
@@ -134,16 +138,16 @@ pub async fn list_users(
 
     // 2. Get paginated users
     let mut users_qb = sqlx::QueryBuilder::new(
-        "SELECT id, owner_user_id, email, display_name, role, plan, created_at, deactivated_at FROM tb_users",
+        "SELECT u.id, u.owner_user_id, u.email, u.display_name, u.role, COALESCE(o.plan, u.plan) as plan, u.created_at, u.deactivated_at FROM tb_users u LEFT JOIN tb_users o ON u.owner_user_id = o.id",
     );
     if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
         let search_pat = format!("%{}%", search.trim());
-        users_qb.push(" WHERE email ILIKE ");
+        users_qb.push(" WHERE u.email ILIKE ");
         users_qb.push_bind(search_pat.clone());
-        users_qb.push(" OR display_name ILIKE ");
+        users_qb.push(" OR u.display_name ILIKE ");
         users_qb.push_bind(search_pat);
     }
-    users_qb.push(" ORDER BY created_at DESC LIMIT ");
+    users_qb.push(" ORDER BY u.created_at DESC, u.id DESC LIMIT ");
     users_qb.push_bind(limit);
     users_qb.push(" OFFSET ");
     users_qb.push_bind(offset);
@@ -449,34 +453,39 @@ pub async fn list_audit_logs(
 
     // 2. Get paginated audit logs
     let mut logs_qb = sqlx::QueryBuilder::new(
-        "SELECT id, actor_user_id, action, target_type, target_id, metadata, created_at FROM tb_audit_log",
+        "SELECT a.id, a.actor_user_id, u_actor.email as actor_email, u_actor.display_name as actor_name, \
+                a.action, a.target_type, a.target_id, u_target.email as target_email, u_target.display_name as target_name, \
+                a.metadata, a.created_at \
+         FROM tb_audit_log a \
+         LEFT JOIN tb_users u_actor ON a.actor_user_id = u_actor.id \
+         LEFT JOIN tb_users u_target ON (a.target_type = 'user' AND a.target_id = u_target.id)",
     );
     let mut has_where = false;
 
     if let Some(action) = query.action.as_deref().filter(|s| !s.trim().is_empty()) {
-        logs_qb.push(" WHERE action = ");
+        logs_qb.push(" WHERE a.action = ");
         logs_qb.push_bind(action.trim());
         has_where = true;
     }
     if let Some(actor_id) = query.actor_id {
         if has_where {
-            logs_qb.push(" AND actor_user_id = ");
+            logs_qb.push(" AND a.actor_user_id = ");
         } else {
-            logs_qb.push(" WHERE actor_user_id = ");
+            logs_qb.push(" WHERE a.actor_user_id = ");
             has_where = true;
         }
         logs_qb.push_bind(actor_id);
     }
     if let Some(target_id) = query.target_id {
         if has_where {
-            logs_qb.push(" AND target_id = ");
+            logs_qb.push(" AND a.target_id = ");
         } else {
-            logs_qb.push(" WHERE target_id = ");
+            logs_qb.push(" WHERE a.target_id = ");
         }
         logs_qb.push_bind(target_id);
     }
 
-    logs_qb.push(" ORDER BY created_at DESC LIMIT ");
+    logs_qb.push(" ORDER BY a.created_at DESC, a.id DESC LIMIT ");
     logs_qb.push_bind(limit);
     logs_qb.push(" OFFSET ");
     logs_qb.push_bind(offset);
@@ -488,13 +497,17 @@ pub async fn list_audit_logs(
         .map_err(|e| ApiError::Internal(e.into()))?;
 
     let logs = rows
-        .iter()
+        .into_iter()
         .map(|r| AuditLogEntry {
             id: r.get("id"),
             actor_user_id: r.get("actor_user_id"),
+            actor_email: r.get("actor_email"),
+            actor_name: r.get("actor_name"),
             action: r.get("action"),
             target_type: r.get("target_type"),
             target_id: r.get("target_id"),
+            target_email: r.get("target_email"),
+            target_name: r.get("target_name"),
             metadata: r.get("metadata"),
             created_at: r.get("created_at"),
         })
@@ -667,8 +680,12 @@ pub async fn list_assessments_admin(
         count_qb.push(" OR a.description ILIKE ");
         count_qb.push_bind(search_pat.clone());
         count_qb.push(" OR u.email ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR u.display_name ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = u.owner_user_id AND ow.email ILIKE ");
         count_qb.push_bind(search_pat);
-        count_qb.push(")");
+        count_qb.push("))");
         has_where = true;
     }
 
@@ -699,7 +716,9 @@ pub async fn list_assessments_admin(
         .0;
 
     let mut qb = sqlx::QueryBuilder::new(
-        "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by, u.email as created_by_email, a.objectives, a.created_at, a.deleted_at
+        "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by,
+                COALESCE(u.email, (SELECT email FROM tb_users WHERE id = u.owner_user_id), u.display_name) as created_by_email,
+                a.objectives, a.created_at, a.deleted_at
          FROM tb_assessments a
          LEFT JOIN tb_users u ON a.created_by = u.id"
     );
@@ -713,8 +732,12 @@ pub async fn list_assessments_admin(
         qb.push(" OR a.description ILIKE ");
         qb.push_bind(search_pat.clone());
         qb.push(" OR u.email ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR u.display_name ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = u.owner_user_id AND ow.email ILIKE ");
         qb.push_bind(search_pat);
-        qb.push(")");
+        qb.push("))");
         has_where = true;
     }
 
@@ -737,7 +760,7 @@ pub async fn list_assessments_admin(
         qb.push_bind(status);
     }
 
-    qb.push(" ORDER BY a.created_at DESC LIMIT ");
+    qb.push(" ORDER BY a.created_at DESC, a.id DESC LIMIT ");
     qb.push_bind(limit);
     qb.push(" OFFSET ");
     qb.push_bind(offset);

@@ -20,6 +20,7 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { PageShell } from "@/components/PageShell";
 
 interface Assessment {
   id: string;
@@ -113,31 +114,10 @@ export default function AuthorIndexPage() {
   }
 
   return (
-    <Box sx={{ p: "28px 36px 56px", maxWidth: 720 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          fontFamily: "monospace",
-          letterSpacing: 1.3,
-          textTransform: "uppercase",
-          display: "block",
-          mb: 0.75,
-        }}
-      >
-        Teach
-      </Typography>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 400 }}>
-          Author studio
-        </Typography>
+    <PageShell
+      kicker="Teach"
+      title="Author studio"
+      action={
         <Button
           variant="contained"
           startIcon={<AddOutlinedIcon />}
@@ -146,7 +126,8 @@ export default function AuthorIndexPage() {
         >
           {creating ? "Creating…" : "New assessment"}
         </Button>
-      </Box>
+      }
+    >
 
       {drafts === null ? (
         <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
@@ -256,6 +237,6 @@ export default function AuthorIndexPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </PageShell>
   );
 }

@@ -138,6 +138,7 @@ pub fn answer_session(
         })
         .unwrap_or_default();
 
+    let start_time = std::time::Instant::now();
     let grade = grade_response(
         input.question.kind,
         &input.question.payload,
@@ -146,6 +147,8 @@ pub fn answer_session(
         input.question.max_points,
     )
     .map_err(map_grade_error)?;
+    let latency = start_time.elapsed().as_secs_f64();
+    metrics::histogram!("grader_latency_seconds").record(latency);
 
     let score_fraction = if grade.max == 0 {
         0.0

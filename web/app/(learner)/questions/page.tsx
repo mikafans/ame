@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { tagColor } from "@/lib/tagColor";
+import { useColorMode } from "@/components/ThemeRegistry";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -30,6 +31,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import { PageShell } from "@/components/PageShell";
 
 interface Question {
   id: string;
@@ -72,6 +74,8 @@ const KIND_LABELS: Record<string, string> = {
 
 export default function QuestionsPage() {
   const { user } = useAuth();
+  const { mode: colorMode } = useColorMode();
+  const isDark = colorMode === "dark";
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [kind, setKind] = useState("all");
@@ -210,10 +214,11 @@ export default function QuestionsPage() {
   const endRow = Math.min(page * pageSize, total);
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h5" sx={{ fontWeight: 500, mb: 3 }}>
-        Question Bank
-      </Typography>
+    <PageShell
+      kicker="Library"
+      title="Question Bank"
+      subtitle="Browse, search, and review all questions in your organization"
+    >
 
       {/* Filters toolbar */}
       <Stack
@@ -324,7 +329,7 @@ export default function QuestionsPage() {
                       label={KIND_LABELS[q.kind] || q.kind}
                       size="small"
                       variant="outlined"
-                      sx={tagColor(q.kind)}
+                      sx={tagColor(q.kind, isDark)}
                     />
                   </TableCell>
                   <TableCell>
@@ -355,7 +360,7 @@ export default function QuestionsPage() {
                           label={tag}
                           size="small"
                           variant="outlined"
-                          sx={tagColor(tag)}
+                          sx={tagColor(tag, isDark)}
                         />
                       ))}
                       {q.tags.length > 3 && (
@@ -432,7 +437,7 @@ export default function QuestionsPage() {
                 label={KIND_LABELS[previewRow.kind] || previewRow.kind}
                 size="small"
                 variant="outlined"
-                sx={tagColor(previewRow.kind)}
+                sx={tagColor(previewRow.kind, isDark)}
               />
               <Typography variant="body2" color="text.secondary">
                 {previewRow.points} pt{previewRow.points === 1 ? "" : "s"} ·{" "}
@@ -481,7 +486,7 @@ export default function QuestionsPage() {
                           label={tag}
                           size="small"
                           variant="outlined"
-                          sx={tagColor(tag)}
+                          sx={tagColor(tag, isDark)}
                         />
                       ))}
                     </Box>
@@ -492,7 +497,7 @@ export default function QuestionsPage() {
           </>
         )}
       </Dialog>
-    </Box>
+    </PageShell>
   );
 }
 

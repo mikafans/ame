@@ -40,6 +40,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 utoipa = { version = "5", features = ["uuid", "time", "yaml"] }
 serde_yaml = "0.9"
 axum-prometheus = "0.10.0"
+metrics = "0.24"
 base64 = "0.22.1"
 toml = "0.8"
 deadpool-redis = "0.18"

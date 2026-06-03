@@ -12,6 +12,8 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
 
 interface TagItem {
   name: string;
@@ -89,7 +91,7 @@ export default function PracticePage() {
   }
 
   return (
-    <Box sx={{ p: "28px 36px 56px", maxWidth: 640 }}>
+    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 640 }}>
       <Typography
         variant="caption"
         color="text.secondary"
@@ -119,21 +121,40 @@ export default function PracticePage() {
               No topics yet — all questions will be included.
             </Typography>
           ) : (
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-              {tags.map((t) => (
-                <Chip
-                  key={t.name}
-                  label={t.name}
-                  size="small"
-                  onClick={() => toggleTag(t.name)}
-                  color={selectedTags.includes(t.name) ? "primary" : "default"}
-                  variant={
-                    selectedTags.includes(t.name) ? "filled" : "outlined"
+            <Autocomplete
+              multiple
+              id="topics-autocomplete"
+              options={tags}
+              getOptionLabel={(option) => option.name}
+              value={tags.filter((t) => selectedTags.includes(t.name))}
+              onChange={(event, newValue) => {
+                setSelectedTags(newValue.map((t) => t.name));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder={
+                    selectedTags.length === 0 ? "Select topics..." : ""
                   }
-                  sx={{ cursor: "pointer" }}
+                  size="small"
                 />
-              ))}
-            </Stack>
+              )}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => {
+                  const { key, ...tagProps } = getTagProps({ index });
+                  return (
+                    <Chip
+                      key={key}
+                      label={option.name}
+                      size="small"
+                      color="primary"
+                      {...tagProps}
+                    />
+                  );
+                })
+              }
+              sx={{ bgcolor: "background.paper", borderRadius: 1 }}
+            />
           )}
         </SetupBlock>
 
@@ -148,7 +169,7 @@ export default function PracticePage() {
               <Chip
                 key={qt.value}
                 label={qt.label}
-                size="small"
+                size="medium"
                 onClick={() => toggleType(qt.value)}
                 color={selectedTypes.includes(qt.value) ? "primary" : "default"}
                 variant={
@@ -167,7 +188,7 @@ export default function PracticePage() {
               <Chip
                 key={n}
                 label={n}
-                size="small"
+                size="medium"
                 onClick={() => setCount(n)}
                 color={count === n ? "primary" : "default"}
                 variant={count === n ? "filled" : "outlined"}
@@ -207,7 +228,7 @@ export default function PracticePage() {
               <Chip
                 key={n}
                 label={`${n}m`}
-                size="small"
+                size="medium"
                 onClick={() => setDuration(duration === n ? "" : n)}
                 color={duration === n ? "primary" : "default"}
                 variant={duration === n ? "filled" : "outlined"}
@@ -216,7 +237,7 @@ export default function PracticePage() {
             ))}
             <Chip
               label="No limit"
-              size="small"
+              size="medium"
               onClick={() => setDuration("")}
               color={duration === "" ? "primary" : "default"}
               variant={duration === "" ? "filled" : "outlined"}

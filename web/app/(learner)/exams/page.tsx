@@ -16,6 +16,7 @@ import TextField from "@mui/material/TextField";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
+import { useColorMode } from "@/components/ThemeRegistry";
 import { LearningObjectives } from "@/components/LearningObjectives";
 import { tagColor } from "@/lib/tagColor";
 
@@ -63,6 +64,8 @@ interface SectionDraft {
 
 export default function ExamsPage() {
   const router = useRouter();
+  const { mode } = useColorMode();
+  const isDark = mode === "dark";
   const [exams, setExams] = useState<Exam[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>("all");
@@ -346,7 +349,7 @@ export default function ExamsPage() {
                     label={exam.course}
                     size="small"
                     variant="outlined"
-                    sx={tagColor(exam.course)}
+                    sx={tagColor(exam.course, isDark)}
                   />
                 )}
                 {exam.method && (

@@ -148,6 +148,8 @@ pub async fn register(
     let token_str = issue_token(&state.pool, user_id, &role).await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
+    metrics::counter!("signup_total").increment(1);
+
     Ok((
         StatusCode::CREATED,
         [("set-cookie".to_string(), cookie_header)],
@@ -205,12 +207,16 @@ pub async fn login(
     let password_valid = verify_password(&hash_to_verify, &body.password);
 
     if !password_valid || !is_valid_user {
+        metrics::counter!("login_total", "result" => "failure").increment(1);
         return Err(ApiError::Unauthorized);
     }
 
     let user_row = match user_row {
         Some(row) => row,
-        None => return Err(ApiError::Unauthorized), // Unreachable because of is_valid_user check
+        None => {
+            metrics::counter!("login_total", "result" => "failure").increment(1);
+            return Err(ApiError::Unauthorized);
+        }
     };
 
     let user_id: Uuid = user_row.get("id");
@@ -220,6 +226,8 @@ pub async fn login(
 
     let token_str = issue_token(&state.pool, user_id, &role).await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
+
+    metrics::counter!("login_total", "result" => "success").increment(1);
 
     Ok((
         StatusCode::OK,
