@@ -71,6 +71,20 @@ fn decode_cursor(cursor: &str) -> Option<(OffsetDateTime, Uuid)> {
     Some((ts, Uuid::parse_str(id).ok()?))
 }
 
+async fn get_accessible_accounts(
+    pool: &sqlx::PgPool,
+    owner_id: Uuid,
+) -> Result<Vec<Uuid>, ApiError> {
+    let rows =
+        sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1")
+            .bind(owner_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
 /// GET /v1/explore — searchable, paginated assessment exploration.
 #[utoipa::path(
     get,
@@ -92,19 +106,20 @@ pub async fn explore(
     let uid = auth.owner_id;
     let limit = q.limit.clamp(1, 200);
 
+    // Get accessible account ids (owner + sub-accounts)
+    let accounts = get_accessible_accounts(pool, uid).await?;
+
     // Build dynamic query
     // Strict isolation: only view own items (including agent's)
     let mut sql = String::from(
         "SELECT id, title, status, mode, objectives, created_at
          FROM tb_assessments
-         WHERE (created_by = $1 OR EXISTS (
-             SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
-         ))",
+         WHERE created_by = ANY($1)",
     );
     let mut args = PgArguments::default();
-    args.add(uid)
+    args.add(accounts)
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
-    let mut param_idx = 2; // $1 is already used for uid
+    let mut param_idx = 2; // $1 is already used for account array
 
     if let Some(status) = q.kind {
         sql.push_str(&format!(" AND status = ${}", param_idx));
@@ -214,16 +229,17 @@ pub async fn explore_facets(
     let pool = &state.pool;
     let uid = auth.owner_id;
 
+    // Get accessible account ids (owner + sub-accounts)
+    let accounts = get_accessible_accounts(pool, uid).await?;
+
     // 1. Get counts grouped by mode
     let count_rows = sqlx::query(
         "SELECT mode, count(*) as cnt
          FROM tb_assessments
-         WHERE (created_by = $1 OR EXISTS (
-             SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
-         ))
+         WHERE created_by = ANY($1)
          GROUP BY mode",
     )
-    .bind(uid)
+    .bind(&accounts)
     .fetch_all(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -244,13 +260,11 @@ pub async fn explore_facets(
     let tag_rows = sqlx::query(
         "SELECT DISTINCT unnest(objectives) AS t
          FROM tb_assessments
-         WHERE (created_by = $1 OR EXISTS (
-             SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1
-         ))
+         WHERE created_by = ANY($1)
          ORDER BY t
          LIMIT 200",
     )
-    .bind(uid)
+    .bind(&accounts)
     .fetch_all(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;

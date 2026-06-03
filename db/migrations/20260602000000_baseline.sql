@@ -9,6 +9,11 @@ BEGIN
 END
 $$;
 
+-- ─── extensions ─────────────────────────────────────────────────────────────
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION uuid_generate_v7()
@@ -180,6 +185,9 @@ CREATE TABLE tb_assessments (
   updated_at          timestamptz      NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_assessments_created_by_status ON tb_assessments (created_by, status);
+CREATE INDEX idx_assessments_owner_created ON tb_assessments (created_by, created_at DESC, id DESC);
+CREATE INDEX idx_assessments_objectives_gin ON tb_assessments USING gin (objectives);
+CREATE INDEX idx_assessments_title_trgm ON tb_assessments USING gin (title gin_trgm_ops);
 
 CREATE TABLE tb_assessment_sections (
   id            uuid             PRIMARY KEY DEFAULT uuid_generate_v7(),
