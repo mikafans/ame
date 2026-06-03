@@ -6,6 +6,78 @@ info:
     name: ''
   version: 0.1.0
 paths:
+  /v1/admin/assessments:
+    get:
+      tags:
+      - admin
+      summary: GET /v1/admin/assessments — list all assessments on the platform
+      operationId: list_assessments_admin
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: mode
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Assessments retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminListAssessmentsResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
+  /v1/admin/assessments/{id}:
+    delete:
+      tags:
+      - admin
+      summary: DELETE /v1/admin/assessments/{id} — delete any assessment (moderation)
+      operationId: delete_assessment_admin
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Assessment deleted successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+        '404':
+          description: Assessment not found
+      security:
+      - bearer: []
   /v1/admin/audit:
     get:
       tags:
@@ -117,6 +189,14 @@ paths:
       - admin
       summary: PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user
       operationId: patch_user_admin
+      parameters:
+      - name: id
+        in: path
+        description: User ID
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
@@ -1393,6 +1473,44 @@ components:
         questionId:
           type: string
           format: uuid
+    AdminAssessmentEntry:
+      type: object
+      required:
+      - id
+      - title
+      - status
+      - mode
+      - createdBy
+      - objectives
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        createdByEmail:
+          type:
+          - string
+          - 'null'
+        description:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        mode:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        title:
+          type: string
     AdminHealthResponse:
       type: object
       required:
@@ -1427,6 +1545,19 @@ components:
           format: int64
         valkey:
           type: string
+    AdminListAssessmentsResponse:
+      type: object
+      required:
+      - assessments
+      - total
+      properties:
+        assessments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAssessmentEntry'
+        total:
+          type: integer
+          format: int64
     AgentSummary:
       type: object
       required:
@@ -3243,6 +3374,11 @@ components:
       properties:
         createdAt:
           type: string
+          format: date-time
+        deactivatedAt:
+          type:
+          - string
+          - 'null'
           format: date-time
         displayName:
           type: string

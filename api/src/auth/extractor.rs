@@ -186,6 +186,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             role,
             plan: info.plan,
             created_at: info.created_at,
+            deactivated_at: info.user_deactivated_at,
         };
         let owner_id = user.owner_user_id.unwrap_or(user.id);
 
@@ -285,6 +286,7 @@ mod tests {
                 role: Role::User,
                 plan: "free".into(),
                 created_at: now,
+                deactivated_at: None,
             },
             token_scopes: vec![],
             owner_id: user_id,
@@ -302,6 +304,7 @@ mod tests {
                 role: Role::Agent,
                 plan: "free".into(),
                 created_at: now,
+                deactivated_at: None,
             },
             token_scopes: vec![],
             owner_id: user_id,

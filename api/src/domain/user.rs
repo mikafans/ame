@@ -38,6 +38,9 @@ pub struct User {
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub deactivated_at: Option<OffsetDateTime>,
 }
 
 /// Token scope as enforced by the `api_tokens.scopes` CHECK constraint.

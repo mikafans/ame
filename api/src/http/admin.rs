@@ -134,7 +134,7 @@ pub async fn list_users(
 
     // 2. Get paginated users
     let mut users_qb = sqlx::QueryBuilder::new(
-        "SELECT id, owner_user_id, email, display_name, role, plan, created_at FROM tb_users",
+        "SELECT id, owner_user_id, email, display_name, role, plan, created_at, deactivated_at FROM tb_users",
     );
     if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
         let search_pat = format!("%{}%", search.trim());
@@ -171,6 +171,7 @@ pub async fn list_users(
                 role,
                 plan: r.get("plan"),
                 created_at: r.get("created_at"),
+                deactivated_at: r.get("deactivated_at"),
             }
         })
         .collect();
@@ -182,6 +183,7 @@ pub async fn list_users(
 #[utoipa::path(
     patch,
     path = "/v1/admin/users/{id}",
+    params(("id" = Uuid, Path, description = "User ID")),
     request_body = PatchUserAdminBody,
     responses(
         (status = 204, description = "User successfully updated"),
@@ -515,7 +517,7 @@ pub async fn list_audit_logs(
 )]
 pub async fn get_admin_health(
     State(state): State<AppState>,
-    _admin: RequireScope<AdminScope>,
+    admin: RequireScope<AdminScope>,
 ) -> Result<Json<AdminHealthResponse>, ApiError> {
     // 1. Check Database
     let db_res = sqlx::query("SELECT 1").execute(&state.pool).await;
@@ -533,24 +535,31 @@ pub async fn get_admin_health(
     // 3. Query table row counts
     let (users_count, assessments_count, sessions_count, questions_count, audit_log_count) =
         if database == "ok" {
+            let mut conn = state
+                .pool
+                .acquire()
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
+            crate::http::db::set_rls_guc(&mut conn, admin.0.user.id, true).await?;
+
             let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_users")
-                .fetch_one(&state.pool)
+                .fetch_one(&mut *conn)
                 .await
                 .unwrap_or(0);
             let assessments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_assessments")
-                .fetch_one(&state.pool)
+                .fetch_one(&mut *conn)
                 .await
                 .unwrap_or(0);
             let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions")
-                .fetch_one(&state.pool)
+                .fetch_one(&mut *conn)
                 .await
                 .unwrap_or(0);
             let questions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_questions")
-                .fetch_one(&state.pool)
+                .fetch_one(&mut *conn)
                 .await
                 .unwrap_or(0);
             let audit: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_audit_log")
-                .fetch_one(&state.pool)
+                .fetch_one(&mut *conn)
                 .await
                 .unwrap_or(0);
             (users, assessments, sessions, questions, audit)
@@ -587,6 +596,220 @@ pub async fn get_admin_health(
     }))
 }
 
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminListAssessmentsQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub q: Option<String>,
+    pub mode: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminAssessmentEntry {
+    pub id: Uuid,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub mode: String,
+    pub created_by: Uuid,
+    pub created_by_email: Option<String>,
+    pub objectives: Vec<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: time::OffsetDateTime,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminListAssessmentsResponse {
+    pub assessments: Vec<AdminAssessmentEntry>,
+    pub total: i64,
+}
+
+/// GET /v1/admin/assessments — list all assessments on the platform
+#[utoipa::path(
+    get,
+    path = "/v1/admin/assessments",
+    params(AdminListAssessmentsQuery),
+    responses(
+        (status = 200, description = "Assessments retrieved successfully", body = AdminListAssessmentsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden (Admin required)"),
+    ),
+    security(("bearer" = [])),
+    tag = "admin"
+)]
+pub async fn list_assessments_admin(
+    State(state): State<AppState>,
+    _admin: RequireScope<AdminScope>,
+    Query(query): Query<AdminListAssessmentsQuery>,
+) -> Result<Json<AdminListAssessmentsResponse>, ApiError> {
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let mut count_qb = sqlx::QueryBuilder::new(
+        "SELECT COUNT(*) FROM tb_assessments a
+         LEFT JOIN tb_users u ON a.created_by = u.id",
+    );
+    let mut has_where = false;
+
+    if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
+        let search_pat = format!("%{}%", search.trim());
+        count_qb.push(" WHERE (a.title ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR a.description ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR u.email ILIKE ");
+        count_qb.push_bind(search_pat);
+        count_qb.push(")");
+        has_where = true;
+    }
+
+    if let Some(mode) = query.mode.as_deref().filter(|s| !s.trim().is_empty()) {
+        if has_where {
+            count_qb.push(" AND a.mode = ");
+        } else {
+            count_qb.push(" WHERE a.mode = ");
+            has_where = true;
+        }
+        count_qb.push_bind(mode);
+    }
+
+    if let Some(status) = query.status.as_deref().filter(|s| !s.trim().is_empty()) {
+        if has_where {
+            count_qb.push(" AND a.status = ");
+        } else {
+            count_qb.push(" WHERE a.status = ");
+        }
+        count_qb.push_bind(status);
+    }
+
+    let total: i64 = count_qb
+        .build_query_as::<(i64,)>()
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .0;
+
+    let mut qb = sqlx::QueryBuilder::new(
+        "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by, u.email as created_by_email, a.objectives, a.created_at
+         FROM tb_assessments a
+         LEFT JOIN tb_users u ON a.created_by = u.id"
+    );
+
+    let mut has_where = false;
+
+    if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
+        let search_pat = format!("%{}%", search.trim());
+        qb.push(" WHERE (a.title ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR a.description ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR u.email ILIKE ");
+        qb.push_bind(search_pat);
+        qb.push(")");
+        has_where = true;
+    }
+
+    if let Some(mode) = query.mode.as_deref().filter(|s| !s.trim().is_empty()) {
+        if has_where {
+            qb.push(" AND a.mode = ");
+        } else {
+            qb.push(" WHERE a.mode = ");
+            has_where = true;
+        }
+        qb.push_bind(mode);
+    }
+
+    if let Some(status) = query.status.as_deref().filter(|s| !s.trim().is_empty()) {
+        if has_where {
+            qb.push(" AND a.status = ");
+        } else {
+            qb.push(" WHERE a.status = ");
+        }
+        qb.push_bind(status);
+    }
+
+    qb.push(" ORDER BY a.created_at DESC LIMIT ");
+    qb.push_bind(limit);
+    qb.push(" OFFSET ");
+    qb.push_bind(offset);
+
+    let rows = qb
+        .build()
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let assessments = rows
+        .into_iter()
+        .map(|r| {
+            let status_str: String = r.get("status");
+            let mode_str: String = r.get("mode");
+            AdminAssessmentEntry {
+                id: r.get("id"),
+                title: r.get("title"),
+                description: r.get("description"),
+                status: status_str,
+                mode: mode_str,
+                created_by: r.get("created_by"),
+                created_by_email: r.get("created_by_email"),
+                objectives: r.get("objectives"),
+                created_at: r.get("created_at"),
+            }
+        })
+        .collect();
+
+    Ok(Json(AdminListAssessmentsResponse { assessments, total }))
+}
+
+/// DELETE /v1/admin/assessments/{id} — delete any assessment (moderation)
+#[utoipa::path(
+    delete,
+    path = "/v1/admin/assessments/{id}",
+    params(("id" = Uuid, Path, description = "Assessment ID")),
+    responses(
+        (status = 204, description = "Assessment deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden (Admin required)"),
+        (status = 404, description = "Assessment not found"),
+    ),
+    security(("bearer" = [])),
+    tag = "admin"
+)]
+pub async fn delete_assessment_admin(
+    State(state): State<AppState>,
+    admin: RequireScope<AdminScope>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    crate::audit::audit(
+        state.pool.clone(),
+        Some(admin.0.user.id),
+        "assessment.delete_admin",
+        Some("assessment"),
+        Some(id),
+        serde_json::json!({}),
+    );
+
+    let res = sqlx::query("DELETE FROM tb_assessments WHERE id = $1")
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if res.rows_affected() == 0 {
+        return Err(ApiError::NotFound {
+            resource: "assessment",
+        });
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/admin/users", get(list_users))
@@ -596,5 +819,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         )
         .route("/v1/admin/audit", get(list_audit_logs))
         .route("/v1/admin/health", get(get_admin_health))
+        .route("/v1/admin/assessments", get(list_assessments_admin))
+        .route(
+            "/v1/admin/assessments/{id}",
+            axum::routing::delete(delete_assessment_admin),
+        )
         .with_state(state)
 }

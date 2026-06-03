@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/v1/admin/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/admin/assessments — list all assessments on the platform */
+        get: operations["list_assessments_admin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/assessments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** DELETE /v1/admin/assessments/{id} — delete any assessment (moderation) */
+        delete: operations["delete_assessment_admin"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -639,6 +673,20 @@ export interface components {
             /** Format: uuid */
             questionId: string;
         };
+        AdminAssessmentEntry: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            createdByEmail?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            id: string;
+            mode: string;
+            objectives: string[];
+            status: string;
+            title: string;
+        };
         AdminHealthResponse: {
             /** Format: int64 */
             assessmentsCount: number;
@@ -654,6 +702,11 @@ export interface components {
             /** Format: int64 */
             usersCount: number;
             valkey: string;
+        };
+        AdminListAssessmentsResponse: {
+            assessments: components["schemas"]["AdminAssessmentEntry"][];
+            /** Format: int64 */
+            total: number;
         };
         AgentSummary: {
             /** Format: date-time */
@@ -1350,6 +1403,8 @@ export interface components {
         User: {
             /** Format: date-time */
             createdAt: string;
+            /** Format: date-time */
+            deactivatedAt?: string | null;
             displayName: string;
             email?: string | null;
             /** Format: uuid */
@@ -1383,6 +1438,88 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_assessments_admin: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                q?: string;
+                mode?: string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessments retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListAssessmentsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_assessment_admin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment deleted successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_audit_logs: {
         parameters: {
             query?: {
@@ -1499,7 +1636,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description User ID */
+                id: string;
+            };
             cookie?: never;
         };
         requestBody: {
