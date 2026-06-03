@@ -373,6 +373,7 @@ pub async fn create_assessment(
     );
     crate::http::quota::check_quota(
         &state.pool,
+        Some(&state.valkey),
         &state.config,
         user.owner_id,
         crate::http::quota::QuotaKind::Assessment,
@@ -384,6 +385,7 @@ pub async fn create_assessment(
     if question_count > 0 {
         crate::http::quota::check_quota(
             &state.pool,
+            Some(&state.valkey),
             &state.config,
             user.owner_id,
             crate::http::quota::QuotaKind::Question,
@@ -852,6 +854,7 @@ pub async fn add_assessment_question(
 
         crate::http::quota::check_quota(
             &state.pool,
+            Some(&state.valkey),
             &state.config,
             auth.owner_id,
             crate::http::quota::QuotaKind::Question,

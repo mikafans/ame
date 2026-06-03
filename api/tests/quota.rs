@@ -162,6 +162,7 @@ async fn test_assessment_and_question_quota_check() {
     assert!(
         ame_api::http::quota::check_quota(
             &app_pool,
+            None,
             &config,
             user_id,
             ame_api::http::quota::QuotaKind::Assessment,
@@ -173,6 +174,7 @@ async fn test_assessment_and_question_quota_check() {
     assert!(
         ame_api::http::quota::check_quota(
             &app_pool,
+            None,
             &config,
             user_id,
             ame_api::http::quota::QuotaKind::Question,
@@ -196,6 +198,7 @@ async fn test_assessment_and_question_quota_check() {
     // 3. Check quota: now usage is 2, adding 1 should fail (limit is 2)
     let res = ame_api::http::quota::check_quota(
         &app_pool,
+        None,
         &config,
         user_id,
         ame_api::http::quota::QuotaKind::Assessment,
@@ -225,6 +228,7 @@ async fn test_assessment_and_question_quota_check() {
     assert!(
         ame_api::http::quota::check_quota(
             &app_pool,
+            None,
             &config,
             user_id,
             ame_api::http::quota::QuotaKind::Question,
@@ -235,6 +239,7 @@ async fn test_assessment_and_question_quota_check() {
     );
     let res_q = ame_api::http::quota::check_quota(
         &app_pool,
+        None,
         &config,
         user_id,
         ame_api::http::quota::QuotaKind::Question,

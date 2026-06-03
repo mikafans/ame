@@ -613,6 +613,7 @@ async fn run_assessment_batch_create(
 
     crate::http::quota::check_quota(
         &state.pool,
+        Some(&state.valkey),
         &state.config,
         auth.owner_id,
         crate::http::quota::QuotaKind::Assessment,
@@ -623,6 +624,7 @@ async fn run_assessment_batch_create(
     if total_questions > 0 {
         crate::http::quota::check_quota(
             &state.pool,
+            Some(&state.valkey),
             &state.config,
             auth.owner_id,
             crate::http::quota::QuotaKind::Question,

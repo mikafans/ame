@@ -221,6 +221,7 @@ pub async fn create_questions(
     if count > 0 {
         crate::http::quota::check_quota(
             &state.pool,
+            Some(&state.valkey),
             &state.config,
             auth.0.owner_id,
             crate::http::quota::QuotaKind::Question,

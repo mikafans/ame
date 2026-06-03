@@ -377,6 +377,7 @@ pub async fn create_agent(
 ) -> Result<(StatusCode, Json<CreateAgentResponse>), ApiError> {
     crate::http::quota::check_quota(
         &state.pool,
+        Some(&state.valkey),
         &state.config,
         user.owner_id,
         crate::http::quota::QuotaKind::AgentCreation,

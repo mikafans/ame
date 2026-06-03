@@ -106,6 +106,14 @@ async fn test_admin_flow_and_audit() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::FORBIDDEN);
 
+    let res = client
+        .get(format!("{base_url}/v1/admin/health"))
+        .header("Authorization", format!("Bearer {reg_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
     // 3. Create an admin user and token
     let admin_user_id = Uuid::now_v7();
     sqlx::query(
@@ -367,4 +375,17 @@ async fn test_admin_flow_and_audit() {
     let body: serde_json::Value = res.json().await.unwrap();
     assert_eq!(body["total"].as_i64().unwrap(), 1);
     assert_eq!(body["logs"][0]["action"], "user.update_role");
+
+    // 10. Test Admin Health
+    let res = client
+        .get(format!("{base_url}/v1/admin/health"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let health: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(health["database"], "ok");
+    assert!(health["usersCount"].as_i64().unwrap() >= 2);
+    assert!(health["auditLogCount"].as_i64().unwrap() >= 5);
 }

@@ -61,6 +61,7 @@ pub fn plan_scope_ceiling(plan: Plan) -> Vec<Scope> {
 /// Checks if the owner has quota available for the given kind of action.
 pub async fn check_quota(
     pool: &PgPool,
+    valkey: Option<&deadpool_redis::Pool>,
     config: &crate::config::Config,
     owner_id: Uuid,
     kind: QuotaKind,
@@ -116,6 +117,17 @@ pub async fn check_quota(
             QuotaKind::Assessment => "assessment",
             QuotaKind::Question => "question",
         };
+
+        if let Some(vk) = valkey {
+            let conn_res = vk.get().await;
+            if let Ok(mut c) = conn_res {
+                let _: Result<(), _> = redis::cmd("INCR")
+                    .arg("ame:quota_rejections_count")
+                    .query_async(&mut *c)
+                    .await;
+            }
+        }
+
         return Err(ApiError::QuotaExceeded {
             kind: kind_str.to_string(),
             limit,
