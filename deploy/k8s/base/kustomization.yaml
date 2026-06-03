@@ -11,6 +11,7 @@ resources:
   - web.yaml
   - ingress.yaml
   - backup-cronjob.yaml
+  - valkey.yaml
 
 # Locally-built, side-loaded images (no registry). Overlays may pin a tag.
 images:
