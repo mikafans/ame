@@ -14,6 +14,7 @@ import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -26,6 +27,16 @@ export default function AdminDashboardPage() {
       icon: <PeopleOutlinedIcon sx={{ fontSize: 40, color: "primary.main" }} />,
       link: "/admin/users",
       actionLabel: "Users Console",
+    },
+    {
+      title: "Moderate Assessments",
+      description:
+        "Audit and moderate assessments created on the platform. Review question contents and perform administrative soft deactivations.",
+      icon: (
+        <AssessmentOutlinedIcon sx={{ fontSize: 40, color: "warning.main" }} />
+      ),
+      link: "/admin/assessments",
+      actionLabel: "Moderation Console",
     },
     {
       title: "Audit Logs",
@@ -73,7 +84,11 @@ export default function AdminDashboardPage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            md: "1fr 1fr 1fr 1fr",
+          },
           gap: 3.5,
         }}
       >

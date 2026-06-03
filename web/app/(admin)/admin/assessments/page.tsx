@@ -36,6 +36,7 @@ import Stack from "@mui/material/Stack";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
+import { useColorMode } from "@/components/ThemeRegistry";
 import { api } from "@/api/client";
 import { formatDateTime } from "@/utils/format";
 import { vibrantTagColor } from "@/lib/tagColor";
@@ -54,6 +55,8 @@ interface AssessmentEntry {
 }
 
 export default function AdminAssessmentsPage() {
+  const { mode } = useColorMode();
+  const isDark = mode === "dark";
   const [assessments, setAssessments] = useState<AssessmentEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -479,7 +482,7 @@ export default function AdminAssessmentsPage() {
                               label={tag}
                               size="small"
                               sx={{
-                                ...vibrantTagColor(tag),
+                                ...vibrantTagColor(tag, isDark),
                                 fontSize: 9,
                                 height: 18,
                               }}

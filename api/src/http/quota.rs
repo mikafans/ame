@@ -118,6 +118,8 @@ pub async fn check_quota(
             QuotaKind::Question => "question",
         };
 
+        metrics::counter!("quota_rejection_total", "kind" => kind_str).increment(1);
+
         if let Some(vk) = valkey {
             let conn_res = vk.get().await;
             if let Ok(mut c) = conn_res {

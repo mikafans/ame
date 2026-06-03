@@ -13,6 +13,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import ToggleButton from "@mui/material/ToggleButton";
 import { formatScore, formatDuration } from "@/utils/format";
 import { useTheme } from "@mui/material/styles";
+import { PageShell } from "@/components/PageShell";
 
 type WindowType = "4w" | "all";
 
@@ -115,31 +116,10 @@ export default function ProgressPage() {
     : null;
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              letterSpacing: 1.4,
-              textTransform: "uppercase",
-              display: "block",
-            }}
-          >
-            All courses
-          </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 500 }}>
-            Progress dashboard
-          </Typography>
-        </Box>
+    <PageShell
+      kicker="All courses"
+      title="Progress dashboard"
+      action={
         <ToggleButtonGroup
           value={win}
           exclusive
@@ -149,7 +129,8 @@ export default function ProgressPage() {
           <ToggleButton value="4w">4w</ToggleButton>
           <ToggleButton value="all">All</ToggleButton>
         </ToggleButtonGroup>
-      </Box>
+      }
+    >
 
       {statsLoading ? (
         <Typography color="text.secondary" sx={{ mb: 3 }}>
@@ -296,7 +277,7 @@ export default function ProgressPage() {
           </CardContent>
         </Card>
       </Stack>
-    </Box>
+    </PageShell>
   );
 }
 

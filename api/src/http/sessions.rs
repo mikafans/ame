@@ -219,6 +219,8 @@ pub async fn create_session(
     })?;
     insert_session(conn, &session).await?;
 
+    metrics::counter!("session_start_total").increment(1);
+
     Ok((
         StatusCode::CREATED,
         Json(CreateSessionResponse {
@@ -476,6 +478,8 @@ pub async fn finish(
             .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("missing session result")))?,
     )
     .map_err(anyhow::Error::from)?;
+
+    metrics::counter!("session_submit_total").increment(1);
 
     Ok(Json(FinishSessionResponse {
         session: finished,

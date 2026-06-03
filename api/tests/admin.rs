@@ -591,6 +591,12 @@ async fn test_admin_user_filters() {
     .unwrap();
     let admin_auth = format!("{admin_token_id}_{secret}");
 
+    // Clean up existing test users first to avoid unique key violations
+    sqlx::query("DELETE FROM tb_users WHERE email IN ('alice@example.com', 'bob@example.com', 'charlie@another.com')")
+        .execute(&pool)
+        .await
+        .unwrap();
+
     // 2. Seed multiple test users with specific patterns
     let alice_id = Uuid::now_v7();
     sqlx::query(

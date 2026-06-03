@@ -30,9 +30,13 @@ import { formatDateTime } from "@/utils/format";
 interface AuditLogEntry {
   id: string;
   actorUserId?: string | null;
+  actorEmail?: string | null;
+  actorName?: string | null;
   action: string;
   targetType?: string | null;
   targetId?: string | null;
+  targetEmail?: string | null;
+  targetName?: string | null;
   metadata: any;
   createdAt: string;
 }
@@ -270,9 +274,9 @@ export default function AuditLogsPage() {
               >
                 <TableCell>Timestamp</TableCell>
                 <TableCell>Action</TableCell>
-                <TableCell>Actor User ID</TableCell>
+                <TableCell>Actor</TableCell>
                 <TableCell>Target Type</TableCell>
-                <TableCell>Target ID</TableCell>
+                <TableCell>Target</TableCell>
                 <TableCell align="right" sx={{ pr: 3 }}>
                   Details
                 </TableCell>
@@ -330,14 +334,30 @@ export default function AuditLogsPage() {
                         }}
                       />
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "monospace",
-                        fontSize: 11,
-                        color: "text.secondary",
-                      }}
-                    >
-                      {row.actorUserId || "SYSTEM"}
+                    <TableCell>
+                      {row.actorEmail ? (
+                        <Box>
+                          {row.actorName && (
+                            <Typography variant="body2" fontWeight={500}>
+                              {row.actorName}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary">
+                            {row.actorEmail}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: "monospace",
+                            fontSize: 11,
+                            color: "text.secondary",
+                          }}
+                        >
+                          {row.actorUserId || "SYSTEM"}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       {row.targetType ? (
@@ -350,14 +370,32 @@ export default function AuditLogsPage() {
                         "-"
                       )}
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "monospace",
-                        fontSize: 11,
-                        color: "text.secondary",
-                      }}
-                    >
-                      {row.targetId || "-"}
+                    <TableCell>
+                      {row.targetEmail ? (
+                        <Box>
+                          {row.targetName && (
+                            <Typography variant="body2" fontWeight={500}>
+                              {row.targetName}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary">
+                            {row.targetEmail}
+                          </Typography>
+                        </Box>
+                      ) : row.targetId ? (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: "monospace",
+                            fontSize: 11,
+                            color: "text.secondary",
+                          }}
+                        >
+                          {row.targetId}
+                        </Typography>
+                      ) : (
+                        "-"
+                      )}
                     </TableCell>
                     <TableCell align="right" sx={{ pr: 2 }}>
                       <IconButton
@@ -449,6 +487,36 @@ export default function AuditLogsPage() {
                   {selectedLog.actorUserId || "SYSTEM"}
                 </Typography>
 
+                {selectedLog.actorName && (
+                  <>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      fontWeight={500}
+                    >
+                      Actor Name:
+                    </Typography>
+                    <Typography variant="body2">
+                      {selectedLog.actorName}
+                    </Typography>
+                  </>
+                )}
+
+                {selectedLog.actorEmail && (
+                  <>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      fontWeight={500}
+                    >
+                      Actor Email:
+                    </Typography>
+                    <Typography variant="body2">
+                      {selectedLog.actorEmail}
+                    </Typography>
+                  </>
+                )}
+
                 <Typography
                   variant="body2"
                   color="text.secondary"
@@ -470,6 +538,36 @@ export default function AuditLogsPage() {
                 <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
                   {selectedLog.targetId || "None"}
                 </Typography>
+
+                {selectedLog.targetName && (
+                  <>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      fontWeight={500}
+                    >
+                      Target Name:
+                    </Typography>
+                    <Typography variant="body2">
+                      {selectedLog.targetName}
+                    </Typography>
+                  </>
+                )}
+
+                {selectedLog.targetEmail && (
+                  <>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      fontWeight={500}
+                    >
+                      Target Email:
+                    </Typography>
+                    <Typography variant="body2">
+                      {selectedLog.targetEmail}
+                    </Typography>
+                  </>
+                )}
               </Box>
 
               <Box>

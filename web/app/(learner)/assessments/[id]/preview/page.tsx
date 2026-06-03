@@ -11,6 +11,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import { useColorMode } from "@/components/ThemeRegistry";
 import { tagColor } from "@/lib/tagColor";
 
 const KIND_LABEL: Record<string, string> = {
@@ -45,6 +46,8 @@ export default function AssessmentPreviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { mode } = useColorMode();
+  const isDark = mode === "dark";
   const { user } = useAuth();
   const router = useRouter();
   const [assessment, setAssessment] = useState<AssessmentDetail | null>(null);
@@ -104,7 +107,7 @@ export default function AssessmentPreviewPage({
   );
 
   return (
-    <Box sx={{ p: "28px 36px 56px", maxWidth: 860 }}>
+    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 860 }}>
       {/* Breadcrumb */}
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
         <Typography
@@ -144,7 +147,7 @@ export default function AssessmentPreviewPage({
             label={assessment.course}
             size="small"
             variant="outlined"
-            sx={{ mb: 1.25, ...tagColor(assessment.course) }}
+            sx={{ mb: 1.25, ...tagColor(assessment.course, isDark) }}
           />
         )}
         <Stack

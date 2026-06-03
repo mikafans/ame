@@ -126,7 +126,7 @@ export default function GradingPage() {
   }
 
   return (
-    <Box sx={{ p: "28px 36px 56px" }}>
+    <Box sx={{ pt: 5, px: 5, pb: 8 }}>
       <Box sx={{ mb: 3.5 }}>
         <Typography
           variant="caption"

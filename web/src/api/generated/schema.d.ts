@@ -931,6 +931,8 @@ export interface components {
         };
         AuditLogEntry: {
             action: string;
+            actorEmail?: string | null;
+            actorName?: string | null;
             /** Format: uuid */
             actorUserId?: string | null;
             /** Format: date-time */
@@ -938,8 +940,10 @@ export interface components {
             /** Format: uuid */
             id: string;
             metadata: unknown;
+            targetEmail?: string | null;
             /** Format: uuid */
             targetId?: string | null;
+            targetName?: string | null;
             targetType?: string | null;
         };
         AuthResponse: {

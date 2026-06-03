@@ -2138,6 +2138,14 @@ components:
       properties:
         action:
           type: string
+        actorEmail:
+          type:
+          - string
+          - 'null'
+        actorName:
+          type:
+          - string
+          - 'null'
         actorUserId:
           type:
           - string
@@ -2150,11 +2158,19 @@ components:
           type: string
           format: uuid
         metadata: {}
+        targetEmail:
+          type:
+          - string
+          - 'null'
         targetId:
           type:
           - string
           - 'null'
           format: uuid
+        targetName:
+          type:
+          - string
+          - 'null'
         targetType:
           type:
           - string

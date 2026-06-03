@@ -17,9 +17,7 @@ export default function LearnerLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    console.log("LearnerLayout auth check:", { loading, hasUser: !!user });
     if (!loading && !user) {
-      console.log("LearnerLayout redirecting to /login...");
       window.location.href = "/login";
     }
   }, [loading, user]);

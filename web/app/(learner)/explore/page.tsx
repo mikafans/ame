@@ -25,6 +25,8 @@ import Link from "next/link";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { vibrantTagColor } from "@/lib/tagColor";
+import { useColorMode } from "@/components/ThemeRegistry";
+import { PageShell } from "@/components/PageShell";
 
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -34,6 +36,8 @@ import LaunchOutlinedIcon from "@mui/icons-material/LaunchOutlined";
 export default function ExplorePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { mode: colorMode } = useColorMode();
+  const isDark = colorMode === "dark";
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -142,34 +146,12 @@ export default function ExplorePage() {
   const gradedCount = facets?.counts?.graded ?? 0;
 
   return (
-    <Box
-      sx={{
-        p: 4,
-        display: "flex",
-        flexDirection: "column",
-        gap: 3,
-        minHeight: "100vh",
-      }}
+    <PageShell
+      kicker="Assessments"
+      title="Explore"
+      subtitle="Browse and search practice assessments and graded exams"
     >
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Box>
-          <Typography
-            variant="h4"
-            sx={{ fontWeight: 700, letterSpacing: "-0.5px" }}
-          >
-            Explore
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Browse and search practice assessments and graded exams
-          </Typography>
-        </Box>
-      </Box>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 
       {startError && (
         <Alert severity="error" onClose={() => setStartError(null)}>
@@ -254,7 +236,7 @@ export default function ExplorePage() {
                       key={key}
                       label={option}
                       size="small"
-                      sx={vibrantTagColor(option)}
+                      sx={vibrantTagColor(option, isDark)}
                       {...tagProps}
                     />
                   );
@@ -351,7 +333,7 @@ export default function ExplorePage() {
                             key={t}
                             label={t}
                             size="small"
-                            sx={vibrantTagColor(t)}
+                            sx={vibrantTagColor(t, isDark)}
                           />
                         ))}
                       </Stack>
@@ -465,6 +447,7 @@ export default function ExplorePage() {
           </Box>
         )}
       </TableContainer>
-    </Box>
+      </Box>
+    </PageShell>
   );
 }

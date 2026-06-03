@@ -96,7 +96,7 @@ export default function PlanPage({
     .reduce((sum, item) => sum + item.hours_est, 0);
 
   return (
-    <Box sx={{ p: "28px 36px 56px", maxWidth: 760 }}>
+    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 760 }}>
       <Box sx={{ mb: 3.5 }}>
         <Typography
           variant="caption"

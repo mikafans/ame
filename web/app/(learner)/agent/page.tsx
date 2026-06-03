@@ -32,6 +32,7 @@ import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
+import { PageShell } from "@/components/PageShell";
 
 interface AgentSummary {
   id: string;
@@ -100,34 +101,10 @@ export default function AgentPage() {
   const [tab, setTab] = useState<TabId>("keys");
 
   return (
-    <Box sx={{ p: "28px 36px 56px" }}>
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          mb: 2.75,
-        }}
-      >
-        <Box>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              fontFamily: "monospace",
-              letterSpacing: 1.3,
-              textTransform: "uppercase",
-              display: "block",
-              mb: 0.75,
-            }}
-          >
-            Programmatic surface · OpenAPI 3.1 · MCP-compatible
-          </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 500 }}>
-            Agent integration
-          </Typography>
-        </Box>
+    <PageShell
+      kicker="Programmatic surface · OpenAPI 3.1 · MCP-compatible"
+      title="Agent integration"
+      action={
         <Stack direction="row" spacing={1}>
           <Button
             variant="outlined"
@@ -151,7 +128,8 @@ export default function AgentPage() {
             MCP manifest
           </Button>
         </Stack>
-      </Box>
+      }
+    >
 
       {/* Intro card */}
       <Card
@@ -252,7 +230,7 @@ export default function AgentPage() {
       {tab === "tools" && <ToolsTab />}
       {tab === "import" && <ImportTab />}
       {tab === "activity" && <ActivityTab />}
-    </Box>
+    </PageShell>
   );
 }
 
