@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -179,6 +179,18 @@ db-migrate: ## Run pending sqlx migrations
 db-shell: ## Open interactive pgcli session to local Postgres
 	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
 
+db-backup: db-up ## Backup local Postgres DB to BACKUP_FILE
+	@echo "Backing up database to $(BACKUP_FILE)..."
+	$(COMPOSE) -f db/docker-compose.yml exec -T postgres pg_dump -U postgres -d ame -Fc > $(BACKUP_FILE)
+
+db-restore: db-up ## Restore BACKUP_FILE to RESTORE_DB (creates DB if needed)
+	@if [ ! -f $(BACKUP_FILE) ]; then echo "Error: Backup file $(BACKUP_FILE) not found."; exit 1; fi
+	@echo "Checking if database $(RESTORE_DB) exists..."
+	@$(COMPOSE) -f db/docker-compose.yml exec -T postgres psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$(RESTORE_DB)'" | grep -q 1 || \
+		(echo "Creating database $(RESTORE_DB)..." && $(COMPOSE) -f db/docker-compose.yml exec -T postgres createdb -U postgres $(RESTORE_DB))
+	@echo "Restoring backup to $(RESTORE_DB)..."
+	$(COMPOSE) -f db/docker-compose.yml exec -T postgres pg_restore -U postgres -d $(RESTORE_DB) --clean --if-exists --no-owner --no-privileges < $(BACKUP_FILE)
+
 db-admin: db-up ## Create/grant ADMIN_EMAIL (default admin@example.com) as admin directly in the DB
 	@until $(COMPOSE) -f db/docker-compose.yml exec -T postgres pg_isready -U postgres -d ame >/dev/null 2>&1; do sleep 1; done
 	@hash="$$(uvx --quiet --from argon2-cffi python -c \
@@ -223,6 +235,9 @@ stop: ## Stop API, frontend, and Postgres
 API_HOST ?= localhost
 API_PORT ?= 28080
 WEB_PORT ?= 23000
+
+BACKUP_FILE ?= backup.dump
+RESTORE_DB ?= ame_scratch
 
 # Admin bootstrap (db-admin): registration only grants `user`, so the admin
 # role is set out-of-band in the DB. Override ADMIN_EMAIL to promote yourself.
