@@ -49,6 +49,7 @@ test.describe("UI/UX spec alignment", () => {
     // --- Explore ---
     await page.goto("/explore");
     // Wait for the auth loading to finish and user to be visible in sidebar
+    console.log(await page.locator(".MuiDrawer-paper").innerText());
     await expect(page.getByText(/Ada Lovelace/i)).toBeVisible({
       timeout: 10000,
     });

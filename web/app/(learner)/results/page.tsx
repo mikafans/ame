@@ -107,7 +107,6 @@ export default function ResultsHistoryPage() {
       title="Attempt History"
       subtitle="Review your recent practice sessions, quiz attempts, and exam results."
     >
-
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
