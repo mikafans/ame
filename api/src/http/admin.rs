@@ -198,16 +198,86 @@ pub async fn patch_user_admin(
     Path(user_id): Path<Uuid>,
     Json(body): Json<PatchUserAdminBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // 1. Verify user exists
-    let exists =
-        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM tb_users WHERE id = $1)")
-            .bind(user_id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    // 1. Verify user exists and fetch current role/status
+    let current_user: Option<(String, bool)> = sqlx::query_as(
+        "SELECT role, (deactivated_at IS NOT NULL) as disabled FROM tb_users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
-    if !exists {
-        return Err(ApiError::NotFound { resource: "user" });
+    let (current_role, current_disabled) = match current_user {
+        Some(u) => u,
+        None => return Err(ApiError::NotFound { resource: "user" }),
+    };
+
+    let target_is_self = admin.0.user.id == user_id;
+
+    // A. Check self-demotion
+    if target_is_self && body.role.as_deref().filter(|r| *r != "admin").is_some() {
+        crate::audit::audit(
+            state.pool.clone(),
+            Some(admin.0.user.id),
+            "user.patch_rejected",
+            Some("user"),
+            Some(user_id),
+            serde_json::json!({ "reason": "self_demotion_forbidden" }),
+        );
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "role".into(),
+            message: "cannot demote your own admin role".into(),
+        }]));
+    }
+
+    // B. Check self-disable
+    if target_is_self && body.disabled.unwrap_or(false) {
+        crate::audit::audit(
+            state.pool.clone(),
+            Some(admin.0.user.id),
+            "user.patch_rejected",
+            Some("user"),
+            Some(user_id),
+            serde_json::json!({ "reason": "self_disable_forbidden" }),
+        );
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "disabled".into(),
+            message: "cannot disable your own account".into(),
+        }]));
+    }
+
+    // C. Check last active admin protection
+    let is_active_admin = current_role == "admin" && !current_disabled;
+    let changing_to_non_admin = body.role.as_ref().map(|r| r != "admin").unwrap_or(false);
+    let changing_to_disabled = body.disabled.unwrap_or(false);
+
+    if is_active_admin && (changing_to_non_admin || changing_to_disabled) {
+        let active_admin_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM tb_users WHERE role = 'admin' AND deactivated_at IS NULL",
+        )
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        if active_admin_count <= 1 {
+            let field = if changing_to_disabled {
+                "disabled"
+            } else {
+                "role"
+            };
+            crate::audit::audit(
+                state.pool.clone(),
+                Some(admin.0.user.id),
+                "user.patch_rejected",
+                Some("user"),
+                Some(user_id),
+                serde_json::json!({ "reason": "last_admin_protection" }),
+            );
+            return Err(ApiError::Validation(vec![FieldError {
+                field: field.into(),
+                message: "cannot demote or disable the last remaining admin".into(),
+            }]));
+        }
     }
 
     // 2. Perform plan updates if requested
