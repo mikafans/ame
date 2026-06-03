@@ -255,7 +255,7 @@ pub async fn list_assessments(
          FROM tb_assessments a
          WHERE (a.created_by = $1 OR EXISTS (
              SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
-         ))",
+         )) AND a.deleted_at IS NULL",
     );
 
     let mut args = PgArguments::default();
@@ -551,7 +551,8 @@ pub async fn get_assessment(
     let row = sqlx::query(
         "SELECT * FROM tb_assessments WHERE id = $1 \
          AND (created_by = $2 \
-              OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2))",
+              OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2)) \
+         AND deleted_at IS NULL",
     )
     .bind(id)
     .bind(user.owner_id)
@@ -1260,7 +1261,8 @@ pub async fn count_assessments(
          WHERE (a.created_by = $1 OR EXISTS (
              SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
          ))
-           AND ($2::text IS NULL OR a.mode = $2)",
+           AND ($2::text IS NULL OR a.mode = $2)
+           AND a.deleted_at IS NULL",
     )
     .bind(auth.owner_id)
     .bind(q.mode)

@@ -31,8 +31,25 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** DELETE /v1/admin/assessments/{id} — delete any assessment (moderation) */
+        /** DELETE /v1/admin/assessments/{id} — soft-delete any assessment (moderation) */
         delete: operations["delete_assessment_admin"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/assessments/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /v1/admin/assessments/{id}/restore — restore a soft-deleted assessment */
+        post: operations["restore_assessment_admin"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -679,6 +696,8 @@ export interface components {
             /** Format: uuid */
             createdBy: string;
             createdByEmail?: string | null;
+            /** Format: date-time */
+            deletedAt?: string | null;
             description?: string | null;
             /** Format: uuid */
             id: string;
@@ -696,7 +715,7 @@ export interface components {
             /** Format: int64 */
             questionsCount: number;
             /** Format: int64 */
-            quotaRejectionsCount: number;
+            quotaRejectionsTotal: number;
             /** Format: int64 */
             sessionsCount: number;
             /** Format: int64 */
@@ -1512,6 +1531,48 @@ export interface operations {
                 content?: never;
             };
             /** @description Assessment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restore_assessment_admin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment restored successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found or not deleted */
             404: {
                 headers: {
                     [name: string]: unknown;

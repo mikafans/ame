@@ -434,3 +434,825 @@ async fn test_admin_flow_and_audit() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[tokio::test]
+async fn test_admin_health() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // 1. Create a non-admin user token
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let user_token_id = Uuid::now_v7();
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'user-key', $3, $4::text[])",
+    )
+    .bind(user_token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let user_auth = format!("{user_token_id}_{secret}");
+
+    // 2. Non-admin cannot access health endpoint
+    let res = client
+        .get(format!("{base_url}/v1/admin/health"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // 3. Create an admin user token
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    // 4. Admin can access health endpoint
+    let res = client
+        .get(format!("{base_url}/v1/admin/health"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let health: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(health["database"], "ok");
+    assert!(health["usersCount"].as_i64().is_some());
+    assert!(health["assessmentsCount"].as_i64().is_some());
+    assert!(health["sessionsCount"].as_i64().is_some());
+    assert!(health["questionsCount"].as_i64().is_some());
+    assert!(health["auditLogCount"].as_i64().is_some());
+    assert!(health["quotaRejectionsTotal"].as_i64().is_some());
+}
+
+#[tokio::test]
+async fn test_admin_user_filters() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // 1. Create admin and seed test users
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    // 2. Seed multiple test users with specific patterns
+    let alice_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Alice Smith', 'user', 'free')",
+    )
+    .bind(alice_id)
+    .bind("alice@example.com")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let bob_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Bob Jones', 'user', 'free')",
+    )
+    .bind(bob_id)
+    .bind("bob@example.com")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let charlie_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Charlie Brown', 'user', 'premium')",
+    )
+    .bind(charlie_id)
+    .bind("charlie@another.com")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 3. Test substring search by email
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?q=alice"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let users = body["users"].as_array().unwrap();
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0]["email"], "alice@example.com");
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+
+    // 4. Test substring search by display name
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?q=Jones"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let users = body["users"].as_array().unwrap();
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0]["displayName"], "Bob Jones");
+
+    // 5. Test limit parameter
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?limit=1"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let users = body["users"].as_array().unwrap();
+    assert_eq!(users.len(), 1);
+    assert!(body["total"].as_i64().unwrap() >= 3);
+
+    // 6. Test offset parameter
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?limit=1&offset=0"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body1: serde_json::Value = res.json().await.unwrap();
+    let user1 = &body1["users"][0];
+
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?limit=1&offset=1"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body2: serde_json::Value = res.json().await.unwrap();
+    let user2 = &body2["users"][0];
+
+    // Users should be different (ordered by created_at DESC)
+    assert_ne!(user1["id"], user2["id"]);
+}
+
+#[tokio::test]
+async fn test_admin_audit_filters() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // 1. Create admin
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    // 2. Create two regular users
+    let user1_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User 1', 'user', 'free')",
+    )
+    .bind(user1_id)
+    .bind(format!("user1-{}@example.com", user1_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let user2_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User 2', 'user', 'free')",
+    )
+    .bind(user2_id)
+    .bind(format!("user2-{}@example.com", user2_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 3. Admin updates both users' plans to generate audit logs
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{user1_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"plan": "premium"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{user2_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"plan": "premium"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Wait for audit logs to be inserted
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+
+    // 4. Test action filter
+    let res = client
+        .get(format!("{base_url}/v1/admin/audit?action=user.update_plan"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let logs = body["logs"].as_array().unwrap();
+
+    // Should have at least 2 logs (user1 and user2 plan updates)
+    assert!(logs.len() >= 2);
+    assert!(logs.iter().all(|log| log["action"] == "user.update_plan"));
+
+    // 5. Test target_id filter
+    let res = client
+        .get(format!("{base_url}/v1/admin/audit?targetId={user1_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let logs = body["logs"].as_array().unwrap();
+
+    // All logs should be for user1
+    assert!(
+        logs.iter()
+            .all(|log| log["targetId"] == user1_id.to_string())
+    );
+    assert!(body["total"].as_i64().unwrap() >= 1);
+}
+
+#[tokio::test]
+async fn test_admin_assessments_moderation() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // 1. Create admin and regular user
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let user_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'user-key', $3, $4::text[])",
+    )
+    .bind(user_token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let user_auth = format!("{user_token_id}_{secret}");
+
+    // 2. Seed an assessment
+    let assessment_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, objectives)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(assessment_id)
+    .bind("Test Assessment")
+    .bind("A test assessment for moderation")
+    .bind("practice")
+    .bind("active")
+    .bind(user_id)
+    .bind(vec!["objective1".to_string(), "objective2".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 3. Non-admin cannot list assessments
+    let res = client
+        .get(format!("{base_url}/v1/admin/assessments"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // 4. Admin can list assessments
+    let res = client
+        .get(format!("{base_url}/v1/admin/assessments"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let assessments = body["assessments"].as_array().unwrap();
+    assert!(
+        assessments
+            .iter()
+            .any(|a| a["id"] == assessment_id.to_string())
+    );
+
+    // 5. Non-admin cannot delete assessments
+    let res = client
+        .delete(format!("{base_url}/v1/admin/assessments/{assessment_id}"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // 6. Admin can delete assessment
+    let res = client
+        .delete(format!("{base_url}/v1/admin/assessments/{assessment_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // 7. Assessment should still be in admin list but with deletedAt set (soft delete)
+    let res = client
+        .get(format!("{base_url}/v1/admin/assessments"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let assessments = body["assessments"].as_array().unwrap();
+    let deleted_entry = assessments
+        .iter()
+        .find(|a| a["id"] == assessment_id.to_string())
+        .expect("Soft-deleted assessment should still appear in admin list");
+    assert!(
+        deleted_entry["deletedAt"].is_string(),
+        "deletedAt should be set for soft-deleted assessment"
+    );
+
+    // 8. Deleting again should return 404
+    let res = client
+        .delete(format!("{base_url}/v1/admin/assessments/{assessment_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 9. Verify cascade: seed a session referencing the assessment, then delete
+    let assessment2_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, objectives)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(assessment2_id)
+    .bind("Assessment with Session")
+    .bind(None::<String>)
+    .bind("practice")
+    .bind("active")
+    .bind(user_id)
+    .bind(vec![] as Vec<String>)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let session_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_sessions (id, user_id, assessment_id, kind, question_plan, status)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(session_id)
+    .bind(user_id)
+    .bind(assessment2_id)
+    .bind("assessment")
+    .bind(serde_json::json!({}))
+    .bind("in_progress")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Verify session exists
+    let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions WHERE id = $1")
+        .bind(session_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(session_count, 1);
+
+    // Delete assessment
+    let res = client
+        .delete(format!("{base_url}/v1/admin/assessments/{assessment2_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Verify session is still intact (soft delete = no cascade)
+    // With soft delete, sessions referencing the deleted assessment should still exist
+    let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions WHERE id = $1")
+        .bind(session_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(session_count, 1);
+}
+
+#[tokio::test]
+async fn test_admin_assessment_soft_delete() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // 1. Create admin user and token
+    let admin_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin User', 'admin', 'free')",
+    )
+    .bind(admin_id)
+    .bind(format!("admin-{}@example.com", admin_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let admin_token_id = Uuid::now_v7();
+    let admin_secret = "admin_secret";
+    let admin_hash = ame_api::auth::token::hash_secret(admin_secret);
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_id)
+    .bind(&admin_hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{admin_secret}");
+
+    // 2. Create a regular user and assessment
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Regular User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let assessment_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, objectives)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(assessment_id)
+    .bind("Test Assessment")
+    .bind("A test assessment")
+    .bind("practice")
+    .bind("active")
+    .bind(user_id)
+    .bind(vec![] as Vec<String>)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 3. Create a session referencing the assessment
+    let session_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_sessions (id, user_id, assessment_id, kind, question_plan, status)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(session_id)
+    .bind(user_id)
+    .bind(assessment_id)
+    .bind("assessment")
+    .bind(serde_json::json!({}))
+    .bind("in_progress")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 4. Soft-delete the assessment via admin API
+    let res = client
+        .delete(format!("{base_url}/v1/admin/assessments/{assessment_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // 5. Verify assessment is not in learner list (has deleted_at set)
+    let user_token_id = Uuid::now_v7();
+    let user_secret = "user_secret";
+    let user_hash = ame_api::auth::token::hash_secret(user_secret);
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'user-key', $3, $4::text[])",
+    )
+    .bind(user_token_id)
+    .bind(user_id)
+    .bind(&user_hash)
+    .bind(vec![
+        "assessment.read".to_string(),
+        "assessment.write".to_string(),
+        "attempt.read".to_string(),
+        "attempt.write".to_string(),
+    ])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let user_auth = format!("{user_token_id}_{user_secret}");
+
+    let res = client
+        .get(format!("{base_url}/v1/assessments/{assessment_id}"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 6. Assessment still appears in admin list with deletedAt set
+    let res = client
+        .get(format!("{base_url}/v1/admin/assessments"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let assessments = body["assessments"].as_array().unwrap();
+    let deleted_entry = assessments
+        .iter()
+        .find(|a| a["id"] == assessment_id.to_string())
+        .expect("Assessment should appear in admin list even when deleted");
+    assert!(
+        deleted_entry["deletedAt"].is_string(),
+        "deletedAt should be set"
+    );
+
+    // 7. Session still exists (no cascade)
+    let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions WHERE id = $1")
+        .bind(session_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        session_count, 1,
+        "Session should still exist after soft delete"
+    );
+
+    // 8. Restore the assessment
+    let res = client
+        .post(format!(
+            "{base_url}/v1/admin/assessments/{assessment_id}/restore"
+        ))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // 9. Learner can now see the assessment again
+    let res = client
+        .get(format!("{base_url}/v1/assessments/{assessment_id}"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 10. Admin list shows no deletedAt
+    let res = client
+        .get(format!("{base_url}/v1/admin/assessments"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let assessments = body["assessments"].as_array().unwrap();
+    let restored_entry = assessments
+        .iter()
+        .find(|a| a["id"] == assessment_id.to_string())
+        .expect("Restored assessment should appear in admin list");
+    assert!(
+        restored_entry["deletedAt"].is_null(),
+        "deletedAt should be null after restore"
+    );
+
+    // 11. Deleting non-existent assessment returns 404
+    let fake_id = Uuid::now_v7();
+    let res = client
+        .delete(format!("{base_url}/v1/admin/assessments/{fake_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}

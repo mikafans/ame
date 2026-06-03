@@ -174,7 +174,8 @@ pub async fn create_session(
             "SELECT 1 FROM tb_assessments \
              WHERE id = $1 \
                AND (created_by = $2 \
-                    OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2))",
+                    OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2)) \
+               AND deleted_at IS NULL",
         )
         .bind(assessment_id)
         .bind(auth.owner_id)
@@ -582,7 +583,7 @@ async fn build_assessment_plan(
     assessment_id: Uuid,
 ) -> Result<CreatePlan, ApiError> {
     let row = sqlx::query(
-        "SELECT mode, affects_rating FROM tb_assessments WHERE id = $1 AND status = 'active'",
+        "SELECT mode, affects_rating FROM tb_assessments WHERE id = $1 AND status = 'active' AND deleted_at IS NULL",
     )
     .bind(assessment_id)
     .fetch_optional(&mut *conn)

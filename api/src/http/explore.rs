@@ -114,7 +114,7 @@ pub async fn explore(
     let mut sql = String::from(
         "SELECT id, title, status, mode, objectives, created_at
          FROM tb_assessments
-         WHERE created_by = ANY($1)",
+         WHERE created_by = ANY($1) AND deleted_at IS NULL",
     );
     let mut args = PgArguments::default();
     args.add(accounts)
@@ -250,7 +250,7 @@ pub async fn explore_facets(
     let count_rows = sqlx::query(
         "SELECT mode, count(*) as cnt
          FROM tb_assessments
-         WHERE created_by = ANY($1)
+         WHERE created_by = ANY($1) AND deleted_at IS NULL
          GROUP BY mode",
     )
     .bind(&accounts)
@@ -274,7 +274,7 @@ pub async fn explore_facets(
     let tag_rows = sqlx::query(
         "SELECT DISTINCT unnest(objectives) AS t
          FROM tb_assessments
-         WHERE created_by = ANY($1)
+         WHERE created_by = ANY($1) AND deleted_at IS NULL
          ORDER BY t
          LIMIT 200",
     )

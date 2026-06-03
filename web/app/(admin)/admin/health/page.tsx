@@ -31,7 +31,7 @@ interface HealthData {
   sessionsCount: number;
   questionsCount: number;
   auditLogCount: number;
-  quotaRejectionsCount: number;
+  quotaRejectionsTotal: number;
 }
 
 export default function SystemHealthPage() {
@@ -413,7 +413,7 @@ export default function SystemHealthPage() {
               gap: 3,
               height: "100%",
               borderColor:
-                (health?.quotaRejectionsCount ?? 0) > 0
+                (health?.quotaRejectionsTotal ?? 0) > 0
                   ? "warning.main"
                   : "divider",
             }}
@@ -423,11 +423,11 @@ export default function SystemHealthPage() {
                 p: 1.5,
                 borderRadius: 2,
                 bgcolor:
-                  (health?.quotaRejectionsCount ?? 0) > 0
+                  (health?.quotaRejectionsTotal ?? 0) > 0
                     ? "warning.light"
                     : "success.light",
                 color:
-                  (health?.quotaRejectionsCount ?? 0) > 0
+                  (health?.quotaRejectionsTotal ?? 0) > 0
                     ? "warning.contrastText"
                     : "success.contrastText",
               }}
@@ -446,7 +446,7 @@ export default function SystemHealthPage() {
                 variant="h4"
                 fontWeight="bold"
                 color={
-                  (health?.quotaRejectionsCount ?? 0) > 0
+                  (health?.quotaRejectionsTotal ?? 0) > 0
                     ? "warning.main"
                     : "text.primary"
                 }
@@ -455,7 +455,7 @@ export default function SystemHealthPage() {
                 {loading ? (
                   <CircularProgress size={24} />
                 ) : (
-                  (health?.quotaRejectionsCount.toLocaleString() ?? "0")
+                  (health?.quotaRejectionsTotal.toLocaleString() ?? "0")
                 )}
               </Typography>
               <Typography

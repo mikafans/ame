@@ -57,7 +57,7 @@ paths:
     delete:
       tags:
       - admin
-      summary: DELETE /v1/admin/assessments/{id} — delete any assessment (moderation)
+      summary: DELETE /v1/admin/assessments/{id} — soft-delete any assessment (moderation)
       operationId: delete_assessment_admin
       parameters:
       - name: id
@@ -76,6 +76,31 @@ paths:
           description: Forbidden (Admin required)
         '404':
           description: Assessment not found
+      security:
+      - bearer: []
+  /v1/admin/assessments/{id}/restore:
+    post:
+      tags:
+      - admin
+      summary: POST /v1/admin/assessments/{id}/restore — restore a soft-deleted assessment
+      operationId: restore_assessment_admin
+      parameters:
+      - name: id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Assessment restored successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+        '404':
+          description: Assessment not found or not deleted
       security:
       - bearer: []
   /v1/admin/audit:
@@ -1494,6 +1519,11 @@ components:
           type:
           - string
           - 'null'
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
         description:
           type:
           - string
@@ -1521,7 +1551,7 @@ components:
       - sessionsCount
       - questionsCount
       - auditLogCount
-      - quotaRejectionsCount
+      - quotaRejectionsTotal
       properties:
         assessmentsCount:
           type: integer
@@ -1534,7 +1564,7 @@ components:
         questionsCount:
           type: integer
           format: int64
-        quotaRejectionsCount:
+        quotaRejectionsTotal:
           type: integer
           format: int64
         sessionsCount:
