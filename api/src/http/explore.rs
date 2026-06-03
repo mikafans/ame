@@ -38,14 +38,14 @@ pub struct ExploreResponse {
     pub next_cursor: Option<String>,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExploreFacetsResponse {
     pub tags: Vec<String>,
     pub counts: ExploreCounts,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ExploreCounts {
     pub practice: i64,
     pub graded: i64,
@@ -229,6 +229,20 @@ pub async fn explore_facets(
     let pool = &state.pool;
     let uid = auth.owner_id;
 
+    // 1. Try to load from cache
+    let cache_key = format!("ame:cache:facets:{}", uid);
+    if let Ok(mut conn) = state.valkey.get().await {
+        use redis::AsyncCommands;
+        if let Some(cached) = conn
+            .get::<_, String>(&cache_key)
+            .await
+            .ok()
+            .and_then(|val| serde_json::from_str::<ExploreFacetsResponse>(&val).ok())
+        {
+            return Ok(Json(cached));
+        }
+    }
+
     // Get accessible account ids (owner + sub-accounts)
     let accounts = get_accessible_accounts(pool, uid).await?;
 
@@ -274,8 +288,18 @@ pub async fn explore_facets(
         .map(|row| row.get::<String, _>("t"))
         .collect();
 
-    Ok(Json(ExploreFacetsResponse {
+    let response = ExploreFacetsResponse {
         tags,
         counts: ExploreCounts { practice, graded },
-    }))
+    };
+
+    // 3. Cache the response in Valkey with a short TTL (10 seconds)
+    if let Ok(mut conn) = state.valkey.get().await {
+        use redis::AsyncCommands;
+        if let Ok(serialized) = serde_json::to_string(&response) {
+            let _: Result<(), _> = conn.set_ex(&cache_key, serialized, 10).await;
+        }
+    }
+
+    Ok(Json(response))
 }

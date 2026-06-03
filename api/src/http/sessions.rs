@@ -1247,7 +1247,7 @@ pub async fn list_my_sessions(
                     SELECT COUNT(*) \
                     FROM tb_sessions s2 \
                     WHERE s2.user_id = s.user_id \
-                      AND s2.assessment_id = s.assessment_id \
+                      AND s2.assessment_id IS NOT DISTINCT FROM s.assessment_id \
                       AND s2.status = 'finished' \
                       AND s2.started_at <= s.started_at \
                 ) AS attempt_number, \
@@ -1255,7 +1255,7 @@ pub async fn list_my_sessions(
                     SELECT COUNT(*) \
                     FROM tb_sessions s3 \
                     WHERE s3.user_id = s.user_id \
-                      AND s3.assessment_id = s.assessment_id \
+                      AND s3.assessment_id IS NOT DISTINCT FROM s.assessment_id \
                       AND s3.status = 'finished' \
                 ) AS total_attempts \
          FROM tb_sessions s \

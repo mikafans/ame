@@ -567,12 +567,41 @@ async fn run_assessment_batch_create(
         }]));
     }
 
-    const MAX_BATCH: usize = 500;
-    if batch.items.len() > MAX_BATCH {
+    let (burst, rate) = match auth.owner_plan.as_str() {
+        "premium" => (
+            state.config.ratelimit.premium.burst,
+            state.config.ratelimit.premium.rate as f64,
+        ),
+        _ => (
+            state.config.ratelimit.free.burst,
+            state.config.ratelimit.free.rate as f64,
+        ),
+    };
+
+    let max_batch = match auth.owner_plan.as_str() {
+        "premium" => state.config.batch.premium,
+        _ => state.config.batch.free,
+    };
+    let n = batch.items.len();
+    if n > max_batch {
         return Err(ApiError::Validation(vec![FieldError {
             field: "items".into(),
-            message: format!("batch size exceeds maximum of {MAX_BATCH}"),
+            message: format!(
+                "batch size {n} exceeds the maximum of {max_batch} for your plan. Upgrade to Premium for larger batches."
+            ),
         }]));
+    }
+
+    let write_cost = state.config.ratelimit.cost.write;
+    let extra = (n as u32).saturating_sub(write_cost);
+    let limit_key = format!("ame:limiter:owner:{}", auth.owner_id);
+    if extra > 0
+        && !state
+            .limiter
+            .try_consume(&limit_key, burst, rate, extra)
+            .await
+    {
+        return Err(ApiError::TooManyRequests);
     }
 
     // Validate all items upfront and collect precomputed values
