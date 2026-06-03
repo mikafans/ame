@@ -885,6 +885,7 @@ export interface components {
             passingPoints?: number | null;
             questions?: components["schemas"]["QuestionImport"][];
             showResultsDuring?: boolean;
+            status?: string | null;
             /** Format: int32 */
             timeLimitSeconds?: number | null;
             title: string;

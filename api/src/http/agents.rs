@@ -97,6 +97,20 @@ pub async fn openapi_json(
     Json(doc)
 }
 
+async fn get_accessible_accounts(
+    pool: &sqlx::PgPool,
+    owner_id: Uuid,
+) -> Result<Vec<Uuid>, ApiError> {
+    let rows =
+        sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1")
+            .bind(owner_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
 /// GET /v1/agents/activity — paginated ActivityLog.
 pub async fn activity(
     State(state): State<AppState>,
@@ -104,17 +118,18 @@ pub async fn activity(
     Query(q): Query<ActivityQuery>,
 ) -> Result<Json<ActivityResponse>, ApiError> {
     let limit = q.limit.unwrap_or(50).min(50);
+    let accounts = get_accessible_accounts(&state.pool, user.0.user.id).await?;
 
     let rows = if let Some(cursor) = q.cursor {
         sqlx::query(
             "SELECT a.id, a.ts, a.agent_id, u.display_name as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
              LEFT JOIN tb_users u ON a.agent_id = u.id
-             WHERE (a.agent_id = $1 OR a.agent_id IN (SELECT id FROM tb_users WHERE owner_user_id = $1)) AND a.id < $2
+             WHERE a.agent_id = ANY($1) AND a.id < $2
              ORDER BY a.id DESC
              LIMIT $3",
         )
-        .bind(user.0.user.id)
+        .bind(&accounts)
         .bind(cursor)
         .bind(limit + 1)
         .fetch_all(&state.pool)
@@ -124,11 +139,11 @@ pub async fn activity(
             "SELECT a.id, a.ts, a.agent_id, u.display_name as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
              LEFT JOIN tb_users u ON a.agent_id = u.id
-             WHERE (a.agent_id = $1 OR a.agent_id IN (SELECT id FROM tb_users WHERE owner_user_id = $1))
+             WHERE a.agent_id = ANY($1)
              ORDER BY a.id DESC
              LIMIT $2",
         )
-        .bind(user.0.user.id)
+        .bind(&accounts)
         .bind(limit + 1)
         .fetch_all(&state.pool)
         .await
@@ -231,6 +246,7 @@ fn build_skill_manifest(strict: bool) -> Value {
                     "course":{"type":"string"},
                     "objectives":{"type":"array","items":{"type":"string"}},
                     "method":{"type":"string","enum":["manual","agent"]},
+                    "status":{"type":"string","enum":["draft","active","archived"]},
                     "questions":{
                         "type":"array",
                         "items":{
@@ -250,6 +266,51 @@ fn build_skill_manifest(strict: bool) -> Value {
             }),
             "POST",
             "/v1/assessments",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
+            "assessment.batchCreate",
+            "Batch-create multiple assessments in one call.",
+            json!({
+                "type":"object",
+                "required":["items"],
+                "properties":{
+                    "items":{
+                        "type":"array",
+                        "items":{
+                            "type":"object",
+                            "required":["title","mode","method"],
+                            "properties":{
+                                "title":{"type":"string"},
+                                "description":{"type":"string"},
+                                "mode":{"type":"string","enum":["practice","graded"]},
+                                "course":{"type":"string"},
+                                "objectives":{"type":"array","items":{"type":"string"}},
+                                "method":{"type":"string","enum":["manual","agent"]},
+                                "status":{"type":"string","enum":["draft","active","archived"]},
+                                "questions":{
+                                    "type":"array",
+                                    "items":{
+                                        "type":"object",
+                                        "required":["kind","prompt","payload"],
+                                        "properties":{
+                                            "kind":{"type":"string","enum":["mc","tf","short","essay","code"]},
+                                            "prompt":{"type":"string"},
+                                            "payload":{"type":"object"},
+                                            "explanation":{"type":"string"},
+                                            "tags":{"type":"array","items":{"type":"string"}},
+                                            "points":{"type":"integer"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }),
+            "POST",
+            "/v1/agents/batchCreate",
             Some("assessment.write"),
             strict,
         ),
@@ -383,6 +444,7 @@ fn build_skill_manifest(strict: bool) -> Value {
             "body": { "tool": "<tool name>", "params": { "...": "..." } },
             "runnable_tools": [
                 "assessment.create",
+                "assessment.batchCreate",
                 "assessment.update",
                 "question.create",
                 "question.promote",
@@ -422,6 +484,10 @@ pub async fn run(
         "assessment.create" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_assessment_create(&state, &auth, body.params).await
+        }
+        "assessment.batchCreate" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_batch_create(&state, &auth, body.params).await
         }
         "assessment.update" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
@@ -470,6 +536,70 @@ async fn run_assessment_create(
         ok: true,
         tool: "assessment.create".into(),
         result: serde_json::to_value(res.1.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_batch_create(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    #[derive(Debug, Deserialize)]
+    struct BatchParams {
+        items: Vec<crate::domain::assessment::CreateAssessmentRequest>,
+    }
+
+    let batch: BatchParams = serde_json::from_value(params).map_err(|e| {
+        ApiError::Validation(vec![FieldError {
+            field: "params".into(),
+            message: format!("invalid batch request: {e}"),
+        }])
+    })?;
+
+    if batch.items.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "items".into(),
+            message: "items array must not be empty".into(),
+        }]));
+    }
+
+    const MAX_BATCH: usize = 500;
+    if batch.items.len() > MAX_BATCH {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "items".into(),
+            message: format!("batch size exceeds maximum of {MAX_BATCH}"),
+        }]));
+    }
+
+    let mut created = Vec::new();
+    for (idx, item) in batch.items.into_iter().enumerate() {
+        match super::assessments::create_assessment(auth.clone(), State(state.clone()), Json(item))
+            .await
+        {
+            Ok((_, Json(summary))) => {
+                created.push(json!({
+                    "id": summary.id,
+                    "status": summary.status,
+                }));
+            }
+            Err(e) => {
+                return Err(ApiError::Internal(anyhow::anyhow!(
+                    "batch item {}: {}",
+                    idx,
+                    e
+                )));
+            }
+        }
+    }
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.batchCreate".into(),
+        result: json!({
+            "created": created,
+            "count": created.len(),
+        }),
         error: None,
     }))
 }

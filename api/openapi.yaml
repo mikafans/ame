@@ -2021,6 +2021,10 @@ components:
             $ref: '#/components/schemas/QuestionImport'
         showResultsDuring:
           type: boolean
+        status:
+          type:
+          - string
+          - 'null'
         timeLimitSeconds:
           type:
           - integer

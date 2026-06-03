@@ -353,10 +353,23 @@ pub async fn create_assessment(
         ]));
     }
 
+    let status = if let Some(ref s) = payload.status {
+        parse_status(s).map_err(|e| {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "status".to_string(),
+                message: e,
+            }])
+        })?;
+        s.clone()
+    } else {
+        "draft".to_string()
+    };
+
     tracing::info!(
-        "Creating assessment: title='{}', questions={}",
+        "Creating assessment: title='{}', questions={}, status='{}'",
         payload.title,
-        payload.questions.len()
+        payload.questions.len(),
+        status
     );
     let mut tx = state
         .pool
@@ -378,15 +391,16 @@ pub async fn create_assessment(
 
     sqlx::query(
         "INSERT INTO tb_assessments \
-         (id, title, description, mode, objectives, course, duration_min, \
+         (id, title, description, mode, status, objectives, course, duration_min, \
           time_limit_seconds, passing_points, show_results_during, affects_rating, \
           method, created_by, total_points) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
     )
     .bind(assessment_id)
     .bind(payload.title.clone())
     .bind(payload.description.clone())
     .bind(payload.mode.to_string())
+    .bind(&status)
     .bind(payload.objectives.clone())
     .bind(payload.course.clone())
     .bind(payload.duration_min)
@@ -476,7 +490,7 @@ pub async fn create_assessment(
             title: payload.title,
             description: payload.description,
             mode: payload.mode.to_string(),
-            status: "draft".to_string(),
+            status,
             course: payload.course,
             objectives: payload.objectives,
             duration_min: payload.duration_min,

@@ -116,41 +116,49 @@ def mint_for_user(client, email, password, n_assessments, n_exams, q_min, q_max,
     task = progress.add_task(f"[cyan]{email}", total=n_assessments + n_exams)
     minted = 0
     seq = 0
+    batch_size = 200
+
     for mode, title_prefix, count in (
         ("practice", "Knowledge Check", n_assessments),
         ("graded", "Mastery Exam", n_exams),
     ):
-        for i in range(count):
-            topic = random.choice(TOPICS)
-            qs = [make_question(seq * q_max + k) for k in range(random.randint(q_min, q_max))]
-            seq += 1
+        for batch_start in range(0, count, batch_size):
+            batch_end = min(batch_start + batch_size, count)
+            batch_items = []
 
-            resp = request_with_retry(client, "POST", "/v1/agents/run", json={
-                "tool": "assessment.create",
-                "params": {
+            for i in range(batch_start, batch_end):
+                topic = random.choice(TOPICS)
+                qs = [make_question(seq * q_max + k) for k in range(random.randint(q_min, q_max))]
+                seq += 1
+
+                # Alternate status: draft and active (50/50 mix)
+                status = "active" if i % 2 == 0 else "draft"
+
+                batch_items.append({
                     "title": f"{title_prefix} {i}: {topic.capitalize()}",
                     "mode": mode,
                     "objectives": [f"Master {topic}", f"Understand {random.choice(TOPICS)}"],
                     "course": "Mega Scale 2026",
                     "method": "agent",
+                    "status": status,
                     "questions": qs,
+                })
+
+            resp = request_with_retry(client, "POST", "/v1/agents/run", json={
+                "tool": "assessment.batchCreate",
+                "params": {
+                    "items": batch_items,
                 },
             }, headers=agent_headers)
 
             if not resp.is_success or not resp.json().get("ok"):
-                progress.console.print(f"[red]{email} item {i} ({mode}) failed: {resp.text}[/red]")
-                progress.update(task, advance=1)
+                progress.console.print(f"[red]{email} batch ({mode} {batch_start}-{batch_end}) failed: {resp.text}[/red]")
+                progress.update(task, advance=batch_end - batch_start)
                 continue
 
-            # Publish every other item so the data set has a mix of active + draft.
-            if i % 2 == 0:
-                request_with_retry(client, "POST", "/v1/agents/run", json={
-                    "tool": "assessment.update",
-                    "params": {"id": resp.json()["result"]["id"], "status": "active"},
-                }, headers=agent_headers)
-
-            minted += 1
-            progress.update(task, advance=1)
+            batch_count = resp.json()["result"].get("count", 0)
+            minted += batch_count
+            progress.update(task, advance=batch_end - batch_start)
 
     return minted
 
