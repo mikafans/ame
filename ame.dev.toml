@@ -1,0 +1,32 @@
+# AME Development Configuration File
+# Rate limits effectively disabled for dev testing (10x higher bursts than production)
+
+[server]
+port = 28080
+production = false
+cors_origins = "http://localhost:23000"
+log_format = "compact"
+
+[ratelimit.free]
+burst = 1000000
+rate = 1000000
+
+[ratelimit.premium]
+burst = 1000000
+rate = 1000000
+
+[ratelimit.public]
+burst = 1000000
+period_secs = 2
+
+[ratelimit.export]
+burst = 1000000
+period_secs = 60
+
+[ratelimit.cost]
+read = 1
+write = 5
+
+[batch]
+free = 50
+premium = 500

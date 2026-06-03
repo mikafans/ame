@@ -248,6 +248,7 @@ pub async fn patch_user_admin(
         );
     }
 
+    crate::auth::extractor::invalidate_user_tokens(&state.pool, &state.valkey, user_id).await;
     Ok(StatusCode::NO_CONTENT)
 }
 

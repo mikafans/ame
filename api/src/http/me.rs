@@ -273,6 +273,8 @@ pub async fn rotate_key(
         });
     }
 
+    crate::auth::extractor::invalidate_token(&state.valkey, id).await;
+
     Ok(Json(RotateKeyResponse {
         secret: format!("{}_{}", id, secret),
     }))
@@ -309,6 +311,8 @@ pub async fn revoke_key(
             resource: "api_key",
         });
     }
+
+    crate::auth::extractor::invalidate_token(&state.valkey, id).await;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -517,6 +521,8 @@ pub async fn update_agent(
     tx.commit()
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
+
+    crate::auth::extractor::invalidate_user_tokens(&state.pool, &state.valkey, id).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -537,6 +543,13 @@ pub async fn delete_agent(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    let token_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM tb_api_tokens WHERE user_id = $1")
+            .bind(id)
+            .fetch_all(&state.pool)
+            .await
+            .unwrap_or_default();
+
     let affected =
         sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
             .bind(id)
@@ -547,6 +560,14 @@ pub async fn delete_agent(
 
     if affected.rows_affected() == 0 {
         return Err(ApiError::NotFound { resource: "agent" });
+    }
+
+    if let Ok(mut conn) = state.valkey.get().await {
+        use redis::AsyncCommands;
+        for tid in token_ids {
+            let cache_key = format!("ame:token:{}", tid);
+            let _: Result<(), _> = conn.del(&cache_key).await;
+        }
     }
 
     Ok(StatusCode::NO_CONTENT)

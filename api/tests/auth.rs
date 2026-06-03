@@ -25,7 +25,44 @@ impl ScopeConstraint for WriteQuestionsScope {
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
 
 fn create_test_router(pool: PgPool) -> Router {
-    let state = AppState { pool };
+    let config = ame_api::config::Config::load().unwrap_or(ame_api::config::Config {
+        server: ame_api::config::ServerConfig {
+            port: 28080,
+            production: false,
+            cors_origins: "http://localhost:23000".to_string(),
+            log_format: "compact".to_string(),
+            database_url: None,
+            valkey_url: None,
+        },
+        ratelimit: ame_api::config::RateLimitConfig {
+            free: ame_api::config::TierConfig { burst: 60, rate: 1 },
+            premium: ame_api::config::TierConfig {
+                burst: 600,
+                rate: 10,
+            },
+            public: ame_api::config::PublicConfig {
+                burst: 10,
+                period_secs: 2,
+            },
+            export: ame_api::config::ExportConfig {
+                burst: 1,
+                period_secs: 60,
+            },
+            cost: ame_api::config::CostConfig { read: 1, write: 5 },
+        },
+        batch: ame_api::config::BatchConfig {
+            free: 50,
+            premium: 500,
+        },
+    });
+    let valkey = ame_api::config::create_valkey_pool(&config).unwrap();
+    let limiter = std::sync::Arc::new(ame_api::ratelimit::RateLimiter::new(valkey.clone()));
+    let state = AppState {
+        pool,
+        config,
+        valkey,
+        limiter,
+    };
     Router::new()
         .route(
             "/protected",
@@ -269,6 +306,100 @@ async fn revoked_token_returns_unauthorized() {
     let client = reqwest::Client::new();
     let res = client
         .get(format!("http://{addr}/protected"))
+        .header(header::AUTHORIZATION, format!("Bearer {}", bearer_token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_token_caching_and_invalidation() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let config = ame_api::config::Config::load().unwrap();
+    let valkey = ame_api::config::create_valkey_pool(&config).unwrap();
+
+    let app = create_test_router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // Setup user and token
+    let user_id = uuid::Uuid::now_v7();
+    let token_id = uuid::Uuid::now_v7();
+    let secret = "cached_secret_123";
+    let hash = hash_secret(secret);
+
+    sqlx::query(
+        "INSERT INTO tb_users (id, display_name, email, role) \
+         VALUES ($1, 'Cache Test User', $2, 'user')",
+    )
+    .bind(user_id)
+    .bind(format!("cache-{user_id}@example.com"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let scopes = vec!["assessment.read".to_string()];
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'cached token', $3, $4)",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind(hash)
+    .bind(&scopes)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let bearer_token = format!("{}_{}", token_id, secret);
+
+    // 1. Initial request: should populate cache
+    let res = client
+        .get(format!("{base_url}/protected"))
+        .header(header::AUTHORIZATION, format!("Bearer {}", bearer_token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 2. Modify database directly (revoke token) to bypass normal API pathways
+    sqlx::query("UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1")
+        .bind(token_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // 3. Request should STILL succeed because it hits the cached (non-revoked) info
+    let res = client
+        .get(format!("{base_url}/protected"))
+        .header(header::AUTHORIZATION, format!("Bearer {}", bearer_token))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 4. Manually invalidate token cache key
+    ame_api::auth::extractor::invalidate_token(&valkey, token_id).await;
+
+    // 5. Subsequent request should fail (cache miss, loads revoked token from DB)
+    let res = client
+        .get(format!("{base_url}/protected"))
         .header(header::AUTHORIZATION, format!("Bearer {}", bearer_token))
         .send()
         .await

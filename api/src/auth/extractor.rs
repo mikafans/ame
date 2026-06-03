@@ -73,44 +73,86 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             })
             .ok_or(ApiError::Unauthorized)?;
 
-        // Find token and user
-        let record = sqlx::query(
-            r#"
-            SELECT 
-                t.token_hash, t.scopes, t.revoked_at, t.expires_at,
-                u.id as user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.owner_user_id,
-                u.deactivated_at as user_deactivated_at,
-                o.deactivated_at as owner_deactivated_at,
-                COALESCE(o.plan, u.plan) as owner_plan
-            FROM tb_api_tokens t
-            JOIN tb_users u ON t.user_id = u.id
-            LEFT JOIN tb_users o ON u.owner_user_id = o.id
-            WHERE t.id = $1
-            "#,
-        )
-        .bind(parsed.id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| {
-            eprintln!("EXTRACTOR QUERY ERROR: {:?}", e);
-            ApiError::Internal(e.into())
-        })?
-        .ok_or(ApiError::Unauthorized)?;
+        // 1. Try to fetch from Valkey token cache
+        let cache_key = format!("ame:token:{}", parsed.id);
+        let mut cached_info: Option<CachedTokenInfo> = None;
 
-        let revoked_at: Option<time::OffsetDateTime> = record.get("revoked_at");
-        let expires_at: time::OffsetDateTime = record.get("expires_at");
-        if revoked_at.is_some() || expires_at < time::OffsetDateTime::now_utc() {
+        if let Ok(mut conn) = state.valkey.get().await {
+            use redis::AsyncCommands;
+            if let Some(info) = conn
+                .get::<_, String>(&cache_key)
+                .await
+                .ok()
+                .and_then(|val| serde_json::from_str::<CachedTokenInfo>(&val).ok())
+            {
+                cached_info = Some(info);
+            }
+        }
+
+        // 2. Fall back to PostgreSQL if cache miss or error
+        let info = if let Some(info) = cached_info {
+            info
+        } else {
+            let record = sqlx::query(
+                r#"
+                SELECT 
+                    t.token_hash, t.scopes, t.revoked_at, t.expires_at,
+                    u.id as user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.owner_user_id,
+                    u.deactivated_at as user_deactivated_at,
+                    o.deactivated_at as owner_deactivated_at,
+                    COALESCE(o.plan, u.plan) as owner_plan
+                FROM tb_api_tokens t
+                JOIN tb_users u ON t.user_id = u.id
+                LEFT JOIN tb_users o ON u.owner_user_id = o.id
+                WHERE t.id = $1
+                "#,
+            )
+            .bind(parsed.id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                eprintln!("EXTRACTOR QUERY ERROR: {:?}", e);
+                ApiError::Internal(e.into())
+            })?
+            .ok_or(ApiError::Unauthorized)?;
+
+            let db_info = CachedTokenInfo {
+                token_hash: record.get("token_hash"),
+                scopes: record.get("scopes"),
+                revoked_at: record.get("revoked_at"),
+                expires_at: record.get("expires_at"),
+                user_id: record.get("user_id"),
+                email: record.get("email"),
+                display_name: record.get("display_name"),
+                role: record.get("role"),
+                plan: record.get("plan"),
+                created_at: record.get("created_at"),
+                owner_user_id: record.get("owner_user_id"),
+                user_deactivated_at: record.get("user_deactivated_at"),
+                owner_deactivated_at: record.get("owner_deactivated_at"),
+                owner_plan: record.get("owner_plan"),
+            };
+
+            // Attempt to cache in Valkey with 30s TTL
+            if let Ok(mut conn) = state.valkey.get().await {
+                use redis::AsyncCommands;
+                if let Ok(serialized) = serde_json::to_string(&db_info) {
+                    let _: Result<(), _> = conn.set_ex(&cache_key, serialized, 30).await;
+                }
+            }
+
+            db_info
+        };
+
+        if info.revoked_at.is_some() || info.expires_at < time::OffsetDateTime::now_utc() {
             return Err(ApiError::Unauthorized);
         }
 
-        let user_deactivated_at: Option<time::OffsetDateTime> = record.get("user_deactivated_at");
-        let owner_deactivated_at: Option<time::OffsetDateTime> = record.get("owner_deactivated_at");
-        if user_deactivated_at.is_some() || owner_deactivated_at.is_some() {
+        if info.user_deactivated_at.is_some() || info.owner_deactivated_at.is_some() {
             return Err(ApiError::Unauthorized);
         }
 
-        let token_hash: String = record.get("token_hash");
-        if !verify_token_secret(&token_hash, &parsed.secret) {
+        if !verify_token_secret(&info.token_hash, &parsed.secret) {
             return Err(ApiError::Unauthorized);
         }
 
@@ -124,35 +166,31 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                 .await;
         });
 
-        let role: String = record.get("role");
-        let role = match role.as_str() {
+        let role = match info.role.as_str() {
             "user" => crate::domain::user::Role::User,
             "admin" => crate::domain::user::Role::Admin,
             "agent" => crate::domain::user::Role::Agent,
             _ => {
                 return Err(ApiError::Internal(anyhow::anyhow!(
-                    "unknown role in users.role: {role}"
+                    "unknown role in users.role: {}",
+                    info.role
                 )));
             }
         };
 
         let user = User {
-            id: record.get("user_id"),
-            owner_user_id: record.get("owner_user_id"),
-            email: record.get("email"),
-            display_name: record.get("display_name"),
+            id: info.user_id,
+            owner_user_id: info.owner_user_id,
+            email: info.email,
+            display_name: info.display_name,
             role,
-            plan: record.get("plan"),
-            created_at: record.get("created_at"),
+            plan: info.plan,
+            created_at: info.created_at,
         };
         let owner_id = user.owner_user_id.unwrap_or(user.id);
 
-        // The DB CHECK constraint on api_tokens.scopes restricts values to the
-        // three known wire strings. We still parse defensively: a row that
-        // bypasses the constraint (manual SQL, dropped check, etc.) becomes a
-        // 500 instead of a silently accepted unknown scope.
-        let raw_scopes: Vec<String> = record.get("scopes");
-        let token_scopes = raw_scopes
+        let token_scopes = info
+            .scopes
             .into_iter()
             .map(|s| Scope::from_str(&s))
             .collect::<Result<Vec<_>, _>>()
@@ -162,8 +200,66 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             user,
             token_scopes,
             owner_id,
-            owner_plan: record.get("owner_plan"),
+            owner_plan: info.owner_plan,
         })
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CachedTokenInfo {
+    pub token_hash: String,
+    pub scopes: Vec<String>,
+    pub revoked_at: Option<time::OffsetDateTime>,
+    pub expires_at: time::OffsetDateTime,
+    pub user_id: Uuid,
+    pub email: Option<String>,
+    pub display_name: String,
+    pub role: String,
+    pub plan: String,
+    pub created_at: time::OffsetDateTime,
+    pub owner_user_id: Option<Uuid>,
+    pub user_deactivated_at: Option<time::OffsetDateTime>,
+    pub owner_deactivated_at: Option<time::OffsetDateTime>,
+    pub owner_plan: String,
+}
+
+pub async fn invalidate_token(valkey: &deadpool_redis::Pool, token_id: Uuid) {
+    if let Ok(mut conn) = valkey.get().await {
+        use redis::AsyncCommands;
+        let cache_key = format!("ame:token:{}", token_id);
+        let _: Result<(), _> = conn.del(&cache_key).await;
+    }
+}
+
+pub async fn invalidate_user_tokens(
+    pool: &sqlx::PgPool,
+    valkey: &deadpool_redis::Pool,
+    user_id: Uuid,
+) {
+    let token_ids: Vec<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT t.id FROM tb_api_tokens t
+        JOIN tb_users u ON t.user_id = u.id
+        WHERE u.id = $1 OR u.owner_user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    if let Ok(mut conn) = valkey.get().await {
+        use redis::AsyncCommands;
+        for tid in token_ids {
+            let cache_key = format!("ame:token:{}", tid);
+            let _: Result<(), _> = conn.del(&cache_key).await;
+        }
+    }
+
+    if let Ok(mut conn) = valkey.get().await {
+        use redis::AsyncCommands;
+        let limit_key = format!("ame:limiter:owner:{}", user_id);
+        let _: Result<(), _> = conn.del(&limit_key).await;
     }
 }
 

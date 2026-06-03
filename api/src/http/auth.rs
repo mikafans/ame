@@ -49,19 +49,12 @@ pub struct UserInfo {
 
 // ── handlers ──────────────────────────────────────────────────────────────────
 
-fn set_token_cookie_header(token: &str) -> String {
-    let secure = if std::env::var("AME_PRODUCTION").is_ok() {
-        "; Secure"
-    } else {
-        ""
-    };
+fn set_token_cookie_header(token: &str, secure: bool) -> String {
+    let secure_suffix = if secure { "; Secure" } else { "" };
     // Note: SameSite=Lax is fine for same-host dev or same-site prod deploys.
     // True cross-domain deploys (e.g. web and api on completely different domains)
     // will require SameSite=None and Secure to allow the cookie on subrequests.
-    format!(
-        "ame_token={}; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=86400",
-        token, secure
-    )
+    format!("ame_token={token}; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=2592000")
 }
 
 /// POST /v1/auth/register — register a new user with email and password.
@@ -153,7 +146,7 @@ pub async fn register(
     let role: String = result.get("role");
 
     let token_str = issue_token(&state.pool, user_id, &role).await?;
-    let cookie_header = set_token_cookie_header(&token_str);
+    let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
     Ok((
         StatusCode::CREATED,
@@ -226,7 +219,7 @@ pub async fn login(
     let role: String = user_row.get("role");
 
     let token_str = issue_token(&state.pool, user_id, &role).await?;
-    let cookie_header = set_token_cookie_header(&token_str);
+    let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
     Ok((
         StatusCode::OK,
@@ -347,11 +340,11 @@ pub async fn logout(
                 .and_then(|v| crate::auth::token::parse_token_value(&v))
         })
     {
-        // Ignore failures since we're logging out anyway
         let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
             .bind(parsed.id)
             .execute(&state.pool)
             .await;
+        crate::auth::extractor::invalidate_token(&state.valkey, parsed.id).await;
     }
 
     (
@@ -360,7 +353,7 @@ pub async fn logout(
             "set-cookie".to_string(),
             format!(
                 "ame_token=; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=0",
-                if std::env::var("AME_PRODUCTION").is_ok() {
+                if state.config.server.production {
                     "; Secure"
                 } else {
                     ""

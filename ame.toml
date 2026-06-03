@@ -1,0 +1,32 @@
+# AME Configuration File
+# Controls server settings, rate limits, and system tunables.
+
+[server]
+port = 28080
+production = false
+cors_origins = "http://localhost:23000"
+log_format = "compact"
+
+[ratelimit.free]
+burst = 60
+rate = 1
+
+[ratelimit.premium]
+burst = 600
+rate = 10
+
+[ratelimit.public]
+burst = 10
+period_secs = 2
+
+[ratelimit.export]
+burst = 1
+period_secs = 60
+
+[ratelimit.cost]
+read = 1
+write = 5
+
+[batch]
+free = 50
+premium = 500
