@@ -50,6 +50,20 @@ fn create_test_router(pool: PgPool) -> Router {
             },
             cost: ame_api::config::CostConfig { read: 1, write: 5 },
         },
+        quota: ame_api::config::QuotaConfig {
+            agents: ame_api::config::TierQuotaConfig {
+                free: 1,
+                premium: 100,
+            },
+            assessments: ame_api::config::TierQuotaConfig {
+                free: 50,
+                premium: 5000,
+            },
+            questions: ame_api::config::TierQuotaConfig {
+                free: 50,
+                premium: 5000,
+            },
+        },
         batch: ame_api::config::BatchConfig {
             free: 50,
             premium: 500,
@@ -64,6 +78,7 @@ fn create_test_router(pool: PgPool) -> Router {
         limiter,
     };
     Router::new()
+        .route("/v1/auth/register", post(ame_api::http::auth::register))
         .route(
             "/protected",
             get(|user: AuthenticatedUser| async move { Json(json!({ "user_id": user.user.id })) }),
@@ -405,4 +420,68 @@ async fn test_token_caching_and_invalidation() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_email_canonical_dedup() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = create_test_router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    let rand_id = uuid::Uuid::now_v7();
+    let email1 = format!("bob-{rand_id}@example.com");
+    let email2 = format!("bob-{rand_id}+alias@example.com");
+
+    // 1. Register a user with email1
+    let payload = json!({
+        "email": email1,
+        "name": "Bob",
+        "password": "password123",
+        "role": "user"
+    });
+    let res = client
+        .post(format!("{base_url}/v1/auth/register"))
+        .json(&payload)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    // 2. Register email2 (should conflict via email_canonical)
+    let payload_alias = json!({
+        "email": email2,
+        "name": "Bob Alias",
+        "password": "password123",
+        "role": "user"
+    });
+    let res = client
+        .post(format!("{base_url}/v1/auth/register"))
+        .json(&payload_alias)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let body: Value = res.json().await.unwrap();
+    assert_eq!(
+        body["error"]["details"]["fields"][0]["message"],
+        "email already registered"
+    );
 }

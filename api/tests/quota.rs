@@ -134,3 +134,119 @@ async fn test_quota_enforcement() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 }
+
+#[tokio::test]
+async fn test_assessment_and_question_quota_check() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app_pool = ame_api::http::db::convert_pool_to_ame_app(&pool);
+    let mut config = ame_api::config::Config::load().unwrap();
+    // Set low quotas for testing
+    config.quota.assessments.free = 2;
+    config.quota.questions.free = 5;
+
+    // Create free user
+    let user_id = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_users (id, email, display_name, role, plan) VALUES ($1, $2, 'Free User', 'user', 'free')")
+        .bind(user_id)
+        .bind(format!("quota-test-{}@example.com", user_id))
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // 1. Initial checks should pass
+    assert!(
+        ame_api::http::quota::check_quota(
+            &app_pool,
+            &config,
+            user_id,
+            ame_api::http::quota::QuotaKind::Assessment,
+            1
+        )
+        .await
+        .is_ok()
+    );
+    assert!(
+        ame_api::http::quota::check_quota(
+            &app_pool,
+            &config,
+            user_id,
+            ame_api::http::quota::QuotaKind::Question,
+            3
+        )
+        .await
+        .is_ok()
+    );
+
+    // 2. Let's create some assessments in the DB for this user
+    for i in 0..2 {
+        sqlx::query("INSERT INTO tb_assessments (id, title, mode, status, created_by, total_points) VALUES ($1, $2, 'practice', 'draft', $3, 0)")
+            .bind(Uuid::now_v7())
+            .bind(format!("Assessment {i}"))
+            .bind(user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    // 3. Check quota: now usage is 2, adding 1 should fail (limit is 2)
+    let res = ame_api::http::quota::check_quota(
+        &app_pool,
+        &config,
+        user_id,
+        ame_api::http::quota::QuotaKind::Assessment,
+        1,
+    )
+    .await;
+    assert!(res.is_err());
+    if let Err(ame_api::domain::error::ApiError::QuotaExceeded { kind, limit, usage }) = res {
+        assert_eq!(kind, "assessment");
+        assert_eq!(limit, 2);
+        assert_eq!(usage, 2);
+    } else {
+        panic!("expected QuotaExceeded error");
+    }
+
+    // 4. Create 4 questions in the DB
+    for _ in 0..4 {
+        sqlx::query("INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, status, points, created_by) VALUES ($1, $2, 'mc', 'Prompt', '{}', 'draft', 1, $2)")
+            .bind(Uuid::now_v7())
+            .bind(user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    // 5. Check questions quota: usage is 4, limit is 5. Adding 1 is ok, adding 2 should fail.
+    assert!(
+        ame_api::http::quota::check_quota(
+            &app_pool,
+            &config,
+            user_id,
+            ame_api::http::quota::QuotaKind::Question,
+            1
+        )
+        .await
+        .is_ok()
+    );
+    let res_q = ame_api::http::quota::check_quota(
+        &app_pool,
+        &config,
+        user_id,
+        ame_api::http::quota::QuotaKind::Question,
+        2,
+    )
+    .await;
+    assert!(res_q.is_err());
+    if let Err(ame_api::domain::error::ApiError::QuotaExceeded { kind, limit, usage }) = res_q {
+        assert_eq!(kind, "question");
+        assert_eq!(limit, 5);
+        assert_eq!(usage, 4);
+    } else {
+        panic!("expected QuotaExceeded error");
+    }
+}

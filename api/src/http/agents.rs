@@ -604,6 +604,33 @@ async fn run_assessment_batch_create(
         return Err(ApiError::TooManyRequests);
     }
 
+    let total_assessments = batch.items.len() as i64;
+    let total_questions: i64 = batch
+        .items
+        .iter()
+        .map(|item| item.questions.len() as i64)
+        .sum();
+
+    crate::http::quota::check_quota(
+        &state.pool,
+        &state.config,
+        auth.owner_id,
+        crate::http::quota::QuotaKind::Assessment,
+        total_assessments,
+    )
+    .await?;
+
+    if total_questions > 0 {
+        crate::http::quota::check_quota(
+            &state.pool,
+            &state.config,
+            auth.owner_id,
+            crate::http::quota::QuotaKind::Question,
+            total_questions,
+        )
+        .await?;
+    }
+
     // Validate all items upfront and collect precomputed values
     #[derive(Debug)]
     struct ValidatedItem {

@@ -44,6 +44,34 @@ pub async fn list_tags(conn: &mut sqlx::PgConnection) -> Result<Vec<Tag>, ApiErr
     Ok(rows.into_iter().map(row_to_tag).collect())
 }
 
+/// Normalizes a tag name by trimming, lowercasing, and collapsing runs of
+/// whitespace, hyphens, and underscores into a single hyphen, stripping any
+/// leading/trailing hyphens.
+pub fn normalize_tag(name: &str) -> String {
+    let s = name.trim().to_lowercase();
+    let mut res = String::with_capacity(s.len());
+    let mut last_was_dash = false;
+    for c in s.chars() {
+        if c.is_whitespace() || c == '-' || c == '_' {
+            if !last_was_dash {
+                res.push('-');
+                last_was_dash = true;
+            }
+        } else {
+            res.push(c);
+            last_was_dash = false;
+        }
+    }
+    let mut normalized = res;
+    if normalized.starts_with('-') {
+        normalized.remove(0);
+    }
+    if normalized.ends_with('-') {
+        normalized.pop();
+    }
+    normalized
+}
+
 /// Create a single tag, returning the persisted row. Idempotent on `name`:
 /// if a tag with the lowercased name already exists, its current row is
 /// returned and `description` is left as-is.
@@ -52,7 +80,7 @@ pub async fn create_tag(
     name: &str,
     description: Option<&str>,
 ) -> Result<Tag, ApiError> {
-    let lower = name.to_lowercase();
+    let lower = normalize_tag(name);
 
     sqlx::query(
         "INSERT INTO tb_tags (name, description) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
@@ -86,7 +114,7 @@ pub async fn get_or_create_tags_tx(
 
     let mut unique: Vec<String> = Vec::with_capacity(names.len());
     for raw in names {
-        let lower = raw.to_lowercase();
+        let lower = normalize_tag(raw);
         if !unique.contains(&lower) {
             unique.push(lower);
         }

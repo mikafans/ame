@@ -375,11 +375,12 @@ pub async fn create_agent(
     user: AuthenticatedUser,
     Json(body): Json<CreateAgentBody>,
 ) -> Result<(StatusCode, Json<CreateAgentResponse>), ApiError> {
-    // Check quota
     crate::http::quota::check_quota(
         &state.pool,
-        user.user.id,
+        &state.config,
+        user.owner_id,
         crate::http::quota::QuotaKind::AgentCreation,
+        1,
     )
     .await?;
 

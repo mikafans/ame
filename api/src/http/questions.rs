@@ -212,10 +212,23 @@ pub async fn list_versions(
     tag = "questions"
 )]
 pub async fn create_questions(
+    axum::extract::State(state): axum::extract::State<AppState>,
     mut db: DbConn,
     auth: RequireAnyScope<QuestionWriteScopes>,
     Json(body): Json<CreateQuestionsBody>,
 ) -> Result<(StatusCode, Json<CreateQuestionsResponse>), ApiError> {
+    let count = body.questions.len() as i64;
+    if count > 0 {
+        crate::http::quota::check_quota(
+            &state.pool,
+            &state.config,
+            auth.0.owner_id,
+            crate::http::quota::QuotaKind::Question,
+            count,
+        )
+        .await?;
+    }
+
     let questions =
         repo::create_questions(&mut db, auth.0.user.id, auth.0.owner_id, body.questions).await?;
     Ok((

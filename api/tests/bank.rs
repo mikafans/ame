@@ -93,15 +93,23 @@ async fn tag_get_or_create_lowercases_and_dedupes() {
     let pool = setup_db().await;
     let mut tx = pool.begin().await.unwrap();
 
-    let names = vec!["Rust".to_string(), "rust".to_string(), "ASYNC".to_string()];
+    let names = vec![
+        "Rust".to_string(),
+        "rust".to_string(),
+        "ASYNC".to_string(),
+        "  Rust Async  ".to_string(),
+        "rust_async".to_string(),
+        "rust-async".to_string(),
+    ];
     let tags = t_repo::get_or_create_tags_tx(&mut tx, &names)
         .await
         .unwrap();
     tx.commit().await.unwrap();
 
-    assert_eq!(tags.len(), 2);
+    assert_eq!(tags.len(), 3);
     assert_eq!(tags[0].name, "rust");
     assert_eq!(tags[1].name, "async");
+    assert_eq!(tags[2].name, "rust-async");
 }
 
 #[tokio::test]
