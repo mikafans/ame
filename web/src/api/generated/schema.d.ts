@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/admin/health — retrieve cluster system & health metrics */
+        get: operations["get_admin_health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -621,6 +638,22 @@ export interface components {
             orderIndex: number;
             /** Format: uuid */
             questionId: string;
+        };
+        AdminHealthResponse: {
+            /** Format: int64 */
+            assessmentsCount: number;
+            /** Format: int64 */
+            auditLogCount: number;
+            database: string;
+            /** Format: int64 */
+            questionsCount: number;
+            /** Format: int64 */
+            quotaRejectionsCount: number;
+            /** Format: int64 */
+            sessionsCount: number;
+            /** Format: int64 */
+            usersCount: number;
+            valkey: string;
         };
         AgentSummary: {
             /** Format: date-time */
@@ -1372,6 +1405,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListAuditLogsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_admin_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin health metrics retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminHealthResponse"];
                 };
             };
             /** @description Unauthorized */

@@ -82,6 +82,19 @@ pub struct ListAuditLogsQuery {
     pub target_id: Option<Uuid>,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminHealthResponse {
+    pub database: String,
+    pub valkey: String,
+    pub users_count: i64,
+    pub assessments_count: i64,
+    pub sessions_count: i64,
+    pub questions_count: i64,
+    pub audit_log_count: i64,
+    pub quota_rejections_count: i64,
+}
+
 /// GET /v1/admin/users — list all users
 #[utoipa::path(
     get,
@@ -418,6 +431,92 @@ pub async fn list_audit_logs(
     Ok(Json(ListAuditLogsResponse { logs, total }))
 }
 
+/// GET /v1/admin/health — retrieve cluster system & health metrics
+#[utoipa::path(
+    get,
+    path = "/v1/admin/health",
+    responses(
+        (status = 200, description = "Admin health metrics retrieved successfully", body = AdminHealthResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden (Admin required)"),
+    ),
+    security(("bearer" = [])),
+    tag = "admin"
+)]
+pub async fn get_admin_health(
+    State(state): State<AppState>,
+    _admin: RequireScope<AdminScope>,
+) -> Result<Json<AdminHealthResponse>, ApiError> {
+    // 1. Check Database
+    let db_res = sqlx::query("SELECT 1").execute(&state.pool).await;
+    let database = if db_res.is_ok() { "ok" } else { "down" };
+
+    // 2. Check Valkey
+    let valkey_status = match state.valkey.get().await {
+        Ok(mut conn) => {
+            let ping_res: Result<(), _> = redis::cmd("PING").query_async(&mut *conn).await;
+            if ping_res.is_ok() { "ok" } else { "degraded" }
+        }
+        Err(_) => "degraded",
+    };
+
+    // 3. Query table row counts
+    let (users_count, assessments_count, sessions_count, questions_count, audit_log_count) =
+        if database == "ok" {
+            let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_users")
+                .fetch_one(&state.pool)
+                .await
+                .unwrap_or(0);
+            let assessments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_assessments")
+                .fetch_one(&state.pool)
+                .await
+                .unwrap_or(0);
+            let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions")
+                .fetch_one(&state.pool)
+                .await
+                .unwrap_or(0);
+            let questions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_questions")
+                .fetch_one(&state.pool)
+                .await
+                .unwrap_or(0);
+            let audit: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_audit_log")
+                .fetch_one(&state.pool)
+                .await
+                .unwrap_or(0);
+            (users, assessments, sessions, questions, audit)
+        } else {
+            (0, 0, 0, 0, 0)
+        };
+
+    // 4. Retrieve recent quota-rejection count from Valkey
+    let quota_rejections_count = if valkey_status == "ok" {
+        match state.valkey.get().await {
+            Ok(mut conn) => {
+                let val: Option<String> = redis::cmd("GET")
+                    .arg("ame:quota_rejections_count")
+                    .query_async(&mut *conn)
+                    .await
+                    .unwrap_or(None);
+                val.and_then(|s| s.parse::<i64>().ok()).unwrap_or(0)
+            }
+            Err(_) => 0,
+        }
+    } else {
+        0
+    };
+
+    Ok(Json(AdminHealthResponse {
+        database: database.to_string(),
+        valkey: valkey_status.to_string(),
+        users_count,
+        assessments_count,
+        sessions_count,
+        questions_count,
+        audit_log_count,
+        quota_rejections_count,
+    }))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/admin/users", get(list_users))
@@ -426,5 +525,6 @@ pub fn router(state: AppState) -> Router<AppState> {
             axum::routing::patch(patch_user_admin),
         )
         .route("/v1/admin/audit", get(list_audit_logs))
+        .route("/v1/admin/health", get(get_admin_health))
         .with_state(state)
 }
