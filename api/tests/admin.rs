@@ -388,4 +388,49 @@ async fn test_admin_flow_and_audit() {
     assert_eq!(health["database"], "ok");
     assert!(health["usersCount"].as_i64().unwrap() >= 2);
     assert!(health["auditLogCount"].as_i64().unwrap() >= 5);
+
+    // 11. Test self-demotion protection
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{admin_user_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"role": "user"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "validation_failed");
+
+    // 12. Test self-disable protection
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{admin_user_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"disabled": true}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "validation_failed");
+
+    // Demote reg_user_id back to user (succeeds because active_admin_count is 2)
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{reg_user_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"role": "user"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Now admin_user_id is the last remaining active admin
+    // Try to demote admin_user_id (fails with validation error)
+    let res = client
+        .patch(format!("{base_url}/v1/admin/users/{admin_user_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .json(&json!({"role": "user"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
