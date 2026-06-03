@@ -11,7 +11,6 @@ import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
 import Avatar from "@mui/material/Avatar";
 import Divider from "@mui/material/Divider";
-import LibraryBooksOutlinedIcon from "@mui/icons-material/LibraryBooksOutlined";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
@@ -45,7 +44,6 @@ function stringToColor(str: string): string {
 }
 
 const ICON_MAP: Record<string, React.ReactElement> = {
-  library: <LibraryBooksOutlinedIcon fontSize="small" />,
   explore: <ExploreOutlinedIcon fontSize="small" />,
   stack: <LayersOutlinedIcon fontSize="small" />,
   take: <PlayArrowOutlinedIcon fontSize="small" />,

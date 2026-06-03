@@ -32,6 +32,7 @@ interface PreviewQuestion {
 interface AssessmentDetail {
   id: string;
   title: string;
+  mode?: string;
   status?: string;
   course?: string;
   objectives?: string[];
@@ -116,9 +117,9 @@ export default function AssessmentPreviewPage({
             cursor: "pointer",
             textDecoration: "underline",
           }}
-          onClick={() => router.push("/library")}
+          onClick={() => router.push("/explore")}
         >
-          Assessments
+          Explore
         </Typography>
         <Typography variant="caption" color="text.secondary">
           ›
@@ -282,8 +283,8 @@ export default function AssessmentPreviewPage({
           borderColor: "divider",
         }}
       >
-        <Button variant="outlined" onClick={() => router.push("/library")}>
-          Back to assessments
+        <Button variant="outlined" onClick={() => router.push("/explore")}>
+          Back to Explore
         </Button>
         <Button
           variant="contained"
@@ -300,7 +301,9 @@ export default function AssessmentPreviewPage({
               ? "Cannot start draft"
               : assessment.questions.length === 0
                 ? "No questions available"
-                : "Start assessment"}
+                : assessment.mode === "graded"
+                  ? "Start exam"
+                  : "Start assessment"}
         </Button>
       </Box>
     </Box>

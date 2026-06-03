@@ -1,5 +1,5 @@
 /**
- * Learner golden path — authentication, library, sessions, results, progress.
+ * Learner golden path — authentication, explore, sessions, results, progress.
  *
  * Merged from the old learner-flow.spec.ts and roles/learner.spec.ts.
  * Each describe block is independently runnable; serial mode within each group
@@ -50,19 +50,17 @@ test.describe("learner UI (seeded account)", () => {
     await setAuthCookie(page, token);
   });
 
-  test("library page loads and shows sidebar identity", async ({ page }) => {
-    await page.goto("/library");
+  test("explore page loads and shows sidebar identity", async ({ page }) => {
+    await page.goto("/explore");
     await expect(page.getByText(/Ada Lovelace/i)).toBeVisible({
       timeout: 10000,
     });
-    await expect(
-      page.getByRole("heading", { name: "Assessments" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
   });
 
   test("all assessments tab is visible", async ({ page }) => {
-    await page.goto("/library");
-    await expect(page.getByRole("tab", { name: /All \(\d+\)/ })).toBeVisible({
+    await page.goto("/explore");
+    await expect(page.getByRole("button", { name: "All" })).toBeVisible({
       timeout: 8000,
     });
   });

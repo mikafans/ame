@@ -488,8 +488,8 @@ export default function ResultsPage({
 
       {/* Footer */}
       <Stack direction="row" spacing={2} sx={{ justifyContent: "center" }}>
-        <Button variant="outlined" onClick={() => router.push("/library")}>
-          Back to assessments
+        <Button variant="outlined" onClick={() => router.push("/explore")}>
+          Back to Explore
         </Button>
       </Stack>
     </Box>

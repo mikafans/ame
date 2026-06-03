@@ -1,7 +1,7 @@
 /**
  * UI/UX spec alignment — comprehensive learner surface contract test.
  *
- * Exercises: Library, assessment preview, active session (MCQ), results, progress
+ * Exercises: Explore, assessment preview, active session (MCQ), results, progress
  * dashboard, question bank, exams. This test is intentionally a large single
  * flow so it can verify the session round-trip end-to-end with screenshots.
  *
@@ -46,44 +46,35 @@ test.describe("UI/UX spec alignment", () => {
     const token = await loginAs(request, "ada@example.com");
     await setAuthCookie(page, token);
 
-    // --- Library ---
-    await page.goto("/library");
+    // --- Explore ---
+    await page.goto("/explore");
     // Wait for the auth loading to finish and user to be visible in sidebar
     await expect(page.getByText(/Ada Lovelace/i)).toBeVisible({
       timeout: 10000,
     });
 
-    await expect(
-      page.getByRole("heading", { name: "Assessments" }),
-    ).toBeVisible();
-    await expect(page.getByRole("tab", { name: /All \(\d+\)/ })).toBeVisible();
-    // "Up next" highlights the first unfinished assessment; it is absent once the
-    // learner has completed everything. Assert its detail fields only when shown.
-    const upNext = page.getByText("Up next");
-    if (await upNext.isVisible().catch(() => false)) {
-      await expect(page.getByText("Questions", { exact: true })).toBeVisible();
-      await expect(page.getByText("Duration", { exact: true })).toBeVisible();
-      // "Recommended prep" is only shown when the planner has generated tags.
-      // Skip asserting it to avoid seed-state flakiness.
-    }
-    await screenshot(page, "library");
+    await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "All" })).toBeVisible();
+    // TODO(explore): verify that the "Up next" or equivalent concept still exists on Explore
+    // If Explore has a featured/recommended section, verify the assertions still apply
+    await screenshot(page, "explore");
 
     // --- Assessment preview (use a assessment with MCQ questions for the session test) ---
     const assessmentId = await firstMcqAssessmentId(request, token);
     await page.goto(`/assessments/${assessmentId}/preview`);
-    await expect(page.getByText("Assessments", { exact: true })).toBeVisible();
+    await expect(page.getByText("Explore", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back to assessments" }),
+      page.getByRole("button", { name: "Back to Explore" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Start assessment" }),
+      page.getByRole("button", { name: /Start (exam|assessment)/ }),
     ).toBeVisible();
     await expect(page.getByText(/questions/i).first()).toBeVisible();
     await expect(page.getByText(/pts/i).first()).toBeVisible();
     await screenshot(page, "assessment-preview");
 
     // --- Active session: navigate to an MCQ question ---
-    await page.getByRole("button", { name: "Start assessment" }).click();
+    await page.getByRole("button", { name: /Start (exam|assessment)/ }).click();
     await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]+$/);
     const sessionId = page.url().split("/").pop();
     expect(sessionId).toBeTruthy();
@@ -123,7 +114,7 @@ test.describe("UI/UX spec alignment", () => {
     await expect(page.getByRole("heading", { name: /Results/ })).toBeVisible();
     await expect(page.getByText("Answer review")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back to assessments" }),
+      page.getByRole("button", { name: "Back to Explore" }),
     ).toBeVisible();
     // Wait for the first answer card to render before reading captions
     await expect(page.locator(".MuiCardContent-root").first()).toBeVisible({

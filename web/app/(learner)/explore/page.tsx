@@ -425,7 +425,11 @@ export default function ExplorePage() {
                                   onClick={() => startAssessment(item.id)}
                                   sx={{ textTransform: "none" }}
                                 >
-                                  {starting === item.id ? "Starting…" : "Start"}
+                                  {starting === item.id
+                                    ? "Starting…"
+                                    : isGraded
+                                      ? "Start exam"
+                                      : "Start"}
                                 </Button>
                               </>
                             )}
