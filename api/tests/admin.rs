@@ -317,4 +317,54 @@ async fn test_admin_flow_and_audit() {
     assert_eq!(logs[4]["targetType"], "user");
     assert_eq!(logs[4]["targetId"], reg_user_id.to_string());
     assert_eq!(logs[4]["metadata"]["plan"], "premium");
+
+    // 8. Test Pagination and Filtering on Users
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?limit=1"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["users"].as_array().unwrap().len(), 1);
+    assert!(body["total"].as_i64().unwrap() >= 2);
+
+    let res = client
+        .get(format!("{base_url}/v1/admin/users?q=reg-{}", reg_user_id))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+    assert_eq!(body["users"][0]["displayName"], "Regular Human");
+
+    // 9. Test Pagination and Filtering on Audit Logs
+    let res = client
+        .get(format!(
+            "{base_url}/v1/admin/audit?limit=2&actorId={admin_user_id}"
+        ))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["logs"].as_array().unwrap().len(), 2);
+    assert_eq!(body["total"].as_i64().unwrap(), 5);
+
+    let res = client
+        .get(format!(
+            "{base_url}/v1/admin/audit?action=user.update_role&actorId={admin_user_id}"
+        ))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["total"].as_i64().unwrap(), 1);
+    assert_eq!(body["logs"][0]["action"], "user.update_role");
 }

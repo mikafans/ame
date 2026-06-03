@@ -1024,6 +1024,8 @@ export interface components {
         };
         ListAuditLogsResponse: {
             logs: components["schemas"]["AuditLogEntry"][];
+            /** Format: int64 */
+            total: number;
         };
         ListMySessionsResponse: {
             sessions: components["schemas"]["SessionSummary"][];
@@ -1037,6 +1039,8 @@ export interface components {
             total: number;
         };
         ListUsersResponse: {
+            /** Format: int64 */
+            total: number;
             users: components["schemas"]["User"][];
         };
         LoginBody: {
@@ -1348,7 +1352,13 @@ export type $defs = Record<string, never>;
 export interface operations {
     list_audit_logs: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                action?: string;
+                actorId?: string;
+                targetId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1382,7 +1392,11 @@ export interface operations {
     };
     list_users: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                q?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

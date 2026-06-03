@@ -12,6 +12,36 @@ paths:
       - admin
       summary: GET /v1/admin/audit — retrieve append-only audit trail logs
       operationId: list_audit_logs
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: actorId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: targetId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: Audit trail successfully retrieved
@@ -31,6 +61,24 @@ paths:
       - admin
       summary: GET /v1/admin/users — list all users
       operationId: list_users
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: User list successfully retrieved
@@ -2393,11 +2441,15 @@ components:
       type: object
       required:
       - logs
+      - total
       properties:
         logs:
           type: array
           items:
             $ref: '#/components/schemas/AuditLogEntry'
+        total:
+          type: integer
+          format: int64
     ListMySessionsResponse:
       type: object
       required:
@@ -2432,7 +2484,11 @@ components:
       type: object
       required:
       - users
+      - total
       properties:
+        total:
+          type: integer
+          format: int64
         users:
           type: array
           items:
