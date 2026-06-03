@@ -1,12 +1,10 @@
 use axum::{
-    Json, Router,
+    Router,
     extract::State,
-    http::StatusCode,
     middleware,
     routing::{get, post},
 };
 use axum_prometheus::PrometheusMetricLayer;
-use serde_json::json;
 use sqlx::PgPool;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
@@ -46,6 +44,7 @@ pub mod auth;
 pub mod db;
 pub mod explore;
 pub mod export;
+pub mod health;
 pub mod idempotency;
 pub mod me;
 pub mod messages;
@@ -123,7 +122,7 @@ pub fn router(pool: PgPool) -> Router {
             activity::activity_log_middleware,
         ));
 
-    Router::new()
+    let api_routes = Router::new()
         .merge(admin::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(explore::router(state.clone()))
@@ -135,7 +134,6 @@ pub fn router(pool: PgPool) -> Router {
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/logout", post(auth::logout))
         .merge(logged_router)
-        .route("/healthz", get(healthz))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::ratelimit::rate_limit_middleware,
@@ -143,11 +141,12 @@ pub fn router(pool: PgPool) -> Router {
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,
-        ))
+        ));
+
+    Router::new()
+        .merge(api_routes)
+        .route("/healthz", get(health::healthz))
+        .route("/readyz", get(health::readyz))
         .layer(cors)
         .with_state(state)
-}
-
-async fn healthz() -> impl axum::response::IntoResponse {
-    (StatusCode::OK, Json(json!({"status": "ok"})))
 }

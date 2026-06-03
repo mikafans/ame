@@ -52,11 +52,10 @@ spec:
           envFrom:
             - configMapRef:
                 name: ame-config
-          # /healthz is mounted outside DB-dependent middleware, so it answers
-          # even before the first connection — safe for both probes.
+          # /readyz pings Postgres/Valkey, while /healthz serves as a dumb liveness check.
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /readyz
               port: 8080
             initialDelaySeconds: 3
             periodSeconds: 5
