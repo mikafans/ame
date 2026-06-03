@@ -9,6 +9,7 @@ import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
+import RestoreIcon from "@mui/icons-material/Restore";
 import IconButton from "@mui/material/IconButton";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -49,6 +50,7 @@ interface AssessmentEntry {
   createdByEmail?: string | null;
   objectives: string[];
   createdAt: string;
+  deletedAt?: string | null;
 }
 
 export default function AdminAssessmentsPage() {
@@ -69,6 +71,7 @@ export default function AdminAssessmentsPage() {
 
   // Dialog State
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [selectedAssessment, setSelectedAssessment] =
     useState<AssessmentEntry | null>(null);
   const [understandDelete, setUnderstandDelete] = useState(false);
@@ -182,6 +185,38 @@ export default function AdminAssessmentsPage() {
         );
       } else {
         setDeleteDialogOpen(false);
+        fetchAssessments();
+      }
+    } catch (err) {
+      setDialogError("Network or unexpected server error.");
+    } finally {
+      setDialogLoading(false);
+    }
+  };
+
+  const handleOpenRestore = (assessment: AssessmentEntry) => {
+    setSelectedAssessment(assessment);
+    setDialogError(null);
+    setRestoreDialogOpen(true);
+  };
+
+  const handleRestoreSubmit = async () => {
+    if (!selectedAssessment) return;
+
+    setDialogLoading(true);
+    setDialogError(null);
+
+    try {
+      const { error } = await api.POST("/v1/admin/assessments/{id}/restore", {
+        params: { path: { id: selectedAssessment.id } },
+      });
+
+      if (error) {
+        setDialogError(
+          (error as any)?.message || "Failed to restore assessment.",
+        );
+      } else {
+        setRestoreDialogOpen(false);
         fetchAssessments();
       }
     } catch (err) {
@@ -458,22 +493,36 @@ export default function AdminAssessmentsPage() {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={row.status.toUpperCase()}
-                        size="small"
-                        color={
-                          row.status === "active"
-                            ? "success"
-                            : row.status === "draft"
-                              ? "default"
-                              : "warning"
-                        }
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: 10,
-                          borderRadius: 1.5,
-                        }}
-                      />
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label={row.status.toUpperCase()}
+                          size="small"
+                          color={
+                            row.status === "active"
+                              ? "success"
+                              : row.status === "draft"
+                                ? "default"
+                                : "warning"
+                          }
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: 10,
+                            borderRadius: 1.5,
+                          }}
+                        />
+                        {row.deletedAt && (
+                          <Chip
+                            label="DELETED"
+                            size="small"
+                            color="error"
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: 10,
+                              borderRadius: 1.5,
+                            }}
+                          />
+                        )}
+                      </Stack>
                     </TableCell>
                     <TableCell>
                       <Typography
@@ -506,13 +555,23 @@ export default function AdminAssessmentsPage() {
                       </Typography>
                     </TableCell>
                     <TableCell align="right" sx={{ pr: 2 }}>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDelete(row)}
-                        color="error"
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
+                      {row.deletedAt ? (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenRestore(row)}
+                          color="success"
+                        >
+                          <RestoreIcon fontSize="small" />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDelete(row)}
+                          color="error"
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -547,9 +606,9 @@ export default function AdminAssessmentsPage() {
               {dialogError}
             </Alert>
           )}
-          <Alert severity="warning" sx={{ mb: 2.5 }}>
-            This action is irreversible and will delete all user
-            sessions/attempts linked to this assessment.
+          <Alert severity="info" sx={{ mb: 2.5 }}>
+            This hides the assessment from its creator. It can be restored later
+            from this page.
           </Alert>
           <DialogContentText sx={{ mb: 3 }}>
             Are you sure you want to delete the assessment{" "}
@@ -565,7 +624,8 @@ export default function AdminAssessmentsPage() {
             }
             label={
               <Typography variant="body2" color="text.secondary">
-                I understand this is a destructive moderation action.
+                I understand this removes the assessment from the creator's
+                view.
               </Typography>
             }
           />
@@ -588,6 +648,49 @@ export default function AdminAssessmentsPage() {
               <CircularProgress size={20} />
             ) : (
               "Delete Assessment"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Restore Dialog */}
+      <Dialog
+        open={restoreDialogOpen}
+        onClose={() => !dialogLoading && setRestoreDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle fontWeight="bold">Restore Assessment</DialogTitle>
+        <DialogContent dividers>
+          {dialogError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {dialogError}
+            </Alert>
+          )}
+          <DialogContentText sx={{ mb: 3 }}>
+            Restore the assessment{" "}
+            <strong>"{selectedAssessment?.title}"</strong>? It will become
+            visible to its creator again.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button
+            onClick={() => setRestoreDialogOpen(false)}
+            color="inherit"
+            disabled={dialogLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleRestoreSubmit}
+            variant="contained"
+            color="success"
+            disabled={dialogLoading}
+          >
+            {dialogLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              "Restore Assessment"
             )}
           </Button>
         </DialogActions>

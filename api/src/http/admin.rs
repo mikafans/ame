@@ -92,7 +92,7 @@ pub struct AdminHealthResponse {
     pub sessions_count: i64,
     pub questions_count: i64,
     pub audit_log_count: i64,
-    pub quota_rejections_count: i64,
+    pub quota_rejections_total: i64,
 }
 
 /// GET /v1/admin/users — list all users
@@ -568,7 +568,7 @@ pub async fn get_admin_health(
         };
 
     // 4. Retrieve recent quota-rejection count from Valkey
-    let quota_rejections_count = if valkey_status == "ok" {
+    let quota_rejections_total = if valkey_status == "ok" {
         match state.valkey.get().await {
             Ok(mut conn) => {
                 let val: Option<String> = redis::cmd("GET")
@@ -592,7 +592,7 @@ pub async fn get_admin_health(
         sessions_count,
         questions_count,
         audit_log_count,
-        quota_rejections_count,
+        quota_rejections_total,
     }))
 }
 
@@ -621,6 +621,9 @@ pub struct AdminAssessmentEntry {
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: time::OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub deleted_at: Option<time::OffsetDateTime>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -696,7 +699,7 @@ pub async fn list_assessments_admin(
         .0;
 
     let mut qb = sqlx::QueryBuilder::new(
-        "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by, u.email as created_by_email, a.objectives, a.created_at
+        "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by, u.email as created_by_email, a.objectives, a.created_at, a.deleted_at
          FROM tb_assessments a
          LEFT JOIN tb_users u ON a.created_by = u.id"
     );
@@ -760,6 +763,7 @@ pub async fn list_assessments_admin(
                 created_by_email: r.get("created_by_email"),
                 objectives: r.get("objectives"),
                 created_at: r.get("created_at"),
+                deleted_at: r.get("deleted_at"),
             }
         })
         .collect();
@@ -767,7 +771,7 @@ pub async fn list_assessments_admin(
     Ok(Json(AdminListAssessmentsResponse { assessments, total }))
 }
 
-/// DELETE /v1/admin/assessments/{id} — delete any assessment (moderation)
+/// DELETE /v1/admin/assessments/{id} — soft-delete any assessment (moderation)
 #[utoipa::path(
     delete,
     path = "/v1/admin/assessments/{id}",
@@ -786,6 +790,20 @@ pub async fn delete_assessment_admin(
     admin: RequireScope<AdminScope>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let res = sqlx::query(
+        "UPDATE tb_assessments SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if res.rows_affected() == 0 {
+        return Err(ApiError::NotFound {
+            resource: "assessment",
+        });
+    }
+
     crate::audit::audit(
         state.pool.clone(),
         Some(admin.0.user.id),
@@ -795,17 +813,50 @@ pub async fn delete_assessment_admin(
         serde_json::json!({}),
     );
 
-    let res = sqlx::query("DELETE FROM tb_assessments WHERE id = $1")
-        .bind(id)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /v1/admin/assessments/{id}/restore — restore a soft-deleted assessment
+#[utoipa::path(
+    post,
+    path = "/v1/admin/assessments/{id}/restore",
+    params(("id" = Uuid, Path, description = "Assessment ID")),
+    responses(
+        (status = 204, description = "Assessment restored successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden (Admin required)"),
+        (status = 404, description = "Assessment not found or not deleted"),
+    ),
+    security(("bearer" = [])),
+    tag = "admin"
+)]
+pub async fn restore_assessment_admin(
+    State(state): State<AppState>,
+    admin: RequireScope<AdminScope>,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, ApiError> {
+    let res = sqlx::query(
+        "UPDATE tb_assessments SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
     if res.rows_affected() == 0 {
         return Err(ApiError::NotFound {
             resource: "assessment",
         });
     }
+
+    crate::audit::audit(
+        state.pool.clone(),
+        Some(admin.0.user.id),
+        "assessment.restore_admin",
+        Some("assessment"),
+        Some(id),
+        serde_json::json!({}),
+    );
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -823,6 +874,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route(
             "/v1/admin/assessments/{id}",
             axum::routing::delete(delete_assessment_admin),
+        )
+        .route(
+            "/v1/admin/assessments/{id}/restore",
+            axum::routing::post(restore_assessment_admin),
         )
         .with_state(state)
 }

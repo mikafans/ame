@@ -107,6 +107,7 @@ use crate::{
         crate::http::admin::get_admin_health,
         crate::http::admin::list_assessments_admin,
         crate::http::admin::delete_assessment_admin,
+        crate::http::admin::restore_assessment_admin,
     ),
     components(schemas(
         User,

@@ -96,7 +96,7 @@ pub async fn check_quota(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?,
         QuotaKind::Assessment => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_assessments WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)",
+            "SELECT COUNT(*) FROM tb_assessments WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1) AND deleted_at IS NULL",
         )
         .bind(owner_id)
         .fetch_one(&mut *conn)

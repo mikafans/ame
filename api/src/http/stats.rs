@@ -382,7 +382,7 @@ pub async fn me_stats(
     .map_err(internal)?;
 
     let agent_curated_assessments: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND (created_by = $1 OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1))"
+        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND (created_by = $1 OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1)) AND deleted_at IS NULL"
     )
     .bind(uid)
     .fetch_one(&state.pool)
