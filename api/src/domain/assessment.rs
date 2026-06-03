@@ -100,6 +100,8 @@ pub struct CreateAssessmentRequest {
     pub method: String, // 'manual' or 'agent'
     #[serde(default)]
     pub questions: Vec<QuestionImport>,
+    #[serde(default)]
+    pub status: Option<String>,
 }
 
 fn default_true() -> bool {

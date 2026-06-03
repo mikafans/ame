@@ -145,7 +145,8 @@ CREATE TABLE tb_activity_log (
   note      text,
   target_id uuid
 );
-CREATE INDEX tb_activity_log_agent ON tb_activity_log(agent_id, ts DESC);
+CREATE INDEX tb_activity_log_agent_id ON tb_activity_log (agent_id, id DESC);
+CREATE INDEX tb_activity_log_grade_count ON tb_activity_log (agent_id) WHERE tool_name = 'attempt.grade' AND status = 200;
 
 -- ─── tb_cohorts ─────────────────────────────────────────────────────────────
 
