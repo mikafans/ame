@@ -131,7 +131,6 @@ export default function ProgressPage() {
         </ToggleButtonGroup>
       }
     >
-
       {statsLoading ? (
         <Typography color="text.secondary" sx={{ mb: 3 }}>
           Loading…

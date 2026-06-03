@@ -219,7 +219,6 @@ export default function QuestionsPage() {
       title="Question Bank"
       subtitle="Browse, search, and review all questions in your organization"
     >
-
       {/* Filters toolbar */}
       <Stack
         direction={{ xs: "column", sm: "row" }}

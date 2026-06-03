@@ -58,6 +58,7 @@ test.describe("explore page", () => {
     const hasFetchError = consoleErrors.some((err) =>
       err.includes("Failed to fetch"),
     );
+    console.log(consoleErrors);
     expect(hasFetchError).toBe(false);
   });
 });

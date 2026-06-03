@@ -128,7 +128,6 @@ export default function AuthorIndexPage() {
         </Button>
       }
     >
-
       {drafts === null ? (
         <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
           <CircularProgress />

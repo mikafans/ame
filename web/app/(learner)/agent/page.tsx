@@ -130,7 +130,6 @@ export default function AgentPage() {
         </Stack>
       }
     >
-
       {/* Intro card */}
       <Card
         variant="outlined"
