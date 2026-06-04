@@ -380,6 +380,17 @@ pub async fn patch_user_admin(
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
 
+        if current_role == "admin" && role != "admin" {
+            sqlx::query(
+                "UPDATE tb_api_tokens SET revoked_at = now()
+                 WHERE user_id = $1 AND revoked_at IS NULL",
+            )
+            .bind(user_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        }
+
         crate::audit::audit(
             state.pool.clone(),
             Some(admin.0.user.id),
@@ -884,6 +895,24 @@ pub async fn restore_assessment_admin(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn admin_guard_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response, ApiError> {
+    let auth = req
+        .extensions()
+        .get::<crate::auth::extractor::AuthenticatedUser>()
+        .ok_or(ApiError::Unauthorized)?;
+
+    if !auth.token_scopes.contains(&Scope::Admin) {
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            Scope::Admin.as_str(),
+        )));
+    }
+
+    Ok(next.run(req).await)
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/admin/users", get(list_users))
@@ -902,5 +931,6 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/admin/assessments/{id}/restore",
             axum::routing::post(restore_assessment_admin),
         )
+        .layer(axum::middleware::from_fn(admin_guard_middleware))
         .with_state(state)
 }
