@@ -17,7 +17,7 @@ dashboard depends on the metrics pipeline (Phase D) and so comes last.
 | pre-v0.1 | Foundation build | Schema/auth, question bank, assessments, engine, stats, agent surface, MUI frontend, RLS, owner isolation, security hardening | — |
 | v0.1 (now) | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
 | v0.2 | Operational control plane | **#1 Token Audit**, **#2 Settings & Feature Flags** | admin shell (done) |
-| v0.3 | Content integrity + data hygiene | **#3 Feedback / Flags / Support Queue**, **data retention & pruning** | learner session UI |
+| v0.3 | Content integrity + data hygiene | **#3 Feedback / Flags / Support Queue**, **data retention & pruning**, **learner mobile (H5)** | learner session UI |
 | v1.0 | Insight + hardening | **#4 Analytics Dashboard** | Phase D metrics |
 | v1.1 | GA polish | (all four integrated) | v1.0 |
 
@@ -126,6 +126,26 @@ Plan: [`docs/plans/2026-06-03-data-retention.md`](plans/2026-06-03-data-retentio
 
 **Exit criteria:** every fast-growing table has an enforced retention policy;
 PG size is bounded by usage, not by uptime.
+
+### Learner mobile (H5) — responsive taking flow
+- Make the **test-taker** surface usable on a phone browser: question
+  navigation, MC tap targets (options stay bare strings), sticky timer/submit
+  bar, and the review screen. Authoring, question bank, and admin pages stay
+  desktop-first and only need to degrade gracefully.
+- **Known root cause:** `web/src/components/Sidebar.tsx` renders a
+  `variant="permanent"` Drawer at a fixed `DRAWER_WIDTH = 232` with no
+  breakpoint or toggle, so it covers the whole screen on mobile. Fix is the
+  standard MUI responsive-drawer pattern — `temporary` Drawer + hamburger
+  (AppBar) below `md`, `permanent` at `md+`.
+- **Scope guard:** no separate H5 app, no PWA, no native — pure responsive work
+  on the existing Next.js + MUI frontend.
+- **Open decision:** focus/tab-switch anti-cheat detection is weaker on mobile
+  browsers — a product call to make before exposing high-stakes exams on phones.
+- Rides on the same **learner session UI** that #3's "flag this question" entry
+  point needs, so the two share the test-taker surface work.
+
+**Exit criteria:** a learner can complete a graded session end-to-end on an
+Android/iOS phone browser without horizontal scroll or an uncollapsible sidebar.
 
 ---
 
