@@ -40,7 +40,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - MC question options are **bare strings** (`Vec<String>`) — never `{text: "..."}` objects. The grader and frontend both expect this format.
 - Scheduled exams are not supported — no `opens_at`/`closes_at` fields in the API or DB.
 - SSO/SAML is not implemented — login supports email + password only.
-- Quiz lifecycle: draft → active (publish auto-promotes draft questions to live).
+- Assessment lifecycle: draft → active (publish auto-promotes draft questions to live).
 - **First admin is DB-granted; further admins can be granted in-app by an existing admin.** Registration always creates `role: user` (`POST /v1/auth/register` rejects `role: admin`) — no user can self-escalate. The *root* admin is seeded via `make db-admin` (a direct SQL write — `make db-admin ADMIN_EMAIL=...` to promote a specific account, preserving its password). Once an admin exists, they may promote/demote other users via `PATCH /v1/admin/users/{id}` (`role`); the endpoint blocks self-demotion, self-disable, and demoting/disabling the last remaining active admin (no lockout). `db-seed` depends on `db-admin` because seeding needs an admin to upgrade the primary user (Ada) to premium (premium unlocks the agent-creation quota that `make db-bulk` relies on). Re-login after a role/scope change — token scopes are fixed at login.
 - Sharing/public-visibility was removed — no `visibility` field or `public.publish` scope anywhere. Cross-account access is owner-scoped (sub-accounts), not public sharing.
 

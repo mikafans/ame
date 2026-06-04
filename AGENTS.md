@@ -100,10 +100,9 @@ Use `.tmp/` at repo root (gitignored). Clean with `rm -rf .tmp/*.png .tmp/.playw
 - **Verifier scripts**: write to `.claude/scripts/` so they can be reused across sessions.
 
 ## Agent operations
-`agents/` at the project root contains skill markdowns for agent-driven workflows:
-- `agents/generate-questions/SKILL.md` — fetch weakest tags, generate targeted questions.
-- `agents/analyze-performance/SKILL.md` — read tag stats and recent attempts.
-- `agents/adaptive-generation/SKILL.md` — full adaptive loop with pool-insufficient retry.
+`api/llms.txt` is the canonical agent guide — the served entry doc, with the full
+worked playbooks (analyze-performance, generate-questions, adaptive-generation) and
+a reference client at `agents/client.py`.
 
 Agent discovery starts at `GET /llms.txt` (public entry doc), then `GET /v1/agents/skill.json` (public skill manifest). Add `?strict=1` to drop the ame-specific fields.
-Register a new agent key: `POST /v1/agents/register` (gated by the `AME_AGENT_ACCESS_CODE` shared secret; returns `apiKey` + discovery URLs). Write tools run via `POST /v1/agents/run`; read tools are called directly at their advertised method/path.
+Mint a new agent key: an authenticated human owner calls `POST /v1/me/agents` (creates a token-only sub-account; returns `apiKey` shown once). The old public `POST /v1/agents/register` faucet + `AME_AGENT_ACCESS_CODE` were removed. Write tools run via `POST /v1/agents/run`; read tools are called directly at their advertised method/path.

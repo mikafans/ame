@@ -14,11 +14,41 @@ dashboard depends on the metrics pipeline (Phase D) and so comes last.
 
 | Version | Theme | Operator features delivered | Hard dependency |
 |---------|-------|------------------------------|-----------------|
+| pre-v0.1 | Foundation build | Schema/auth, question bank, assessments, engine, stats, agent surface, MUI frontend, RLS, owner isolation, security hardening | — |
 | v0.1 (now) | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
 | v0.2 | Operational control plane | **#1 Token Audit**, **#2 Settings & Feature Flags** | admin shell (done) |
 | v0.3 | Content integrity + data hygiene | **#3 Feedback / Flags / Support Queue**, **data retention & pruning** | learner session UI |
 | v1.0 | Insight + hardening | **#4 Analytics Dashboard** | Phase D metrics |
 | v1.1 | GA polish | (all four integrated) | v1.0 |
+
+---
+
+## pre-v0.1 — Foundation build *(shipped)*
+
+The platform itself, built out before the admin-console roadmap began. Captured
+here as a milestone; the detailed build plans have been retired now that the work
+is in code. Compressed history:
+[`docs/plans/pre-v0.1-foundation.md`](plans/pre-v0.1-foundation.md).
+
+- **Schema + auth:** Postgres schema, email+password auth, API tokens with
+  login-fixed scopes.
+- **Question bank:** MC (bare-string options) / TF / essay / code questions,
+  full-text search, pagination (verified at 1M rows).
+- **Assessments + engine:** unified assessment model (draft→active; legacy
+  quiz/exam dropped), session engine with server-enforced deadlines, grading,
+  stats + feedback.
+- **Agent surface:** `role=agent` + agent profiles, scoped agent API, served
+  OpenAPI snapshot.
+- **Frontend:** learner + author/agent UIs, full MUI migration (no Tailwind).
+- **Isolation + security:** row-level security on `tb_questions`, owner-scoped
+  sub-accounts, tiered per-owner rate limiting, per-plan quotas, and the security
+  hardening pass (token-scope validation, hashed webhook secrets, security
+  headers, trusted-proxy client IP, per-account login throttle, email
+  canonicalization, admin-token revoke on demotion + router-level admin guard).
+
+**Exit criteria (met):** authors build and publish assessments; learners take
+graded sessions; agents author via API; the service is owner-isolated and
+security-hardened.
 
 ---
 
