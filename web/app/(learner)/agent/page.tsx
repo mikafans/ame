@@ -138,7 +138,7 @@ export default function AgentPage() {
         sx={{
           mb: 3.5,
           display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
+          gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" },
           overflow: "hidden",
         }}
       >
@@ -165,7 +165,7 @@ export default function AgentPage() {
             agent imports a new assessment with another. No scraping, no
             duplicate state.
           </Typography>
-          <Stack direction="row" spacing={2.75}>
+          <Stack direction="row" spacing={2.75} sx={{ flexWrap: "wrap" }}>
             <KV2 k="Endpoints" v="34" />
             <KV2 k="Auth" v="Bearer + scopes" />
             <KV2 k="Rate limit" v="120 / min" />
@@ -211,6 +211,8 @@ export default function AgentPage() {
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v as TabId)}
+        variant="scrollable"
+        allowScrollButtonsMobile
         sx={{ mb: 2.25, borderBottom: 1, borderColor: "divider" }}
       >
         <Tab value="keys" label="API keys" sx={{ textTransform: "none" }} />
@@ -538,7 +540,7 @@ function KeysTab() {
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: "1.4fr 1fr",
+        gridTemplateColumns: { xs: "1fr", md: "1.4fr 1fr" },
         gap: 3.5,
         alignItems: "start",
       }}
@@ -1389,7 +1391,13 @@ function ToolsTab() {
   }
 
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 2.25 }}>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", md: "280px 1fr" },
+        gap: 2.25,
+      }}
+    >
       {/* Tool list */}
       <Card variant="outlined">
         <Box
@@ -1577,7 +1585,13 @@ function ImportTab() {
   }
 
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 2.25 }}>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", md: "1.1fr 1fr" },
+        gap: 2.25,
+      }}
+    >
       <Card variant="outlined">
         <Box
           sx={{
@@ -1757,7 +1771,7 @@ function ActivityTab() {
           </Typography>
         </Box>
       ) : (
-        <Box sx={{ fontFamily: "monospace" }}>
+        <Box sx={{ fontFamily: "monospace", overflowX: "auto" }}>
           <Box
             sx={{
               display: "grid",
@@ -1767,6 +1781,7 @@ function ActivityTab() {
               borderBottom: 1,
               borderColor: "divider",
               bgcolor: "action.hover",
+              minWidth: 640,
             }}
           >
             {["Time", "Agent", "Tool", "Status"].map((h) => (
@@ -1796,6 +1811,7 @@ function ActivityTab() {
                 borderBottom: i < entries.length - 1 ? 1 : 0,
                 borderColor: "divider",
                 alignItems: "center",
+                minWidth: 640,
               }}
             >
               <Typography
