@@ -5,7 +5,6 @@ import httpx
 BASE_URL = os.getenv("AME_API_URL", "http://localhost:8080")
 
 ALL_SCOPES = [
-    "human",
     "assessment.read",
     "assessment.write",
     "attempt.read",
@@ -14,8 +13,6 @@ ALL_SCOPES = [
     "feedback.write",
     "plan.read",
     "plan.write",
-    "agent:write-questions",
-    "agent:read-only",
 ]
 
 
@@ -27,7 +24,27 @@ def client():
 
 @pytest.fixture(scope="session")
 def api_key(client):
-    resp = client.post("/v1/agents/register", json={"label": "pytest", "scopes": ALL_SCOPES})
+    import uuid
+    # 1. Register a human user
+    email = f"pytest-{uuid.uuid4()}@example.com"
+    resp = client.post("/v1/auth/register", json={
+        "email": email,
+        "name": "Pytest User",
+        "password": "password123",
+        "role": "user"
+    })
+    assert resp.status_code == 201, resp.text
+    token = resp.json()["token"]
+
+    # 2. Create an agent for that user
+    resp = client.post(
+        "/v1/me/agents",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "label": "pytest-agent",
+            "scopes": ALL_SCOPES
+        }
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()["apiKey"]
 

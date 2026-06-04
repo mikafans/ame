@@ -15,11 +15,11 @@ MC_QUESTION = {
 @pytest.fixture(scope="module")
 def active_question_id(client, auth):
     """Create and promote a question so it's available for practice sessions."""
-    resp = client.post("/questions", headers=auth, json={"questions": [MC_QUESTION]})
+    resp = client.post("/v1/questions", headers=auth, json={"questions": [MC_QUESTION]})
     assert resp.status_code == 201, resp.text
     qid = resp.json()["questions"][0]["id"]
 
-    resp = client.post(f"/questions/{qid}/promote", headers=auth)
+    resp = client.post(f"/v1/questions/{qid}/promote", headers=auth)
     assert resp.status_code == 200
     return qid
 
