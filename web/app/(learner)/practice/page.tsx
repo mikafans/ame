@@ -91,7 +91,7 @@ export default function PracticePage() {
   }
 
   return (
-    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 640 }}>
+    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 640 }}>
       <Typography
         variant="caption"
         color="text.secondary"
@@ -164,7 +164,7 @@ export default function PracticePage() {
           kicker="Leave empty for all types"
           hint="Mix and match"
         >
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
             {QUESTION_TYPES.map((qt) => (
               <Chip
                 key={qt.value}
@@ -183,7 +183,10 @@ export default function PracticePage() {
 
         {/* Count */}
         <SetupBlock label="Questions" kicker="How many">
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Stack
+            direction="row"
+            sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}
+          >
             {[5, 10, 20, 50].map((n) => (
               <Chip
                 key={n}
@@ -223,7 +226,7 @@ export default function PracticePage() {
 
         {/* Duration */}
         <SetupBlock label="Time limit" kicker="Minutes (optional)">
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
             {[10, 20, 30, 60].map((n) => (
               <Chip
                 key={n}
