@@ -3,9 +3,8 @@
 // NOTE: The `(learner)` directory name is a legacy label. It hosts both learner and authoring features now.
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Box from "@mui/material/Box";
 import { useAuth } from "@/hooks/useAuth";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 export default function LearnerLayout({
   children,
@@ -63,11 +62,8 @@ export default function LearnerLayout({
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      <Sidebar route={getRouteId()} setRoute={handleRouteChange} />
-      <Box component="main" sx={{ flex: 1, overflowY: "auto" }}>
-        {children}
-      </Box>
-    </Box>
+    <AppShell route={getRouteId()} setRoute={handleRouteChange}>
+      {children}
+    </AppShell>
   );
 }
