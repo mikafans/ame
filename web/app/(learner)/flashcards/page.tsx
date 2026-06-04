@@ -186,7 +186,7 @@ export default function FlashcardsPage() {
   // ---- Setup phase ----
   if (phase === "setup") {
     return (
-      <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 640 }}>
+      <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 640 }}>
         <Kicker>Flashcards</Kicker>
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
           Review deck
@@ -290,7 +290,7 @@ export default function FlashcardsPage() {
   // ---- Review phase ----
   if (phase === "review") {
     return (
-      <Box sx={{ pt: 5, px: 5, pb: 8 }}>
+      <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8 }}>
         {note && (
           <Alert severity="info" sx={{ mb: 2, maxWidth: 680 }}>
             {note}
@@ -310,7 +310,7 @@ export default function FlashcardsPage() {
 
   // ---- Summary phase ----
   return (
-    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 640 }}>
+    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 640 }}>
       <Kicker>Deck complete</Kicker>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
         You knew {knewCount} of {knewCount + missed.length}
@@ -322,7 +322,7 @@ export default function FlashcardsPage() {
             ? "Clean sweep — nothing missed."
             : `${missed.length} to review again.`}
       </Typography>
-      <Stack direction="row" spacing={1.5}>
+      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1.5 }}>
         <Button
           variant="contained"
           size="large"
