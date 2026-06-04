@@ -31,7 +31,7 @@ Send the key on every request: `Authorization: Bearer <apiKey>`.
 - `GET /v1/agents/skill.json` — machine-readable tool list. Each tool carries an
   `input_schema` and the REST `method`/`path` it maps to. Add `?strict=1` to drop
   the method/path/scope hints. Top-level `run` block lists the runnable tools.
-- `GET /v1/agents/openapi.json` — full OpenAPI schema (public).
+- `GET /v1/openapi.yaml` — full OpenAPI schema (public, YAML).
 - `GET /v1/agents/activity` — your own call log, newest first (scope: `assessment.read`).
 
 ## Two ways to act

@@ -984,23 +984,6 @@ fn internal<E: Into<anyhow::Error>>(e: E) -> ApiError {
     ApiError::Internal(e.into())
 }
 
-#[utoipa::path(
-    patch,
-    path = "/v1/sessions/{id}/answers",
-    params(("id" = Uuid, Path, description = "Session id")),
-    responses(
-        (status = 204, description = "Draft saved"),
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn autosave_answers(
-    _user: AuthenticatedUser,
-    Path(_id): Path<Uuid>,
-    Json(_body): Json<serde_json::Value>,
-) -> StatusCode {
-    StatusCode::NO_CONTENT
-}
-
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PendingAttemptRow {
     pub attempt_id: Uuid,
@@ -1318,7 +1301,6 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/sessions", post(create_session).get(list_my_sessions))
         .route("/v1/sessions/{id}", get(get_session).patch(patch_session))
         .route("/v1/sessions/{id}/answer", post(answer))
-        .route("/v1/sessions/{id}/answers", patch(autosave_answers))
         .route("/v1/sessions/{id}/finish", post(finish))
         .route("/v1/attempts/pending", get(list_pending_attempts))
         .route("/v1/attempts/{id}/grade", patch(grade_attempt))
