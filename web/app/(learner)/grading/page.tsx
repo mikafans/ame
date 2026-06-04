@@ -126,7 +126,7 @@ export default function GradingPage() {
   }
 
   return (
-    <Box sx={{ pt: 5, px: 5, pb: 8 }}>
+    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8 }}>
       <Box sx={{ mb: 3.5 }}>
         <Typography
           variant="caption"
@@ -260,9 +260,9 @@ export default function GradingPage() {
                     px: "22px",
                     py: 2,
                     display: "grid",
-                    gridTemplateColumns: "120px 1fr auto",
+                    gridTemplateColumns: { xs: "1fr", sm: "120px 1fr auto" },
                     gap: 2,
-                    alignItems: "flex-end",
+                    alignItems: { xs: "stretch", sm: "flex-end" },
                   }}
                 >
                   <TextField
