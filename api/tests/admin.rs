@@ -413,6 +413,30 @@ async fn test_admin_flow_and_audit() {
     let body: serde_json::Value = res.json().await.unwrap();
     assert_eq!(body["error"]["code"], "validation_failed");
 
+    // Mint an admin token for reg_user while they are an admin
+    let reg_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'reg-admin-key', $3, $4::text[])",
+    )
+    .bind(reg_token_id)
+    .bind(reg_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string(), "assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let reg_admin_auth = format!("{reg_token_id}_{secret}");
+
+    // Verify reg_user can access admin endpoint using their admin token
+    let res = client
+        .get(format!("{base_url}/v1/admin/health"))
+        .header("Authorization", format!("Bearer {reg_admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
     // Demote reg_user_id back to user (succeeds because active_admin_count is 2)
     let res = client
         .patch(format!("{base_url}/v1/admin/users/{reg_user_id}"))
@@ -422,6 +446,15 @@ async fn test_admin_flow_and_audit() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Assert that the demoted admin's token has been revoked and returns 401
+    let res = client
+        .get(format!("{base_url}/v1/admin/health"))
+        .header("Authorization", format!("Bearer {reg_admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
     // Now admin_user_id is the last remaining active admin
     // Try to demote admin_user_id (fails with validation error)
@@ -1261,4 +1294,112 @@ async fn test_admin_assessment_soft_delete() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_admin_routes_forbidden_without_admin_scope() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // Create a regular user and token (not admin)
+    let user_id = Uuid::now_v7();
+    let secret = "abcdef0123456789abcdef0123456789abcdef0123456789";
+    let hash = ame_api::auth::token::hash_secret(secret);
+
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, password_hash)
+         VALUES ($1, 'regular@example.com', 'Regular User', 'user', 'dummy')",
+    )
+    .bind(user_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'user-key', $3, $4::text[])",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let user_auth = format!("{token_id}_{secret}");
+
+    let admin_paths = vec![
+        ("GET", format!("{base_url}/v1/admin/users")),
+        ("PATCH", format!("{base_url}/v1/admin/users/{user_id}")),
+        ("GET", format!("{base_url}/v1/admin/audit")),
+        ("GET", format!("{base_url}/v1/admin/health")),
+        ("GET", format!("{base_url}/v1/admin/assessments")),
+        (
+            "DELETE",
+            format!("{base_url}/v1/admin/assessments/{user_id}"),
+        ),
+        (
+            "POST",
+            format!("{base_url}/v1/admin/assessments/{user_id}/restore"),
+        ),
+    ];
+
+    for (method, url) in admin_paths {
+        // Test with regular user token (403)
+        let req = match method {
+            "GET" => client.get(&url),
+            "PATCH" => client.patch(&url).json(&serde_json::json!({})),
+            "DELETE" => client.delete(&url),
+            "POST" => client.post(&url),
+            _ => unreachable!(),
+        };
+        let res = req
+            .header("Authorization", format!("Bearer {user_auth}"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            res.status(),
+            StatusCode::FORBIDDEN,
+            "Path {} {} should be forbidden without admin scope",
+            method,
+            url
+        );
+
+        // Test with no token (401)
+        let req_no_auth = match method {
+            "GET" => client.get(&url),
+            "PATCH" => client.patch(&url).json(&serde_json::json!({})),
+            "DELETE" => client.delete(&url),
+            "POST" => client.post(&url),
+            _ => unreachable!(),
+        };
+        let res_no_auth = req_no_auth.send().await.unwrap();
+        assert_eq!(
+            res_no_auth.status(),
+            StatusCode::UNAUTHORIZED,
+            "Path {} {} should be unauthorized without token",
+            method,
+            url
+        );
+    }
 }
