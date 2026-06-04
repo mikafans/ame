@@ -7,6 +7,9 @@ production = false
 cors_origins = "http://localhost:23000"
 log_format = "compact"
 
+[ratelimit]
+trusted_proxies = 1
+
 [ratelimit.free]
 burst = 1000000
 rate = 1000000
@@ -20,7 +23,7 @@ burst = 1000000
 period_secs = 2
 
 [ratelimit.export]
-burst = 1000000
+burst = 1
 period_secs = 60
 
 [ratelimit.cost]
@@ -32,7 +35,7 @@ free = 50
 premium = 500
 
 [quota.agents]
-free = 1000000
+free = 1
 premium = 1000000
 
 [quota.assessments]

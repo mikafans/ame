@@ -73,7 +73,8 @@ pub async fn register(
     Json(body): Json<RegisterBody>,
 ) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
     // Validate email
-    if body.email.trim().is_empty() {
+    let trimmed_email = body.email.trim();
+    if trimmed_email.is_empty() {
         return Err(ApiError::Validation(vec![FieldError {
             field: "email".into(),
             message: "must not be empty".into(),
@@ -119,7 +120,7 @@ pub async fn register(
          RETURNING id, email, display_name, role",
     )
     .bind(user_id)
-    .bind(&body.email)
+    .bind(trimmed_email)
     .bind(&body.name)
     .bind(&normalized_role)
     .bind(&password_hash)
@@ -180,11 +181,29 @@ pub async fn login(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<LoginBody>,
 ) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
-    // Fetch user by email
+    let canonical = crate::auth::token::canonical_email(&body.email);
+
+    // Per-account rate limiting to prevent distributed login brute force
+    let (login_burst, login_refill) = if state.config.server.production {
+        (5, 5.0 / 60.0)
+    } else {
+        (1000000, 1000000.0)
+    };
+
+    let account_limiter_key = format!("ame:limiter:login_account:{}", canonical);
+    if !state
+        .limiter
+        .try_consume(&account_limiter_key, login_burst, login_refill, 1)
+        .await
+    {
+        return Err(ApiError::TooManyRequests);
+    }
+
+    // Fetch user by email canonical
     let user_row = sqlx::query(
-        "SELECT id, email, display_name, role, password_hash, deactivated_at FROM tb_users WHERE email = $1",
+        "SELECT id, email, display_name, role, password_hash, deactivated_at FROM tb_users WHERE email_canonical = $1",
     )
-    .bind(&body.email)
+    .bind(&canonical)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;

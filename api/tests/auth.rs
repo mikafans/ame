@@ -49,6 +49,7 @@ fn create_test_router(pool: PgPool) -> Router {
                 period_secs: 60,
             },
             cost: ame_api::config::CostConfig { read: 1, write: 5 },
+            trusted_proxies: Some(1),
         },
         quota: ame_api::config::QuotaConfig {
             agents: ame_api::config::TierQuotaConfig {
@@ -79,6 +80,8 @@ fn create_test_router(pool: PgPool) -> Router {
     };
     Router::new()
         .route("/v1/auth/register", post(ame_api::http::auth::register))
+        .route("/v1/auth/login", post(ame_api::http::auth::login))
+        .route("/v1/auth/logout", post(ame_api::http::auth::logout))
         .route(
             "/protected",
             get(|user: AuthenticatedUser| async move { Json(json!({ "user_id": user.user.id })) }),
@@ -484,4 +487,133 @@ async fn test_email_canonical_dedup() {
         body["error"]["details"]["fields"][0]["message"],
         "email already registered"
     );
+
+    // 3. Login using email2 (canonical alias) should succeed and authenticate as Bob
+    let login_payload = json!({
+        "email": email2,
+        "password": "password123"
+    });
+    let res = client
+        .post(format!("{base_url}/v1/auth/login"))
+        .json(&login_payload)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let login_body: Value = res.json().await.unwrap();
+    assert_eq!(login_body["user"]["email"], email1);
+}
+
+#[tokio::test]
+async fn test_per_account_login_rate_limiting() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+
+    // Set up a custom config with production = true to enable the login rate limiter
+    let config = ame_api::config::Config {
+        server: ame_api::config::ServerConfig {
+            port: 28080,
+            production: true, // Enable prod rate limits
+            cors_origins: "http://localhost:23000".to_string(),
+            log_format: "compact".to_string(),
+            database_url: None,
+            valkey_url: None,
+        },
+        ratelimit: ame_api::config::RateLimitConfig {
+            free: ame_api::config::TierConfig {
+                burst: 1000,
+                rate: 1000,
+            },
+            premium: ame_api::config::TierConfig {
+                burst: 1000,
+                rate: 1000,
+            },
+            public: ame_api::config::PublicConfig {
+                burst: 1000,
+                period_secs: 1,
+            },
+            export: ame_api::config::ExportConfig {
+                burst: 1000,
+                period_secs: 1,
+            },
+            cost: ame_api::config::CostConfig { read: 1, write: 1 },
+            trusted_proxies: Some(1),
+        },
+        quota: ame_api::config::QuotaConfig {
+            agents: ame_api::config::TierQuotaConfig {
+                free: 1000,
+                premium: 1000,
+            },
+            assessments: ame_api::config::TierQuotaConfig {
+                free: 1000,
+                premium: 1000,
+            },
+            questions: ame_api::config::TierQuotaConfig {
+                free: 1000,
+                premium: 1000,
+            },
+        },
+        batch: ame_api::config::BatchConfig {
+            free: 1000,
+            premium: 1000,
+        },
+    };
+
+    let valkey = ame_api::config::create_valkey_pool(&config).unwrap();
+    let limiter = std::sync::Arc::new(ame_api::ratelimit::RateLimiter::new(valkey.clone()));
+    let state = ame_api::http::AppState {
+        pool: ame_api::http::db::convert_pool_to_ame_app(&pool),
+        config,
+        valkey,
+        limiter,
+    };
+
+    // We can merge the auth routes for testing
+    let app = Router::new()
+        .route("/v1/auth/login", post(ame_api::http::auth::login))
+        .with_state(state);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    let rand_id = uuid::Uuid::now_v7();
+    let login_payload = json!({
+        "email": format!("bruteforce-{}@example.com", rand_id),
+        "password": "wrongpassword"
+    });
+
+    // Make 5 attempts (burst of 5)
+    for _ in 0..5 {
+        let res = client
+            .post(format!("{base_url}/v1/auth/login"))
+            .json(&login_payload)
+            .send()
+            .await
+            .unwrap();
+        // Since the user is not found, we get 401
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    // 6th attempt should return 429 Too Many Requests
+    let res = client
+        .post(format!("{base_url}/v1/auth/login"))
+        .json(&login_payload)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::TOO_MANY_REQUESTS);
 }

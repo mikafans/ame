@@ -158,6 +158,7 @@ pub async fn rate_limit_middleware(
 
     let auth = req.extensions().get::<AuthenticatedUser>();
     let method = req.method().clone();
+    let trusted_proxies = state.config.ratelimit.trusted_proxies.unwrap_or(1);
 
     let (key, burst, refill_rate, cost) = if path == "/v1/me/export" {
         if let Some(auth) = auth {
@@ -166,7 +167,7 @@ pub async fn rate_limit_middleware(
             let refill_rate = 1.0 / (state.config.ratelimit.export.period_secs as f64);
             (key, burst, refill_rate, 1)
         } else {
-            let ip = get_client_ip(&req);
+            let ip = get_client_ip(&req, trusted_proxies);
             let key = format!("ame:limiter:ip:{ip}");
             let burst = state.config.ratelimit.public.burst;
             let refill_rate = 1.0 / (state.config.ratelimit.public.period_secs as f64);
@@ -195,7 +196,7 @@ pub async fn rate_limit_middleware(
         };
         (key, burst, rate, cost)
     } else {
-        let ip = get_client_ip(&req);
+        let ip = get_client_ip(&req, trusted_proxies);
         let key = format!("ame:limiter:ip:{ip}");
         let burst = state.config.ratelimit.public.burst;
         let refill_rate = 1.0 / (state.config.ratelimit.public.period_secs as f64);
@@ -214,16 +215,94 @@ pub async fn rate_limit_middleware(
     }
 }
 
-fn get_client_ip(req: &axum::extract::Request) -> String {
-    req.headers()
-        .get("x-forwarded-for")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim().to_string())
-        .or_else(|| {
-            req.extensions()
-                .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-                .map(|axum::extract::ConnectInfo(addr)| addr.ip().to_string())
-        })
+fn get_client_ip(req: &axum::extract::Request, trusted_proxies: usize) -> String {
+    let xff_header = if trusted_proxies > 0 {
+        req.headers()
+            .get("x-forwarded-for")
+            .and_then(|h| h.to_str().ok())
+    } else {
+        None
+    };
+    if let Some(xff) = xff_header {
+        let ips: Vec<&str> = xff.split(',').map(|s| s.trim()).collect();
+        if ips.len() > trusted_proxies {
+            return ips[ips.len() - 1 - trusted_proxies].to_string();
+        }
+    }
+    req.extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .map(|axum::extract::ConnectInfo(addr)| addr.ip().to_string())
         .unwrap_or_else(|| "127.0.0.1".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::extract::ConnectInfo;
+    use std::net::SocketAddr;
+
+    #[test]
+    fn test_get_client_ip_no_xff_no_connect_info() {
+        let req = axum::extract::Request::builder()
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(get_client_ip(&req, 1), "127.0.0.1");
+    }
+
+    #[test]
+    fn test_get_client_ip_connect_info_fallback() {
+        let addr: SocketAddr = "192.168.1.50:8080".parse().unwrap();
+        let mut req = axum::extract::Request::builder()
+            .body(axum::body::Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(addr));
+
+        assert_eq!(get_client_ip(&req, 1), "192.168.1.50");
+        assert_eq!(get_client_ip(&req, 0), "192.168.1.50");
+    }
+
+    #[test]
+    fn test_get_client_ip_trusted_proxies() {
+        let addr: SocketAddr = "10.0.0.1:8080".parse().unwrap();
+
+        // Case: AME_TRUSTED_PROXIES=1, XFF: "1.2.3.4, 10.0.0.1" -> "1.2.3.4"
+        let mut req = axum::extract::Request::builder()
+            .header("x-forwarded-for", "1.2.3.4, 10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(addr));
+        assert_eq!(get_client_ip(&req, 1), "1.2.3.4");
+
+        // Case: AME_TRUSTED_PROXIES=1, XFF: "evil, 1.2.3.4, 10.0.0.1" -> "1.2.3.4"
+        let mut req = axum::extract::Request::builder()
+            .header("x-forwarded-for", "evil, 1.2.3.4, 10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(addr));
+        assert_eq!(get_client_ip(&req, 1), "1.2.3.4");
+
+        // Case: AME_TRUSTED_PROXIES=2, XFF: "1.2.3.4, 10.0.0.2, 10.0.0.1" -> "1.2.3.4"
+        let mut req = axum::extract::Request::builder()
+            .header("x-forwarded-for", "1.2.3.4, 10.0.0.2, 10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(addr));
+        assert_eq!(get_client_ip(&req, 2), "1.2.3.4");
+
+        // Case: XFF has fewer entries than trusted_proxies + 1 -> fallback to ConnectInfo
+        let mut req = axum::extract::Request::builder()
+            .header("x-forwarded-for", "10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(addr));
+        assert_eq!(get_client_ip(&req, 1), "10.0.0.1");
+
+        // Case: trusted_proxies=0 -> fallback to ConnectInfo
+        let mut req = axum::extract::Request::builder()
+            .header("x-forwarded-for", "1.2.3.4, 10.0.0.1")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(addr));
+        assert_eq!(get_client_ip(&req, 0), "10.0.0.1");
+    }
 }
