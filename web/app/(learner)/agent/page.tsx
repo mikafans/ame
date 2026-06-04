@@ -29,6 +29,7 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
@@ -365,6 +366,22 @@ function KeysTab() {
   // Revoke agent modal state
   const [revokeAgent, setRevokeAgent] = useState<AgentSummary | null>(null);
   const [revoking, setRevoking] = useState(false);
+
+  // Origin for copy-correct usage hints (set after mount — avoids SSR `window`).
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const downloadClient = () => {
+    const blob = new Blob([CLIENT_PY], { type: "text/x-python" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "client.py";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const ALL_SCOPES = [
     {
@@ -1020,33 +1037,50 @@ function KeysTab() {
           </Stack>
 
           <Box sx={{ mt: 2.5 }}>
-            <Typography
-              variant="caption"
+            <Box
               sx={{
-                fontFamily: "monospace",
-                fontWeight: 600,
-                display: "block",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
                 mb: 0.75,
               }}
             >
-              Reference client — agents/client.py
-            </Typography>
+              <Typography
+                variant="caption"
+                sx={{ fontFamily: "monospace", fontWeight: 600 }}
+              >
+                Reference client — agents/client.py
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FileDownloadOutlinedIcon />}
+                onClick={downloadClient}
+              >
+                Download
+              </Button>
+            </Box>
             <Typography
               variant="caption"
               color="text.secondary"
               sx={{ display: "block", mb: 1.25, lineHeight: 1.3 }}
             >
               A dependency-free Python wrapper and the canonical worked example.
-              Copy it, run it directly with{" "}
-              <Box component="code" sx={codeStyle}>
-                uv run client.py
-              </Box>
-              , or import{" "}
+              Download it, then run the end-to-end demo against this host (or
+              import{" "}
               <Box component="code" sx={codeStyle}>
                 AmeAgent
               </Box>{" "}
-              as a library.
+              as a library):
             </Typography>
+            <Box sx={{ mb: 1.25 }}>
+              <CodeBlock
+                label="run the demo"
+                lines={[
+                  `uv run client.py --api ${origin || "<your-ame-host>"} --token <owner-token>`,
+                ]}
+              />
+            </Box>
             <CodeBlock
               label="agents/client.py"
               lines={CLIENT_PY.replace(/\n$/, "").split("\n")}
