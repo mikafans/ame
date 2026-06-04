@@ -267,7 +267,7 @@ export default function ExplorePage() {
           variant="outlined"
           sx={{ borderRadius: 2 }}
         >
-          <Table>
+          <Table sx={{ minWidth: 720 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
