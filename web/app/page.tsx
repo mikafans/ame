@@ -376,9 +376,9 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                     desc: "MCP-compatible tool definitions and schema parameters.",
                   },
                   {
-                    href: "/v1/agents/openapi.json",
-                    label: "/v1/agents/openapi.json",
-                    desc: "Standard OpenAPI 3.1 schema for model client generators.",
+                    href: "/v1/openapi.yaml",
+                    label: "/v1/openapi.yaml",
+                    desc: "Standard OpenAPI 3.1 schema (YAML) for model client generators.",
                   },
                 ].map((row) => (
                   <Box
