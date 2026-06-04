@@ -89,7 +89,7 @@ pub async fn check_quota(
 
     let usage: i64 = match kind {
         QuotaKind::AgentCreation => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent'",
+            "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent' AND deactivated_at IS NULL",
         )
         .bind(owner_id)
         .fetch_one(&mut *conn)

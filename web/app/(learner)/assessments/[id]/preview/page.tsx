@@ -151,9 +151,9 @@ export default function AssessmentPreviewPage({
           />
         )}
         <Stack
-          direction="row"
-          spacing={1.5}
-          sx={{ alignItems: "center", mb: 2 }}
+          direction={{ xs: "column", sm: "row" }}
+          spacing={{ xs: 1, sm: 1.5 }}
+          sx={{ alignItems: { xs: "flex-start", sm: "center" }, mb: 2 }}
         >
           <Typography variant="h4" sx={{ fontWeight: 500 }}>
             {assessment.title}
@@ -190,7 +190,7 @@ export default function AssessmentPreviewPage({
       </Box>
 
       {/* Stat strip */}
-      <Stack direction="row" spacing={2.5} sx={{ mb: 3, flexWrap: "wrap" }}>
+      <Stack direction="row" spacing={1.5} sx={{ mb: 3, alignItems: "center" }}>
         <Typography
           variant="caption"
           color="text.secondary"
@@ -201,6 +201,9 @@ export default function AssessmentPreviewPage({
           }}
         >
           {assessment.questions.length} questions
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          ·
         </Typography>
         <Typography
           variant="caption"
@@ -213,19 +216,6 @@ export default function AssessmentPreviewPage({
         >
           {totalPoints} pts
         </Typography>
-        {kindSummary && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              fontFamily: "monospace",
-              letterSpacing: 1.1,
-              textTransform: "uppercase",
-            }}
-          >
-            {kindSummary}
-          </Typography>
-        )}
       </Stack>
 
       {/* Question list */}
@@ -239,9 +229,17 @@ export default function AssessmentPreviewPage({
               borderBottom: i < sorted.length - 1 ? 1 : 0,
               borderColor: "divider",
               display: "grid",
-              gridTemplateColumns: "28px 1fr auto",
+              gridTemplateColumns: {
+                xs: "24px 50px 1fr 50px",
+                sm: "28px 70px 1fr 60px",
+              },
               gap: 1.75,
               alignItems: "start",
+              transition: "background-color 0.2s ease",
+              cursor: "pointer",
+              "&:hover": {
+                bgcolor: "action.hover",
+              },
             }}
           >
             <Typography
@@ -252,21 +250,41 @@ export default function AssessmentPreviewPage({
               {i + 1}
             </Typography>
             <Typography
-              variant="body2"
+              variant="caption"
+              color="text.secondary"
               sx={{
-                color: "text.primary",
-                lineHeight: 1.5,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
+                fontFamily: "monospace",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                fontSize: 10,
+                pt: 0.25,
               }}
             >
-              {q.prompt}
+              {KIND_LABEL[q.kind] || q.kind}
             </Typography>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "text.primary",
+                  lineHeight: 1.5,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  transition: "color 0.2s ease",
+                  "&:hover": {
+                    color: "primary.main",
+                  },
+                }}
+              >
+                {q.prompt}
+              </Typography>
+            </Box>
             <Typography
               variant="caption"
               color="text.secondary"
+              align="right"
               sx={{ fontFamily: "monospace", whiteSpace: "nowrap", pt: 0.25 }}
             >
               {q.points} pt{q.points !== 1 ? "s" : ""}
@@ -279,14 +297,21 @@ export default function AssessmentPreviewPage({
       <Box
         sx={{
           display: "flex",
+          flexDirection: { xs: "column-reverse", sm: "row" },
+          gap: { xs: 1.5, sm: 0 },
           justifyContent: "space-between",
           alignItems: "center",
           pt: 3,
           borderTop: 1,
           borderColor: "divider",
+          width: "100%",
         }}
       >
-        <Button variant="outlined" onClick={() => router.push("/explore")}>
+        <Button
+          variant="outlined"
+          onClick={() => router.push("/explore")}
+          sx={{ width: { xs: "100%", sm: "auto" }, minWidth: { sm: 180 } }}
+        >
           Back to Explore
         </Button>
         <Button
@@ -297,6 +322,7 @@ export default function AssessmentPreviewPage({
             assessment.status === "draft" ||
             assessment.questions.length === 0
           }
+          sx={{ width: { xs: "100%", sm: "auto" }, minWidth: { sm: 180 } }}
         >
           {starting
             ? "Starting…"

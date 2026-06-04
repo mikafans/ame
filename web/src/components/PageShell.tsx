@@ -51,8 +51,10 @@ export function PageShell({
       <Box
         sx={{
           display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 2, sm: 0 },
           justifyContent: "space-between",
-          alignItems: "flex-start",
+          alignItems: { xs: "flex-start", sm: "flex-start" },
           mb: 4,
         }}
       >
@@ -83,7 +85,17 @@ export function PageShell({
             </Typography>
           )}
         </Box>
-        {action && <Box sx={{ flexShrink: 0, ml: 2 }}>{action}</Box>}
+        {action && (
+          <Box
+            sx={{
+              flexShrink: 0,
+              ml: { xs: 0, sm: 2 },
+              mt: { xs: 0.5, sm: 0 },
+            }}
+          >
+            {action}
+          </Box>
+        )}
       </Box>
 
       {children}

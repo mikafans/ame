@@ -352,7 +352,7 @@ pub async fn list_agents(
          FROM tb_users u
          JOIN tb_agent_profiles a ON a.agent_user_id = u.id
          JOIN tb_api_tokens t ON t.user_id = u.id
-         WHERE u.owner_user_id = $1 AND u.role = 'agent' AND t.revoked_at IS NULL",
+         WHERE u.owner_user_id = $1 AND u.role = 'agent' AND u.deactivated_at IS NULL AND t.revoked_at IS NULL",
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
@@ -505,7 +505,7 @@ pub async fn update_agent(
 
     // 1. Verify existence and ownership
     let exists = sqlx::query(
-        "SELECT 1 FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'",
+        "SELECT 1 FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent' AND deactivated_at IS NULL",
     )
     .bind(id)
     .bind(user.user.id)
@@ -532,7 +532,7 @@ pub async fn update_agent(
             "UPDATE tb_agent_profiles \
              SET focus_tags = $1 \
              WHERE agent_user_id = $2 \
-               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent')"
+               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent' AND deactivated_at IS NULL)"
         )
         .bind(tags)
         .bind(id)
@@ -567,7 +567,7 @@ pub async fn update_agent(
             "UPDATE tb_api_tokens \
              SET scopes = $1 \
              WHERE user_id = $2 \
-               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent')"
+               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent' AND deactivated_at IS NULL)"
         )
         .bind(scopes)
         .bind(id)
@@ -609,17 +609,40 @@ pub async fn delete_agent(
             .await
             .unwrap_or_default();
 
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let is_admin = user.user.role == Role::Admin;
+    crate::http::db::set_rls_guc(&mut tx, user.owner_id, is_admin).await?;
+
+    // 1. Deactivate the agent user record
     let affected =
-        sqlx::query("DELETE FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent'")
+        sqlx::query("UPDATE tb_users SET deactivated_at = now() WHERE id = $1 AND owner_user_id = $2 AND role = 'agent' AND deactivated_at IS NULL")
             .bind(id)
             .bind(user.user.id)
-            .execute(&state.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
 
     if affected.rows_affected() == 0 {
         return Err(ApiError::NotFound { resource: "agent" });
     }
+
+    // 2. Revoke all active tokens for this agent
+    sqlx::query(
+        "UPDATE tb_api_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     if let Ok(mut conn) = state.valkey.get().await {
         use redis::AsyncCommands;

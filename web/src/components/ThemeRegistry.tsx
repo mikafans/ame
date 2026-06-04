@@ -199,7 +199,7 @@ function buildTheme(mode: ColorMode) {
       MuiTableContainer: {
         styleOverrides: {
           root: {
-            overflow: "hidden",
+            overflow: "auto",
             borderRadius: 12,
             border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
             backgroundColor: isDark ? "#1a1f2e" : "#ffffff",

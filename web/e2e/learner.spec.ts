@@ -53,7 +53,7 @@ test.describe("learner UI (seeded account)", () => {
   test("explore page loads and shows sidebar identity", async ({ page }) => {
     await page.goto("/explore");
     await page.screenshot({ path: "sidebar.png" });
-    await expect(page.getByText(/Ada Lovelace/i)).toBeVisible({
+    await expect(page.getByText(/Ada Lovelace/i).first()).toBeVisible({
       timeout: 10000,
     });
     await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
@@ -116,7 +116,7 @@ test.describe("learner session flow (primary user)", () => {
 
     await setAuthCookie(page, token);
     await page.goto(`/sessions/${sessionId}`);
-    await expect(page.locator("text=/question/i").first()).toBeVisible({
+    await expect(page.getByText(/Question \d+ of \d+/i)).toBeVisible({
       timeout: 8000,
     });
   });

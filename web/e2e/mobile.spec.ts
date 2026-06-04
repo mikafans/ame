@@ -95,7 +95,7 @@ test.describe("mobile session flow (primary user)", () => {
     await page.goto(`/sessions/${sessionId}`);
 
     // Assert the question renders
-    await expect(page.locator("text=/question/i").first()).toBeVisible({
+    await expect(page.getByText(/Question \d+ of \d+/i)).toBeVisible({
       timeout: 8000,
     });
 
