@@ -135,6 +135,29 @@ the platform with, confidently. Tag `v1.1.0`.
 
 ---
 
+## v2.0 — High Scale & Performance (The "1M Concurrent Users" Problem)
+
+Targeting extreme load spikes (e.g., 1 million concurrent users opening assessment sessions simultaneously) by redesigning the hot paths to eliminate database bottlenecks and network saturation.
+
+### #5 — In-Memory Assessment & Question Plan Caching
+- **Goal**: Eliminate SQL read queries when creating sessions.
+- **Plan**: Cache published assessment objects (along with their linked sections and questions) in local memory using `moka` or `dashmap` in Rust, or as pre-compiled JSON blobs in Valkey/Redis. Bypasses multi-table SQL joins on `tb_assessments`, `tb_assessment_sections`, `tb_assessment_items`, and `tb_questions`.
+
+### #6 — Asynchronous Session Write Buffering
+- **Goal**: Decouple the HTTP response latency from Postgres write transactions.
+- **Plan**: 
+  - When a user calls `POST /v1/sessions`, generate the session UUID, compile the session question list, push the creation event to a Valkey Stream or message queue, and immediately return a `201 Created` response.
+  - Run background worker groups to pull session creation events and perform bulk/batched inserts (`COPY` or batched inserts) into `tb_sessions` and `tb_session_questions`, shifting high-write database contention out of the request-response cycle.
+
+### #7 — Horizontal Scaling & Connection Multiplexing
+- **Goal**: Bounded OS resources and stable connection pool limits.
+- **Plan**:
+  - Horizontal pod auto-scaling (HPA) for the Axum API server.
+  - Deploy Envoy or ingress controller configured for HTTP/2 multiplexing and active load shedding.
+  - Implement active queueing/backpressure on the database connection pool using tools like `pgbouncer` or internal pool queuing.
+
+---
+
 ## Cross-cutting principles
 
 - Every state-changing admin action writes to `tb_audit_log`.
