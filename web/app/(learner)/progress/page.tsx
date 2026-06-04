@@ -136,7 +136,11 @@ export default function ProgressPage() {
           Loading…
         </Typography>
       ) : stats ? (
-        <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          sx={{ mb: 3 }}
+        >
           {[
             {
               label: "Avg score",
@@ -181,7 +185,7 @@ export default function ProgressPage() {
           >
             Agent Insights
           </Typography>
-          <Stack direction="row" spacing={2}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             {[
               {
                 label: "Active agents",
@@ -222,7 +226,7 @@ export default function ProgressPage() {
         </Box>
       )}
 
-      <Stack direction="row" spacing={2}>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
         <Card variant="outlined" sx={{ flex: 1 }}>
           <CardContent>
             <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
