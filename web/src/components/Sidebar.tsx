@@ -34,7 +34,7 @@ import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
 
-const DRAWER_WIDTH = 232;
+export const DRAWER_WIDTH = 232;
 
 // Deterministic avatar color: same name always maps to the same hue, so the
 // default (initials) avatar is distinguishable per-user instead of one flat
@@ -68,9 +68,16 @@ const ICON_MAP: Record<string, React.ReactElement> = {
 interface SidebarProps {
   route: string;
   setRoute: (route: string) => void;
+  mobileOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function Sidebar({ route, setRoute }: SidebarProps) {
+export function Sidebar({
+  route,
+  setRoute,
+  mobileOpen = false,
+  onClose,
+}: SidebarProps) {
   const { user, logout: logoutContext } = useAuth();
   const { mode, toggle } = useColorMode();
 
@@ -167,20 +174,8 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
       .slice(0, 2) ?? "?";
   const displayName = user?.displayName ?? "";
 
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: DRAWER_WIDTH,
-        flexShrink: 0,
-        "& .MuiDrawer-paper": {
-          width: DRAWER_WIDTH,
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-        },
-      }}
-    >
+  const drawerContent = (
+    <>
       <Box sx={{ p: 2.5, pb: 2, borderBottom: 1, borderColor: "divider" }}>
         <Logo />
         <Typography
@@ -274,6 +269,44 @@ export function Sidebar({ route, setRoute }: SidebarProps) {
           </IconButton>
         </Tooltip>
       </Box>
-    </Drawer>
+    </>
+  );
+
+  return (
+    <>
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: "none", md: "block" },
+          width: DRAWER_WIDTH,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: DRAWER_WIDTH,
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+      <Drawer
+        variant="temporary"
+        open={!!mobileOpen}
+        onClose={onClose}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
+            width: DRAWER_WIDTH,
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+    </>
   );
 }
