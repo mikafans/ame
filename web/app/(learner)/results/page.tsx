@@ -160,7 +160,7 @@ export default function ResultsHistoryPage() {
       ) : (
         <Box sx={{ overflowX: "auto", mb: 3 }}>
           <TableContainer>
-            <Table stickyHeader>
+            <Table stickyHeader sx={{ minWidth: 620 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Assessment</TableCell>
