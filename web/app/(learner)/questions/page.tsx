@@ -243,7 +243,10 @@ export default function QuestionsPage() {
           exclusive
           onChange={handleKindChange}
           size="small"
-          sx={{ "& .MuiToggleButtonGroup-grouped": { height: 40 } }}
+          sx={{
+            flexWrap: "wrap",
+            "& .MuiToggleButtonGroup-grouped": { height: 40 },
+          }}
         >
           {Object.entries(KIND_LABELS).map(([k, label]) => (
             <ToggleButton key={k} value={k}>
@@ -277,7 +280,7 @@ export default function QuestionsPage() {
 
       {/* Table */}
       <Box sx={{ overflowX: "auto", mb: 3 }}>
-        <Table stickyHeader>
+        <Table stickyHeader sx={{ minWidth: 560 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: "80px" }}>Kind</TableCell>
