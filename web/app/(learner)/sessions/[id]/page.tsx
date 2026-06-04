@@ -83,7 +83,6 @@ export default function ActiveQuizPage({
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const autosaveScheduled = useRef(false);
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
@@ -172,13 +171,21 @@ export default function ActiveQuizPage({
     }
   }, [id, router, finishing, answers, session]);
 
+  // Keep the latest handleFinish reachable from the once-created interval below
+  // without rebuilding the interval — the interval closes over a stale closure
+  // otherwise and would auto-submit an empty answer set on timeout.
+  const finishRef = useRef(handleFinish);
+  useEffect(() => {
+    finishRef.current = handleFinish;
+  }, [handleFinish]);
+
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
     const t = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(t);
-          handleFinish();
+          finishRef.current();
           return 0;
         }
         return prev - 1;
@@ -187,33 +194,6 @@ export default function ActiveQuizPage({
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft !== null && timeLeft > 0]);
-
-  useEffect(() => {
-    if (Object.keys(answers).length === 0 || autosaveScheduled.current) return;
-    autosaveScheduled.current = true;
-    const timer = setTimeout(() => {
-      const answersList = Object.entries(answers).map(([qid, val]) => ({
-        questionId: qid,
-        answer: val,
-      }));
-      api
-        .PATCH(
-          "/v1/sessions/{id}/answers" as never,
-          {
-            params: { path: { id } },
-            body: { answers: answersList } as never,
-          } as never,
-        )
-        .catch(console.error)
-        .finally(() => {
-          autosaveScheduled.current = false;
-        });
-    }, 8000);
-    return () => {
-      clearTimeout(timer);
-      autosaveScheduled.current = false;
-    };
-  }, [answers, id]);
 
   const handleSaveExit = useCallback(async () => {
     try {
