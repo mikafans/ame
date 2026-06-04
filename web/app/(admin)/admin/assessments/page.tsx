@@ -319,7 +319,11 @@ export default function AdminAssessmentsPage() {
             justifyContent="space-between"
           >
             {/* Mode Toggle */}
-            <Stack direction="row" spacing={2} alignItems="center">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+            >
               <Typography
                 variant="body2"
                 sx={{ fontWeight: 600, color: "text.secondary" }}
@@ -355,7 +359,11 @@ export default function AdminAssessmentsPage() {
             </Stack>
 
             {/* Status Selector */}
-            <Stack direction="row" spacing={2} alignItems="center">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+            >
               <Typography
                 variant="body2"
                 sx={{ fontWeight: 600, color: "text.secondary" }}
@@ -386,7 +394,7 @@ export default function AdminAssessmentsPage() {
 
         {/* Table */}
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 800 }}>
             <TableHead>
               <TableRow
                 sx={{
