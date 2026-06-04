@@ -90,7 +90,7 @@ export function FlashcardReview({
       </Stack>
 
       <Card variant="outlined" sx={{ minHeight: 240, borderRadius: 2 }}>
-        <CardContent sx={{ p: 3.5 }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
           <Typography
             variant="h6"
             sx={{ fontWeight: 400, lineHeight: 1.5, mb: snippet ? 2 : 0 }}
@@ -162,7 +162,14 @@ export function FlashcardReview({
 
       <Stack
         direction="row"
-        sx={{ mt: 2.5, alignItems: "center", justifyContent: "space-between" }}
+        sx={{
+          mt: 2.5,
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          rowGap: 1.5,
+          gap: 1,
+        }}
       >
         {!revealed ? (
           <Button

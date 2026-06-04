@@ -271,9 +271,11 @@ export default function ActiveQuizPage({
         sx={{
           borderBottom: 1,
           borderColor: "divider",
-          px: 3,
+          px: { xs: 1.5, sm: 3 },
           py: 1.5,
           display: "flex",
+          flexWrap: "wrap",
+          gap: 1,
           alignItems: "center",
           justifyContent: "space-between",
           position: "sticky",
@@ -282,14 +284,18 @@ export default function ActiveQuizPage({
           bgcolor: "background.default",
         }}
       >
-        <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
+        <Typography
+          variant="subtitle2"
+          sx={{ fontWeight: 500, minWidth: 0, flexShrink: 1 }}
+          noWrap
+        >
           {session.session.assessment_title || "Quiz"}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {answered}/{questions.length} answered
           {mm !== null && ss !== null && ` · ${mm}:${ss}`}
         </Typography>
-        <Stack direction="row" spacing={1.5}>
+        <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
           <Button
             size="small"
             variant="contained"
@@ -322,7 +328,7 @@ export default function ActiveQuizPage({
         sx={{
           flex: 1,
           overflowY: "auto",
-          p: 4,
+          p: { xs: 2, sm: 4 },
           maxWidth: 800,
           mx: "auto",
           width: "100%",
