@@ -55,12 +55,12 @@ const nextConfig = {
         destination: `${apiOrigin}/llms.txt`,
       },
       {
-        source: "/v1/agents/skill.json",
-        destination: `${apiOrigin}/v1/agents/skill.json`,
+        source: "/skill.json",
+        destination: `${apiOrigin}/skill.json`,
       },
       {
-        source: "/v1/agents/openapi.json",
-        destination: `${apiOrigin}/v1/agents/openapi.json`,
+        source: "/openapi.yaml",
+        destination: `${apiOrigin}/openapi.yaml`,
       },
     ];
   },

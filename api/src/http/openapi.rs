@@ -210,7 +210,7 @@ pub fn openapi_yaml() -> String {
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/v1/openapi.yaml", get(|| async { openapi_yaml() }))
+        .route("/openapi.yaml", get(|| async { openapi_yaml() }))
         .with_state(state)
 }
 

@@ -22,10 +22,10 @@ fmt-check: ## Verify formatting without mutating
 		echo "[web] skipping prettier --check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
 
-lint: ## Clippy + tsc + api drift check + sqlfluff lint
+lint: ## Clippy + tsc + api/client drift check + sqlfluff lint
 	cd api && mise exec -- cargo clippy --all-targets -- -D warnings
 	@if [ -x web/node_modules/.bin/next ]; then \
-		cd web && mise exec -- bun run type-check && mise exec -- bun run api:check; \
+		cd web && mise exec -- bun run type-check && mise exec -- bun run api:check && mise exec -- bun run client:check; \
 	else \
 		echo "[web] skipping lint + type-check (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi
@@ -81,10 +81,10 @@ test-stats: ## Stats, messages, keys integration tests (requires `make db-up`)
 test-api: ## Black-box HTTP tests against a running API (requires `make db-up` + API running)
 	uv run pytest api_tests -v
 
-openapi: ## Regenerate api/openapi.yaml and web TypeScript schema
+openapi: ## Regenerate api/openapi.yaml, web TypeScript schema, and embedded client source
 	cd api && mise exec -- cargo run --quiet --bin gen-openapi
 	@if [ -x web/node_modules/.bin/openapi-typescript ]; then \
-		cd web && mise exec -- bun run api:gen; \
+		cd web && mise exec -- bun run api:gen && mise exec -- bun run client:gen; \
 	else \
 		echo "[web] skipping schema regen (web deps missing - run 'cd web && bun install' to enable)"; \
 	fi

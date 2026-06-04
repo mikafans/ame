@@ -33,6 +33,7 @@ import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
 import { PageShell } from "@/components/PageShell";
+import { CLIENT_PY } from "@/generated/clientSource";
 
 interface AgentSummary {
   id: string;
@@ -116,14 +117,14 @@ export default function AgentPage() {
           <Button
             variant="outlined"
             size="small"
-            onClick={() => window.open("/v1/agents/openapi.json", "_blank")}
+            onClick={() => window.open("/openapi.yaml", "_blank")}
           >
             OpenAPI
           </Button>
           <Button
             variant="outlined"
             size="small"
-            onClick={() => window.open("/v1/agents/skill.json", "_blank")}
+            onClick={() => window.open("/skill.json", "_blank")}
           >
             MCP manifest
           </Button>
@@ -985,7 +986,7 @@ function KeysTab() {
                   display: "block",
                 }}
               >
-                2. /v1/agents/skill.json (Tool Manifest)
+                2. /skill.json (Tool Manifest)
               </Typography>
               <Typography
                 variant="caption"
@@ -1005,7 +1006,7 @@ function KeysTab() {
                   display: "block",
                 }}
               >
-                3. /v1/agents/openapi.json (OpenAPI 3.1)
+                3. /openapi.yaml (OpenAPI 3.1)
               </Typography>
               <Typography
                 variant="caption"
@@ -1017,6 +1018,40 @@ function KeysTab() {
               </Typography>
             </Box>
           </Stack>
+
+          <Box sx={{ mt: 2.5 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: "monospace",
+                fontWeight: 600,
+                display: "block",
+                mb: 0.75,
+              }}
+            >
+              Reference client — agents/client.py
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 1.25, lineHeight: 1.3 }}
+            >
+              A dependency-free Python wrapper and the canonical worked example.
+              Copy it, run it directly with{" "}
+              <Box component="code" sx={codeStyle}>
+                uv run client.py
+              </Box>
+              , or import{" "}
+              <Box component="code" sx={codeStyle}>
+                AmeAgent
+              </Box>{" "}
+              as a library.
+            </Typography>
+            <CodeBlock
+              label="agents/client.py"
+              lines={CLIENT_PY.replace(/\n$/, "").split("\n")}
+            />
+          </Box>
         </Card>
       </Stack>
 
@@ -1115,7 +1150,7 @@ function KeysTab() {
 ${window.location.origin}/llms.txt
 
 The machine-readable tool schemas are available at:
-${window.location.origin}/v1/agents/skill.json
+${window.location.origin}/skill.json
 
 Authenticate all your requests using this API Key:
 Bearer ${createdSecret}
@@ -1133,7 +1168,7 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
 ${window.location.origin}/llms.txt
 
 The machine-readable tool schemas are available at:
-${window.location.origin}/v1/agents/skill.json
+${window.location.origin}/skill.json
 
 Authenticate all your requests using this API Key:
 Bearer ${createdSecret}
@@ -1290,7 +1325,7 @@ function ToolsTab() {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)
-      .GET("/v1/agents/skill.json")
+      .GET("/skill.json")
       .then(({ data }: { data?: { tools: McpTool[] } }) => {
         if (data?.tools) {
           setTools(data.tools);

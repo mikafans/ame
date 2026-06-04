@@ -26,6 +26,12 @@ COPY api/openapi.yaml /tmp/openapi.yaml
 RUN if [ ! -f src/api/generated/schema.d.ts ]; then \
       bunx openapi-typescript /tmp/openapi.yaml -o src/api/generated/schema.d.ts; \
     fi
+# Embedded reference client (src/generated/clientSource.ts) is committed; if
+# missing, rebuild from agents/client.py at the repo root.
+COPY agents/client.py /tmp/client.py
+RUN if [ ! -f src/generated/clientSource.ts ]; then \
+      bun scripts/gen-client-source.mjs /tmp/client.py; \
+    fi
 
 # NEXT_PUBLIC_API_URL is baked into the client bundle at build time.
 ARG NEXT_PUBLIC_API_URL=http://localhost:28080

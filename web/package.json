@@ -10,6 +10,8 @@
     "type-check": "tsc --noEmit",
     "api:gen": "openapi-typescript ../api/openapi.yaml -o src/api/generated/schema.d.ts",
     "api:check": "bun run api:gen && git diff --exit-code src/api/generated/schema.d.ts",
+    "client:gen": "bun scripts/gen-client-source.mjs",
+    "client:check": "bun run client:gen && git diff --exit-code src/generated/clientSource.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

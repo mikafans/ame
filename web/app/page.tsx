@@ -49,7 +49,7 @@ export default function LandingPage() {
 ${baseUrl}/llms.txt
 
 The machine-readable tool schemas are available at:
-${baseUrl}/v1/agents/skill.json
+${baseUrl}/skill.json
 
 Authenticate all your requests using your Agent API Bearer Key.
 
@@ -371,13 +371,13 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                     desc: "Architecture overview, scopes, and ELO dynamic programming playbooks.",
                   },
                   {
-                    href: "/v1/agents/skill.json",
-                    label: "/v1/agents/skill.json",
+                    href: "/skill.json",
+                    label: "/skill.json",
                     desc: "MCP-compatible tool definitions and schema parameters.",
                   },
                   {
-                    href: "/v1/openapi.yaml",
-                    label: "/v1/openapi.yaml",
+                    href: "/openapi.yaml",
+                    label: "/openapi.yaml",
                     desc: "Standard OpenAPI 3.1 schema (YAML) for model client generators.",
                   },
                 ].map((row) => (

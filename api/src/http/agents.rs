@@ -66,7 +66,7 @@ pub struct ActivityQuery {
 
 // ── handlers ──────────────────────────────────────────────────────────────────
 
-/// GET /v1/agents/skill.json — agent skill manifest (public).
+/// GET /skill.json — agent skill manifest (public).
 pub async fn skill_manifest(
     State(_state): State<AppState>,
     Query(params): Query<std::collections::HashMap<String, String>>,
@@ -1308,7 +1308,7 @@ fn parse_id(params: &Value) -> Result<Uuid, ApiError> {
 pub fn public_router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/llms.txt", get(llms_txt))
-        .route("/v1/agents/skill.json", get(skill_manifest))
+        .route("/skill.json", get(skill_manifest))
         .with_state(state)
 }
 
