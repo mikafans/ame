@@ -142,7 +142,7 @@ test.describe("MCP skill manifest", () => {
   test("manifest is public and contains expected tool names", async ({
     request,
   }) => {
-    const r = await request.get(`${API_URL}/v1/agents/skill.json`);
+    const r = await request.get(`${API_URL}/skill.json`);
     expect(r.status()).toBe(200);
     const manifest = await r.json();
     const names: string[] = manifest.tools.map((t: { name: string }) => t.name);

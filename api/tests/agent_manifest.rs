@@ -1,6 +1,6 @@
 //! Agent skill-manifest integration tests.
 //!
-//! Covers the agent skill manifest exposed at `/v1/agents/skill.json`: the
+//! Covers the agent skill manifest exposed at `/skill.json`: the
 //! tools it advertises and the field-stripping done in `?strict=1` mode.
 
 use serde_json::Value;
@@ -40,7 +40,7 @@ async fn skill_manifest_contains_assessment_tools() {
     let client = reqwest::Client::new();
 
     let manifest: Value = client
-        .get(format!("{base}/v1/agents/skill.json"))
+        .get(format!("{base}/skill.json"))
         .send()
         .await
         .unwrap()
@@ -77,7 +77,7 @@ async fn skill_manifest_strict_drops_ame_fields() {
     let client = reqwest::Client::new();
 
     let manifest: Value = client
-        .get(format!("{base}/v1/agents/skill.json?strict=1"))
+        .get(format!("{base}/skill.json?strict=1"))
         .send()
         .await
         .unwrap()

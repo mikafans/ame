@@ -37,6 +37,6 @@ jobs:
       - name: fmt-check + lint + test
         run: make check
 
-      - name: openapi drift check
+      - name: openapi + client drift check
         working-directory: web
-        run: mise exec -- bun run api:check
+        run: mise exec -- bun run api:check && mise exec -- bun run client:check

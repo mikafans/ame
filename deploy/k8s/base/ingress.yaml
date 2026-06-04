@@ -34,6 +34,13 @@ spec:
                 name: ame-api
                 port:
                   number: 8080
+          - path: /skill.json
+            pathType: Prefix
+            backend:
+              service:
+                name: ame-api
+                port:
+                  number: 8080
           - path: /llms.txt
             pathType: Prefix
             backend:

@@ -104,5 +104,5 @@ Use `.tmp/` at repo root (gitignored). Clean with `rm -rf .tmp/*.png .tmp/.playw
 worked playbooks (analyze-performance, generate-questions, adaptive-generation) and
 a reference client at `agents/client.py`.
 
-Agent discovery starts at `GET /llms.txt` (public entry doc), then `GET /v1/agents/skill.json` (public skill manifest). Add `?strict=1` to drop the ame-specific fields.
+Agent discovery starts at `GET /llms.txt` (public entry doc), then `GET /skill.json` (public skill manifest). Add `?strict=1` to drop the ame-specific fields.
 Mint a new agent key: an authenticated human owner calls `POST /v1/me/agents` (creates a token-only sub-account; returns `apiKey` shown once). The old public `POST /v1/agents/register` faucet + `AME_AGENT_ACCESS_CODE` were removed. Write tools run via `POST /v1/agents/run`; read tools are called directly at their advertised method/path.
