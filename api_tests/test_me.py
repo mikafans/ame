@@ -14,7 +14,7 @@ def test_list_keys(client, auth):
 
 def test_create_and_revoke_key(client, auth):
     resp = client.post("/v1/me/keys", headers=auth, json={
-        "label": "test-key",
+        "name": "test-key",
         "scopes": ["assessment.read"],
     })
     assert resp.status_code == 201

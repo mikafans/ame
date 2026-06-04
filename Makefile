@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -42,37 +42,41 @@ test: ## Backend + frontend unit / integration tests
 bench: ## Criterion micro-benchmarks for hot paths (token verify, grader, elo)
 	cd api && mise exec -- cargo bench --bench hot_paths
 
-bench-load: ## k6 load test against a running API (requires `make dev` + `make db-seed`)
-	@command -v k6 >/dev/null 2>&1 || { echo "k6 not found — install it (https://k6.io/docs/get-started/installation/)"; exit 1; }
-	BASE_URL=http://localhost:$(API_PORT) k6 run api_tests/perf/answer_load.js
+bench-load: ## oha load test against a running API (requires `make dev` or API running)
+	@command -v oha >/dev/null 2>&1 || { echo "oha not found — install it (e.g. via nix)"; exit 1; }
+	./api_tests/perf/answer_load.sh http://localhost:$(API_PORT)
+
+bench-soak: ## oha duration/soak test to check for leaks (requires `make dev` or API running)
+	@command -v oha >/dev/null 2>&1 || { echo "oha not found — install it (e.g. via nix)"; exit 1; }
+	./api_tests/perf/duration_load.sh $(DURATION) http://localhost:$(API_PORT)
 
 test-engine: ## Engine unit and integration-test compile gate
 	cd api && mise exec -- cargo test engine
 	cd api && mise exec -- cargo test --test planner
 
 test-db: ## DB-backed backend integration tests (requires `make db-up`)
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test auth -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test me -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test agent_tools -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test cross_owner -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test sessions -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test quota -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test planner -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test agent_manifest -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test export -- --nocapture
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test admin -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test auth -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test bank -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test me -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test agent_tools -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test cross_owner -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test sessions -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test exams -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test quota -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test stats -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test planner -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test agent_manifest -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test export -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test admin -- --nocapture
 
 test-bank: ## Bank integration tests only (requires `make db-up`)
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test bank -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test bank -- --nocapture
 
 test-assess: ## Exam composition integration tests (requires `make db-up`)
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test exams -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test exams -- --nocapture
 
 test-stats: ## Stats, messages, keys integration tests (requires `make db-up`)
-	cd api && AME_RUN_DB_TESTS=1 mise exec -- cargo test --test stats -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test stats -- --nocapture
 
 test-api: ## Black-box HTTP tests against a running API (requires `make db-up` + API running)
 	uv run pytest api_tests -v
