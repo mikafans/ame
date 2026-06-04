@@ -54,7 +54,8 @@ function buildTheme(mode: ColorMode) {
         : { primary: "#0f172a", secondary: "#475569", disabled: "#94a3b8" },
     },
     typography: {
-      fontFamily: '"Inter", "Roboto", sans-serif',
+      fontFamily:
+        '"Inter", "Roboto", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", sans-serif',
       fontSize: 14,
       fontWeightRegular: 400,
       fontWeightMedium: 500,
