@@ -265,7 +265,7 @@ export default function ResultsPage({
   const answers = data.answers;
 
   return (
-    <Box sx={{ p: 4, maxWidth: 800, mx: "auto" }}>
+    <Box sx={{ px: { xs: 2, sm: 4 }, py: 4, maxWidth: 800, mx: "auto" }}>
       <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
         Quiz Results — {data.assessment_title || "Results"}
       </Typography>
@@ -281,7 +281,12 @@ export default function ResultsPage({
         <CardContent>
           <Stack
             direction="row"
-            sx={{ justifyContent: "space-between", alignItems: "center" }}
+            sx={{
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+            }}
           >
             <Box>
               <Typography variant="h3" sx={{ fontWeight: 600 }}>

@@ -107,7 +107,7 @@ export default function AssessmentPreviewPage({
   );
 
   return (
-    <Box sx={{ pt: 5, px: 5, pb: 8, maxWidth: 860 }}>
+    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 860 }}>
       {/* Breadcrumb */}
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
         <Typography
@@ -190,7 +190,7 @@ export default function AssessmentPreviewPage({
       </Box>
 
       {/* Stat strip */}
-      <Stack direction="row" spacing={2.5} sx={{ mb: 3 }}>
+      <Stack direction="row" spacing={2.5} sx={{ mb: 3, flexWrap: "wrap" }}>
         <Typography
           variant="caption"
           color="text.secondary"
