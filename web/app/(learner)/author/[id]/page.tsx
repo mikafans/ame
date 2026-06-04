@@ -308,7 +308,7 @@ export default function AuthorStudioPage({
   }
 
   return (
-    <Box sx={{ pt: 5, px: 5, pb: 8 }}>
+    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8 }}>
       {/* Header */}
       <Box
         sx={{
@@ -336,7 +336,11 @@ export default function AuthorStudioPage({
             Author studio
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center", flexWrap: "wrap" }}
+        >
           <Button
             variant="outlined"
             size="small"
@@ -385,7 +389,11 @@ export default function AuthorStudioPage({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "2fr 1fr 1fr",
+              md: "2fr 1fr 1fr 1fr 1fr",
+            },
             borderBottom: 1,
             borderColor: "divider",
           }}
@@ -544,7 +552,7 @@ export default function AuthorStudioPage({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "320px 1fr 280px",
+          gridTemplateColumns: { xs: "1fr", md: "320px 1fr 280px" },
           gap: 2.25,
           minHeight: 600,
         }}
@@ -901,7 +909,7 @@ export default function AuthorStudioPage({
                     borderTop: 1,
                     borderColor: "divider",
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
                     gap: 2.25,
                   }}
                 >
