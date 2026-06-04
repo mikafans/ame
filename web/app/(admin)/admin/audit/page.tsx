@@ -262,7 +262,7 @@ export default function AuditLogsPage() {
         )}
 
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 700 }}>
             <TableHead>
               <TableRow
                 sx={{

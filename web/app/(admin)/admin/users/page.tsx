@@ -377,7 +377,7 @@ export default function ManageUsersPage() {
 
         {/* Table */}
         <TableContainer>
-          <Table>
+          <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow
                 sx={{
