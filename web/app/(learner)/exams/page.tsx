@@ -251,12 +251,20 @@ export default function ExamsPage() {
   }
 
   return (
-    <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        height: { xs: "auto", md: "100vh" },
+        overflow: { xs: "visible", md: "hidden" },
+      }}
+    >
       {/* Left: exam list */}
       <Box
         sx={{
-          width: 320,
-          borderRight: 1,
+          width: { xs: "100%", md: 320 },
+          borderRight: { xs: 0, md: 1 },
+          borderBottom: { xs: 1, md: 0 },
           borderColor: "divider",
           display: "flex",
           flexDirection: "column",
@@ -278,7 +286,14 @@ export default function ExamsPage() {
           </Tabs>
         </Box>
 
-        <Box sx={{ flex: 1, overflowY: "auto", p: 1 }}>
+        <Box
+          sx={{
+            flex: { xs: "none", md: 1 },
+            maxHeight: { xs: 320, md: "none" },
+            overflowY: "auto",
+            p: 1,
+          }}
+        >
           {loading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
               <CircularProgress size={24} />
@@ -327,7 +342,13 @@ export default function ExamsPage() {
       </Box>
 
       {/* Right: exam detail */}
-      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: { xs: "visible", md: "auto" },
+          p: { xs: 2, md: 3 },
+        }}
+      >
         {!exam ? (
           <Typography color="text.secondary">Select an exam.</Typography>
         ) : (
@@ -561,7 +582,13 @@ export default function ExamsPage() {
             zIndex: 1300,
           }}
         >
-          <Card sx={{ width: 480, maxHeight: "80vh", overflowY: "auto" }}>
+          <Card
+            sx={{
+              width: { xs: "95vw", sm: 480 },
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+          >
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Compose exam
