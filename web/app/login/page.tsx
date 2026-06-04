@@ -261,7 +261,7 @@ export default function LoginPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          p: "52px 48px",
+          p: { xs: "40px 24px", md: "52px 48px" },
         }}
       >
         <Box sx={{ width: "100%", maxWidth: 380 }}>
