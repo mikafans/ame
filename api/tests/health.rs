@@ -23,13 +23,29 @@ async fn healthz_returns_ok() {
         .unwrap();
     });
 
-    let body: serde_json::Value = reqwest::get(format!("http://{addr}/healthz"))
-        .await
-        .unwrap()
-        .json()
+    let res = reqwest::get(format!("http://{addr}/healthz"))
         .await
         .unwrap();
 
+    assert_eq!(res.headers().get("x-frame-options").unwrap(), "DENY");
+    assert_eq!(
+        res.headers().get("x-content-type-options").unwrap(),
+        "nosniff"
+    );
+    assert_eq!(
+        res.headers().get("referrer-policy").unwrap(),
+        "strict-origin-when-cross-origin"
+    );
+    assert_eq!(
+        res.headers().get("content-security-policy").unwrap(),
+        "default-src 'none'; frame-ancestors 'none'"
+    );
+    assert_eq!(
+        res.headers().get("strict-transport-security").unwrap(),
+        "max-age=31536000; includeSubDomains; preload"
+    );
+
+    let body: serde_json::Value = res.json().await.unwrap();
     assert_eq!(body, serde_json::json!({ "status": "ok" }));
 }
 

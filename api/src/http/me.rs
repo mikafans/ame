@@ -207,6 +207,22 @@ pub async fn create_key(
         ]
     });
 
+    // Validate scopes
+    if effective_scopes.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "scopes".into(),
+            message: "must contain at least one scope".into(),
+        }]));
+    }
+    for scope_str in &effective_scopes {
+        if scope_str.parse::<crate::domain::user::Scope>().is_err() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "scopes".into(),
+                message: format!("unknown scope: {}", scope_str),
+            }]));
+        }
+    }
+
     // Non-admin users may not create keys with the admin scope.
     if effective_scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
         return Err(ApiError::ScopeRequired("admin".into()));
@@ -385,6 +401,27 @@ pub async fn create_agent(
     )
     .await?;
 
+    // Validate scopes
+    if body.scopes.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "scopes".into(),
+            message: "must contain at least one scope".into(),
+        }]));
+    }
+    for scope_str in &body.scopes {
+        if scope_str.parse::<crate::domain::user::Scope>().is_err() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "scopes".into(),
+                message: format!("unknown scope: {}", scope_str),
+            }]));
+        }
+    }
+
+    // Non-admin users may not create agents with the admin scope.
+    if body.scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
+        return Err(ApiError::ScopeRequired("admin".into()));
+    }
+
     let mut tx = state
         .pool
         .begin()
@@ -506,6 +543,26 @@ pub async fn update_agent(
     }
 
     if let Some(scopes) = &body.scopes {
+        // Validate scopes
+        if scopes.is_empty() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "scopes".into(),
+                message: "must contain at least one scope".into(),
+            }]));
+        }
+        for scope_str in scopes {
+            if scope_str.parse::<crate::domain::user::Scope>().is_err() {
+                return Err(ApiError::Validation(vec![FieldError {
+                    field: "scopes".into(),
+                    message: format!("unknown scope: {}", scope_str),
+                }]));
+            }
+        }
+
+        // Non-admin users may not assign the admin scope to agents.
+        if scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
+            return Err(ApiError::ScopeRequired("admin".into()));
+        }
         sqlx::query(
             "UPDATE tb_api_tokens \
              SET scopes = $1 \
@@ -628,14 +685,20 @@ pub async fn create_webhook(
     Json(body): Json<CreateWebhookBody>,
 ) -> Result<(StatusCode, Json<CreateWebhookResponse>), ApiError> {
     let id = Uuid::now_v7();
+    let secret = body
+        .secret
+        .unwrap_or_else(crate::auth::token::generate_secret);
+    let secret_hash = crate::auth::token::hash_secret(&secret);
+
     sqlx::query(
-        "INSERT INTO tb_webhooks (id, user_id, url, events, secret) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_webhooks (id, user_id, url, events, secret_hash, signing_key) VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(id)
     .bind(user.user.id)
     .bind(&body.url)
     .bind(&body.events)
-    .bind(&body.secret)
+    .bind(&secret_hash)
+    .bind(&secret)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
