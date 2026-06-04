@@ -18,6 +18,7 @@ pub struct RateLimitConfig {
     pub public: PublicConfig,
     pub export: ExportConfig,
     pub cost: CostConfig,
+    pub trusted_proxies: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,6 +111,12 @@ impl Config {
         }
         if let Ok(vk) = std::env::var("AME_VALKEY_URL") {
             config.server.valkey_url = Some(vk);
+        }
+        if let Some(tp) = std::env::var("AME_TRUSTED_PROXIES")
+            .ok()
+            .and_then(|s| s.parse::<usize>().ok())
+        {
+            config.ratelimit.trusted_proxies = Some(tp);
         }
 
         Ok(config)

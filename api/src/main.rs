@@ -30,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
                     period_secs: 60,
                 },
                 cost: ame_api::config::CostConfig { read: 1, write: 5 },
+                trusted_proxies: Some(1),
             },
             quota: ame_api::config::QuotaConfig {
                 agents: ame_api::config::TierQuotaConfig {

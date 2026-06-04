@@ -72,9 +72,41 @@ pub fn verify_token_secret(stored_hash: &str, presented_secret: &str) -> bool {
     stored.as_slice().ct_eq(presented.as_slice()).into()
 }
 
+/// Compute canonical email representation.
+/// Normalizes case, trims whitespace, and strips '+' suffixes from the local part.
+pub fn canonical_email(email: &str) -> String {
+    let email_trimmed = email.trim();
+    let parts: Vec<&str> = email_trimmed.split('@').collect();
+    if parts.len() != 2 {
+        return email_trimmed.to_lowercase();
+    }
+    let local = parts[0];
+    let domain = parts[1];
+    let local_without_plus = local.split('+').next().unwrap_or(local);
+    format!(
+        "{}@{}",
+        local_without_plus.to_lowercase(),
+        domain.to_lowercase()
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_canonical_email() {
+        assert_eq!(
+            canonical_email("Ada.Lovelace+spam@Example.Com"),
+            "ada.lovelace@example.com"
+        );
+        assert_eq!(
+            canonical_email("  BOB+alias@domain.COM  "),
+            "bob@domain.com"
+        );
+        assert_eq!(canonical_email("plain@domain.com"), "plain@domain.com");
+        assert_eq!(canonical_email("invalid-email"), "invalid-email");
+    }
 
     #[test]
     fn parse_bearer_token_allows_underscores_in_secret() {

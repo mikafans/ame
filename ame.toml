@@ -7,6 +7,9 @@ production = false
 cors_origins = "http://localhost:23000"
 log_format = "compact"
 
+[ratelimit]
+trusted_proxies = 1
+
 [ratelimit.free]
 burst = 60
 rate = 1
