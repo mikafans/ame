@@ -17,6 +17,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircle";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import { HighlightedCode } from "@/components/HighlightedCode";
 
 interface Answer {
   qid: string;
@@ -373,22 +374,8 @@ export default function ResultsPage({
                     Your submission
                   </Typography>
                   {a.given ? (
-                    <Box
-                      component="pre"
-                      sx={{
-                        m: 0,
-                        p: 1.5,
-                        borderRadius: 1,
-                        bgcolor: "action.hover",
-                        fontFamily: "monospace",
-                        fontSize: 13,
-                        lineHeight: 1.6,
-                        overflowX: "auto",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {a.given}
+                    <Box sx={{ mt: 0.5 }}>
+                      <HighlightedCode code={a.given} language="python" />
                     </Box>
                   ) : (
                     <Typography variant="caption" color="text.secondary">

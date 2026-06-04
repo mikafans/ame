@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { formatDate, formatTime } from "@/utils/format";
+import { copyToClipboard } from "@/utils/clipboard";
 import { api } from "@/api/client";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -34,6 +35,7 @@ import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
 import { PageShell } from "@/components/PageShell";
+import { HighlightedCode } from "@/components/HighlightedCode";
 import { CLIENT_PY } from "@/generated/clientSource";
 
 interface AgentSummary {
@@ -168,8 +170,8 @@ export default function AgentPage() {
           <Stack direction="row" spacing={2.75} sx={{ flexWrap: "wrap" }}>
             <KV2 k="Endpoints" v="34" />
             <KV2 k="Auth" v="Bearer + scopes" />
-            <KV2 k="Rate limit" v="120 / min" />
-            <KV2 k="SDKs" v="ts · py · go" />
+            <KV2 k="Rate limit" v="60 - 600 / min" />
+            <KV2 k="SDKs" v="ts · py" />
           </Stack>
         </Box>
         <Box
@@ -178,6 +180,7 @@ export default function AgentPage() {
             borderLeft: 1,
             borderColor: "divider",
             p: "22px 26px",
+            minWidth: 0,
           }}
         >
           <Typography
@@ -194,15 +197,15 @@ export default function AgentPage() {
             Hello, world
           </Typography>
           <CodeBlock
-            label="curl"
+            label="cURL request"
             lines={[
-              `curl https://api.ame-platform.app/v1/assessments \\`,
-              `  -H "Authorization: Bearer hk_agent_3fY9…ax2P" \\`,
+              `curl ${origin || "http://localhost:28080"}/v1/assessments \\`,
+              `  -H "Authorization: Bearer <your_agent_key>" \\`,
               `  -H "Content-Type: application/json"`,
               ``,
-              `→ 200 OK · 24 assessments`,
+              `# → Response: 200 OK · 24 assessments`,
             ]}
-            dim={[4]}
+            language="bash"
           />
         </Box>
       </Card>
@@ -263,36 +266,54 @@ function KV2({ k, v }: { k: string; v: string }) {
 function CodeBlock({
   label,
   lines,
-  dim = [],
+  language,
   style,
 }: {
   label?: string;
   lines: string[];
-  dim?: number[];
+  language?: string;
   style?: React.CSSProperties;
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    // Exclude response lines or comments starting with → or # →
+    const copyText = lines
+      .filter((l) => !l.trim().startsWith("→") && !l.trim().startsWith("# →"))
+      .join("\n");
+    copyToClipboard(copyText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
+
+  const codeContent = lines.join("\n");
+  const lang =
+    language ||
+    (label && label.toLowerCase().includes("py") ? "python" : "bash");
 
   return (
     <Paper
       variant="outlined"
       style={style}
-      sx={{ overflow: "hidden", borderRadius: 1 }}
+      sx={{
+        overflow: "hidden",
+        borderRadius: 2,
+        borderColor: "divider",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
+      }}
     >
       {label && (
         <Box
           sx={{
-            px: 1.5,
-            py: 0.75,
+            px: 2,
+            py: 1,
             borderBottom: 1,
             borderColor: "divider",
-            bgcolor: "background.paper",
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark"
+                ? "rgba(255,255,255,0.02)"
+                : "rgba(0,0,0,0.01)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -301,7 +322,12 @@ function CodeBlock({
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ fontFamily: "monospace", letterSpacing: 1 }}
+            sx={{
+              fontFamily: "monospace",
+              fontWeight: 600,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+            }}
           >
             {label}
           </Typography>
@@ -309,35 +335,26 @@ function CodeBlock({
             size="small"
             variant="text"
             onClick={handleCopy}
-            sx={{ minWidth: 0, p: 0.25 }}
+            startIcon={
+              copied ? null : <ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />
+            }
+            sx={{
+              minWidth: 0,
+              py: 0.5,
+              px: 1.5,
+              fontSize: 11,
+              textTransform: "none",
+              color: copied ? "success.main" : "text.secondary",
+              "&:hover": {
+                bgcolor: "action.hover",
+              },
+            }}
           >
-            {copied ? "✓" : "⎘"}
+            {copied ? "Copied! ✓" : "Copy"}
           </Button>
         </Box>
       )}
-      <Box
-        component="pre"
-        sx={{
-          m: 0,
-          p: "12px 14px",
-          fontFamily: "monospace",
-          fontSize: 12,
-          lineHeight: 1.65,
-          color: "text.secondary",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-        }}
-      >
-        {lines.map((l, i) => (
-          <Box
-            key={i}
-            component="div"
-            sx={{ color: dim.includes(i) ? "primary.main" : undefined }}
-          >
-            {l || " "}
-          </Box>
-        ))}
-      </Box>
+      <HighlightedCode code={codeContent} language={lang} />
     </Paper>
   );
 }
@@ -546,7 +563,7 @@ function KeysTab() {
       }}
     >
       {/* Agents list */}
-      <Stack spacing={2.5}>
+      <Stack spacing={2.5} sx={{ minWidth: 0 }}>
         <Card variant="outlined">
           <Box
             sx={{
@@ -806,7 +823,7 @@ function KeysTab() {
       </Stack>
 
       {/* Create agent column */}
-      <Stack spacing={2.5}>
+      <Stack spacing={2.5} sx={{ minWidth: 0 }}>
         <Card variant="outlined" sx={{ p: 3 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
             Create Agent Sub-Account
@@ -969,73 +986,126 @@ function KeysTab() {
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ lineHeight: 1.55, mb: 1.5 }}
+            sx={{ lineHeight: 1.55, mb: 2 }}
           >
             You don't need to manually teach external agents. AME exposes
             public-facing discovery endpoints that allow any LLM assistant to
             learn all API scopes, structures, and workflows dynamically:
           </Typography>
-          <Stack spacing={1.25}>
-            <Box>
-              <Typography
-                variant="caption"
+          <Stack spacing={1.5} sx={{ mb: 3 }}>
+            {[
+              {
+                num: "1",
+                name: "/llms.txt",
+                title: "LLM Developer Specs",
+                desc: "A structured, agent-optimized overview of architecture, scopes, data models, and step-by-step diagnostic recipes.",
+                url: "/llms.txt",
+              },
+              {
+                num: "2",
+                name: "/skill.json",
+                title: "MCP Tool Manifest",
+                desc: "A machine-readable, Model Context Protocol compatible tool schema mapping capabilities to REST endpoints.",
+                url: "/skill.json",
+              },
+              {
+                num: "3",
+                name: "/openapi.yaml",
+                title: "OpenAPI Spec",
+                desc: "Standard OpenAPI 3.1 schema snapshot for direct client code generation and API broker orchestration.",
+                url: "/openapi.yaml",
+              },
+            ].map((item) => (
+              <Paper
+                key={item.num}
+                variant="outlined"
                 sx={{
-                  fontFamily: "monospace",
-                  fontWeight: 600,
-                  display: "block",
+                  p: 2,
+                  borderRadius: 2,
+                  borderColor: "divider",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  gap: 2,
+                  alignItems: "flex-start",
+                  "&:hover": {
+                    borderColor: "primary.main",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(25, 118, 210, 0.04)"
+                        : "rgba(25, 118, 210, 0.01)",
+                  },
                 }}
               >
-                1. /llms.txt (Developer Specs)
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", ml: 1.5, lineHeight: 1.3 }}
-              >
-                A structured overview of architecture, scopes, data models, and
-                step-by-step performance diagnostic recipes.
-              </Typography>
-            </Box>
-            <Box>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontFamily: "monospace",
-                  fontWeight: 600,
-                  display: "block",
-                }}
-              >
-                2. /skill.json (Tool Manifest)
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", ml: 1.5, lineHeight: 1.3 }}
-              >
-                A machine-readable MCP-compatible tool schema mapping capability
-                names directly to REST endpoints and body definitions.
-              </Typography>
-            </Box>
-            <Box>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontFamily: "monospace",
-                  fontWeight: 600,
-                  display: "block",
-                }}
-              >
-                3. /openapi.yaml (OpenAPI 3.1)
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", ml: 1.5, lineHeight: 1.3 }}
-              >
-                Standard OpenAPI snapshot for deep integration with client
-                generators and API brokers.
-              </Typography>
-            </Box>
+                <Paper
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(25, 118, 210, 0.2)"
+                        : "rgba(25, 118, 210, 0.08)",
+                    color: "primary.main",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.num}
+                </Paper>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 0.5,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 600,
+                        fontFamily: "monospace",
+                        fontSize: 13,
+                      }}
+                    >
+                      {item.name}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => window.open(item.url, "_blank")}
+                      sx={{
+                        fontSize: 11,
+                        textTransform: "none",
+                        py: 0.25,
+                        px: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      Open ↗
+                    </Button>
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, mb: 0.5, fontSize: 12.5 }}
+                  >
+                    {item.title}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", lineHeight: 1.4 }}
+                  >
+                    {item.desc}
+                  </Typography>
+                </Box>
+              </Paper>
+            ))}
           </Stack>
 
           <Box sx={{ mt: 2.5 }}>
@@ -1077,10 +1147,11 @@ function KeysTab() {
             </Typography>
             <Box sx={{ mb: 1.25 }}>
               <CodeBlock
-                label="run the demo"
+                label="Run the Demo"
                 lines={[
-                  `uv run client.py --api ${origin || "<your-ame-host>"} --token <owner-token>`,
+                  `uv run client.py --api ${origin || "http://localhost:28080"} --token <your_auth_token>`,
                 ]}
+                language="bash"
               />
             </Box>
             <CodeBlock
@@ -1137,9 +1208,7 @@ function KeysTab() {
               </Box>
               <Button
                 size="small"
-                onClick={() =>
-                  navigator.clipboard.writeText(createdSecret).catch(() => {})
-                }
+                onClick={() => copyToClipboard(createdSecret)}
                 sx={{ minWidth: 0, ml: 1, p: 0.5 }}
               >
                 Copy
@@ -1210,7 +1279,7 @@ Authenticate all your requests using this API Key:
 Bearer ${createdSecret}
 
 Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`;
-                navigator.clipboard.writeText(promptText).catch(() => {});
+                copyToClipboard(promptText);
               }}
               startIcon={<ContentCopyOutlinedIcon />}
               sx={{ mr: "auto" }}
@@ -1500,24 +1569,10 @@ function ToolsTab() {
             >
               MCP descriptor
             </Typography>
-            <Box
-              component="pre"
-              sx={{
-                m: 0,
-                p: "12px 14px",
-                bgcolor: "action.hover",
-                border: 1,
-                borderColor: "divider",
-                borderRadius: 1,
-                fontFamily: "monospace",
-                fontSize: 12,
-                color: "text.secondary",
-                lineHeight: 1.65,
-                overflowX: "auto",
-              }}
-            >
-              {JSON.stringify(tool, null, 2)}
-            </Box>
+            <HighlightedCode
+              code={JSON.stringify(tool, null, 2)}
+              language="json"
+            />
           </Box>
         </Card>
       ) : (
@@ -1699,24 +1754,10 @@ function ImportTab() {
         </Box>
         {response ? (
           <Box sx={{ p: 2.5 }}>
-            <Box
-              component="pre"
-              sx={{
-                m: 0,
-                p: "12px 14px",
-                bgcolor: "action.hover",
-                border: 1,
-                borderColor: "divider",
-                borderRadius: 1,
-                fontFamily: "monospace",
-                fontSize: 12,
-                color: "text.secondary",
-                lineHeight: 1.65,
-                overflowX: "auto",
-              }}
-            >
-              {JSON.stringify(response.body, null, 2)}
-            </Box>
+            <HighlightedCode
+              code={JSON.stringify(response.body, null, 2)}
+              language="json"
+            />
           </Box>
         ) : (
           <Box sx={{ py: 6, px: 2.5, textAlign: "center" }}>

@@ -243,7 +243,7 @@ export default function ActiveQuizPage({
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          height: "100vh",
+          height: "100dvh",
         }}
       >
         <CircularProgress />
@@ -264,7 +264,7 @@ export default function ActiveQuizPage({
       : DEFAULT_ALLOWED_MATERIALS;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
       {/* Sticky header */}
       <Paper
         elevation={0}

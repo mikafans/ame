@@ -155,8 +155,10 @@ export default function AuthorIndexPage() {
                   <CardContent
                     sx={{
                       display: "flex",
+                      flexDirection: { xs: "column", sm: "row" },
+                      gap: { xs: 1.5, sm: 0 },
                       justifyContent: "space-between",
-                      alignItems: "center",
+                      alignItems: { xs: "flex-start", sm: "center" },
                     }}
                   >
                     <Box>

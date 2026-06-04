@@ -32,6 +32,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { PageShell } from "@/components/PageShell";
+import { HighlightedCode } from "@/components/HighlightedCode";
 
 interface Question {
   id: string;
@@ -238,22 +239,35 @@ export default function QuestionsPage() {
           sx={{ flex: 1, minWidth: 250 }}
         />
 
-        <ToggleButtonGroup
-          value={kind}
-          exclusive
-          onChange={handleKindChange}
-          size="small"
+        <Box
           sx={{
-            flexWrap: "wrap",
-            "& .MuiToggleButtonGroup-grouped": { height: 40 },
+            overflowX: "auto",
+            maxWidth: "100%",
+            WebkitOverflowScrolling: "touch",
+            "&::-webkit-scrollbar": { display: "none" },
+            msOverflowStyle: "none",
+            scrollbarWidth: "none",
           }}
         >
-          {Object.entries(KIND_LABELS).map(([k, label]) => (
-            <ToggleButton key={k} value={k}>
-              {label}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
+          <ToggleButtonGroup
+            value={kind}
+            exclusive
+            onChange={handleKindChange}
+            size="small"
+            sx={{
+              display: "flex",
+              flexWrap: "nowrap",
+              minWidth: "max-content",
+              "& .MuiToggleButtonGroup-grouped": { height: 40 },
+            }}
+          >
+            {Object.entries(KIND_LABELS).map(([k, label]) => (
+              <ToggleButton key={k} value={k} sx={{ px: 2 }}>
+                {label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
 
         <Autocomplete
           options={tags}
@@ -611,19 +625,8 @@ function AnswerBlock({ detail }: { detail: QuestionDetail }) {
           {tests.length === 1 ? "" : "s"}
         </Typography>
         {starter && (
-          <Box
-            component="pre"
-            sx={{
-              mt: 1,
-              p: 1.5,
-              borderRadius: 1,
-              bgcolor: "action.hover",
-              fontSize: 13,
-              overflowX: "auto",
-              fontFamily: "monospace",
-            }}
-          >
-            {starter}
+          <Box sx={{ mt: 1 }}>
+            <HighlightedCode code={starter} language={language} />
           </Box>
         )}
       </Box>

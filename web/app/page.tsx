@@ -21,6 +21,7 @@ import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export default function LandingPage() {
   const [copied, setCopied] = useState(false);
@@ -56,9 +57,10 @@ Authenticate all your requests using your Agent API Bearer Key.
 Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`;
 
   const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(starterPrompt).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyToClipboard(starterPrompt).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   // Mode-dependent palette. The page hardcodes its own colors (rather than

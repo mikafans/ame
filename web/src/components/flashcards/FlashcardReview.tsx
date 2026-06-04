@@ -13,6 +13,7 @@ import {
   hasModelAnswer,
   type FlashQuestion,
 } from "@/lib/flashcards";
+import { HighlightedCode } from "@/components/HighlightedCode";
 
 const KIND_LABEL: Record<string, string> = {
   mc: "Multiple choice",
@@ -99,19 +100,11 @@ export function FlashcardReview({
           </Typography>
 
           {snippet && (
-            <Box
-              component="pre"
-              sx={{
-                m: 0,
-                p: 2,
-                bgcolor: "action.hover",
-                borderRadius: 1,
-                fontFamily: "monospace",
-                fontSize: 13,
-                overflowX: "auto",
-              }}
-            >
-              {snippet}
+            <Box sx={{ mt: snippet ? 2 : 0 }}>
+              <HighlightedCode
+                code={snippet}
+                language={(question.payload?.language as string) ?? "python"}
+              />
             </Box>
           )}
 
