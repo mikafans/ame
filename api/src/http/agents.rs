@@ -22,7 +22,7 @@ use crate::{
         error::{ApiError, FieldError},
         user::Scope,
     },
-    http::{AppState, openapi::openapi_yaml},
+    http::AppState,
 };
 
 // ── scope guards ──────────────────────────────────────────────────────────────
@@ -84,17 +84,6 @@ pub async fn llms_txt() -> impl IntoResponse {
         )],
         include_str!("../../llms.txt"),
     )
-}
-
-/// GET /v1/agents/openapi.json — serves the OpenAPI snapshot.
-pub async fn openapi_json(
-    State(_state): State<AppState>,
-    _user: RequireAnyScope<AgentReadScopes>,
-) -> impl IntoResponse {
-    let yaml = openapi_yaml();
-    let doc: Value = serde_yaml::from_str(&yaml)
-        .unwrap_or_else(|_| json!({"error": "failed to parse openapi snapshot"}));
-    Json(doc)
 }
 
 async fn get_accessible_accounts(
@@ -436,7 +425,7 @@ fn build_skill_manifest(strict: bool) -> Value {
         "schema_version": "v1",
         "name": "ame",
         "description": "Read and write assessments, attempts, and study plans on AME.",
-        "auth": { "type": "bearer", "format": "hk_<env>_<id>" },
+        "auth": { "type": "bearer", "format": "<id>_<secret>" },
         "entrypoint": "/llms.txt",
         "run": {
             "endpoint": "/v1/agents/run",
@@ -1320,7 +1309,6 @@ pub fn public_router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/llms.txt", get(llms_txt))
         .route("/v1/agents/skill.json", get(skill_manifest))
-        .route("/v1/agents/openapi.json", get(openapi_json))
         .with_state(state)
 }
 
