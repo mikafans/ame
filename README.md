@@ -1,6 +1,6 @@
 # ame
 
-Quiz and exam platform. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
+Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
 
 **Stack**: Rust 2024 · Axum 0.8 · sqlx · Next.js 16 · React 19 · Bun · TypeScript · MUI 7 · Postgres 18
 
@@ -13,7 +13,7 @@ make init-env       # mise install + sqlx-cli + web deps + Playwright
 make db-up          # start Postgres in Docker or Podman
 make db-migrate     # apply pending migrations
 make dev            # API on :28080, frontend on :23000
-make db-seed        # seed demo users, quizzes, questions (requires API running)
+make db-seed        # seed demo users, assessments, questions (requires API running)
 ```
 
 Demo credentials after seeding: `ada@example.com / password123` (primary user), `mira@example.com / password123` (second user), `admin@example.com / password123` (admin).
@@ -30,9 +30,9 @@ make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (passw
 ```
 
 `db-seed` depends on `db-admin`, so the demo admin exists before seeding runs (the
-seed needs an admin to upgrade the instructor to premium, which in turn unlocks the
-agent-creation quota used by `make db-bulk`). After being promoted, log out and back
-in — token scopes are fixed at login.
+seed needs an admin to upgrade the primary user, Ada, to premium, which in turn
+unlocks the agent-creation quota used by `make db-bulk`). After being promoted, log
+out and back in — token scopes are fixed at login.
 
 Copy `.env.example` to `.env` if you need to override defaults.
 
