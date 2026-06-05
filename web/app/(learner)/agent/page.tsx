@@ -104,6 +104,13 @@ const SAMPLE_IMPORT = JSON.stringify(
 export default function AgentPage() {
   const [tab, setTab] = useState<TabId>("keys");
 
+  // Origin for copy-correct usage hints (set after mount — avoids SSR `window`,
+  // which would crash prerender; falls back to localhost until hydrated).
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
   return (
     <PageShell
       kicker="Programmatic surface · OpenAPI 3.1 · MCP-compatible"
@@ -1252,10 +1259,10 @@ function KeysTab() {
                 }}
               >
                 {`You are an AI assistant helping me with my study on AME. AME has a first-class agent surface. To learn how to use it, please fetch and read the platform capabilities at:
-${window.location.origin}/llms.txt
+${origin || "http://localhost:23000"}/llms.txt
 
 The machine-readable tool schemas are available at:
-${window.location.origin}/skill.json
+${origin || "http://localhost:23000"}/skill.json
 
 Authenticate all your requests using this API Key:
 Bearer ${createdSecret}
@@ -1270,10 +1277,10 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
               size="small"
               onClick={() => {
                 const promptText = `You are an AI assistant helping me with my study on AME. AME has a first-class agent surface. To learn how to use it, please fetch and read the platform capabilities at:
-${window.location.origin}/llms.txt
+${origin || "http://localhost:23000"}/llms.txt
 
 The machine-readable tool schemas are available at:
-${window.location.origin}/skill.json
+${origin || "http://localhost:23000"}/skill.json
 
 Authenticate all your requests using this API Key:
 Bearer ${createdSecret}
