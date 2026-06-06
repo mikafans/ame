@@ -69,14 +69,28 @@ pub struct RotateKeyResponse {
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct AgentSummary {
+pub struct AgentTokenSummary {
     pub id: Uuid,
-    pub label: String,
+    pub name: String,
     pub scopes: Vec<String>,
-    pub focus_tags: Vec<String>,
     #[serde(with = "time::serde::rfc3339::option")]
     #[schema(value_type = Option<String>, format = DateTime)]
     pub last_used_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub expires_at: Option<OffsetDateTime>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSummary {
+    pub id: Uuid,
+    pub label: String,
+    pub focus_tags: Vec<String>,
+    pub tokens: Vec<AgentTokenSummary>,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
@@ -96,6 +110,13 @@ pub struct CreateAgentBody {
     pub focus_tags: Vec<String>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAgentTokenBody {
+    pub name: String,
+    pub scopes: Vec<String>,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAgentResponse {
@@ -107,8 +128,9 @@ pub struct CreateAgentResponse {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAgentBody {
     pub label: Option<String>,
-    pub scopes: Option<Vec<String>>,
     pub focus_tags: Option<Vec<String>>,
+    pub current_goal: Option<String>,
+    pub next_target: Option<String>,
 }
 
 // ── webhooks ──────────────────────────────────────────────────────────────────
@@ -274,7 +296,10 @@ pub async fn rotate_key(
     let hash = crate::auth::token::hash_secret(&secret);
 
     let affected = sqlx::query(
-        "UPDATE tb_api_tokens SET token_hash = $1 WHERE id = $2 AND user_id = $3 AND revoked_at IS NULL"
+        "UPDATE tb_api_tokens SET token_hash = $1 
+         WHERE id = $2 
+         AND (user_id = $3 OR agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $3)) 
+         AND revoked_at IS NULL",
     )
     .bind(&hash)
     .bind(id)
@@ -314,7 +339,10 @@ pub async fn revoke_key(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     let affected = sqlx::query(
-        "UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL"
+        "UPDATE tb_api_tokens SET revoked_at = now() 
+         WHERE id = $1 
+         AND (user_id = $2 OR agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $2)) 
+         AND revoked_at IS NULL",
     )
     .bind(id)
     .bind(user.user.id)
@@ -347,26 +375,59 @@ pub async fn list_agents(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> Result<Json<ListAgentsResponse>, ApiError> {
-    let rows = sqlx::query(
-        "SELECT a.id, a.label as display_name, t.scopes, a.focus_tags, t.last_used_at, a.created_at
-         FROM tb_agents a
-         JOIN tb_api_tokens t ON t.agent_id = a.id
-         WHERE a.owner_user_id = $1 AND a.deactivated_at IS NULL AND t.revoked_at IS NULL",
+    let agent_rows = sqlx::query(
+        "SELECT id, label as display_name, focus_tags, created_at
+         FROM tb_agents
+         WHERE owner_user_id = $1 AND deactivated_at IS NULL
+         ORDER BY created_at DESC",
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let agents = rows
+    let token_rows = sqlx::query(
+        "SELECT id, agent_id, name, scopes, last_used_at, created_at, expires_at
+         FROM tb_api_tokens
+         WHERE agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL)
+         AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())
+         ORDER BY created_at DESC",
+    )
+    .bind(user.user.id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let mut tokens_by_agent: std::collections::HashMap<Uuid, Vec<AgentTokenSummary>> =
+        std::collections::HashMap::new();
+    for r in token_rows {
+        let agent_id: Option<Uuid> = r.get("agent_id");
+        if let Some(agent_id) = agent_id {
+            tokens_by_agent
+                .entry(agent_id)
+                .or_default()
+                .push(AgentTokenSummary {
+                    id: r.get("id"),
+                    name: r.get("name"),
+                    scopes: r.get("scopes"),
+                    last_used_at: r.get("last_used_at"),
+                    created_at: r.get("created_at"),
+                    expires_at: r.get("expires_at"),
+                });
+        }
+    }
+
+    let agents = agent_rows
         .into_iter()
-        .map(|r| AgentSummary {
-            id: r.get("id"),
-            label: r.get("display_name"),
-            scopes: r.get("scopes"),
-            focus_tags: r.get("focus_tags"),
-            last_used_at: r.get("last_used_at"),
-            created_at: r.get("created_at"),
+        .map(|r| {
+            let id: Uuid = r.get("id");
+            AgentSummary {
+                id,
+                label: r.get("display_name"),
+                focus_tags: r.get("focus_tags"),
+                tokens: tokens_by_agent.remove(&id).unwrap_or_default(),
+                created_at: r.get("created_at"),
+            }
         })
         .collect();
 
@@ -469,6 +530,82 @@ pub async fn create_agent(
 }
 
 #[utoipa::path(
+    post,
+    path = "/v1/me/agents/{id}/tokens",
+    params(("id" = Uuid, Path, description = "Agent id")),
+    request_body = CreateAgentTokenBody,
+    responses(
+        (status = 201, description = "Token created", body = CreateKeyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such agent"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn create_agent_token(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CreateAgentTokenBody>,
+) -> Result<(StatusCode, Json<CreateKeyResponse>), ApiError> {
+    if body.scopes.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "scopes".into(),
+            message: "must contain at least one scope".into(),
+        }]));
+    }
+    for scope_str in &body.scopes {
+        if scope_str.parse::<crate::domain::user::Scope>().is_err() {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "scopes".into(),
+                message: format!("unknown scope: {}", scope_str),
+            }]));
+        }
+    }
+
+    if body.scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
+        return Err(ApiError::ScopeRequired("admin".into()));
+    }
+
+    let exists = sqlx::query(
+        "SELECT 1 FROM tb_agents WHERE id = $1 AND owner_user_id = $2 AND deactivated_at IS NULL",
+    )
+    .bind(id)
+    .bind(user.user.id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if exists.is_none() {
+        return Err(ApiError::NotFound { resource: "agent" });
+    }
+
+    let token_id = Uuid::now_v7();
+    let secret = crate::auth::token::generate_secret();
+    let hash = crate::auth::token::hash_secret(&secret);
+
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
+    )
+    .bind(token_id)
+    .bind(id)
+    .bind(&body.name)
+    .bind(&hash)
+    .bind(&body.scopes)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateKeyResponse {
+            id: token_id,
+            secret: format!("{}_{}", token_id, secret),
+        }),
+    ))
+}
+
+#[utoipa::path(
     patch,
     path = "/v1/me/agents/{id}",
     params(("id" = Uuid, Path, description = "Agent id")),
@@ -533,39 +670,24 @@ pub async fn update_agent(
         .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
-    if let Some(scopes) = &body.scopes {
-        // Validate scopes
-        if scopes.is_empty() {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "scopes".into(),
-                message: "must contain at least one scope".into(),
-            }]));
-        }
-        for scope_str in scopes {
-            if scope_str.parse::<crate::domain::user::Scope>().is_err() {
-                return Err(ApiError::Validation(vec![FieldError {
-                    field: "scopes".into(),
-                    message: format!("unknown scope: {}", scope_str),
-                }]));
-            }
-        }
+    if let Some(goal) = &body.current_goal {
+        sqlx::query("UPDATE tb_agents SET current_goal = $1 WHERE id = $2 AND owner_user_id = $3")
+            .bind(goal)
+            .bind(id)
+            .bind(user.user.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+    }
 
-        // Non-admin users may not assign the admin scope to agents.
-        if scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
-            return Err(ApiError::ScopeRequired("admin".into()));
-        }
-        sqlx::query(
-            "UPDATE tb_api_tokens \
-             SET scopes = $1 \
-             WHERE agent_id = $2 \
-               AND EXISTS (SELECT 1 FROM tb_agents WHERE id = $2 AND owner_user_id = $3 AND deactivated_at IS NULL)"
-        )
-        .bind(scopes)
-        .bind(id)
-        .bind(user.user.id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    if let Some(target) = &body.next_target {
+        sqlx::query("UPDATE tb_agents SET next_target = $1 WHERE id = $2 AND owner_user_id = $3")
+            .bind(target)
+            .bind(id)
+            .bind(user.user.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
     }
 
     tx.commit()
@@ -1200,6 +1322,7 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/me/agents", post(create_agent))
         .route("/v1/me/agents/{id}", patch(update_agent))
         .route("/v1/me/agents/{id}", delete(delete_agent))
+        .route("/v1/me/agents/{id}/tokens", post(create_agent_token))
         .route("/v1/me/webhooks", get(list_webhooks))
         .route("/v1/me/webhooks", post(create_webhook))
         .route("/v1/me/webhooks/{id}", delete(delete_webhook))
