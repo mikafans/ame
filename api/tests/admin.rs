@@ -625,7 +625,7 @@ async fn test_admin_user_filters() {
     let admin_auth = format!("{admin_token_id}_{secret}");
 
     // Clean up existing test users first to avoid unique key violations
-    sqlx::query("DELETE FROM tb_users WHERE email IN ('alice@example.com', 'bob@example.com', 'charlie@another.com')")
+    sqlx::query("DELETE FROM tb_users WHERE email IN ('alice-unique-search-xyz@example.com', 'bob-unique-search-xyz@example.com', 'charlie-unique-search-xyz@another.com')")
         .execute(&pool)
         .await
         .unwrap();
@@ -634,10 +634,10 @@ async fn test_admin_user_filters() {
     let alice_id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role, plan)
-         VALUES ($1, $2, 'Alice Smith', 'user', 'free')",
+         VALUES ($1, $2, 'Alice Smith-Unique-Search-XYZ', 'user', 'free')",
     )
     .bind(alice_id)
-    .bind("alice@example.com")
+    .bind("alice-unique-search-xyz@example.com")
     .execute(&pool)
     .await
     .unwrap();
@@ -645,10 +645,10 @@ async fn test_admin_user_filters() {
     let bob_id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role, plan)
-         VALUES ($1, $2, 'Bob Jones', 'user', 'free')",
+         VALUES ($1, $2, 'Bob Jones-Unique-Search-XYZ', 'user', 'free')",
     )
     .bind(bob_id)
-    .bind("bob@example.com")
+    .bind("bob-unique-search-xyz@example.com")
     .execute(&pool)
     .await
     .unwrap();
@@ -656,17 +656,19 @@ async fn test_admin_user_filters() {
     let charlie_id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role, plan)
-         VALUES ($1, $2, 'Charlie Brown', 'user', 'premium')",
+         VALUES ($1, $2, 'Charlie Brown-Unique-Search-XYZ', 'user', 'premium')",
     )
     .bind(charlie_id)
-    .bind("charlie@another.com")
+    .bind("charlie-unique-search-xyz@another.com")
     .execute(&pool)
     .await
     .unwrap();
 
     // 3. Test substring search by email
     let res = client
-        .get(format!("{base_url}/v1/admin/users?q=alice"))
+        .get(format!(
+            "{base_url}/v1/admin/users?q=alice-unique-search-xyz"
+        ))
         .header("Authorization", format!("Bearer {admin_auth}"))
         .send()
         .await
@@ -675,12 +677,14 @@ async fn test_admin_user_filters() {
     let body: serde_json::Value = res.json().await.unwrap();
     let users = body["users"].as_array().unwrap();
     assert_eq!(users.len(), 1);
-    assert_eq!(users[0]["email"], "alice@example.com");
+    assert_eq!(users[0]["email"], "alice-unique-search-xyz@example.com");
     assert_eq!(body["total"].as_i64().unwrap(), 1);
 
     // 4. Test substring search by display name
     let res = client
-        .get(format!("{base_url}/v1/admin/users?q=Jones"))
+        .get(format!(
+            "{base_url}/v1/admin/users?q=Jones-Unique-Search-XYZ"
+        ))
         .header("Authorization", format!("Bearer {admin_auth}"))
         .send()
         .await
@@ -689,7 +693,7 @@ async fn test_admin_user_filters() {
     let body: serde_json::Value = res.json().await.unwrap();
     let users = body["users"].as_array().unwrap();
     assert_eq!(users.len(), 1);
-    assert_eq!(users[0]["displayName"], "Bob Jones");
+    assert_eq!(users[0]["displayName"], "Bob Jones-Unique-Search-XYZ");
 
     // 5. Test limit parameter
     let res = client
@@ -1327,9 +1331,13 @@ async fn test_admin_routes_forbidden_without_admin_scope() {
     let secret = "abcdef0123456789abcdef0123456789abcdef0123456789";
     let hash = ame_api::auth::token::hash_secret(secret);
 
+    let _ = sqlx::query("DELETE FROM tb_users WHERE email = 'regular-unique-xyz@example.com'")
+        .execute(&pool)
+        .await;
+
     sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role, password_hash)
-         VALUES ($1, 'regular@example.com', 'Regular User', 'user', 'dummy')",
+         VALUES ($1, 'regular-unique-xyz@example.com', 'Regular User', 'user', 'dummy')",
     )
     .bind(user_id)
     .execute(&pool)
@@ -1471,14 +1479,14 @@ async fn test_admin_token_list_and_filters() {
     .await
     .unwrap();
 
-    // Create an agent user (role = 'agent')
+    // Create an agent record (linked to user_id as owner)
     let agent_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_users (id, email, display_name, role, plan)
-         VALUES ($1, $2, 'Agent User', 'agent', 'free')",
+        "INSERT INTO tb_agents (id, owner_user_id, label)
+         VALUES ($1, $2, 'Agent User')",
     )
     .bind(agent_id)
-    .bind(format!("agent-{}@example.com", agent_id))
+    .bind(user_id)
     .execute(&pool)
     .await
     .unwrap();
@@ -1526,7 +1534,7 @@ async fn test_admin_token_list_and_filters() {
     // Seed agent token
     let agent_token_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at)
          VALUES ($1, $2, 'agent-token', $3, $4::text[], now() + interval '7 days')",
     )
     .bind(agent_token_id)

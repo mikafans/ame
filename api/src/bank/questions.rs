@@ -290,6 +290,7 @@ pub async fn create_questions(
     conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     owner_id: Uuid,
+    agent_id: Option<Uuid>,
     questions: Vec<QuestionInsert>,
 ) -> Result<Vec<Question>, ApiError> {
     if questions.len() > MAX_BATCH {
@@ -308,8 +309,8 @@ pub async fn create_questions(
         let status = q.status.unwrap_or(QuestionStatus::Draft);
 
         sqlx::query(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
         )
         .bind(id)
         .bind(owner_id)
@@ -320,6 +321,7 @@ pub async fn create_questions(
         .bind(status.as_str())
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
+        .bind(agent_id)
         .execute(&mut *tx)
         .await
         .map_err(internal)?;

@@ -537,11 +537,11 @@ pub async fn run(
         }
         "question.create" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
-            run_question_create(&state, &user_id, body.params).await
+            run_question_create(&state, &auth, body.params).await
         }
         "question.promote" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
-            run_question_promote(&state, &user_id, body.params).await
+            run_question_promote(&state, &auth, body.params).await
         }
         "attempt.grade" => {
             require_scope(&auth, Scope::AttemptWrite)?;
@@ -1088,7 +1088,7 @@ async fn run_assessment_add_question(
 
 async fn run_question_create(
     state: &AppState,
-    user_id: &Uuid,
+    auth: &AuthenticatedUser,
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
     use crate::bank::questions as repo;
@@ -1110,16 +1110,12 @@ async fn run_question_create(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
     let conn = &mut *acquired;
-    let owner_id: Uuid =
-        sqlx::query_scalar("SELECT COALESCE(owner_user_id, id) FROM tb_users WHERE id = $1")
-            .bind(*user_id)
-            .fetch_one(&mut *conn)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    let owner_id = auth.owner_id;
+    let agent_id = Some(auth.user.id);
 
     crate::http::db::set_rls_guc(conn, owner_id, false).await?;
 
-    let created = repo::create_questions(conn, *user_id, owner_id, questions).await?;
+    let created = repo::create_questions(conn, owner_id, owner_id, agent_id, questions).await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "question.create".into(),
@@ -1130,7 +1126,7 @@ async fn run_question_create(
 
 async fn run_question_promote(
     state: &AppState,
-    user_id: &Uuid,
+    auth: &AuthenticatedUser,
     params: Value,
 ) -> Result<Json<RunResponse>, ApiError> {
     let id = parse_id(&params)?;
@@ -1140,12 +1136,7 @@ async fn run_question_promote(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
     let conn = &mut *acquired;
-    let owner_id: Uuid =
-        sqlx::query_scalar("SELECT COALESCE(owner_user_id, id) FROM tb_users WHERE id = $1")
-            .bind(*user_id)
-            .fetch_one(&mut *conn)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    let owner_id = auth.owner_id;
 
     crate::http::db::set_rls_guc(conn, owner_id, false).await?;
 
@@ -1168,7 +1159,7 @@ async fn load_agent_profile(
 ) -> Result<sqlx::postgres::PgRow, ApiError> {
     sqlx::query(
         "SELECT label, focus_tags, current_goal, next_target, memory \
-         FROM tb_agent_profiles WHERE agent_user_id = $1",
+         FROM tb_agents WHERE id = $1",
     )
     .bind(agent_id)
     .fetch_optional(&state.pool)
@@ -1264,9 +1255,9 @@ async fn update_profile_memory(
 ) -> Result<Json<RunResponse>, ApiError> {
     // `memory || $1` shallow-merges; `$1` replaces.
     let sql = if merge {
-        "UPDATE tb_agent_profiles SET memory = memory || $1 WHERE agent_user_id = $2 RETURNING memory"
+        "UPDATE tb_agents SET memory = memory || $1 WHERE id = $2 RETURNING memory"
     } else {
-        "UPDATE tb_agent_profiles SET memory = $1 WHERE agent_user_id = $2 RETURNING memory"
+        "UPDATE tb_agents SET memory = $1 WHERE id = $2 RETURNING memory"
     };
     let row = sqlx::query(sql)
         .bind(&value)
@@ -1295,10 +1286,10 @@ async fn run_target_set(
     let next_target = params.get("nextTarget").and_then(|v| v.as_str());
 
     let row = sqlx::query(
-        "UPDATE tb_agent_profiles \
+        "UPDATE tb_agents \
          SET current_goal = COALESCE($1, current_goal), \
              next_target = COALESCE($2, next_target) \
-         WHERE agent_user_id = $3 RETURNING current_goal, next_target",
+         WHERE id = $3 RETURNING current_goal, next_target",
     )
     .bind(current_goal)
     .bind(next_target)

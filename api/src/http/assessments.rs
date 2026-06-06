@@ -421,12 +421,18 @@ pub async fn create_assessment(
         .map(|q| q.points.unwrap_or(1))
         .sum();
 
+    let agent_id = if user.user.role == crate::domain::user::Role::Agent {
+        Some(user.user.id)
+    } else {
+        None
+    };
+
     sqlx::query(
         "INSERT INTO tb_assessments \
          (id, title, description, mode, status, objectives, course, duration_min, \
           time_limit_seconds, passing_points, show_results_during, affects_rating, \
-          method, created_by, owner_id, total_points) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+          method, created_by, owner_id, total_points, agent_id) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
     )
     .bind(assessment_id)
     .bind(payload.title.clone())
@@ -441,9 +447,10 @@ pub async fn create_assessment(
     .bind(payload.show_results_during)
     .bind(payload.affects_rating)
     .bind(&payload.method)
-    .bind(user.user.id)
+    .bind(user.owner_id)
     .bind(user.owner_id)
     .bind(total_points)
+    .bind(agent_id)
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
@@ -466,8 +473,8 @@ pub async fn create_assessment(
     for (i, q) in payload.questions.into_iter().enumerate() {
         let question_id = Uuid::now_v7();
         sqlx::query(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8)"
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id) \
+             VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8, $9)"
         )
         .bind(question_id)
         .bind(user.owner_id)
@@ -476,7 +483,8 @@ pub async fn create_assessment(
         .bind(&q.payload)
         .bind(&q.explanation)
         .bind(q.points.unwrap_or(1))
-        .bind(user.user.id)
+        .bind(user.owner_id)
+        .bind(agent_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -708,7 +716,7 @@ pub async fn patch_assessment(
                status      = COALESCE($3, status),
                objectives  = COALESCE($4, objectives),
                updated_at  = now()
-           WHERE id = $5 AND created_by = $6
+           WHERE id = $5 AND owner_id = $6
            RETURNING *",
     )
     .bind(&payload.title)
@@ -716,7 +724,7 @@ pub async fn patch_assessment(
     .bind(&status)
     .bind(payload.objectives)
     .bind(id)
-    .bind(user.user.id)
+    .bind(user.owner_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
@@ -786,9 +794,9 @@ pub async fn delete_assessment(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     // Only the owner can delete
-    sqlx::query("DELETE FROM tb_assessments WHERE id = $1 AND created_by = $2")
+    sqlx::query("DELETE FROM tb_assessments WHERE id = $1 AND owner_id = $2")
         .bind(id)
-        .bind(user.user.id)
+        .bind(user.owner_id)
         .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
@@ -824,11 +832,11 @@ pub async fn add_assessment_question(
         sqlx::query_scalar(
             "SELECT s.id FROM tb_assessment_sections s
              JOIN tb_assessments a ON a.id = s.assessment_id
-             WHERE s.id = $1 AND s.assessment_id = $2 AND a.created_by = $3",
+             WHERE s.id = $1 AND s.assessment_id = $2 AND a.owner_id = $3",
         )
         .bind(sid)
         .bind(assessment_id)
-        .bind(auth.user.id)
+        .bind(auth.owner_id)
         .fetch_optional(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
@@ -840,11 +848,11 @@ pub async fn add_assessment_question(
         sqlx::query_scalar(
             "SELECT s.id FROM tb_assessment_sections s
              JOIN tb_assessments a ON a.id = s.assessment_id
-             WHERE s.assessment_id = $1 AND a.created_by = $2
+             WHERE s.assessment_id = $1 AND a.owner_id = $2
              ORDER BY s.order_index ASC LIMIT 1",
         )
         .bind(assessment_id)
-        .bind(auth.user.id)
+        .bind(auth.owner_id)
         .fetch_optional(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
@@ -990,10 +998,10 @@ pub async fn create_assessment_section(
 ) -> Result<(StatusCode, Json<AssessmentSectionDetail>), ApiError> {
     // Verify ownership
     let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM tb_assessments WHERE id = $1 AND created_by = $2)",
+        "SELECT EXISTS(SELECT 1 FROM tb_assessments WHERE id = $1 AND owner_id = $2)",
     )
     .bind(assessment_id)
-    .bind(auth.user.id)
+    .bind(auth.owner_id)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
@@ -1074,7 +1082,7 @@ pub async fn patch_assessment_section(
                 mix    = COALESCE($3, sec.mix)
            FROM tb_assessments a
           WHERE sec.id = $4 AND sec.assessment_id = $5
-            AND a.id = sec.assessment_id AND a.created_by = $6
+            AND a.id = sec.assessment_id AND a.owner_id = $6
           RETURNING sec.id, sec.title, sec.order_index, sec.weight, sec.mix, sec.items_count",
     )
     .bind(&body.title)
@@ -1082,7 +1090,7 @@ pub async fn patch_assessment_section(
     .bind(&body.mix)
     .bind(section_id)
     .bind(assessment_id)
-    .bind(auth.user.id)
+    .bind(auth.owner_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
@@ -1157,11 +1165,11 @@ pub async fn delete_assessment_section(
         "DELETE FROM tb_assessment_sections sec
          USING tb_assessments a
          WHERE sec.id = $1 AND sec.assessment_id = $2
-           AND a.id = sec.assessment_id AND a.created_by = $3",
+           AND a.id = sec.assessment_id AND a.owner_id = $3",
     )
     .bind(section_id)
     .bind(assessment_id)
-    .bind(auth.user.id)
+    .bind(auth.owner_id)
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
@@ -1201,11 +1209,11 @@ pub async fn remove_assessment_question(
           FROM tb_assessment_items ai
           JOIN tb_assessment_sections s ON s.id = ai.section_id
           JOIN tb_assessments a ON a.id = s.assessment_id
-         WHERE s.assessment_id = $1 AND a.created_by = $2 AND ai.question_id = $3
+         WHERE s.assessment_id = $1 AND a.owner_id = $2 AND ai.question_id = $3
          ORDER BY ai.order_index ASC LIMIT 1",
     )
     .bind(assessment_id)
-    .bind(auth.user.id)
+    .bind(auth.owner_id)
     .bind(question_id)
     .fetch_optional(&state.pool)
     .await

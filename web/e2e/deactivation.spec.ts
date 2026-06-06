@@ -58,11 +58,14 @@ test.describe("account deactivation", () => {
   });
 
   test("agent can call API before owner deactivation", async ({ request }) => {
-    const r = await request.get(`${API_URL}/v1/assessments`, {
+    const r = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
+      data: { tool: "assessment.list", params: {} },
     });
     // 200 (empty or populated list) means the agent token is valid and owner is active
     expect(r.status()).toBe(200);
+    const body = await r.json();
+    expect(body.ok).toBe(true);
   });
 
   test("admin can deactivate the user via PATCH", async ({ request }) => {
@@ -91,8 +94,9 @@ test.describe("account deactivation", () => {
   test("agent whose owner is deactivated is rejected (401)", async ({
     request,
   }) => {
-    const r = await request.get(`${API_URL}/v1/assessments`, {
+    const r = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
+      data: { tool: "assessment.list", params: {} },
     });
     expect(r.status()).toBe(401);
   });
@@ -118,9 +122,12 @@ test.describe("account deactivation", () => {
     // revoke agent sub-account tokens — those remain in tb_api_tokens.
     // Re-enabling the owner clears deactivated_at, so the extractor's
     // owner_deactivated_at check passes again and agent calls succeed.
-    const r = await request.get(`${API_URL}/v1/assessments`, {
+    const r = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
+      data: { tool: "assessment.list", params: {} },
     });
     expect(r.status()).toBe(200);
+    const body = await r.json();
+    expect(body.ok).toBe(true);
   });
 });

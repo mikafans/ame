@@ -106,7 +106,7 @@ pub async fn activity_log_middleware(
 
         tokio::spawn(async move {
             let result = sqlx::query(
-                "SELECT user_id FROM tb_api_tokens WHERE id = $1 AND revoked_at IS NULL",
+                "SELECT COALESCE(user_id, agent_id) as user_id FROM tb_api_tokens WHERE id = $1 AND revoked_at IS NULL",
             )
             .bind(token_id)
             .fetch_optional(&pool)

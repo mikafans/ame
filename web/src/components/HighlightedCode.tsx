@@ -33,6 +33,7 @@ export function HighlightedCode({ code, language = "python" }: Props) {
     <Box
       component="pre"
       className={langClass}
+      suppressHydrationWarning
       sx={[
         {
           margin: "0 !important",

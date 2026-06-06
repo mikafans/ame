@@ -348,11 +348,10 @@ pub async fn list_agents(
     user: AuthenticatedUser,
 ) -> Result<Json<ListAgentsResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT u.id, u.display_name, t.scopes, a.focus_tags, t.last_used_at, u.created_at
-         FROM tb_users u
-         JOIN tb_agent_profiles a ON a.agent_user_id = u.id
-         JOIN tb_api_tokens t ON t.user_id = u.id
-         WHERE u.owner_user_id = $1 AND u.role = 'agent' AND u.deactivated_at IS NULL AND t.revoked_at IS NULL",
+        "SELECT a.id, a.label as display_name, t.scopes, a.focus_tags, t.last_used_at, a.created_at
+         FROM tb_agents a
+         JOIN tb_api_tokens t ON t.agent_id = a.id
+         WHERE a.owner_user_id = $1 AND a.deactivated_at IS NULL AND t.revoked_at IS NULL",
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
@@ -430,19 +429,10 @@ pub async fn create_agent(
 
     let agent_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_users (id, email, password_hash, display_name, role, owner_user_id) VALUES ($1, NULL, NULL, $2, 'agent', $3)"
+        "INSERT INTO tb_agents (id, owner_user_id, label, focus_tags) VALUES ($1, $2, $3, $4)",
     )
     .bind(agent_id)
-    .bind(&body.label)
     .bind(user.user.id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    sqlx::query(
-        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)",
-    )
-    .bind(agent_id)
     .bind(&body.label)
     .bind(&body.focus_tags)
     .execute(&mut *tx)
@@ -454,7 +444,7 @@ pub async fn create_agent(
     let hash = crate::auth::token::hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
     )
     .bind(token_id)
     .bind(agent_id)
@@ -505,7 +495,7 @@ pub async fn update_agent(
 
     // 1. Verify existence and ownership
     let exists = sqlx::query(
-        "SELECT 1 FROM tb_users WHERE id = $1 AND owner_user_id = $2 AND role = 'agent' AND deactivated_at IS NULL",
+        "SELECT 1 FROM tb_agents WHERE id = $1 AND owner_user_id = $2 AND deactivated_at IS NULL",
     )
     .bind(id)
     .bind(user.user.id)
@@ -518,7 +508,7 @@ pub async fn update_agent(
     }
 
     if let Some(label) = &body.label {
-        sqlx::query("UPDATE tb_users SET display_name = $1 WHERE id = $2 AND owner_user_id = $3")
+        sqlx::query("UPDATE tb_agents SET label = $1 WHERE id = $2 AND owner_user_id = $3")
             .bind(label)
             .bind(id)
             .bind(user.user.id)
@@ -529,10 +519,11 @@ pub async fn update_agent(
 
     if let Some(tags) = &body.focus_tags {
         sqlx::query(
-            "UPDATE tb_agent_profiles \
+            "UPDATE tb_agents \
              SET focus_tags = $1 \
-             WHERE agent_user_id = $2 \
-               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent' AND deactivated_at IS NULL)"
+             WHERE id = $2 \
+               AND owner_user_id = $3 \
+               AND deactivated_at IS NULL",
         )
         .bind(tags)
         .bind(id)
@@ -566,8 +557,8 @@ pub async fn update_agent(
         sqlx::query(
             "UPDATE tb_api_tokens \
              SET scopes = $1 \
-             WHERE user_id = $2 \
-               AND EXISTS (SELECT 1 FROM tb_users WHERE id = $2 AND owner_user_id = $3 AND role = 'agent' AND deactivated_at IS NULL)"
+             WHERE agent_id = $2 \
+               AND EXISTS (SELECT 1 FROM tb_agents WHERE id = $2 AND owner_user_id = $3 AND deactivated_at IS NULL)"
         )
         .bind(scopes)
         .bind(id)
@@ -603,7 +594,7 @@ pub async fn delete_agent(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     let token_ids: Vec<Uuid> =
-        sqlx::query_scalar("SELECT id FROM tb_api_tokens WHERE user_id = $1")
+        sqlx::query_scalar("SELECT id FROM tb_api_tokens WHERE agent_id = $1")
             .bind(id)
             .fetch_all(&state.pool)
             .await
@@ -618,9 +609,9 @@ pub async fn delete_agent(
     let is_admin = user.user.role == Role::Admin;
     crate::http::db::set_rls_guc(&mut tx, user.owner_id, is_admin).await?;
 
-    // 1. Deactivate the agent user record
+    // 1. Deactivate the agent record
     let affected =
-        sqlx::query("UPDATE tb_users SET deactivated_at = now() WHERE id = $1 AND owner_user_id = $2 AND role = 'agent' AND deactivated_at IS NULL")
+        sqlx::query("UPDATE tb_agents SET deactivated_at = now() WHERE id = $1 AND owner_user_id = $2 AND deactivated_at IS NULL")
             .bind(id)
             .bind(user.user.id)
             .execute(&mut *tx)
@@ -633,7 +624,7 @@ pub async fn delete_agent(
 
     // 2. Revoke all active tokens for this agent
     sqlx::query(
-        "UPDATE tb_api_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
+        "UPDATE tb_api_tokens SET revoked_at = now() WHERE agent_id = $1 AND revoked_at IS NULL",
     )
     .bind(id)
     .execute(&mut *tx)

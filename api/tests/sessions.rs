@@ -119,34 +119,59 @@ async fn make_user_token(
     let token_id = Uuid::now_v7();
     let secret = "scoped_secret_123";
     let hash = hash_secret(secret);
-    // Agents carry no email (auth by token only); users need one.
-    let email: Option<String> = (role != "agent").then(|| format!("u-{user_id}@example.com"));
-
-    sqlx::query(
-        "INSERT INTO tb_users (id, owner_user_id, display_name, email, role, plan) \
-         VALUES ($1, $2, $3, $4, $5, 'premium')",
-    )
-    .bind(user_id)
-    .bind(owner_user_id)
-    .bind(format!("user-{user_id}"))
-    .bind(email)
-    .bind(role)
-    .execute(pool)
-    .await
-    .unwrap();
 
     let scopes: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
-    sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
-         VALUES ($1, $2, 'scoped token', $3, $4)",
-    )
-    .bind(token_id)
-    .bind(user_id)
-    .bind(hash)
-    .bind(scopes)
-    .execute(pool)
-    .await
-    .unwrap();
+
+    if role == "agent" {
+        sqlx::query(
+            "INSERT INTO tb_agents (id, owner_user_id, label) \
+             VALUES ($1, $2, $3)",
+        )
+        .bind(user_id)
+        .bind(owner_user_id.expect("agent must have an owner"))
+        .bind(format!("agent-{user_id}"))
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) \
+             VALUES ($1, $2, 'scoped token', $3, $4)",
+        )
+        .bind(token_id)
+        .bind(user_id)
+        .bind(hash)
+        .bind(scopes)
+        .execute(pool)
+        .await
+        .unwrap();
+    } else {
+        let email = format!("u-{user_id}@example.com");
+        sqlx::query(
+            "INSERT INTO tb_users (id, owner_user_id, display_name, email, role, plan) \
+             VALUES ($1, $2, $3, $4, $5, 'premium')",
+        )
+        .bind(user_id)
+        .bind(owner_user_id)
+        .bind(format!("user-{user_id}"))
+        .bind(email)
+        .bind(role)
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
+             VALUES ($1, $2, 'scoped token', $3, $4)",
+        )
+        .bind(token_id)
+        .bind(user_id)
+        .bind(hash)
+        .bind(scopes)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
 
     (format!("{token_id}_{secret}"), user_id)
 }
@@ -247,10 +272,16 @@ async fn completion_state_is_scoped_to_caller_not_owner() {
             .get(format!("{base_url}/v1/assessments/{assessment_id}"))
             .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
     };
-
     // ── Agent: sees the assessment (owner-scoped visibility) but NOT the owner's
     //    completion. list and get must agree. (F-1 cross-principal leak guard.)
-    let agent_list: Value = get_list(&agent_bearer)
+    //    Note: Agent must access this through the single run-door.
+    let agent_list_res: Value = client
+        .post(format!("{base_url}/v1/agents/run"))
+        .header(header::AUTHORIZATION, format!("Bearer {agent_bearer}"))
+        .json(&json!({
+            "tool": "assessment.list",
+            "params": { "status": "active" }
+        }))
         .send()
         .await
         .unwrap()
@@ -259,6 +290,8 @@ async fn completion_state_is_scoped_to_caller_not_owner() {
         .json()
         .await
         .unwrap();
+    assert!(agent_list_res["ok"].as_bool().unwrap());
+    let agent_list = agent_list_res["result"].clone();
     let agent_item = find(&agent_list);
     assert_eq!(
         agent_item["completed"], false,
@@ -269,7 +302,13 @@ async fn completion_state_is_scoped_to_caller_not_owner() {
         "agent must not see owner's session id"
     );
 
-    let agent_detail: Value = get_detail(&agent_bearer)
+    let agent_detail_res: Value = client
+        .post(format!("{base_url}/v1/agents/run"))
+        .header(header::AUTHORIZATION, format!("Bearer {agent_bearer}"))
+        .json(&json!({
+            "tool": "assessment.get",
+            "params": { "id": assessment_id }
+        }))
         .send()
         .await
         .unwrap()
@@ -278,6 +317,8 @@ async fn completion_state_is_scoped_to_caller_not_owner() {
         .json()
         .await
         .unwrap();
+    assert!(agent_detail_res["ok"].as_bool().unwrap());
+    let agent_detail = agent_detail_res["result"].clone();
     assert_eq!(
         agent_detail["completed"], agent_item["completed"],
         "list and get must agree for the agent (F-2)"
