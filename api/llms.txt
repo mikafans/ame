@@ -1,18 +1,19 @@
 # AME
 
-> An assessment learning platform with a first-class agent surface. Agents can
-> author question banks, assemble assessments, publish them, and read learner
-> stats — all over plain HTTP + JSON. This file is the entry point; read it
-> first.
+> An assessment learning platform with a first-class agent surface. An agent acts
+> on behalf of its owner: it authors question banks, assembles and publishes
+> assessments, grades pending attempts, and reads the owner's learner stats. This
+> file is the entry point and describes the entire contract.
 
-This is NOT an MCP server. There is no JSON-RPC. You call a normal REST API
-with a bearer token, plus one convenience dispatcher (`/v1/agents/run`) for
-composite and write operations.
+This is NOT an MCP server and there is no JSON-RPC. An agent token reaches the
+platform through exactly one authenticated door: `POST /v1/agents/run`. Every
+operation — reads, writes, and self-management — is a named tool dispatched
+through that single endpoint. Agents never take assessments and never hold their
+own sessions; the learner REST surface is human-only.
 
 ## Getting a key
 
-An authenticated owner (human user logged in with email + password) creates an
-agent:
+An owner (a human user logged in with email + password) creates an agent:
 
 ```
 POST /v1/me/agents
@@ -20,71 +21,93 @@ POST /v1/me/agents
 -> 201 { "id": "<uuid>", "apiKey": "<id>_<secret>" }
 ```
 
-Send the key on every request: `Authorization: Bearer <apiKey>`.
+The key travels on every request as `Authorization: Bearer <apiKey>`. The secret
+is shown once at creation and stored only as a hash.
 
 **Valid scopes**: `assessment.read`, `assessment.write`, `attempt.read`,
-`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`.
-`admin` cannot be granted to agents.
+`attempt.write`, `stats.read`, `feedback.write`, `plan.read`, `plan.write`. The
+`admin` scope cannot be granted to an agent.
+
+## The single door
+
+An agent token is confined to these endpoints; every other path returns `403`:
+
+- `POST /v1/agents/run` — the dispatcher for all tools (body below).
+- `GET /v1/agents/activity` — the agent's own call log, newest first.
+- `GET /llms.txt`, `GET /skill.json`, `GET /openapi.yaml` — public discovery.
+
+Every tool is invoked the same way:
+
+```
+POST /v1/agents/run
+{ "tool": "<name>", "params": { ... } }
+-> 200 { "ok": true, "tool": "<name>", "result": { ... } }
+```
+
+A scope mismatch returns `403`; a malformed `params` returns `422`.
 
 ## Discovery
 
-- `GET /skill.json` — machine-readable tool list. Each tool carries an
-  `input_schema` and the REST `method`/`path` it maps to. Add `?strict=1` to drop
-  the method/path/scope hints. Top-level `run` block lists the runnable tools.
-- `GET /openapi.yaml` — full OpenAPI schema (public, YAML).
-- `GET /v1/agents/activity` — your own call log, newest first (scope: `assessment.read`).
+`GET /skill.json` is the machine-readable tool list. Each tool carries an
+`input_schema`; `method` and `path` are uniform (`POST /v1/agents/run`) because
+the dispatcher is the only entry point. `?strict=1` drops the `method`/`path`/
+`scope` hints. The top-level `run` block lists every runnable tool. `GET
+/openapi.yaml` is the full schema for the underlying human REST API (informational
+for an agent — those routes are not directly reachable with an agent token).
 
-## Two ways to act
+## Tools
 
-1. **Reads + simple writes** — call the REST endpoint directly
-   (e.g. `GET /v1/assessments`, `GET /v1/questions`, `GET /v1/me/stats`,
-   `GET /v1/assessments/{id}`).
-2. **Composite / write tools** — POST to the dispatcher:
+All tools dispatch through `POST /v1/agents/run`.
 
-   ```
-   POST /v1/agents/run
-   { "tool": "<name>", "params": { ... } }
-   ```
+**Authoring (scope `assessment.write`)**
+- `question.create` — batch-create bank questions.
+  `params: { questions: [{ kind, prompt, payload, explanation?, tags?, points?, status? }] }`.
+- `question.promote` — promote one draft question to live. `params: { id }`.
+- `assessment.create` — create an assessment. Required: `title`, `mode`
+  (`practice`|`graded`), `objectives` (array), `method` (`agent`). Optional:
+  `description`, `course`, `status`, and an inline `questions` array.
+- `assessment.batchCreate` — create many assessments in one transaction.
+  `params: { items: [ <assessment.create params> ] }`.
+- `assessment.addQuestion` — attach a bank question (or create one inline) to an
+  assessment. `params: { id, questionId? | (kind, prompt), sectionId?, pointsOverride? }`.
+- `assessment.update` — patch metadata or change lifecycle state.
+  `params: { id, title?, status? }`. `status: "active"` publishes;
+  `status: "archived"` archives.
 
-   Runnable tools (each requires `assessment.write`):
-   - `question.create` — batch-create bank questions.
-     `params: { questions: [{ kind, prompt, payload, explanation?, tags?, points? }] }`.
-   - `assessment.create` — create an assessment (draft). REQUIRED params: `title`,
-     `mode` ("practice"|"graded"), `objectives` (array), `method` ("agent").
-     Optional: `description`, `course`, `durationMin`, `timeLimitSeconds`,
-     `passingPoints`, `showResultsDuring`, `affectsRating`.
-   - `assessment.update` — patch metadata / publish.
-     `params: { id, title?, status?, objectives? }`. Publish with
-     `status: "active"`.
-   - `question.promote` — promote one draft question to live. `params: { id }`.
+**Grading (scope `attempt.write`)**
+- `attempt.grade` — grade one pending essay or code attempt.
+  `params: { id, score (0.0–1.0), notes? }`. Grades a learner's attempt, never the
+  agent's own.
 
-   **Attaching questions to an assessment (direct REST, not a run tool)**:
-   ```
-   POST /v1/assessments/{id}/questions
-   { "questionId": "<uuid>" }
-   -> 201 { "questionId", "orderIndex" }
-   ```
-   (Also supports inline create with `{ kind, prompt, ... }` instead of questionId.)
+**Reading (scope `assessment.read`, or `stats.read` for stats)**
+- `assessment.list` — list the owner's assessments. `params: { course?, status?, mode? }`.
+- `assessment.get` — one assessment with its sections and questions. `params: { id }`.
+- `assessment.stats` — per-assessment performance (scope `stats.read`). `params: { id }`.
+- `question.list` — list bank questions. `params: { tag?, status?, limit?, offset? }`.
+- `activity.list` — the agent's own activity log. `params: { cursor?, limit? }`.
+- `stats.user` — the owner's aggregate learning statistics (scope `stats.read`).
 
-   **Assessment generation helper (direct REST, not a run tool)**:
-   ```
-   POST /v1/assessments/generate
-   { "source", "questionCount"?, "types"?, "objectives"? }
-   -> { "candidates", "objectives", "warnings" }
-   ```
-   Selects existing live bank questions and returns them as candidates
-   (does not persist).
+**Self-management (no scope required)**
+- `profile.get` — the agent's own config (label, focus tags, goal, memory) plus the
+  owner's per-tag ELO ratings under `owner.ratings`.
+- `memory.set` — replace the agent's memory blob. `params: { memory }`.
+- `memory.append` — shallow-merge keys into the memory blob. `params: { append }`.
+- `target.set` — update the agent's goal and next target.
+  `params: { currentGoal?, nextTarget? }`.
 
 ## Authoring an assessment end to end
 
-1. `POST /v1/agents/run` `question.create` (batch) → collect question ids.
-2. `POST /v1/agents/run` `assessment.create` `{ title, mode, objectives, method: "agent" }`
-   → `id` (assessment is `draft`).
-3. For each question id: `POST /v1/assessments/{id}/questions` `{ "questionId": id }`.
-4. `POST /v1/agents/run` `assessment.update` `{ id, status: "active" }` to publish.
-   Publishing auto-promotes draft questions to live. Assessment needs ≥1 question.
-   Archived assessments cannot be re-activated.
-5. `GET /v1/assessments` to confirm it is listed.
+1. `question.create` (batch) yields question ids.
+2. `assessment.create` `{ title, mode, objectives, method: "agent" }` yields an
+   assessment id in `draft` state.
+3. `assessment.addQuestion` `{ id, questionId }` for each question attaches it.
+4. `assessment.update` `{ id, status: "active" }` publishes; publishing
+   auto-promotes draft questions to live. An assessment needs ≥1 question to
+   publish, and an archived assessment cannot be re-activated.
+5. `assessment.list` confirms the result.
+
+Inline shortcut: `assessment.create` accepts a `questions` array and a
+`status: "active"`, collapsing the four steps into one call.
 
 ## Data-model rules (violating these returns 422 or silently mis-grades)
 
@@ -95,13 +118,13 @@ Send the key on every request: `Authorization: Bearer <apiKey>`.
 - No scheduled assessments: there are no `opens_at` / `closes_at` fields.
 - Auth is email + password only. No SSO/SAML.
 - `code` questions are graded by exemplar/manual comparison — there is no code
-  runner.
+  runner, so `code` and `essay` answers land as pending and are resolved with
+  `attempt.grade`.
 
 ## Reference client
 
 `agents/client.py` is a dependency-free Python wrapper and the canonical worked
-example. You do not need it to use the API, but it shows the exact
-request/auth/error shapes. Run its end-to-end author demo with:
+example of the request/auth/error shapes. Its end-to-end author demo runs with:
 
 ```
 uv run agents/client.py --api http://localhost:28080 --token <owner-token>
@@ -109,122 +132,44 @@ uv run agents/client.py --api http://localhost:28080 --token <owner-token>
 
 ## Task playbooks
 
-Worked, step-by-step playbooks and recipes for performing diagnostic analyses and material adjustments on AME.
+Declarative recipes for diagnostic analysis and material adjustment. Each step is
+a tool dispatched through `POST /v1/agents/run`.
 
-### Playbook 1: Analyze Learner Performance (`analyze-performance`)
+### Playbook 1: Analyze learner performance (`analyze-performance`)
 
-Read a learner's tag-level stats and recent attempt history to surface learning gaps.
+Surfaces learning gaps from an assessment's per-item stats and the owner's
+aggregate stats.
 
-1. **Get per-tag stats for an assessment**:
-   ```http
-   GET /v1/assessments/{assessmentId}/stats
-   Authorization: Bearer <your-key>
-   ```
-   Response:
-   ```json
-   {
-     "avg": 0.72,
-     "median": 0.75,
-     "distribution": [
-       { "bucket": 3, "count": 1 }
-     ],
-     "items": [
-       {
-         "questionId": "019...",
-         "correctRate": 0.31,
-         "avgTimeMs": 14200,
-         "discriminationIdx": 0.55
-       }
-     ]
-   }
-   ```
-   Items with `correctRate < 0.5` are struggle points.
+1. `assessment.stats` `{ id }` returns `avg`, `median`, `distribution`, and an
+   `items` array of `{ questionId, correctRate, avgTimeMs, discriminationIdx }`.
+2. `stats.user` returns the owner's aggregate `{ avgScore, attemptsTotal,
+   hoursSpent, streaks, masteredTopics }`.
+3. `activity.list` returns the agent's recent tool calls for audit.
 
-2. **Check agent activity log**:
-   ```http
-   GET /v1/agents/activity?limit=20
-   Authorization: Bearer <your-key>
-   ```
-   Review recent tool calls, status codes, and paths to audit what the agent has done.
+Interpretation: `correctRate < 0.5` marks a topic needing more practice;
+`discriminationIdx < 0.2` marks a question that may be poorly written;
+`avgTimeMs > 30000` marks a question that may be too long or complex.
 
-3. **Interpreting results**:
-   * `correctRate < 0.5`: Topic/tag needs more practice questions.
-   * `discriminationIdx < 0.2`: Question may be poorly written or confusing.
-   * `avgTimeMs > 30,000`: Question may be too complex or long.
+### Playbook 2: Targeted question generation (`generate-questions`)
 
----
+Authors targeted questions for the owner's weakest topics and publishes them as a
+practice assessment.
 
-### Playbook 2: Targeted Question Generation (`generate-questions`)
+1. `profile.get` returns `owner.ratings`; the lowest ratings are the primary
+   targets.
+2. `question.create` authors questions for the weakest tag (their `tags` field
+   carries the topic).
+3. `assessment.create` `{ title, mode: "practice", objectives: [<tag>],
+   method: "agent" }` creates the draft.
+4. `assessment.addQuestion` attaches each new question.
+5. `assessment.update` `{ id, status: "active" }` publishes.
 
-Generate targeted questions for a learner's weakest topics and import them as a practice assessment.
+### Playbook 3: Adaptive generation loop (`adaptive-generation`)
 
-1. **Find weakest tags**:
-   Use the profile tool to fetch the ELO ratings:
-   ```http
-   POST /v1/agents/run
-   { "tool": "profile.get", "params": {} }
-   ```
-   The response returns `owner.ratings` sorted from highest to lowest. The lowest ratings are your primary targets.
+The full loop: read struggle points, author targeted questions, publish.
 
-2. **Generate question candidates for the weakest tag**:
-   ```http
-   POST /v1/assessments/generate
-   Authorization: Bearer <your-key>
-   Content-Type: application/json
-   {
-     "source": "Explain binary search trees, including insertion, deletion, and traversal algorithms.",
-     "questionCount": 5,
-     "types": ["mc", "tf", "short"],
-     "objectives": ["binary-search-tree"]
-   }
-   ```
-   If `warnings` is non-empty, the source was too thin — add more context and retry.
-
-3. **Publish the assessment**:
-   Create the assessment draft, attach the generated questions, and publish:
-   ```http
-   POST /v1/agents/run
-   {
-     "tool": "assessment.update",
-     "params": { "id": "<assessmentId>", "status": "active" }
-   }
-   ```
-
----
-
-### Playbook 3: Adaptive Generation Loop (`adaptive-generation`)
-
-The full adaptive loop: read weakest tags → check assessment pool gaps → generate targeted questions, handling `pool_insufficient` gracefully by reducing question count and retrying.
-
-1. **Identify struggle points**:
-   ```http
-   GET /v1/assessments/{assessmentId}/stats
-   Authorization: Bearer <your-key>
-   ```
-   Collect items where `correctRate < 0.5`.
-
-2. **For each weak tag, generate with retry**:
-   ```http
-   POST /v1/assessments/generate
-   Authorization: Bearer <your-key>
-   Content-Type: application/json
-   {
-     "source": "Rust ownership and borrowing rules: move semantics, references, lifetimes.",
-     "questionCount": 5,
-     "objectives": ["rust"]
-   }
-   ```
-   On `422 pool_insufficient`:
-   ```json
-   {
-     "error": {
-       "code": "exam_pool_insufficient",
-       "details": { "required": 5, "available": 3 }
-     }
-   }
-   ```
-   Retry with `questionCount: 3` (available count).
-
-3. **Activate and publish**:
-   Once attached, promote the assessment status to `"active"`.
-
+1. `assessment.stats` `{ id }` yields the `items` whose `correctRate < 0.5`.
+2. For each weak tag, `question.create` authors fresh questions tagged to it.
+3. `assessment.create` (or an existing draft) collects them via
+   `assessment.addQuestion`.
+4. `assessment.update` `{ id, status: "active" }` activates and publishes.
