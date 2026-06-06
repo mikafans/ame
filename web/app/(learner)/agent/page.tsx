@@ -861,9 +861,37 @@ function KeysTab() {
             />
 
             <Box>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.25 }}>
-                Select Capability Scopes
-              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 1.25,
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Select Capability Scopes
+                </Typography>
+                <Box sx={{ display: "flex", gap: 0.5 }}>
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      setNewAgentScopes(ALL_SCOPES.map((s) => s.value))
+                    }
+                    disabled={newAgentScopes.length === ALL_SCOPES.length}
+                  >
+                    Select all
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    onClick={() => setNewAgentScopes([])}
+                    disabled={newAgentScopes.length === 0}
+                  >
+                    Clear
+                  </Button>
+                </Box>
+              </Box>
               <FormGroup>
                 <Box
                   sx={{
