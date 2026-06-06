@@ -30,7 +30,8 @@ use crate::{
         AppState,
         admin::{
             AdminAssessmentEntry, AdminHealthResponse, AdminListAssessmentsResponse, AuditLogEntry,
-            ListAuditLogsResponse, ListUsersResponse, PatchUserAdminBody,
+            ListAuditLogsResponse, ListTokensResponse, ListUsersResponse, PatchUserAdminBody,
+            TokenEntry,
         },
         agents::{ActivityEntry, ActivityResponse as AgentActivityResponse, RunResponse},
         assessments::{
@@ -108,6 +109,8 @@ use crate::{
         crate::http::admin::list_assessments_admin,
         crate::http::admin::delete_assessment_admin,
         crate::http::admin::restore_assessment_admin,
+        crate::http::admin::list_tokens,
+        crate::http::admin::delete_token_admin,
     ),
     components(schemas(
         User,
@@ -173,6 +176,8 @@ use crate::{
         CreatePlanBody,
         ListUsersResponse,
         PatchUserAdminBody,
+        TokenEntry,
+        ListTokensResponse,
         ListAuditLogsResponse,
         AdminHealthResponse,
         AdminAssessmentEntry,

@@ -15,6 +15,7 @@ import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -57,6 +58,14 @@ export default function AdminDashboardPage() {
       ),
       link: "/admin/health",
       actionLabel: "System Status",
+    },
+    {
+      title: "API Tokens",
+      description:
+        "Audit all API tokens platform-wide. Review token usage history, expiration dates, assigned scopes, and revoke tokens on demand.",
+      icon: <VpnKeyOutlinedIcon sx={{ fontSize: 40, color: "info.main" }} />,
+      link: "/admin/tokens",
+      actionLabel: "Token Audit",
     },
   ];
 

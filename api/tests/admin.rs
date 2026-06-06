@@ -1403,3 +1403,571 @@ async fn test_admin_routes_forbidden_without_admin_scope() {
         );
     }
 }
+
+#[tokio::test]
+async fn test_admin_token_list_and_filters() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // Create admin
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    // Create a regular user
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Regular User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Create an agent user (role = 'agent')
+    let agent_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Agent User', 'agent', 'free')",
+    )
+    .bind(agent_id)
+    .bind(format!("agent-{}@example.com", agent_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Seed tokens: active, revoked, expired
+    let active_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, 'active-token', $3, $4::text[], now() + interval '7 days')",
+    )
+    .bind(active_token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let revoked_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at, revoked_at)
+         VALUES ($1, $2, 'revoked-token', $3, $4::text[], now() + interval '7 days', now())",
+    )
+    .bind(revoked_token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let expired_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, 'expired-token', $3, $4::text[], now() - interval '1 day')",
+    )
+    .bind(expired_token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Seed agent token
+    let agent_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, 'agent-token', $3, $4::text[], now() + interval '7 days')",
+    )
+    .bind(agent_token_id)
+    .bind(agent_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Test 1: List all tokens
+    let res = client
+        .get(format!("{base_url}/v1/admin/tokens"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let tokens = body["tokens"].as_array().unwrap();
+    let total = body["total"].as_i64().unwrap();
+
+    // Should have at least the admin's own token
+    assert!(!tokens.is_empty());
+    assert!(total >= 1);
+
+    // SECURITY ASSERTION (critical): Ensure no tokenHash or token_hash appears in response
+    let body_str = body.to_string();
+    assert!(
+        !body_str.contains("tokenHash"),
+        "Response should not contain tokenHash field"
+    );
+    assert!(
+        !body_str.contains("token_hash"),
+        "Response should not contain token_hash field"
+    );
+
+    // Verify no tokenHash key exists in any token object
+    for token_obj in tokens {
+        assert!(
+            token_obj.get("tokenHash").is_none(),
+            "Token object should not have tokenHash key"
+        );
+        assert!(
+            token_obj.get("token_hash").is_none(),
+            "Token object should not have token_hash key"
+        );
+    }
+
+    // Helper: GET /v1/admin/tokens with a query string, return the token name set.
+    // All assertions below scope by this test's fresh ownerId (a unique UUID), so
+    // they are deterministic regardless of rows seeded by other tests.
+    async fn token_names(
+        client: &reqwest::Client,
+        base_url: &str,
+        admin_auth: &str,
+        query: &str,
+    ) -> std::collections::HashSet<String> {
+        let res = client
+            .get(format!("{base_url}/v1/admin/tokens?{query}"))
+            .header("Authorization", format!("Bearer {admin_auth}"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body: serde_json::Value = res.json().await.unwrap();
+        body["tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    let want = |names: &[&str]| -> std::collections::HashSet<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    };
+
+    // The seeded user owns exactly 3 tokens (active/revoked/expired).
+    let all = token_names(
+        &client,
+        &base_url,
+        &admin_auth,
+        &format!("ownerId={user_id}"),
+    )
+    .await;
+    assert_eq!(
+        all,
+        want(&["active-token", "revoked-token", "expired-token"])
+    );
+
+    // status filters, scoped to the seeded owner — each returns exactly one.
+    let active = token_names(
+        &client,
+        &base_url,
+        &admin_auth,
+        &format!("ownerId={user_id}&status=active"),
+    )
+    .await;
+    assert_eq!(active, want(&["active-token"]));
+
+    let revoked = token_names(
+        &client,
+        &base_url,
+        &admin_auth,
+        &format!("ownerId={user_id}&status=revoked"),
+    )
+    .await;
+    assert_eq!(revoked, want(&["revoked-token"]));
+
+    let expired = token_names(
+        &client,
+        &base_url,
+        &admin_auth,
+        &format!("ownerId={user_id}&status=expired"),
+    )
+    .await;
+    assert_eq!(expired, want(&["expired-token"]));
+
+    // role filter via the agent owner — exactly the one agent token.
+    let agent = token_names(
+        &client,
+        &base_url,
+        &admin_auth,
+        &format!("ownerId={agent_id}&role=agent"),
+    )
+    .await;
+    assert_eq!(agent, want(&["agent-token"]));
+
+    // q filter matches by token name, scoped to the seeded owner.
+    let by_q = token_names(
+        &client,
+        &base_url,
+        &admin_auth,
+        &format!("ownerId={user_id}&q=expired-token"),
+    )
+    .await;
+    assert_eq!(by_q, want(&["expired-token"]));
+}
+
+#[tokio::test]
+async fn test_admin_token_revoke_idempotent() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // Create admin
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    // Create user and active token
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, 'test-token', $3, $4::text[], now() + interval '7 days')",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // First DELETE should return 204
+    let res = client
+        .delete(format!("{base_url}/v1/admin/tokens/{token_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Verify token is revoked in DB
+    let revoked_at: Option<time::OffsetDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM tb_api_tokens WHERE id = $1")
+            .bind(token_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(revoked_at.is_some(), "Token should have revoked_at set");
+
+    // Second DELETE of same token should also return 204 (idempotent)
+    let res = client
+        .delete(format!("{base_url}/v1/admin/tokens/{token_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // DELETE of non-existent token should return 404
+    let fake_token_id = Uuid::now_v7();
+    let res = client
+        .delete(format!("{base_url}/v1/admin/tokens/{fake_token_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_admin_token_revoke_enforced() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // Create admin
+    let admin_user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'Admin', 'admin', 'premium')",
+    )
+    .bind(admin_user_id)
+    .bind(format!("admin-{}@example.com", admin_user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let admin_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+    )
+    .bind(admin_token_id)
+    .bind(admin_user_id)
+    .bind(&hash)
+    .bind(vec!["admin".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let admin_auth = format!("{admin_token_id}_{secret}");
+
+    // Create non-admin user with assessment.read scope
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let user_token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, 'user-token', $3, $4::text[], now() + interval '7 days')",
+    )
+    .bind(user_token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let user_auth = format!("{user_token_id}_{secret}");
+
+    // Request with active token should work (GET /me is a common endpoint)
+    let res = client
+        .get(format!("{base_url}/v1/me"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // Admin revokes the token
+    let res = client
+        .delete(format!("{base_url}/v1/admin/tokens/{user_token_id}"))
+        .header("Authorization", format!("Bearer {admin_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Now the same request with the revoked token should fail
+    let res = client
+        .get(format!("{base_url}/v1/me"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_admin_tokens_forbidden_without_admin_scope() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // Create non-admin user token
+    let user_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role, plan)
+         VALUES ($1, $2, 'User', 'user', 'free')",
+    )
+    .bind(user_id)
+    .bind(format!("user-{}@example.com", user_id))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let secret = "supersecret";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    let token_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, 'user-key', $3, $4::text[])",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind(&hash)
+    .bind(vec!["assessment.read".to_string()])
+    .execute(&pool)
+    .await
+    .unwrap();
+    let user_auth = format!("{token_id}_{secret}");
+
+    let fake_token_id = Uuid::now_v7();
+
+    // Test GET /v1/admin/tokens with non-admin token -> 403
+    let res = client
+        .get(format!("{base_url}/v1/admin/tokens"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // Test DELETE /v1/admin/tokens/{id} with non-admin token -> 403
+    let res = client
+        .delete(format!("{base_url}/v1/admin/tokens/{fake_token_id}"))
+        .header("Authorization", format!("Bearer {user_auth}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // Test without any token -> 401
+    let res = client
+        .get(format!("{base_url}/v1/admin/tokens"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    let res = client
+        .delete(format!("{base_url}/v1/admin/tokens/{fake_token_id}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
