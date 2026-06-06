@@ -410,8 +410,8 @@ export default function ExplorePage() {
                                   >
                                     {starting === item.id
                                       ? "Starting…"
-                                      : isGraded
-                                        ? "Start exam"
+                                      : item.completed
+                                        ? "Re-take"
                                         : "Start"}
                                   </Button>
                                 </>

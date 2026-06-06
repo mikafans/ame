@@ -95,14 +95,23 @@ pub async fn explore(
     // Build dynamic query
     // Strict isolation: only view own items (by owner_id)
     let mut sql = String::from(
-        "SELECT id, title, status, mode, objectives, created_at
-         FROM tb_assessments
+        "SELECT id, title, status, mode, objectives, created_at, \
+         ( \
+             SELECT EXISTS( \
+                 SELECT 1 FROM tb_sessions s \
+                 WHERE s.assessment_id = tb_assessments.id AND s.user_id = $2 \
+                   AND s.status = 'finished' \
+             ) \
+         ) AS completed \
+         FROM tb_assessments \
          WHERE owner_id = $1 AND deleted_at IS NULL",
     );
     let mut args = PgArguments::default();
     args.add(uid)
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
-    let mut param_idx = 2; // $1 is already used for owner_id
+    args.add(auth.user.id)
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+    let mut param_idx = 3; // $1 is owner_id, $2 is user_id
 
     if let Some(status) = q.kind {
         sql.push_str(&format!(" AND status = ${}", param_idx));
@@ -176,6 +185,7 @@ pub async fn explore(
                 "mode": row.get::<String, _>("mode"),
                 "tags": row.get::<Vec<String>, _>("objectives"),
                 "createdAt": created_at.format(&time::format_description::well_known::Rfc3339).unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string()),
+                "completed": row.get::<bool, _>("completed"),
             })
         })
         .collect();

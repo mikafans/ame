@@ -24,6 +24,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import Checkbox from "@mui/material/Checkbox";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
+import Alert from "@mui/material/Alert";
 
 // Icons
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
@@ -34,16 +35,25 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
+import { useAuth } from "@/hooks/useAuth";
 import { PageShell } from "@/components/PageShell";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { CLIENT_PY } from "@/generated/clientSource";
 
+interface AgentTokenSummary {
+  id: string;
+  name: string;
+  scopes: string[];
+  createdAt: string;
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+}
+
 interface AgentSummary {
   id: string;
   label: string;
-  scopes: string[];
+  tokens: AgentTokenSummary[];
   createdAt: string;
-  lastUsedAt?: string | null;
   focusTags: string[];
   currentGoal?: string | null;
   nextTarget?: string | null;
@@ -104,11 +114,14 @@ const SAMPLE_IMPORT = JSON.stringify(
 export default function AgentPage() {
   const [tab, setTab] = useState<TabId>("keys");
 
-  // Origin for copy-correct usage hints (set after mount — avoids SSR `window`,
+  // API URL for copy-correct usage hints (set after mount — avoids SSR `window`,
   // which would crash prerender; falls back to localhost until hydrated).
-  const [origin, setOrigin] = useState("");
+  const [apiUrl, setApiUrl] = useState("");
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setApiUrl(
+      process.env.NEXT_PUBLIC_API_URL ||
+        `http://${window.location.hostname}:28080`,
+    );
   }, []);
 
   return (
@@ -206,7 +219,7 @@ export default function AgentPage() {
           <CodeBlock
             label="cURL request"
             lines={[
-              `curl ${origin || "http://localhost:28080"}/v1/assessments \\`,
+              `curl ${apiUrl || "http://localhost:28080"}/v1/assessments \\`,
               `  -H "Authorization: Bearer <your_agent_key>" \\`,
               `  -H "Content-Type: application/json"`,
               ``,
@@ -369,11 +382,13 @@ function CodeBlock({
 // ── API Keys / Agents tab ──────────────────────────────────────────────────────
 
 function KeysTab() {
+  const { user } = useAuth();
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Create agent form state
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [newAgentLabel, setNewAgentLabel] = useState("");
   const [newAgentScopes, setNewAgentScopes] = useState<string[]>([
     "assessment.read",
@@ -392,6 +407,26 @@ function KeysTab() {
   // Revoke agent modal state
   const [revokeAgent, setRevokeAgent] = useState<AgentSummary | null>(null);
   const [revoking, setRevoking] = useState(false);
+
+  // Token management state
+  const [createTokenAgent, setCreateTokenAgent] = useState<AgentSummary | null>(
+    null,
+  );
+  const [newTokenName, setNewTokenName] = useState("");
+  const [newTokenScopes, setNewTokenScopes] = useState<string[]>([
+    "assessment.read",
+  ]);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [generateTokenError, setGenerateTokenError] = useState<string | null>(
+    null,
+  );
+  const [revokeTokenAgentId, setRevokeTokenAgentId] = useState<string | null>(
+    null,
+  );
+  const [revokeToken, setRevokeToken] = useState<AgentTokenSummary | null>(
+    null,
+  );
+  const [revokingToken, setRevokingToken] = useState(false);
 
   // Origin for copy-correct usage hints (set after mount — avoids SSR `window`).
   const [origin, setOrigin] = useState("");
@@ -450,6 +485,15 @@ function KeysTab() {
       label: "plan.write",
       desc: "Generate and configure study plans",
     },
+    ...(user?.role === "admin"
+      ? [
+          {
+            value: "admin",
+            label: "admin",
+            desc: "Full administrative access",
+          },
+        ]
+      : []),
   ];
 
   function loadAgents() {
@@ -472,8 +516,9 @@ function KeysTab() {
   async function createAgent() {
     if (!newAgentLabel.trim()) return;
     setCreating(true);
+    setCreateError(null);
     try {
-      const { data } = await api.POST("/v1/me/agents", {
+      const { data, error } = await api.POST("/v1/me/agents", {
         body: {
           label: newAgentLabel,
           scopes: newAgentScopes,
@@ -483,7 +528,9 @@ function KeysTab() {
             .filter(Boolean),
         },
       });
-      if (data?.apiKey) {
+      if (error) {
+        setCreateError((error as any)?.message || "Failed to create agent.");
+      } else if (data?.apiKey) {
         setCreatedSecret(data.apiKey);
         setNewAgentLabel("");
         setNewAgentFocus("");
@@ -492,6 +539,7 @@ function KeysTab() {
       }
     } catch (err) {
       console.error(err);
+      setCreateError("An unexpected error occurred.");
     } finally {
       setCreating(false);
     }
@@ -546,8 +594,68 @@ function KeysTab() {
     }
   }
 
+  async function handleGenerateToken() {
+    if (!createTokenAgent || !newTokenName.trim()) return;
+    setGeneratingToken(true);
+    setGenerateTokenError(null);
+    try {
+      const { data, error } = await api.POST("/v1/me/agents/{id}/tokens", {
+        params: { path: { id: createTokenAgent.id } },
+        body: {
+          name: newTokenName,
+          scopes: newTokenScopes,
+        },
+      });
+      if (error) {
+        setGenerateTokenError(
+          (error as any)?.error?.message ||
+            (error as any)?.message ||
+            "Failed to generate token.",
+        );
+      } else if (data?.secret) {
+        setCreatedSecret(data.secret);
+        setCreateTokenAgent(null);
+        setNewTokenName("");
+        setNewTokenScopes(["assessment.read"]);
+        loadAgents();
+      }
+    } catch (err) {
+      console.error(err);
+      setGenerateTokenError("An unexpected error occurred.");
+    } finally {
+      setGeneratingToken(false);
+    }
+  }
+
+  async function handleConfirmRevokeToken() {
+    if (!revokeToken || !revokeTokenAgentId) return;
+    setRevokingToken(true);
+    try {
+      const res = await api.DELETE("/v1/me/keys/{id}", {
+        params: {
+          path: { id: revokeToken.id },
+        },
+      });
+      if (res.response.ok) {
+        setRevokeToken(null);
+        setRevokeTokenAgentId(null);
+        loadAgents();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRevokingToken(false);
+    }
+  }
+
   const handleToggleScope = (scope: string) => {
     setNewAgentScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
+    );
+  };
+
+  const handleToggleTokenScope = (scope: string) => {
+    setNewTokenScopes((prev) =>
       prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
     );
   };
@@ -646,10 +754,7 @@ function KeysTab() {
                           color="text.secondary"
                           sx={{ display: "block", mt: 0.25 }}
                         >
-                          Created on {formatDate(agent.createdAt)} · Last used{" "}
-                          {agent.lastUsedAt
-                            ? formatDate(agent.lastUsedAt)
-                            : "never"}
+                          Created on {formatDate(agent.createdAt)}
                         </Typography>
                       </Box>
                     </Box>
@@ -675,25 +780,104 @@ function KeysTab() {
                     </Stack>
                   </Box>
 
-                  {/* Scopes */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 0.75,
-                      mb: 1.5,
-                    }}
-                  >
-                    {agent.scopes.map((scope) => (
-                      <Chip
-                        key={scope}
-                        label={scope}
+                  {/* Tokens */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ fontWeight: 600, color: "text.secondary" }}
+                      >
+                        ACTIVE TOKENS
+                      </Typography>
+                      <Button
                         size="small"
-                        color={scope === "admin" ? "warning" : "default"}
                         variant="outlined"
-                        sx={{ fontSize: 11, height: 22 }}
-                      />
-                    ))}
+                        onClick={() => setCreateTokenAgent(agent)}
+                        sx={{ fontSize: 11, textTransform: "none", py: 0 }}
+                      >
+                        Generate Token
+                      </Button>
+                    </Box>
+                    {agent.tokens.length === 0 ? (
+                      <Typography variant="caption" color="text.secondary">
+                        No active tokens
+                      </Typography>
+                    ) : (
+                      agent.tokens.map((token) => (
+                        <Paper
+                          key={token.id}
+                          variant="outlined"
+                          sx={{ p: 1.5, mb: 1, borderRadius: 1 }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              mb: 1,
+                            }}
+                          >
+                            <Box>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 600 }}
+                              >
+                                {token.name}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: "block" }}
+                              >
+                                Created: {formatDate(token.createdAt)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                                {token.expiresAt ? `Expires: ${formatDate(token.expiresAt)}` : "No expiry"}
+                              </Typography>
+                            </Box>
+                            <Tooltip title="Revoke Token">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => {
+                                  setRevokeTokenAgentId(agent.id);
+                                  setRevokeToken(token);
+                                }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 0.75,
+                            }}
+                          >
+                            {token.scopes.map((scope) => (
+                              <Chip
+                                key={scope}
+                                label={scope}
+                                size="small"
+                                color={
+                                  scope === "admin" ? "warning" : "default"
+                                }
+                                variant="outlined"
+                                sx={{ fontSize: 11, height: 22 }}
+                              />
+                            ))}
+                          </Box>
+                        </Paper>
+                      ))
+                    )}
                   </Box>
 
                   {/* Focus Tags */}
@@ -839,6 +1023,12 @@ function KeysTab() {
             Assign a label, target focus tags, and specific capability scopes to
             authorize an autonomous sub-account.
           </Typography>
+
+          {createError && (
+            <Alert severity="error" sx={{ mb: 2.5 }}>
+              {createError}
+            </Alert>
+          )}
 
           <Stack spacing={2.5}>
             <TextField
@@ -1418,7 +1608,7 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
             }}
           >
             <WarningAmberOutlinedIcon color="error" />
-            Revoke Agent Key?
+            Delete Agent?
           </DialogTitle>
           <DialogContent>
             <Typography
@@ -1426,9 +1616,9 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
               color="text.secondary"
               sx={{ lineHeight: 1.6 }}
             >
-              Are you sure you want to revoke programmatic access for **
-              {revokeAgent.label}**? This action is permanent. The agent will
-              lose all access immediately.
+              Are you sure you want to delete the agent **
+              {revokeAgent.label}**? This action is permanent. All active tokens
+              will be revoked and the agent's memory will be lost.
             </Typography>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -1446,7 +1636,166 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
               onClick={handleConfirmRevoke}
               disabled={revoking}
             >
-              {revoking ? <CircularProgress size={16} /> : "Revoke Access"}
+              {revoking ? <CircularProgress size={16} /> : "Delete Agent"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Generate token dialog */}
+      {createTokenAgent && (
+        <Dialog
+          open={!!createTokenAgent}
+          onClose={() => setCreateTokenAgent(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 600 }}>Generate API Token</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Generate a new API token for **{createTokenAgent.label}**. Tokens
+              automatically expire after 7 days.
+            </Typography>
+
+            {generateTokenError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {generateTokenError}
+              </Alert>
+            )}
+
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <TextField
+                label="Token Name"
+                placeholder="e.g. CI workflow"
+                size="small"
+                value={newTokenName}
+                onChange={(e) => setNewTokenName(e.target.value)}
+                fullWidth
+                required
+              />
+              <Box>
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 600, display: "block", mb: 1 }}
+                >
+                  Token Scopes
+                </Typography>
+                <FormGroup
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 1,
+                  }}
+                >
+                  {ALL_SCOPES.map((scope) => (
+                    <FormControlLabel
+                      key={scope.value}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={newTokenScopes.includes(scope.value)}
+                          onChange={() => handleToggleTokenScope(scope.value)}
+                          color={
+                            scope.value === "admin" ? "warning" : "primary"
+                          }
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {scope.label}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block", lineHeight: 1.2 }}
+                          >
+                            {scope.desc}
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ alignItems: "flex-start", m: 0 }}
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setCreateTokenAgent(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleGenerateToken}
+              disabled={generatingToken || !newTokenName.trim()}
+            >
+              {generatingToken ? (
+                <CircularProgress size={16} />
+              ) : (
+                "Generate Token"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Revoke token dialog */}
+      {revokeToken && (
+        <Dialog
+          open={!!revokeToken}
+          onClose={() => {
+            setRevokeToken(null);
+            setRevokeTokenAgentId(null);
+          }}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              display: "flex",
+              gap: 1,
+              alignItems: "center",
+            }}
+          >
+            <WarningAmberOutlinedIcon color="error" />
+            Revoke Token?
+          </DialogTitle>
+          <DialogContent>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ lineHeight: 1.6 }}
+            >
+              Are you sure you want to revoke the token **{revokeToken.name}**?
+              Any API requests using this token will immediately begin to fail.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setRevokeToken(null);
+                setRevokeTokenAgentId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              color="error"
+              onClick={handleConfirmRevokeToken}
+              disabled={revokingToken}
+            >
+              {revokingToken ? <CircularProgress size={16} /> : "Revoke Token"}
             </Button>
           </DialogActions>
         </Dialog>

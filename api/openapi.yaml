@@ -952,6 +952,38 @@ paths:
           description: No such agent
       security:
       - bearer: []
+  /v1/me/agents/{id}/tokens:
+    post:
+      tags:
+      - me
+      operationId: create_agent_token
+      parameters:
+      - name: id
+        in: path
+        description: Agent id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentTokenBody'
+        required: true
+      responses:
+        '201':
+          description: Token created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateKeyResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such agent
+      security:
+      - bearer: []
   /v1/me/attempts:
     get:
       tags:
@@ -1013,6 +1045,91 @@ paths:
                 $ref: '#/components/schemas/CohortStatsResponse'
         '401':
           description: Unauthorized
+      security:
+      - bearer: []
+  /v1/me/keys:
+    get:
+      tags:
+      - me
+      operationId: list_keys
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListKeysResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+    post:
+      tags:
+      - me
+      operationId: create_key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKeyBody'
+        required: true
+      responses:
+        '201':
+          description: Key created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateKeyResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /v1/me/keys/{id}:
+    delete:
+      tags:
+      - me
+      operationId: revoke_key
+      parameters:
+      - name: id
+        in: path
+        description: Key id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Key revoked
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such key
+      security:
+      - bearer: []
+  /v1/me/keys/{id}/rotate:
+    post:
+      tags:
+      - me
+      operationId: rotate_key
+      parameters:
+      - name: id
+        in: path
+        description: Key id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Key rotated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotateKeyResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: No such key
       security:
       - bearer: []
   /v1/plans:
@@ -1671,8 +1788,8 @@ components:
       required:
       - id
       - label
-      - scopes
       - focusTags
+      - tokens
       - createdAt
       properties:
         createdAt:
@@ -1687,11 +1804,36 @@ components:
           format: uuid
         label:
           type: string
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentTokenSummary'
+    AgentTokenSummary:
+      type: object
+      required:
+      - id
+      - name
+      - scopes
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
         lastUsedAt:
           type:
           - string
           - 'null'
           format: date-time
+        name:
+          type: string
         scopes:
           type: array
           items:
@@ -2358,6 +2500,18 @@ components:
         id:
           type: string
           format: uuid
+    CreateAgentTokenBody:
+      type: object
+      required:
+      - name
+      - scopes
+      properties:
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
     CreateAssessmentRequest:
       type: object
       required:
@@ -2407,6 +2561,30 @@ components:
           - 'null'
           format: int32
         title:
+          type: string
+    CreateKeyBody:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        scopes:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+    CreateKeyResponse:
+      type: object
+      required:
+      - id
+      - secret
+      properties:
+        id:
+          type: string
+          format: uuid
+        secret:
           type: string
     CreatePlanBody:
       type: object
@@ -2730,6 +2908,26 @@ components:
         questionId:
           type: string
           format: uuid
+    KeySummary:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        lastUsedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        name:
+          type: string
     ListAgentsResponse:
       type: object
       required:
@@ -2778,6 +2976,15 @@ components:
         total:
           type: integer
           format: int64
+    ListKeysResponse:
+      type: object
+      required:
+      - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeySummary'
     ListMySessionsResponse:
       type: object
       required:
@@ -3195,6 +3402,13 @@ components:
       - user
       - admin
       - agent
+    RotateKeyResponse:
+      type: object
+      required:
+      - secret
+      properties:
+        secret:
+          type: string
     RunResponse:
       type: object
       required:
@@ -3530,6 +3744,10 @@ components:
     UpdateAgentBody:
       type: object
       properties:
+        currentGoal:
+          type:
+          - string
+          - 'null'
         focusTags:
           type:
           - array
@@ -3540,12 +3758,10 @@ components:
           type:
           - string
           - 'null'
-        scopes:
+        nextTarget:
           type:
-          - array
+          - string
           - 'null'
-          items:
-            type: string
     UpdateAssessmentRequest:
       type: object
       properties:
