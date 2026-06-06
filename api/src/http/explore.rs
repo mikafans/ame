@@ -247,10 +247,12 @@ pub async fn explore_facets(
     let accounts = get_accessible_accounts(pool, uid).await?;
 
     // 1. Get counts grouped by mode
+    // Facets must mirror the list (which is active-only): counting drafts or
+    // archived assessments here over-reports vs. what Explore actually shows.
     let count_rows = sqlx::query(
         "SELECT mode, count(*) as cnt
          FROM tb_assessments
-         WHERE created_by = ANY($1) AND deleted_at IS NULL
+         WHERE created_by = ANY($1) AND deleted_at IS NULL AND status = 'active'
          GROUP BY mode",
     )
     .bind(&accounts)
@@ -274,7 +276,7 @@ pub async fn explore_facets(
     let tag_rows = sqlx::query(
         "SELECT DISTINCT unnest(objectives) AS t
          FROM tb_assessments
-         WHERE created_by = ANY($1) AND deleted_at IS NULL
+         WHERE created_by = ANY($1) AND deleted_at IS NULL AND status = 'active'
          ORDER BY t
          LIMIT 200",
     )
