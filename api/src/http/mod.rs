@@ -36,6 +36,39 @@ pub async fn auth_extract_middleware(
     next.run(req).await
 }
 
+/// Confines agent-role tokens to the single run-door. Runs AFTER
+/// auth_extract_middleware (so the cached AuthenticatedUser is present) and
+/// rejects any agent-role request outside the allowlist with 403.
+pub async fn agent_guard_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use crate::auth::extractor::AuthenticatedUser;
+    use crate::domain::user::Role;
+    use axum::response::IntoResponse;
+    if let Some(auth) = req.extensions().get::<AuthenticatedUser>()
+        && auth.user.role == Role::Agent
+    {
+        let method = req.method();
+        let path = req.uri().path();
+        let allowed = matches!(
+            (method.as_str(), path),
+            ("POST", "/v1/agents/run")
+                | ("GET", "/v1/agents/activity")
+                | ("GET", "/llms.txt")
+                | ("GET", "/skill.json")
+                | ("GET", "/openapi.yaml")
+        );
+        if !allowed {
+            return crate::domain::error::ApiError::Forbidden(std::borrow::Cow::Borrowed(
+                "agents must use POST /v1/agents/run",
+            ))
+            .into_response();
+        }
+    }
+    next.run(req).await
+}
+
 pub mod activity;
 pub mod admin;
 pub mod agents;
@@ -138,6 +171,7 @@ pub fn router(pool: PgPool) -> Router {
             state.clone(),
             crate::ratelimit::rate_limit_middleware,
         ))
+        .layer(middleware::from_fn(agent_guard_middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,

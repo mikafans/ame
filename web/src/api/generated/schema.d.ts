@@ -785,6 +785,8 @@ export interface components {
             replayed: boolean;
         };
         ApiError: "Unauthorized" | {
+            Forbidden: string;
+        } | {
             ScopeRequired: string;
         } | {
             NotFound: {
