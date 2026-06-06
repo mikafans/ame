@@ -1472,6 +1472,7 @@ export interface components {
             /** Format: date-time */
             lastUsedAt?: string | null;
             name: string;
+            ownerDisplayName?: string | null;
             ownerEmail?: string | null;
             /** Format: uuid */
             ownerId: string;
@@ -1479,6 +1480,7 @@ export interface components {
             /** Format: date-time */
             revokedAt?: string | null;
             scopes: string[];
+            status: string;
         };
         UpdateAgentBody: {
             focusTags?: string[] | null;

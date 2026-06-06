@@ -3482,6 +3482,7 @@ components:
       - name
       - ownerId
       - ownerRole
+      - status
       - scopes
       - expiresAt
       - createdAt
@@ -3502,6 +3503,10 @@ components:
           format: date-time
         name:
           type: string
+        ownerDisplayName:
+          type:
+          - string
+          - 'null'
         ownerEmail:
           type:
           - string
@@ -3520,6 +3525,8 @@ components:
           type: array
           items:
             type: string
+        status:
+          type: string
     UpdateAgentBody:
       type: object
       properties:

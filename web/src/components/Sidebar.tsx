@@ -28,6 +28,7 @@ import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { Logo } from "@/components/Logo";
@@ -61,6 +62,7 @@ const ICON_MAP: Record<string, React.ReactElement> = {
   "admin-dashboard": <ShieldOutlinedIcon fontSize="small" />,
   "admin-users": <PeopleOutlinedIcon fontSize="small" />,
   "admin-assessments": <AssessmentOutlinedIcon fontSize="small" />,
+  "admin-tokens": <VpnKeyOutlinedIcon fontSize="small" />,
   "admin-audit": <HistoryOutlinedIcon fontSize="small" />,
   "admin-health": <MonitorHeartOutlinedIcon fontSize="small" />,
 };
@@ -104,6 +106,12 @@ export function Sidebar({
             id: "admin-assessments",
             label: "Manage Assessments",
             icon: "admin-assessments",
+            section: "Admin",
+          },
+          {
+            id: "admin-tokens",
+            label: "API Tokens",
+            icon: "admin-tokens",
             section: "Admin",
           },
           {
