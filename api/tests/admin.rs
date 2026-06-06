@@ -938,14 +938,15 @@ async fn test_admin_assessments_moderation() {
     // 2. Seed an assessment
     let assessment_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, objectives)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, owner_id, objectives)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(assessment_id)
     .bind("Test Assessment")
     .bind("A test assessment for moderation")
     .bind("practice")
     .bind("active")
+    .bind(user_id)
     .bind(user_id)
     .bind(vec!["objective1".to_string(), "objective2".to_string()])
     .execute(&pool)
@@ -1026,14 +1027,15 @@ async fn test_admin_assessments_moderation() {
     // 9. Verify cascade: seed a session referencing the assessment, then delete
     let assessment2_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, objectives)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, owner_id, objectives)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(assessment2_id)
     .bind("Assessment with Session")
     .bind(None::<String>)
     .bind("practice")
     .bind("active")
+    .bind(user_id)
     .bind(user_id)
     .bind(vec![] as Vec<String>)
     .execute(&pool)
@@ -1147,14 +1149,15 @@ async fn test_admin_assessment_soft_delete() {
 
     let assessment_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, objectives)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO tb_assessments (id, title, description, mode, status, created_by, owner_id, objectives)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(assessment_id)
     .bind("Test Assessment")
     .bind("A test assessment")
     .bind("practice")
     .bind("active")
+    .bind(user_id)
     .bind(user_id)
     .bind(vec![] as Vec<String>)
     .execute(&pool)

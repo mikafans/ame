@@ -78,17 +78,15 @@ pub async fn assessment_stats(
     Query(params): Query<AssessmentStatsParams>,
 ) -> Result<Json<AssessmentStatsResponse>, ApiError> {
     // Verify assessment exists and is owner-scoped
-    let exists: bool =
-        sqlx::query_scalar(
-            "SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1 \
-             AND (created_by = $2 \
-                  OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2)))"
-        )
-        .bind(id)
-        .bind(user.0.owner_id())
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+    let exists: bool = sqlx::query_scalar(
+        "SELECT exists(SELECT 1 FROM tb_assessments WHERE id = $1 \
+             AND owner_id = $2)",
+    )
+    .bind(id)
+    .bind(user.0.owner_id())
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
     if !exists {
         return Err(ApiError::NotFound {
             resource: "assessment",
@@ -386,7 +384,7 @@ pub async fn me_stats(
     .map_err(internal)?;
 
     let agent_curated_assessments: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND (created_by = $1 OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $1)) AND deleted_at IS NULL"
+        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND owner_id = $1 AND deleted_at IS NULL"
     )
     .bind(uid)
     .fetch_one(&state.pool)
