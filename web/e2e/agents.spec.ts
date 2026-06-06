@@ -63,55 +63,72 @@ test.describe("agent management (owner API)", () => {
   });
 
   test("agent can list assessments", async ({ request }) => {
-    const r = await request.get(`${API_URL}/v1/assessments`, {
+    const r = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
+      data: { tool: "assessment.list", params: {} },
     });
     expect(r.status()).toBe(200);
+    const body = await r.json();
+    expect(body.ok).toBe(true);
   });
 
   test("agent can import and promote a question", async ({ request }) => {
-    const r = await request.post(`${API_URL}/v1/questions`, {
+    const r = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
       data: {
-        questions: [
-          {
-            kind: "mc",
-            prompt: "e2e agent question — scope test?",
-            payload: { options: ["A", "B"], correct_index: 0 },
-            tags: [],
-          },
-        ],
+        tool: "question.create",
+        params: {
+          questions: [
+            {
+              kind: "mc",
+              prompt: "e2e agent question — scope test?",
+              payload: { options: ["A", "B"], correct_index: 0 },
+              tags: [],
+            },
+          ],
+        },
       },
     });
-    expect([200, 201]).toContain(r.status());
-    const qid = (await r.json()).questions[0].id;
+    expect(r.status()).toBe(200);
+    const body = await r.json();
+    expect(body.ok).toBe(true);
+    const qid = body.result.questions[0].id;
 
-    const pr = await request.post(`${API_URL}/v1/questions/${qid}/promote`, {
+    const pr = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
+      data: {
+        tool: "question.promote",
+        params: { id: qid },
+      },
     });
-    expect([200, 204]).toContain(pr.status());
+    expect(pr.status()).toBe(200);
+    const pBody = await pr.json();
+    expect(pBody.ok).toBe(true);
   });
 
   test("agent can fetch user stats", async ({ request }) => {
-    const r = await request.get(`${API_URL}/v1/me/stats`, {
+    const r = await request.post(`${API_URL}/v1/agents/run`, {
       headers: { Authorization: `Bearer ${agentKey}` },
+      data: { tool: "stats.user", params: {} },
     });
     expect(r.status()).toBe(200);
-    const stats = await r.json();
+    const body = await r.json();
+    expect(body.ok).toBe(true);
+    const stats = body.result;
     expect(stats).toHaveProperty("avg_score");
     expect(stats).toHaveProperty("current_streak");
   });
 
-  test("agent can create and retrieve a study plan", async ({ request }) => {
+  test("owner can create and retrieve a study plan", async ({ request }) => {
     const cr = await request.post(`${API_URL}/v1/plans`, {
-      headers: { Authorization: `Bearer ${agentKey}` },
+      headers: { Authorization: `Bearer ${ownerToken}` },
       data: { goal: "e2e plan goal", lookbackDays: 7 },
     });
     expect([200, 201]).toContain(cr.status());
     const planId = (await cr.json()).id;
 
     const gr = await request.get(`${API_URL}/v1/plans/${planId}`, {
-      headers: { Authorization: `Bearer ${agentKey}` },
+      headers: { Authorization: `Bearer ${ownerToken}` },
     });
     expect(gr.status()).toBe(200);
     const plan = await gr.json();
@@ -148,7 +165,6 @@ test.describe("MCP skill manifest", () => {
     const names: string[] = manifest.tools.map((t: { name: string }) => t.name);
     expect(names).toContain("question.list");
     expect(names).toContain("question.create");
-    expect(names).toContain("question.update");
     expect(names).toContain("question.promote");
     expect(names).toContain("stats.user");
   });

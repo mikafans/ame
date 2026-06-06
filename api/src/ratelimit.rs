@@ -18,24 +18,33 @@ fn get_lua_script() -> &'static redis::Script {
             local cost = tonumber(ARGV[3])
             local now = tonumber(ARGV[4])
 
-            local state = redis.call('HMGET', key, 'tokens', 'last_updated')
+            local state = redis.call('HMGET', key, 'tokens', 'last_updated', 'burst')
             local tokens = tonumber(state[1])
             local last_updated = tonumber(state[2])
+            local old_burst = tonumber(state[3])
 
             if not tokens then
                 tokens = burst
                 last_updated = now
             else
-                local elapsed = math.max(0, now - last_updated)
-                tokens = math.min(burst, tokens + elapsed * rate)
+                if old_burst and old_burst ~= burst then
+                    tokens = burst
+                    last_updated = now
+                else
+                    local elapsed = math.max(0, now - last_updated)
+                    tokens = math.min(burst, tokens + elapsed * rate)
+                end
             end
 
             if tokens >= cost then
                 tokens = tokens - cost
-                redis.call('HMSET', key, 'tokens', tokens, 'last_updated', now)
+                redis.call('HMSET', key, 'tokens', tokens, 'last_updated', now, 'burst', burst)
                 redis.call('EXPIRE', key, 86400)
                 return 1
             else
+                if old_burst and old_burst ~= burst then
+                    redis.call('HMSET', key, 'tokens', tokens, 'last_updated', now, 'burst', burst)
+                end
                 return 0
             end
         "#,
@@ -210,6 +219,10 @@ pub async fn rate_limit_middleware(
     {
         Ok(next.run(req).await)
     } else {
+        println!(
+            "RATE LIMIT REJECTION: key={}, burst={}, refill_rate={}, cost={}",
+            key, burst, refill_rate, cost
+        );
         metrics::counter!("ratelimit_rejection_total").increment(1);
         Err(crate::domain::error::ApiError::TooManyRequests)
     }

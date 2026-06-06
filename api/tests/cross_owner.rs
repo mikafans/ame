@@ -61,7 +61,7 @@ async fn test_cross_owner_agent_visibility() {
     .unwrap();
 
     let agent_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, 'Agent', 'agent')")
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, 'Agent')")
         .bind(agent_id)
         .bind(owner_id)
         .execute(&pool)
@@ -72,7 +72,7 @@ async fn test_cross_owner_agent_visibility() {
     let token_id = Uuid::now_v7();
     let secret = "agent-secret";
     let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
         .bind(token_id)
         .bind(agent_id)
         .bind("agent-key")
@@ -121,8 +121,8 @@ async fn test_cross_owner_agent_visibility() {
     // question (see build_assessment_plan), so give it one and activate it. It stays
     // private — the access checks below are what we're exercising.
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
-         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $3) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by, agent_id) \
+         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $1, $3) RETURNING id",
     )
     .bind(owner_id)
     .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))

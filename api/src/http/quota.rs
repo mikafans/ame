@@ -89,26 +89,26 @@ pub async fn check_quota(
 
     let usage: i64 = match kind {
         QuotaKind::AgentCreation => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent' AND deactivated_at IS NULL",
+            "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL",
         )
         .bind(owner_id)
         .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?,
         QuotaKind::Assessment => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_assessments WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1) AND deleted_at IS NULL",
+            "SELECT COUNT(*) FROM tb_assessments WHERE owner_id = $1 AND deleted_at IS NULL",
         )
         .bind(owner_id)
         .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?,
-        QuotaKind::Question => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_questions WHERE owner_id = $1",
-        )
-        .bind(owner_id)
-        .fetch_one(&mut *conn)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?,
+        QuotaKind::Question => {
+            sqlx::query_scalar("SELECT COUNT(*) FROM tb_questions WHERE owner_id = $1")
+                .bind(owner_id)
+                .fetch_one(&mut *conn)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?
+        }
     };
 
     if usage + add_count > limit {

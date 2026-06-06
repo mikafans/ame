@@ -126,7 +126,7 @@ async fn create_questions_batch_inserts_and_links_tags() {
         mc_insert("Q3", &[]),
     ];
     let mut conn = pool.acquire().await.unwrap();
-    let created = q_repo::create_questions(&mut conn, user_id, user_id, batch)
+    let created = q_repo::create_questions(&mut conn, user_id, user_id, None, batch)
         .await
         .unwrap();
 
@@ -182,7 +182,7 @@ async fn create_questions_rejects_oversized_batch() {
         .map(|i| mc_insert(&format!("over{}", i), &[]))
         .collect();
     let mut conn = pool.acquire().await.unwrap();
-    let err = q_repo::create_questions(&mut conn, user_id, user_id, batch)
+    let err = q_repo::create_questions(&mut conn, user_id, user_id, None, batch)
         .await
         .unwrap_err();
 
@@ -204,11 +204,17 @@ async fn update_live_question_bumps_version_and_writes_history() {
     let user_id = make_user(&pool).await;
 
     let mut conn = pool.acquire().await.unwrap();
-    let q = q_repo::create_questions(&mut conn, user_id, user_id, vec![mc_insert("live-q", &[])])
-        .await
-        .unwrap()
-        .pop()
-        .unwrap();
+    let q = q_repo::create_questions(
+        &mut conn,
+        user_id,
+        user_id,
+        None,
+        vec![mc_insert("live-q", &[])],
+    )
+    .await
+    .unwrap()
+    .pop()
+    .unwrap();
 
     q_repo::promote_question(&mut conn, q.id).await.unwrap();
 
@@ -244,11 +250,17 @@ async fn update_draft_question_does_not_bump_version() {
     let user_id = make_user(&pool).await;
 
     let mut conn = pool.acquire().await.unwrap();
-    let q = q_repo::create_questions(&mut conn, user_id, user_id, vec![mc_insert("draft-q", &[])])
-        .await
-        .unwrap()
-        .pop()
-        .unwrap();
+    let q = q_repo::create_questions(
+        &mut conn,
+        user_id,
+        user_id,
+        None,
+        vec![mc_insert("draft-q", &[])],
+    )
+    .await
+    .unwrap()
+    .pop()
+    .unwrap();
 
     let patch = QuestionPatch {
         prompt: Some("draft-q updated".into()),
@@ -280,6 +292,7 @@ async fn cannot_edit_archived_question() {
         &mut conn,
         user_id,
         user_id,
+        None,
         vec![mc_insert("archive-me", &[])],
     )
     .await

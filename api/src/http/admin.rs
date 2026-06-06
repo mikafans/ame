@@ -253,7 +253,9 @@ pub async fn list_tokens(
 
     // 1. Get total count
     let mut count_qb = sqlx::QueryBuilder::new(
-        "SELECT COUNT(*) FROM tb_api_tokens t JOIN tb_users u ON u.id = t.user_id",
+        "SELECT COUNT(*) FROM tb_api_tokens t \
+         LEFT JOIN tb_users u ON u.id = t.user_id \
+         LEFT JOIN tb_agents a ON a.id = t.agent_id",
     );
     let mut has_where = false;
 
@@ -269,9 +271,11 @@ pub async fn list_tokens(
 
     if let Some(role) = query.role.as_deref().filter(|s| !s.trim().is_empty()) {
         if has_where {
-            count_qb.push(" AND u.role = ");
+            count_qb
+                .push(" AND (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
         } else {
-            count_qb.push(" WHERE u.role = ");
+            count_qb
+                .push(" WHERE (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
             has_where = true;
         }
         count_qb.push_bind(role);
@@ -279,9 +283,9 @@ pub async fn list_tokens(
 
     if let Some(owner_id) = query.owner_id {
         if has_where {
-            count_qb.push(" AND t.user_id = ");
+            count_qb.push(" AND COALESCE(t.user_id, t.agent_id) = ");
         } else {
-            count_qb.push(" WHERE t.user_id = ");
+            count_qb.push(" WHERE COALESCE(t.user_id, t.agent_id) = ");
             has_where = true;
         }
         count_qb.push_bind(owner_id);
@@ -316,9 +320,13 @@ pub async fn list_tokens(
 
     // 2. Get paginated tokens
     let mut qb = sqlx::QueryBuilder::new(
-        "SELECT t.id, t.name, t.user_id, u.email, u.role, t.scopes, t.last_used_at, t.revoked_at, t.expires_at, t.created_at
-         FROM tb_api_tokens t
-         JOIN tb_users u ON u.id = t.user_id",
+        "SELECT t.id, t.name, COALESCE(t.user_id, t.agent_id) as user_id, \
+         CASE WHEN t.agent_id IS NOT NULL THEN NULL ELSE u.email END as email, \
+         CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END as role, \
+         t.scopes, t.last_used_at, t.revoked_at, t.expires_at, t.created_at \
+         FROM tb_api_tokens t \
+         LEFT JOIN tb_users u ON u.id = t.user_id \
+         LEFT JOIN tb_agents a ON a.id = t.agent_id",
     );
 
     has_where = false;
@@ -335,9 +343,9 @@ pub async fn list_tokens(
 
     if let Some(role) = query.role.as_deref().filter(|s| !s.trim().is_empty()) {
         if has_where {
-            qb.push(" AND u.role = ");
+            qb.push(" AND (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
         } else {
-            qb.push(" WHERE u.role = ");
+            qb.push(" WHERE (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
             has_where = true;
         }
         qb.push_bind(role);
@@ -345,9 +353,9 @@ pub async fn list_tokens(
 
     if let Some(owner_id) = query.owner_id {
         if has_where {
-            qb.push(" AND t.user_id = ");
+            qb.push(" AND COALESCE(t.user_id, t.agent_id) = ");
         } else {
-            qb.push(" WHERE t.user_id = ");
+            qb.push(" WHERE COALESCE(t.user_id, t.agent_id) = ");
             has_where = true;
         }
         qb.push_bind(owner_id);

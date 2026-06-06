@@ -54,20 +54,18 @@ async fn seed_agent(pool: &PgPool, scopes: &[&str]) -> (Uuid, Uuid, String) {
         .unwrap();
 
     let agent_id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, $3, 'agent')",
-    )
-    .bind(agent_id)
-    .bind(owner_id)
-    .bind("Loop Agent")
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, $3)")
+        .bind(agent_id)
+        .bind(owner_id)
+        .bind("Loop Agent")
+        .execute(pool)
+        .await
+        .unwrap();
 
     let token_id = Uuid::now_v7();
     let secret = "loop-secret-123";
     let scopes: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
+    sqlx::query("INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(agent_id)
         .bind("loop-key")
@@ -136,19 +134,10 @@ async fn test_agent_behavioral_tools() {
     // 2. Create agent linked to owner
     let agent_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, $3, 'agent')",
+        "INSERT INTO tb_agents (id, owner_user_id, label, focus_tags) VALUES ($1, $2, $3, $4)",
     )
     .bind(agent_id)
     .bind(owner_id)
-    .bind("Agent Rust")
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    sqlx::query(
-        "INSERT INTO tb_agent_profiles (agent_user_id, label, focus_tags) VALUES ($1, $2, $3)",
-    )
-    .bind(agent_id)
     .bind("Agent Rust")
     .bind(vec![tag_name.clone()])
     .execute(&pool)
@@ -158,7 +147,7 @@ async fn test_agent_behavioral_tools() {
     let token_id = Uuid::now_v7();
     let secret = "agent-secret-123";
     let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
+    sqlx::query("INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(agent_id)
         .bind("agent-key")
@@ -339,19 +328,17 @@ async fn test_agent_reads_owner_record_via_run() {
 
     // Agent linked to the owner, with a token scoped to read the learning record.
     let agent_id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, $3, 'agent')",
-    )
-    .bind(agent_id)
-    .bind(owner_id)
-    .bind("Reader Agent")
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, $3)")
+        .bind(agent_id)
+        .bind(owner_id)
+        .bind("Reader Agent")
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let token_id = Uuid::now_v7();
     let secret = "reader-secret-123";
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
+    sqlx::query("INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(agent_id)
         .bind("reader-key")
@@ -489,6 +476,7 @@ async fn test_agent_full_authoring_loop_via_run() {
         }),
     )
     .await;
+    println!("DEBUG question.create response: {:#?}", created);
     assert_eq!(created["result"]["created"], 1);
     let question_id = created["result"]["questions"][0]["id"]
         .as_str()

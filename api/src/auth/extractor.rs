@@ -97,13 +97,20 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                 r#"
                 SELECT 
                     t.token_hash, t.scopes, t.revoked_at, t.expires_at,
-                    u.id as user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.owner_user_id,
-                    u.deactivated_at as user_deactivated_at,
+                    COALESCE(t.user_id, t.agent_id) as user_id,
+                    CASE WHEN t.agent_id IS NOT NULL THEN NULL ELSE u.email END as email,
+                    CASE WHEN t.agent_id IS NOT NULL THEN a.label ELSE u.display_name END as display_name,
+                    CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END as role,
+                    CASE WHEN t.agent_id IS NOT NULL THEN COALESCE(o.plan, 'free') ELSE u.plan END as plan,
+                    CASE WHEN t.agent_id IS NOT NULL THEN a.created_at ELSE u.created_at END as created_at,
+                    CASE WHEN t.agent_id IS NOT NULL THEN a.owner_user_id ELSE u.owner_user_id END as owner_user_id,
+                    CASE WHEN t.agent_id IS NOT NULL THEN a.deactivated_at ELSE u.deactivated_at END as user_deactivated_at,
                     o.deactivated_at as owner_deactivated_at,
                     COALESCE(o.plan, u.plan) as owner_plan
                 FROM tb_api_tokens t
-                JOIN tb_users u ON t.user_id = u.id
-                LEFT JOIN tb_users o ON u.owner_user_id = o.id
+                LEFT JOIN tb_users u ON t.user_id = u.id
+                LEFT JOIN tb_agents a ON t.agent_id = a.id
+                LEFT JOIN tb_users o ON COALESCE(u.owner_user_id, a.owner_user_id) = o.id
                 WHERE t.id = $1
                 "#,
             )
@@ -240,8 +247,8 @@ pub async fn invalidate_user_tokens(
     let token_ids: Vec<Uuid> = sqlx::query_scalar(
         r#"
         SELECT t.id FROM tb_api_tokens t
-        JOIN tb_users u ON t.user_id = u.id
-        WHERE u.id = $1 OR u.owner_user_id = $1
+        LEFT JOIN tb_agents a ON t.agent_id = a.id
+        WHERE t.user_id = $1 OR a.owner_user_id = $1
         "#,
     )
     .bind(user_id)
