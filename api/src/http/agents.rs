@@ -16,7 +16,7 @@ use uuid::Uuid;
 use crate::{
     auth::{
         extractor::AuthenticatedUser,
-        scope::{RequireAnyScope, ScopeOneOf},
+        scope::{RequireAnyScope, RequireScope, ScopeOneOf},
     },
     domain::{
         error::{ApiError, FieldError},
@@ -208,8 +208,8 @@ fn build_skill_manifest(strict: bool) -> Value {
             "assessment.list",
             "List assessments accessible to the caller.",
             json!({"type":"object","properties":{"course":{"type":"string"},"status":{"type":"string"},"mode":{"type":"string","enum":["practice","graded"]}}}),
-            "GET",
-            "/v1/assessments",
+            "POST",
+            "/v1/agents/run",
             Some("assessment.read"),
             strict,
         ),
@@ -217,8 +217,8 @@ fn build_skill_manifest(strict: bool) -> Value {
             "assessment.get",
             "Get a single assessment with its questions and sections.",
             id_only(),
-            "GET",
-            "/v1/assessments/{id}",
+            "POST",
+            "/v1/agents/run",
             Some("assessment.read"),
             strict,
         ),
@@ -347,8 +347,8 @@ fn build_skill_manifest(strict: bool) -> Value {
             "question.list",
             "List questions in the bank.",
             json!({"type":"object","properties":{"tag":{"type":"string"},"status":{"type":"string","enum":["draft","live","archived"]},"limit":{"type":"integer"},"offset":{"type":"integer"}}}),
-            "GET",
-            "/v1/questions",
+            "POST",
+            "/v1/agents/run",
             Some("assessment.read"),
             strict,
         ),
@@ -380,11 +380,29 @@ fn build_skill_manifest(strict: bool) -> Value {
             strict,
         ),
         tool(
+            "assessment.stats",
+            "Get per-assessment performance stats (avg, median, distribution, per-question metrics).",
+            id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("stats.read"),
+            strict,
+        ),
+        tool(
+            "activity.list",
+            "List agent activity log.",
+            json!({"type":"object","properties":{"cursor":{"type":"string","format":"uuid"},"limit":{"type":"integer"}}}),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.read"),
+            strict,
+        ),
+        tool(
             "stats.user",
             "Read the caller's aggregate learning statistics.",
             json!({"type":"object","properties":{}}),
-            "GET",
-            "/v1/me/stats",
+            "POST",
+            "/v1/agents/run",
             Some("stats.read"),
             strict,
         ),
@@ -509,6 +527,12 @@ fn build_skill_manifest(strict: bool) -> Value {
             "method": "POST",
             "body": { "tool": "<tool name>", "params": { "...": "..." } },
             "runnable_tools": [
+                "assessment.list",
+                "assessment.get",
+                "assessment.stats",
+                "question.list",
+                "activity.list",
+                "stats.user",
                 "assessment.create",
                 "assessment.batchCreate",
                 "assessment.update",
@@ -574,6 +598,30 @@ pub async fn run(
         "attempt.grade" => {
             require_scope(&auth, Scope::AttemptWrite)?;
             run_attempt_grade(&state, &auth, body.params).await
+        }
+        "assessment.list" => {
+            require_scope(&auth, Scope::AssessmentRead)?;
+            run_assessment_list(&state, &auth, body.params).await
+        }
+        "assessment.get" => {
+            require_scope(&auth, Scope::AssessmentRead)?;
+            run_assessment_get(&state, &auth, body.params).await
+        }
+        "question.list" => {
+            require_scope(&auth, Scope::AssessmentRead)?;
+            run_question_list(&state, &auth, body.params).await
+        }
+        "assessment.stats" => {
+            require_scope(&auth, Scope::StatsRead)?;
+            run_assessment_stats(&state, &auth, body.params).await
+        }
+        "activity.list" => {
+            require_scope(&auth, Scope::AssessmentRead)?;
+            run_activity_list(&state, &auth, body.params).await
+        }
+        "stats.user" => {
+            require_scope(&auth, Scope::StatsRead)?;
+            run_stats_user(&state, &auth, body.params).await
         }
         "profile.get" => run_profile_get(&state, &auth).await,
         "memory.set" => run_memory_set(&state, &user_id, body.params).await,
@@ -1359,6 +1407,163 @@ async fn run_attempt_grade(
         ok: true,
         tool: "attempt.grade".into(),
         result: serde_json::to_value(attempt).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_list(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let query_params: super::assessments::ListParams =
+        serde_json::from_value(params).map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid list params: {e}"),
+            }])
+        })?;
+    let res = super::assessments::list_assessments(
+        auth.clone(),
+        State(state.clone()),
+        Query(query_params),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.list".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_get(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let mut conn = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let is_admin = auth.user.role == crate::domain::user::Role::Admin;
+    crate::http::db::set_rls_guc(&mut conn, auth.owner_id, is_admin).await?;
+    let db = crate::http::db::DbConn(conn);
+    let res = super::assessments::get_assessment(auth.clone(), db, Path(id)).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.get".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_question_list(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let query_params: super::questions::ListQuestionsQuery = serde_json::from_value(params)
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid question list params: {e}"),
+            }])
+        })?;
+    let mut conn = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let is_admin = auth.user.role == crate::domain::user::Role::Admin;
+    crate::http::db::set_rls_guc(&mut conn, auth.owner_id, is_admin).await?;
+    let db = crate::http::db::DbConn(conn);
+    let res = super::questions::list_questions(
+        db,
+        RequireAnyScope::new(auth.clone()),
+        Query(query_params),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.list".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_stats(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let stats_params: super::stats::AssessmentStatsParams = serde_json::from_value(params)
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid stats params: {e}"),
+            }])
+        })?;
+    let res = super::stats::assessment_stats(
+        State(state.clone()),
+        RequireScope::new(auth.clone()),
+        Path(id),
+        Query(stats_params),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.stats".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_activity_list(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let query_params: ActivityQuery = serde_json::from_value(params).map_err(|e| {
+        ApiError::Validation(vec![FieldError {
+            field: "params".into(),
+            message: format!("invalid activity params: {e}"),
+        }])
+    })?;
+    let res = activity(
+        State(state.clone()),
+        RequireAnyScope::new(auth.clone()),
+        Query(query_params),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "activity.list".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_stats_user(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let query_params: super::stats::MeStatsQuery = serde_json::from_value(params).map_err(|e| {
+        ApiError::Validation(vec![FieldError {
+            field: "params".into(),
+            message: format!("invalid stats params: {e}"),
+        }])
+    })?;
+    let res =
+        super::stats::me_stats(State(state.clone()), auth.clone(), Query(query_params)).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "stats.user".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
         error: None,
     }))
 }
