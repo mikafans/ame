@@ -79,6 +79,8 @@ export default function ResultsPage({
   const [data, setData] = useState<ResultData | null>(null);
   const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
   const [history, setHistory] = useState<SessionSummary[]>([]);
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [retaking, setRetaking] = useState(false);
 
   const [loading, setLoading] = useState(true);
 
@@ -90,6 +92,7 @@ export default function ResultsPage({
       .then(({ data: d }: { data?: any }) => {
         if (!d?.session) return;
         const session = d.session;
+        setAssessmentId(session.assessment_id ?? null);
         const questions: any[] = d.questions ?? [];
         const attempts: any[] = d.attempts ?? [];
         const byQuestion = new Map(
@@ -237,6 +240,24 @@ export default function ResultsPage({
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleRetake = async () => {
+    if (!assessmentId || retaking) return;
+    setRetaking(true);
+    try {
+      const { data: d } = await api.POST("/v1/sessions", {
+        body: { assessmentId },
+      });
+      if (d?.sessionId) {
+        router.push(`/sessions/${d.sessionId}`);
+      } else {
+        setRetaking(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setRetaking(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -483,6 +504,15 @@ export default function ResultsPage({
         <Button variant="outlined" onClick={() => router.push("/explore")}>
           Back to Explore
         </Button>
+        {assessmentId && (
+          <Button
+            variant="contained"
+            onClick={handleRetake}
+            disabled={retaking}
+          >
+            {retaking ? "Starting…" : "Re-take"}
+          </Button>
+        )}
       </Stack>
     </Box>
   );

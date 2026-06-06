@@ -218,9 +218,12 @@ export default function ActiveQuizPage({
     setSubmitDialogOpen(true);
   }, []);
 
-  // Enter advances to the next question (or submits on the last one). In
-  // multiline fields (essay/code) plain Enter inserts a newline, so advancing
-  // there requires Ctrl/Cmd+Enter.
+  // Enter advances to the next question. On the last question it opens the
+  // submit confirmation dialog rather than finishing outright — submitting ends
+  // the attempt and is destructive, so it must be confirmed exactly like the
+  // Submit button (never a silent one-keystroke submit). In multiline fields
+  // (essay/code) plain Enter inserts a newline, so advancing there requires
+  // Ctrl/Cmd+Enter.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Enter" || e.shiftKey || !session) return;
@@ -230,11 +233,11 @@ export default function ActiveQuizPage({
       e.preventDefault();
       const last = session.questions.length - 1;
       if (idx < last) setIdx((i) => Math.min(last, i + 1));
-      else handleFinish();
+      else setSubmitDialogOpen(true);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idx, session, handleFinish]);
+  }, [idx, session]);
 
   if (!session) {
     return (

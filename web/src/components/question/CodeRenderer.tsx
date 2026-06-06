@@ -1,9 +1,17 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
+import Editor from "react-simple-code-editor";
+import Prism from "prismjs";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-sql";
+import { prismTokenSx, toPrismLanguage } from "@/lib/prismTheme";
 
 interface Props {
   value: string;
@@ -23,38 +31,12 @@ export function CodeRenderer({
   starter = "",
 }: Props) {
   const current = value || starter;
+  const prismLang = toPrismLanguage(language);
 
-  const INDENT = "  ";
-
-  // Tab/Shift+Tab indent inside the editor instead of moving focus. This traps
-  // Tab while focused — acceptable for a code field; Esc still blurs it.
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Tab" || disabled) return;
-    e.preventDefault();
-    const ta = e.target as HTMLTextAreaElement;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-
-    if (e.shiftKey) {
-      const lineStart = current.lastIndexOf("\n", start - 1) + 1;
-      const removed =
-        current.slice(lineStart).match(/^ {1,2}/)?.[0].length ?? 0;
-      if (removed === 0) return;
-      const next =
-        current.slice(0, lineStart) + current.slice(lineStart + removed);
-      onChange(next);
-      requestAnimationFrame(() => {
-        const caret = Math.max(lineStart, start - removed);
-        ta.selectionStart = ta.selectionEnd = caret;
-      });
-    } else {
-      const next = current.slice(0, start) + INDENT + current.slice(end);
-      onChange(next);
-      requestAnimationFrame(() => {
-        ta.selectionStart = ta.selectionEnd = start + INDENT.length;
-      });
-    }
-  }
+  const highlight = (code: string) => {
+    const grammar = Prism.languages[prismLang] ?? Prism.languages.clike;
+    return Prism.highlight(code, grammar, prismLang);
+  };
 
   return (
     <Box
@@ -88,29 +70,43 @@ export function CodeRenderer({
         </Typography>
       </Box>
 
-      {/* Code editor */}
-      <TextField
-        fullWidth
-        multiline
-        minRows={10}
-        value={current}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder="Write your solution here…"
-        spellCheck={false}
-        variant="standard"
-        slotProps={{ input: { disableUnderline: true } }}
-        sx={{
-          "& .MuiInputBase-root": {
+      {/* Code editor: transparent textarea over a Prism-highlighted layer,
+          driven by react-simple-code-editor (handles Tab-indent + scroll sync). */}
+      <Box
+        sx={[
+          {
+            minHeight: 240,
             fontFamily: "monospace",
             fontSize: 13.5,
             lineHeight: 1.6,
-            p: "16px 18px",
-            alignItems: "flex-start",
+            tabSize: 2,
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "#282c34" : "#fafafa",
+            color: (theme) =>
+              theme.palette.mode === "dark" ? "#abb2bf" : "#383a42",
+            "& textarea:focus": { outline: "none" },
+            "& .token": { background: "transparent !important" },
           },
-        }}
-      />
+          prismTokenSx,
+        ]}
+      >
+        <Editor
+          value={current}
+          onValueChange={disabled ? () => {} : onChange}
+          highlight={highlight}
+          disabled={disabled}
+          tabSize={2}
+          insertSpaces
+          padding={16}
+          placeholder="Write your solution here…"
+          spellCheck={false}
+          style={{
+            fontFamily: "inherit",
+            fontSize: "inherit",
+            minHeight: 240,
+          }}
+        />
+      </Box>
     </Box>
   );
 }
