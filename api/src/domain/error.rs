@@ -12,6 +12,8 @@ use utoipa::ToSchema;
 pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
+    #[error("forbidden: {0}")]
+    Forbidden(Cow<'static, str>),
     #[error("scope required: {0}")]
     ScopeRequired(Cow<'static, str>),
     #[error("not found: {resource}")]
@@ -62,6 +64,7 @@ impl IntoResponse for ApiError {
                 "missing or invalid token".to_string(),
                 None,
             ),
+            ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.to_string(), None),
             ApiError::ScopeRequired(scope) => (
                 StatusCode::FORBIDDEN,
                 "scope_required",

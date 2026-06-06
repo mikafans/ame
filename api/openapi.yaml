@@ -1732,6 +1732,12 @@ components:
         - Unauthorized
       - type: object
         required:
+        - Forbidden
+        properties:
+          Forbidden:
+            type: string
+      - type: object
+        required:
         - ScopeRequired
         properties:
           ScopeRequired:
