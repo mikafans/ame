@@ -299,7 +299,11 @@ fn build_skill_manifest(strict: bool) -> Value {
                 }
             }),
             "POST",
-            "/v1/agents/batchCreate",
+            // Run-only composite — no REST route exists. Advertise the real
+            // endpoint (matches profile.get/memory.set/target.set), not a path
+            // that 404s. Callers invoke it via POST /v1/agents/run with
+            // {"tool":"assessment.batchCreate","params":{...}}. (Audit F-3.)
+            "/v1/agents/run",
             Some("assessment.write"),
             strict,
         ),

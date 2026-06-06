@@ -76,6 +76,17 @@ async fn skill_manifest_contains_assessment_tools() {
             "skill manifest missing tool: {expected}. Got: {tool_names:?}"
         );
     }
+
+    // Audit F-3: a run-only composite must not advertise a REST path that 404s.
+    // batchCreate is reachable only via POST /v1/agents/run, like the self tools.
+    let batch = tools
+        .iter()
+        .find(|t| t["name"] == "assessment.batchCreate")
+        .expect("assessment.batchCreate present");
+    assert_eq!(
+        batch["path"], "/v1/agents/run",
+        "batchCreate must advertise its real (run) endpoint, not a 404 path"
+    );
 }
 
 #[tokio::test]

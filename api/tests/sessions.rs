@@ -106,6 +106,225 @@ async fn make_live_mc_question(pool: &PgPool) -> Uuid {
     make_live_mc_question_with_tag(pool, "rust").await
 }
 
+/// Create a user (or agent sub-account) with a scoped bearer token.
+/// `owner_user_id` is the self-FK that makes an agent a sub-account of its owner;
+/// pass `None` for a top-level user. Returns `(bearer, user_id)`.
+async fn make_user_token(
+    pool: &PgPool,
+    owner_user_id: Option<Uuid>,
+    role: &str,
+    scopes: &[&str],
+) -> (String, Uuid) {
+    let user_id = Uuid::now_v7();
+    let token_id = Uuid::now_v7();
+    let secret = "scoped_secret_123";
+    let hash = hash_secret(secret);
+    // Agents carry no email (auth by token only); users need one.
+    let email: Option<String> = (role != "agent").then(|| format!("u-{user_id}@example.com"));
+
+    sqlx::query(
+        "INSERT INTO tb_users (id, owner_user_id, display_name, email, role, plan) \
+         VALUES ($1, $2, $3, $4, $5, 'premium')",
+    )
+    .bind(user_id)
+    .bind(owner_user_id)
+    .bind(format!("user-{user_id}"))
+    .bind(email)
+    .bind(role)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    let scopes: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
+         VALUES ($1, $2, 'scoped token', $3, $4)",
+    )
+    .bind(token_id)
+    .bind(user_id)
+    .bind(hash)
+    .bind(scopes)
+    .execute(pool)
+    .await
+    .unwrap();
+
+    (format!("{token_id}_{secret}"), user_id)
+}
+
+/// Audit F-1/F-2: assessment completion state must be scoped to the requesting
+/// principal, never the owner. An agent sub-account shares its owner's
+/// *visibility* of an assessment but must NOT inherit the owner's completion —
+/// and `list` and `get` must agree on the same caller's state.
+#[tokio::test]
+async fn completion_state_is_scoped_to_caller_not_owner() {
+    if skip_if_no_db() {
+        return;
+    }
+
+    let pool = setup_db().await;
+    // Owner (top-level user) and its agent sub-account.
+    let (owner_bearer, owner_id) = make_user_token(
+        &pool,
+        None,
+        "user",
+        &["assessment.write", "attempt.write", "assessment.read"],
+    )
+    .await;
+    let (agent_bearer, _agent_id) = make_user_token(
+        &pool,
+        Some(owner_id),
+        "agent",
+        &["assessment.read", "attempt.write"],
+    )
+    .await;
+    let base_url = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    // Owner creates an active assessment with one live question.
+    let created: Value = client
+        .post(format!("{base_url}/v1/assessments"))
+        .header(header::AUTHORIZATION, format!("Bearer {owner_bearer}"))
+        .json(&json!({
+            "title": "Scoping check",
+            "mode": "practice",
+            "method": "manual",
+            "objectives": [],
+            "status": "active",
+            "questions": [
+                { "kind": "mc", "prompt": "Pick", "payload": { "options": ["a", "b"], "correct_index": 0 } }
+            ]
+        }))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let assessment_id = created["id"].as_str().unwrap().to_string();
+
+    // Owner takes and finishes a session on it.
+    let session: Value = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header(header::AUTHORIZATION, format!("Bearer {owner_bearer}"))
+        .json(&json!({ "assessmentId": assessment_id }))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let owner_session_id = session["sessionId"].as_str().unwrap().to_string();
+    client
+        .post(format!("{base_url}/v1/sessions/{owner_session_id}/finish"))
+        .header(header::AUTHORIZATION, format!("Bearer {owner_bearer}"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    // Helper: find this assessment in a list response.
+    let find = |list: &Value| -> Value {
+        list["assessments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["id"] == assessment_id)
+            .cloned()
+            .expect("assessment present in list")
+    };
+    let get_list = |bearer: &str| {
+        client
+            .get(format!("{base_url}/v1/assessments?status=active"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+    };
+    let get_detail = |bearer: &str| {
+        client
+            .get(format!("{base_url}/v1/assessments/{assessment_id}"))
+            .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+    };
+
+    // ── Agent: sees the assessment (owner-scoped visibility) but NOT the owner's
+    //    completion. list and get must agree. (F-1 cross-principal leak guard.)
+    let agent_list: Value = get_list(&agent_bearer)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let agent_item = find(&agent_list);
+    assert_eq!(
+        agent_item["completed"], false,
+        "agent must not inherit owner's completion"
+    );
+    assert!(
+        agent_item["lastSessionId"].is_null(),
+        "agent must not see owner's session id"
+    );
+
+    let agent_detail: Value = get_detail(&agent_bearer)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        agent_detail["completed"], agent_item["completed"],
+        "list and get must agree for the agent (F-2)"
+    );
+    assert_eq!(agent_detail["lastSessionId"], agent_item["lastSessionId"]);
+
+    // ── Owner: sees its own completion, list == get, and the returned
+    //    lastSessionId resolves for the same caller (no-unresolvable-id invariant).
+    let owner_list: Value = get_list(&owner_bearer)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let owner_item = find(&owner_list);
+    assert_eq!(owner_item["completed"], true);
+    assert_eq!(owner_item["lastSessionId"], owner_session_id);
+
+    let owner_detail: Value = get_detail(&owner_bearer)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(owner_detail["completed"], owner_item["completed"]);
+    assert_eq!(owner_detail["lastSessionId"], owner_item["lastSessionId"]);
+
+    // Invariant: a lastSessionId returned to a caller must resolve for that caller.
+    let resolved = client
+        .get(format!("{base_url}/v1/sessions/{owner_session_id}"))
+        .header(header::AUTHORIZATION, format!("Bearer {owner_bearer}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        resolved.status(),
+        StatusCode::OK,
+        "owner must be able to resolve its own lastSessionId"
+    );
+}
+
 /// Insert a live MC question (correct_index = 1) tagged `tag`. Use a unique
 /// tag to make tag-filtered practice planning deterministic on a shared DB.
 async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {

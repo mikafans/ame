@@ -843,6 +843,17 @@ export interface components {
             updatedAt: string;
         };
         AssessmentDetail: components["schemas"]["Assessment"] & {
+            /**
+             * @description Whether the requesting caller has a finished session for this assessment.
+             *     Scoped to the caller's own user id (matches the list endpoint, audit F-2).
+             */
+            completed: boolean;
+            /**
+             * Format: uuid
+             * @description The caller's most recent finished session for this assessment, if any.
+             *     Invariant: when present, GET /v1/sessions/{id} resolves for the same caller.
+             */
+            lastSessionId?: string | null;
             questions: components["schemas"]["AssessmentQuestion"][];
             sections: components["schemas"]["AssessmentSectionDetail"][];
         };
