@@ -119,6 +119,12 @@ pub struct AssessmentSectionDetail {
 pub struct AssessmentDetail {
     #[serde(flatten)]
     pub assessment: Assessment,
+    /// Whether the requesting caller has a finished session for this assessment.
+    /// Scoped to the caller's own user id (matches the list endpoint, audit F-2).
+    pub completed: bool,
+    /// The caller's most recent finished session for this assessment, if any.
+    /// Invariant: when present, GET /v1/sessions/{id} resolves for the same caller.
+    pub last_session_id: Option<Uuid>,
     pub sections: Vec<AssessmentSectionDetail>,
     pub questions: Vec<AssessmentQuestion>,
 }
@@ -233,7 +239,10 @@ pub async fn list_assessments(
     Query(params): Query<ListParams>,
 ) -> Result<Json<ListAssessmentsResponse>, ApiError> {
     let uid = user.owner_id;
-
+    // Visibility is owner-scoped ($1 = owner_id), but completion/session state is
+    // per-principal ($2 = caller's own user id). For an agent token owner_id is the
+    // human owner; scoping completion by it would leak the owner's web-UI sessions
+    // and yield a lastSessionId the agent itself gets 404 on (audit F-1/F-2).
     let mut sql = String::from(
         "SELECT a.id, a.title, a.description, a.mode, a.status,
                 a.course, a.objectives, a.duration_min, a.total_points,
@@ -243,12 +252,12 @@ pub async fn list_assessments(
                            WHERE assessment_id = a.id), 0) AS question_count,
                 EXISTS(
                     SELECT 1 FROM tb_sessions s
-                    WHERE s.assessment_id = a.id AND s.user_id = $1
+                    WHERE s.assessment_id = a.id AND s.user_id = $2
                       AND s.status = 'finished'
                 ) AS completed,
                 (
                     SELECT s.id FROM tb_sessions s
-                    WHERE s.assessment_id = a.id AND s.user_id = $1
+                    WHERE s.assessment_id = a.id AND s.user_id = $2
                       AND s.status = 'finished'
                     ORDER BY s.finished_at DESC LIMIT 1
                 ) AS last_session_id
@@ -261,7 +270,9 @@ pub async fn list_assessments(
     let mut args = PgArguments::default();
     args.add(uid)
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
-    let mut param_idx = 2;
+    args.add(user.user.id)
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
+    let mut param_idx = 3;
 
     if let Some(status) = params.status {
         sql.push_str(&format!(" AND a.status = ${}", param_idx));
@@ -644,8 +655,23 @@ pub async fn get_assessment(
         .map(|s| s.questions.clone())
         .unwrap_or_default();
 
+    // Per-caller completion state — scoped to the caller's own user id so it stays
+    // consistent with the list endpoint and the sessions endpoints (audit F-2).
+    let last_session_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT s.id FROM tb_sessions s
+         WHERE s.assessment_id = $1 AND s.user_id = $2 AND s.status = 'finished'
+         ORDER BY s.finished_at DESC LIMIT 1",
+    )
+    .bind(id)
+    .bind(user.user.id)
+    .fetch_optional(&mut *conn)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
     Ok(Json(AssessmentDetail {
         assessment,
+        completed: last_session_id.is_some(),
+        last_session_id,
         sections,
         questions,
     }))
