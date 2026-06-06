@@ -61,7 +61,14 @@ async fn skill_manifest_contains_assessment_tools() {
         "question.list",
         "question.create",
         "session.create",
+        "session.answer",
         "session.finish",
+        "assessment.generate",
+        // Run-only self tools (no REST route; reachable via POST /v1/agents/run).
+        "profile.get",
+        "memory.set",
+        "memory.append",
+        "target.set",
     ];
     for expected in &all_expected {
         assert!(

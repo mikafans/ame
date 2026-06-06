@@ -860,7 +860,9 @@ pub async fn list_attempts(
              ORDER BY created_at DESC
              LIMIT $3 OFFSET $4",
         )
-        .bind(auth.0.user.id)
+        // Owner-scoped: an agent sub-account reads its owner's attempts
+        // (owner_id == user.id for a human, so their view is unchanged).
+        .bind(auth.0.owner_id)
         .bind(sid)
         .bind(limit)
         .bind(q.offset)
@@ -879,7 +881,8 @@ pub async fn list_attempts(
              ORDER BY created_at DESC
              LIMIT $2 OFFSET $3",
         )
-        .bind(auth.0.user.id)
+        // Owner-scoped: see the session_id branch above.
+        .bind(auth.0.owner_id)
         .bind(limit)
         .bind(q.offset)
         .fetch_all(&state.pool)
@@ -968,7 +971,8 @@ pub async fn get_cohort_stats(
             message: "required".into(),
         }])
     })?;
-    let user_id = auth.user.id;
+    // Owner-scoped so an agent token resolves the owner's cohort/percentile.
+    let user_id = auth.owner_id;
 
     let cohort_id: Option<Uuid> = sqlx::query_scalar(
         "SELECT cm.cohort_id FROM tb_cohort_memberships cm WHERE cm.user_id = $1 LIMIT 1",
