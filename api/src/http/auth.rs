@@ -273,9 +273,11 @@ async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String,
     let secret = generate_secret();
     let token_hash = hash_secret(&secret);
 
+    // expires_at omitted — inherits the tb_api_tokens column default (7 days),
+    // the single source of truth shared with the me.rs mint paths.
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, expires_at)
-         VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '30 days')",
+        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)
