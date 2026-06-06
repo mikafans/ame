@@ -254,7 +254,7 @@ fn build_skill_manifest(strict: bool) -> Value {
                 }
             }),
             "POST",
-            "/v1/assessments",
+            "/v1/agents/run",
             Some("assessment.write"),
             strict,
         ),
@@ -311,35 +311,29 @@ fn build_skill_manifest(strict: bool) -> Value {
             "assessment.update",
             "Update assessment metadata.",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"status":{"type":"string"}}}),
-            "PATCH",
-            "/v1/assessments/{id}",
+            "POST",
+            "/v1/agents/run",
             Some("assessment.write"),
             strict,
         ),
         tool(
-            "assessment.delete",
-            "Delete an assessment.",
-            id_only(),
-            "DELETE",
-            "/v1/assessments/{id}",
-            Some("assessment.write"),
-            strict,
-        ),
-        tool(
-            "assessment.generate",
-            "Generate candidate questions from the live bank for the given objectives (returns candidates; does not persist).",
+            "assessment.addQuestion",
+            "Attach a bank question to an assessment or create a new question inline.",
             json!({
                 "type":"object",
+                "required":["id"],
                 "properties":{
-                    "source":{"type":"string"},
-                    "questionCount":{"type":"integer"},
-                    "types":{"type":"array","items":{"type":"string","enum":["mc","tf","short","essay","code"]}},
-                    "objectives":{"type":"array","items":{"type":"string"}}
+                    "id":{"type":"string","format":"uuid","description":"assessment id"},
+                    "questionId":{"type":"string","format":"uuid","description":"existing bank question id (optional)"},
+                    "kind":{"type":"string","enum":["mc","tf","short","essay","code"],"description":"required if questionId absent"},
+                    "prompt":{"type":"string","description":"question text"},
+                    "pointsOverride":{"type":"integer","description":"override default points"},
+                    "sectionId":{"type":"string","format":"uuid","description":"target section (defaults to first)"}
                 }
             }),
             "POST",
-            "/v1/assessments/generate",
-            Some("assessment.read"),
+            "/v1/agents/run",
+            Some("assessment.write"),
             strict,
         ),
         // Questions
@@ -357,16 +351,7 @@ fn build_skill_manifest(strict: bool) -> Value {
             "Batch-create one or more questions in the bank.",
             json!({"type":"object","required":["questions"],"properties":{"questions":{"type":"array","items":{"type":"object","required":["kind","prompt","payload"],"properties":{"kind":{"type":"string","enum":["mc","tf","short","essay","code"]},"prompt":{"type":"string"},"payload":{"type":"object"},"explanation":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"points":{"type":"integer"},"status":{"type":"string","enum":["draft","live","archived"]}}}}}}),
             "POST",
-            "/v1/questions",
-            Some("assessment.write"),
-            strict,
-        ),
-        tool(
-            "question.update",
-            "Update a question in the bank.",
-            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"},"prompt":{"type":"string"},"payload":{"type":"object"},"explanation":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"status":{"type":"string","enum":["draft","live","archived"]}}}),
-            "PATCH",
-            "/v1/questions/{id}",
+            "/v1/agents/run",
             Some("assessment.write"),
             strict,
         ),
@@ -375,7 +360,7 @@ fn build_skill_manifest(strict: bool) -> Value {
             "Promote one draft question to live.",
             id_only(),
             "POST",
-            "/v1/questions/{id}/promote",
+            "/v1/agents/run",
             Some("assessment.write"),
             strict,
         ),
@@ -406,59 +391,7 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("stats.read"),
             strict,
         ),
-        // Session & attempt
-        tool(
-            "session.create",
-            "Start a practice or graded assessment session.",
-            json!({"type":"object","properties":{"assessmentId":{"type":"string"}}}),
-            "POST",
-            "/v1/sessions",
-            Some("attempt.write"),
-            strict,
-        ),
-        tool(
-            "session.answer",
-            "Submit an answer for one question in an active session.",
-            json!({
-                "type":"object",
-                "required":["id","questionId","response"],
-                "properties":{
-                    "id":{"type":"string","format":"uuid","description":"session id (path)"},
-                    "questionId":{"type":"string","format":"uuid"},
-                    "response":{"type":"object","description":"AttemptResponse payload for the question kind"},
-                    "timeToAnswerMs":{"type":"integer"}
-                }
-            }),
-            "POST",
-            "/v1/sessions/{id}/answer",
-            Some("attempt.write"),
-            strict,
-        ),
-        tool(
-            "session.finish",
-            "Finish a session and compute results.",
-            id_only(),
-            "POST",
-            "/v1/sessions/{id}/finish",
-            Some("attempt.write"),
-            strict,
-        ),
-        tool(
-            "attempts.list",
-            "List the user's recent assessment attempt results.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "limit": { "type": "integer" },
-                    "offset": { "type": "integer" },
-                    "sessionId": { "type": "string", "format": "uuid" }
-                }
-            }),
-            "GET",
-            "/v1/me/attempts",
-            Some("attempt.read"),
-            strict,
-        ),
+        // Attempt grading
         tool(
             "attempt.grade",
             "Grade a pending essay or code attempt.",
@@ -471,8 +404,8 @@ fn build_skill_manifest(strict: bool) -> Value {
                     "notes": { "type": "string" }
                 }
             }),
-            "PATCH",
-            "/v1/attempts/{id}/grade",
+            "POST",
+            "/v1/agents/run",
             Some("attempt.write"),
             strict,
         ),
@@ -536,6 +469,7 @@ fn build_skill_manifest(strict: bool) -> Value {
                 "assessment.create",
                 "assessment.batchCreate",
                 "assessment.update",
+                "assessment.addQuestion",
                 "question.create",
                 "question.promote",
                 "attempt.grade",
@@ -586,6 +520,10 @@ pub async fn run(
         "assessment.update" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_assessment_update(&state, &auth, body.params).await
+        }
+        "assessment.addQuestion" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_add_question(&state, &auth, body.params).await
         }
         "question.create" => {
             require_scope(&auth, Scope::AssessmentWrite)?;
@@ -1092,6 +1030,43 @@ async fn run_assessment_update(
         ok: true,
         tool: "assessment.update".into(),
         result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_add_question(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let assessment_id = parse_id(&params)?;
+    let body: super::assessments::AddAssessmentQuestionBody = serde_json::from_value(params)
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid add question request: {e}"),
+            }])
+        })?;
+    let mut conn = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let is_admin = auth.user.role == crate::domain::user::Role::Admin;
+    crate::http::db::set_rls_guc(&mut conn, auth.owner_id, is_admin).await?;
+    let db = crate::http::db::DbConn(conn);
+    let res = super::assessments::add_assessment_question(
+        State(state.clone()),
+        db,
+        auth.clone(),
+        Path(assessment_id),
+        Json(body),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.addQuestion".into(),
+        result: serde_json::to_value(res.1.0).unwrap_or(Value::Null),
         error: None,
     }))
 }

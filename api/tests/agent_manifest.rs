@@ -51,20 +51,23 @@ async fn skill_manifest_contains_assessment_tools() {
     let tools = manifest["tools"].as_array().unwrap();
     let tool_names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
-    // Tools exposed in the unified assessment manifest (post agent-identity refactor)
+    // Writes: assessment.create, assessment.batchCreate, assessment.update, assessment.addQuestion, question.create, question.promote, attempt.grade
+    // Reads: assessment.list, assessment.get, assessment.stats, question.list, activity.list, stats.user
+    // Self: profile.get, memory.set, memory.append, target.set
     let all_expected = [
         "assessment.list",
         "assessment.get",
         "assessment.create",
+        "assessment.batchCreate",
         "assessment.update",
-        "assessment.delete",
+        "assessment.addQuestion",
+        "assessment.stats",
         "question.list",
         "question.create",
-        "session.create",
-        "session.answer",
-        "session.finish",
-        "assessment.generate",
-        // Run-only self tools (no REST route; reachable via POST /v1/agents/run).
+        "question.promote",
+        "activity.list",
+        "stats.user",
+        "attempt.grade",
         "profile.get",
         "memory.set",
         "memory.append",
@@ -77,16 +80,38 @@ async fn skill_manifest_contains_assessment_tools() {
         );
     }
 
-    // Audit F-3: a run-only composite must not advertise a REST path that 404s.
-    // batchCreate is reachable only via POST /v1/agents/run, like the self tools.
-    let batch = tools
-        .iter()
-        .find(|t| t["name"] == "assessment.batchCreate")
-        .expect("assessment.batchCreate present");
-    assert_eq!(
-        batch["path"], "/v1/agents/run",
-        "batchCreate must advertise its real (run) endpoint, not a 404 path"
-    );
+    // Assert that dead tools are NOT present
+    let dead_tools = [
+        "assessment.delete",
+        "assessment.generate",
+        "question.update",
+        "session.create",
+        "session.answer",
+        "session.finish",
+        "attempts.list",
+    ];
+    for dead in &dead_tools {
+        assert!(
+            !tool_names.contains(dead),
+            "skill manifest should not contain dead tool: {dead}"
+        );
+    }
+
+    // Single-door contract (audit F-3): every advertised tool is reachable ONLY
+    // via POST /v1/agents/run after the agent guard, so the manifest must not
+    // advertise any REST path that 403s for an agent token.
+    for t in tools {
+        assert_eq!(
+            t["method"], "POST",
+            "tool {} must advertise method POST",
+            t["name"]
+        );
+        assert_eq!(
+            t["path"], "/v1/agents/run",
+            "tool {} must advertise the single-door endpoint, not a REST path",
+            t["name"]
+        );
+    }
 }
 
 #[tokio::test]

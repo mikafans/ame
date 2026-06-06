@@ -15,12 +15,14 @@ canonical worked example. Copy it, import it, or run it directly:
     # or use it as a library
     from client import AmeAgent
     agent = AmeAgent(base_url="http://localhost:28080", api_key="<agent-key>")
-    assessments = agent.get("/v1/assessments")
+    assessments = agent.run("assessment.list")
     print(f"Found {len(assessments['assessments'])} assessments")
 
-Two ways to act (mirrors llms.txt):
-  - reads + simple writes -> call REST directly:  agent.get/post/patch/delete(path)
-  - composite / write tools -> the dispatcher:     agent.run(tool, **params)
+Single door (mirrors llms.txt): an agent token reaches the platform only through
+``POST /v1/agents/run``. Every operation — reads, writes, and self-management —
+is ``agent.run(tool, **params)``. The raw ``get/post/patch/delete`` verbs remain
+as a low-level escape hatch for an *owner* token (e.g. creating the agent); an
+agent token using them on any path other than the single door is rejected 403.
 
 The transport is resilient by default: every call has a timeout and retries
 transient failures (HTTP 429 / 5xx and network errors) with backoff, honouring a
@@ -106,7 +108,7 @@ class AmeAgent:
         return resp.get("result")
 
     def get(self, path: str, **query):
-        """GET a read endpoint (e.g. /v1/assessments). Read tools are direct REST."""
+        """GET a path (owner-token escape hatch; agent reads go through run())."""
         if query:
             path = f"{path}?{urlencode(query)}"
         return self.request("GET", path)
@@ -116,7 +118,7 @@ class AmeAgent:
         return self.request("POST", path, body)
 
     def patch(self, path: str, body=None):
-        """PATCH a write endpoint (e.g. /v1/assessments/{id})."""
+        """PATCH a write endpoint (e.g. /v1/me/agents/{id})."""
         return self.request("PATCH", path, body)
 
     def delete(self, path: str):
@@ -226,16 +228,16 @@ def _demo(api: str, token: str, title: str) -> None:
 
     print("attaching questions...")
     for qid in qids:
-        agent.post(f"/v1/assessments/{aid}/questions", {"questionId": qid})
+        agent.run("assessment.addQuestion", id=aid, questionId=qid)
     print(f"  attached {len(qids)} questions")
 
     print("publishing...")
     published = agent.run("assessment.update", id=aid, status="active")
     print(f"  status={published['status']}")
 
-    listed = agent.get("/v1/assessments")["assessments"]
+    listed = agent.run("assessment.list")["assessments"]
     match = next((a for a in listed if a["id"] == aid), None)
-    assert match, f"assessment {aid} not visible in /v1/assessments"
+    assert match, f"assessment {aid} not visible via assessment.list"
     print(f"  library shows: {match['title']!r} ({match['status']})")
     print("\nRESULT: OK")
 
