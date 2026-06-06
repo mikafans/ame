@@ -391,6 +391,15 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("stats.read"),
             strict,
         ),
+        tool(
+            "attempt.list",
+            "List the owner's per-attempt history, optionally filtered to one session.",
+            json!({"type":"object","properties":{"limit":{"type":"integer"},"offset":{"type":"integer"},"sessionId":{"type":"string","format":"uuid"}}}),
+            "POST",
+            "/v1/agents/run",
+            Some("attempt.read"),
+            strict,
+        ),
         // Attempt grading
         tool(
             "attempt.grade",
@@ -466,6 +475,7 @@ fn build_skill_manifest(strict: bool) -> Value {
                 "question.list",
                 "activity.list",
                 "stats.user",
+                "attempt.list",
                 "assessment.create",
                 "assessment.batchCreate",
                 "assessment.update",
@@ -560,6 +570,10 @@ pub async fn run(
         "stats.user" => {
             require_scope(&auth, Scope::StatsRead)?;
             run_stats_user(&state, &auth, body.params).await
+        }
+        "attempt.list" => {
+            require_scope(&auth, Scope::AttemptRead)?;
+            run_attempt_list(&state, &auth, body.params).await
         }
         "profile.get" => run_profile_get(&state, &auth).await,
         "memory.set" => run_memory_set(&state, &user_id, body.params).await,
@@ -1538,6 +1552,34 @@ async fn run_stats_user(
     Ok(Json(RunResponse {
         ok: true,
         tool: "stats.user".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_attempt_list(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let query_params: super::me::ListAttemptsQuery =
+        serde_json::from_value(params).map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid attempts params: {e}"),
+            }])
+        })?;
+    // list_attempts is owner-scoped (binds auth.owner_id) and reads tb_attempts
+    // directly off the pool, so no RLS conn is needed here.
+    let res = super::me::list_attempts(
+        State(state.clone()),
+        RequireAnyScope::new(auth.clone()),
+        Query(query_params),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "attempt.list".into(),
         result: serde_json::to_value(res.0).unwrap_or(Value::Null),
         error: None,
     }))

@@ -67,6 +67,7 @@ async fn skill_manifest_contains_assessment_tools() {
         "question.promote",
         "activity.list",
         "stats.user",
+        "attempt.list",
         "attempt.grade",
         "profile.get",
         "memory.set",
@@ -88,7 +89,7 @@ async fn skill_manifest_contains_assessment_tools() {
         "session.create",
         "session.answer",
         "session.finish",
-        "attempts.list",
+        "attempts.list", // old plural name; the live tool is the singular attempt.list
     ];
     for dead in &dead_tools {
         assert!(
