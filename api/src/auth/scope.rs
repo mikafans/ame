@@ -32,6 +32,16 @@ pub trait ScopeConstraint: Send + Sync {
 /// user record after the scope check passes.
 pub struct RequireScope<T: ScopeConstraint>(pub AuthenticatedUser, std::marker::PhantomData<T>);
 
+impl<T: ScopeConstraint> RequireScope<T> {
+    /// Construct directly from an already-authorized user, bypassing the
+    /// extractor-time scope check. The caller (e.g. the agent run-dispatcher,
+    /// which enforces scope itself before delegating to a REST handler) is
+    /// responsible for the scope check.
+    pub fn new(user: AuthenticatedUser) -> Self {
+        Self(user, std::marker::PhantomData)
+    }
+}
+
 impl<T> FromRequestParts<AppState> for RequireScope<T>
 where
     T: ScopeConstraint + Send + Sync + 'static,
@@ -67,6 +77,13 @@ pub trait ScopeOneOf: Send + Sync {
 }
 
 pub struct RequireAnyScope<T: ScopeOneOf>(pub AuthenticatedUser, std::marker::PhantomData<T>);
+
+impl<T: ScopeOneOf> RequireAnyScope<T> {
+    /// See [`RequireScope::new`] — construct from a pre-authorized user.
+    pub fn new(user: AuthenticatedUser) -> Self {
+        Self(user, std::marker::PhantomData)
+    }
+}
 
 impl<T> FromRequestParts<AppState> for RequireAnyScope<T>
 where
