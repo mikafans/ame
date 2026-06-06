@@ -42,7 +42,9 @@ pub struct TokenEntry {
     // tb_users.email is nullable (agent sub-accounts may have none), so this
     // must be optional — decoding a NULL into String would panic the handler.
     pub owner_email: Option<String>,
+    pub owner_display_name: Option<String>,
     pub owner_role: String,
+    pub status: String,
     pub scopes: Vec<String>,
     #[serde(with = "time::serde::rfc3339::option")]
     #[schema(value_type = Option<String>, format = DateTime)]
@@ -255,7 +257,8 @@ pub async fn list_tokens(
     let mut count_qb = sqlx::QueryBuilder::new(
         "SELECT COUNT(*) FROM tb_api_tokens t \
          LEFT JOIN tb_users u ON u.id = t.user_id \
-         LEFT JOIN tb_agents a ON a.id = t.agent_id",
+         LEFT JOIN tb_agents a ON a.id = t.agent_id \
+         LEFT JOIN tb_users o ON a.owner_user_id = o.id",
     );
     let mut has_where = false;
 
@@ -264,6 +267,12 @@ pub async fn list_tokens(
         count_qb.push(" WHERE (t.name ILIKE ");
         count_qb.push_bind(search_pat.clone());
         count_qb.push(" OR u.email ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR o.email ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR u.display_name ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR a.label ILIKE ");
         count_qb.push_bind(search_pat);
         count_qb.push(")");
         has_where = true;
@@ -321,12 +330,14 @@ pub async fn list_tokens(
     // 2. Get paginated tokens
     let mut qb = sqlx::QueryBuilder::new(
         "SELECT t.id, t.name, COALESCE(t.user_id, t.agent_id) as user_id, \
-         CASE WHEN t.agent_id IS NOT NULL THEN NULL ELSE u.email END as email, \
+         CASE WHEN t.agent_id IS NOT NULL THEN o.email ELSE u.email END as email, \
+         CASE WHEN t.agent_id IS NOT NULL THEN a.label ELSE u.display_name END as display_name, \
          CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END as role, \
          t.scopes, t.last_used_at, t.revoked_at, t.expires_at, t.created_at \
          FROM tb_api_tokens t \
          LEFT JOIN tb_users u ON u.id = t.user_id \
-         LEFT JOIN tb_agents a ON a.id = t.agent_id",
+         LEFT JOIN tb_agents a ON a.id = t.agent_id \
+         LEFT JOIN tb_users o ON a.owner_user_id = o.id",
     );
 
     has_where = false;
@@ -336,6 +347,12 @@ pub async fn list_tokens(
         qb.push(" WHERE (t.name ILIKE ");
         qb.push_bind(search_pat.clone());
         qb.push(" OR u.email ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR o.email ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR u.display_name ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR a.label ILIKE ");
         qb.push_bind(search_pat);
         qb.push(")");
         has_where = true;
@@ -392,21 +409,34 @@ pub async fn list_tokens(
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
+    let now = time::OffsetDateTime::now_utc();
     let tokens = rows
         .iter()
         .map(|r| {
             let role_str: String = r.get("role");
             let scopes: Vec<String> = r.get("scopes");
+            let revoked_at: Option<time::OffsetDateTime> = r.get("revoked_at");
+            let expires_at: time::OffsetDateTime = r.get("expires_at");
+            let status = if revoked_at.is_some() {
+                "revoked".to_string()
+            } else if expires_at <= now {
+                "expired".to_string()
+            } else {
+                "active".to_string()
+            };
+
             TokenEntry {
                 id: r.get("id"),
                 name: r.get("name"),
                 owner_id: r.get("user_id"),
                 owner_email: r.get("email"),
+                owner_display_name: r.get("display_name"),
                 owner_role: role_str,
+                status,
                 scopes,
                 last_used_at: r.get("last_used_at"),
-                revoked_at: r.get("revoked_at"),
-                expires_at: r.get("expires_at"),
+                revoked_at,
+                expires_at,
                 created_at: r.get("created_at"),
             }
         })
@@ -1151,22 +1181,31 @@ pub async fn delete_token_admin(
     admin: RequireScope<AdminScope>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // Check if token exists (EXISTS yields a bool — avoids the int4/i64 decode
-    // mismatch that `SELECT 1` into an i64 would cause).
-    let exists: bool =
-        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tb_api_tokens WHERE id = $1)")
-            .bind(id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    // 1. Fetch token details (owner, name, status) for auditing and existence check.
+    let token_info: Option<(Uuid, String, Option<time::OffsetDateTime>)> = sqlx::query_as(
+        "SELECT COALESCE(user_id, agent_id) as owner_id, name, revoked_at \
+         FROM tb_api_tokens WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
-    if !exists {
-        return Err(ApiError::NotFound {
-            resource: "api_token",
-        });
+    let (owner_id, name, revoked_at) = match token_info {
+        Some(info) => info,
+        None => {
+            return Err(ApiError::NotFound {
+                resource: "api_token",
+            });
+        }
+    };
+
+    // If it's already revoked, return 204 immediately (idempotent)
+    if revoked_at.is_some() {
+        return Ok(StatusCode::NO_CONTENT);
     }
 
-    // Revoke the token (idempotent: will succeed even if already revoked)
+    // Revoke the token
     sqlx::query("UPDATE tb_api_tokens SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL")
         .bind(id)
         .execute(&state.pool)
@@ -1183,7 +1222,10 @@ pub async fn delete_token_admin(
         "token.revoke_admin",
         Some("api_token"),
         Some(id),
-        serde_json::json!({}),
+        serde_json::json!({
+            "owner_id": owner_id,
+            "name": name,
+        }),
     );
 
     Ok(StatusCode::NO_CONTENT)

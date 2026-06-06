@@ -27,6 +27,7 @@ export default function AdminLayout({
   const getRouteId = () => {
     if (pathname.startsWith("/admin/users")) return "admin-users";
     if (pathname.startsWith("/admin/assessments")) return "admin-assessments";
+    if (pathname.startsWith("/admin/tokens")) return "admin-tokens";
     if (pathname.startsWith("/admin/audit")) return "admin-audit";
     if (pathname.startsWith("/admin/health")) return "admin-health";
     if (pathname.startsWith("/admin")) return "admin-dashboard";
@@ -38,6 +39,7 @@ export default function AdminLayout({
       "admin-dashboard": "/admin",
       "admin-users": "/admin/users",
       "admin-assessments": "/admin/assessments",
+      "admin-tokens": "/admin/tokens",
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
       explore: "/explore",

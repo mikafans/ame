@@ -39,8 +39,10 @@ interface TokenEntry {
   id: string;
   name: string;
   ownerId: string;
-  ownerEmail: string;
+  ownerEmail: string | null;
+  ownerDisplayName?: string | null;
   ownerRole: string;
+  status: string;
   scopes: string[];
   lastUsedAt: string | null;
   revokedAt: string | null;
@@ -184,7 +186,7 @@ export default function TokensAuditPage() {
   };
 
   const getStatusChip = (token: TokenEntry) => {
-    if (token.revokedAt !== null) {
+    if (token.status === "revoked") {
       return (
         <Chip
           label="REVOKED"
@@ -198,9 +200,7 @@ export default function TokensAuditPage() {
       );
     }
 
-    const now = new Date();
-    const expiresAt = new Date(token.expiresAt);
-    if (expiresAt <= now) {
+    if (token.status === "expired") {
       return (
         <Chip
           label="EXPIRED"
@@ -231,7 +231,7 @@ export default function TokensAuditPage() {
   };
 
   const canRevoke = (token: TokenEntry) => {
-    return token.revokedAt === null;
+    return token.status !== "revoked";
   };
 
   return (
@@ -474,9 +474,19 @@ export default function TokensAuditPage() {
                     </TableCell>
                     <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight={500} noWrap>
-                          {row.ownerEmail}
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {row.ownerDisplayName || "—"}
                         </Typography>
+                        {row.ownerEmail && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            noWrap
+                            display="block"
+                          >
+                            {row.ownerEmail}
+                          </Typography>
+                        )}
                       </Box>
                     </TableCell>
                     <TableCell>
