@@ -87,14 +87,19 @@ async fn test_cross_owner_agent_visibility() {
         .unwrap();
     let agent_auth = format!("{token_id}_{secret}");
 
+    // Agent authors through the single run-door — direct POST /v1/assessments
+    // is 403 for agent tokens (agent_guard_middleware confines agents to /run).
     let res = client
-        .post(format!("{base_url}/v1/assessments"))
+        .post(format!("{base_url}/v1/agents/run"))
         .header("Authorization", format!("Bearer {agent_auth}"))
         .json(&json!({
-            "title": "Agent Assessment",
-            "mode": "graded",
-            "method": "agent",
-            "objectives": []
+            "tool": "assessment.create",
+            "params": {
+                "title": "Agent Assessment",
+                "mode": "graded",
+                "method": "agent",
+                "objectives": []
+            }
         }))
         .send()
         .await
@@ -105,7 +110,11 @@ async fn test_cross_owner_agent_visibility() {
         panic!("Assessment creation failed ({status}): {body}");
     }
     let json: serde_json::Value = res.json().await.unwrap();
-    let qid = json["id"].as_str().unwrap().to_string();
+    assert!(
+        json["ok"].as_bool().unwrap_or(false),
+        "run assessment.create failed: {json}"
+    );
+    let qid = json["result"]["id"].as_str().unwrap().to_string();
     let assessment_uuid: Uuid = qid.parse().unwrap();
 
     // A session can only be created on an active assessment with at least one live
@@ -201,17 +210,11 @@ async fn test_cross_owner_agent_visibility() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 
-    // 5. Test: Agent creates a session for its own private assessment
-    let res = client
-        .post(format!("{base_url}/v1/sessions"))
-        .header("Authorization", format!("Bearer {agent_auth}"))
-        .json(&json!({"assessmentId": qid}))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::CREATED);
+    // (Agents never take assessments — POST /v1/sessions is 403 for an agent
+    // token under the single-door model; that boundary is covered by
+    // agent_tools::test_agent_token_blocked_on_learner_rest.)
 
-    // 6. Test: Owner creates a session for agent's private assessment
+    // 5. Test: Owner creates a session for agent's private assessment
     let res = client
         .post(format!("{base_url}/v1/sessions"))
         .header("Authorization", format!("Bearer {owner_auth}"))
@@ -221,7 +224,7 @@ async fn test_cross_owner_agent_visibility() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    // 7. Test: Stranger creates a session for private assessment -> 404
+    // 6. Test: Stranger creates a session for private assessment -> 404
     let res = client
         .post(format!("{base_url}/v1/sessions"))
         .header("Authorization", format!("Bearer {stranger_auth}"))
