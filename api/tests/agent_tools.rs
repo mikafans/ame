@@ -24,6 +24,62 @@ async fn setup_db() -> PgPool {
     pool
 }
 
+/// Boot the router on an ephemeral port and return its base URL.
+async fn spawn_app(pool: PgPool) -> String {
+    let app = router(pool);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    format!("http://{addr}")
+}
+
+/// Insert an owner + an agent sub-account linked to it, and mint an agent token
+/// with the given scopes. Returns `(owner_id, agent_id, "{token_id}_{secret}")`.
+async fn seed_agent(pool: &PgPool, scopes: &[&str]) -> (Uuid, Uuid, String) {
+    let owner_id = Uuid::now_v7();
+    let owner_email = format!("loop-owner-{owner_id}@example.com");
+    sqlx::query("INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, $3, 'user')")
+        .bind(owner_id)
+        .bind(&owner_email)
+        .bind("Loop Owner")
+        .execute(pool)
+        .await
+        .unwrap();
+
+    let agent_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_users (id, owner_user_id, display_name, role) VALUES ($1, $2, $3, 'agent')",
+    )
+    .bind(agent_id)
+    .bind(owner_id)
+    .bind("Loop Agent")
+    .execute(pool)
+    .await
+    .unwrap();
+
+    let token_id = Uuid::now_v7();
+    let secret = "loop-secret-123";
+    let scopes: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
+        .bind(token_id)
+        .bind(agent_id)
+        .bind("loop-key")
+        .bind(ame_api::auth::token::hash_secret(secret))
+        .bind(&scopes)
+        .execute(pool)
+        .await
+        .unwrap();
+
+    (owner_id, agent_id, format!("{token_id}_{secret}"))
+}
+
 #[tokio::test]
 async fn test_agent_behavioral_tools() {
     if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
@@ -205,31 +261,21 @@ async fn test_agent_behavioral_tools() {
     assert_eq!(agent["nextTarget"], "Read Tokio docs");
 }
 
-/// Regression: an agent token reading learner-record endpoints (`/v1/me/stats`,
-/// `/v1/me/attempts`) must see the OWNER's data, not the agent sub-account's
-/// (which has none). Previously these scoped by the caller's own id and returned
-/// empty for agents.
+/// Regression: an agent reads the learning record through the single door
+/// (`stats.user` / `attempt.list` via POST /v1/agents/run) and must see the
+/// OWNER's data, not the agent sub-account's (which has none). The old direct
+/// REST reads (`GET /v1/me/stats`, `/v1/me/attempts`) are now 403 for agents —
+/// see `test_agent_token_blocked_on_learner_rest`.
 #[tokio::test]
-async fn test_agent_token_reads_owner_stats_and_attempts() {
+async fn test_agent_reads_owner_record_via_run() {
     if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
         eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
         return;
     }
 
     let pool = setup_db().await;
-    let app = router(pool.clone());
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr: SocketAddr = listener.local_addr().unwrap();
-    tokio::spawn(async move {
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-        )
-        .await
-        .unwrap();
-    });
+    let base_url = spawn_app(pool.clone()).await;
     let client = reqwest::Client::new();
-    let base_url = format!("http://{addr}");
 
     // Owner with a finished session + attempt (the learning record an agent reads).
     let owner_id = Uuid::now_v7();
@@ -315,34 +361,249 @@ async fn test_agent_token_reads_owner_stats_and_attempts() {
         .unwrap();
     let agent_auth = format!("{token_id}_{secret}");
 
-    // /v1/me/stats — agent must see the owner's aggregate, not an empty record.
-    let stats: serde_json::Value = client
-        .get(format!("{base_url}/v1/me/stats"))
-        .header("Authorization", format!("Bearer {agent_auth}"))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    // stats.user — agent must see the owner's aggregate, not an empty record.
+    let stats = run_tool(&client, &base_url, &agent_auth, "stats.user", json!({})).await;
     assert_eq!(
-        stats["attempts_total"], 1,
+        stats["result"]["attempts_total"], 1,
         "agent should see the owner's attempt count, got {stats}"
     );
 
-    // /v1/me/attempts — agent must see the owner's attempt history.
-    let attempts: serde_json::Value = client
-        .get(format!("{base_url}/v1/me/attempts"))
+    // attempt.list — agent must see the owner's attempt history.
+    let attempts = run_tool(&client, &base_url, &agent_auth, "attempt.list", json!({})).await;
+    assert_eq!(
+        attempts["result"]["total"], 1,
+        "agent should see the owner's attempts, got {attempts}"
+    );
+    assert_eq!(attempts["result"]["attempts"].as_array().unwrap().len(), 1);
+}
+
+/// Single-door boundary: an agent-role token is confined to POST /v1/agents/run.
+/// Any direct learner/authoring REST endpoint must be rejected with 403 by the
+/// agent guard middleware (task-4), regardless of the token's scopes.
+#[tokio::test]
+async fn test_agent_token_blocked_on_learner_rest() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    // A generously-scoped agent token — the 403 comes from the role guard, not
+    // from a missing scope.
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(
+        &pool,
+        &[
+            "assessment.read",
+            "assessment.write",
+            "stats.read",
+            "attempt.read",
+        ],
+    )
+    .await;
+    let bearer = format!("Bearer {agent_auth}");
+
+    // POST /v1/sessions — start a session (agents never take assessments).
+    let res = client
+        .post(format!("{base_url}/v1/sessions"))
+        .header("Authorization", &bearer)
+        .json(&json!({ "assessmentId": Uuid::now_v7() }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on POST /v1/sessions"
+    );
+
+    // GET /v1/me/stats — learner record read is run-only for agents now.
+    let res = client
+        .get(format!("{base_url}/v1/me/stats"))
+        .header("Authorization", &bearer)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on GET /v1/me/stats"
+    );
+
+    // POST /v1/assessments — authoring is run-only for agents.
+    let res = client
+        .post(format!("{base_url}/v1/assessments"))
+        .header("Authorization", &bearer)
+        .json(&json!({ "title": "Direct", "mode": "practice" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on POST /v1/assessments"
+    );
+}
+
+/// The agent completes the full author → publish → analyze → archive loop using
+/// POST /v1/agents/run exclusively (no direct REST), acting for its owner.
+#[tokio::test]
+async fn test_agent_full_authoring_loop_via_run() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(
+        &pool,
+        &[
+            "assessment.read",
+            "assessment.write",
+            "stats.read",
+            "attempt.read",
+        ],
+    )
+    .await;
+
+    // 1. Author a question (live so it can back a published assessment).
+    let created = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "question.create",
+        json!({
+            "questions": [{
+                "kind": "mc",
+                "prompt": "2 + 2 = ?",
+                "payload": { "options": ["3", "4"], "correct_index": 1 },
+                "tags": ["arithmetic"],
+                "status": "live",
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(created["result"]["created"], 1);
+    let question_id = created["result"]["questions"][0]["id"]
+        .as_str()
+        .expect("created question id")
+        .to_string();
+
+    // 2. Create the assessment as a draft.
+    let assessment = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.create",
+        json!({
+            "title": "Agent-authored quiz",
+            "mode": "practice",
+            "status": "draft",
+        }),
+    )
+    .await;
+    let assessment_id = assessment["result"]["id"]
+        .as_str()
+        .expect("created assessment id")
+        .to_string();
+
+    // 3. Attach the question to the assessment.
+    let attached = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.addQuestion",
+        json!({ "id": assessment_id, "questionId": question_id }),
+    )
+    .await;
+    assert!(
+        attached["ok"].as_bool().unwrap_or(false),
+        "addQuestion: {attached}"
+    );
+
+    // 4. Publish (draft -> active).
+    let published = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.update",
+        json!({ "id": assessment_id, "status": "active" }),
+    )
+    .await;
+    assert!(
+        published["ok"].as_bool().unwrap_or(false),
+        "publish: {published}"
+    );
+
+    // 5. Analyze: read owner stats + the assessment's own stats via run.
+    let stats = run_tool(&client, &base_url, &agent_auth, "stats.user", json!({})).await;
+    assert!(
+        stats["ok"].as_bool().unwrap_or(false),
+        "stats.user: {stats}"
+    );
+    let a_stats = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.stats",
+        json!({ "id": assessment_id }),
+    )
+    .await;
+    assert!(
+        a_stats["ok"].as_bool().unwrap_or(false),
+        "assessment.stats: {a_stats}"
+    );
+
+    // 6. Archive (active -> archived) and confirm the new state via run.
+    let archived = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.update",
+        json!({ "id": assessment_id, "status": "archived" }),
+    )
+    .await;
+    assert!(
+        archived["ok"].as_bool().unwrap_or(false),
+        "archive: {archived}"
+    );
+
+    let fetched = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.get",
+        json!({ "id": assessment_id }),
+    )
+    .await;
+    assert_eq!(
+        fetched["result"]["status"], "archived",
+        "assessment should be archived, got {fetched}"
+    );
+}
+
+/// POST a single run-tool call and return the parsed JSON envelope
+/// (`{ ok, tool, result, error }`). Panics on transport failure.
+async fn run_tool(
+    client: &reqwest::Client,
+    base_url: &str,
+    agent_auth: &str,
+    tool: &str,
+    params: serde_json::Value,
+) -> serde_json::Value {
+    client
+        .post(format!("{base_url}/v1/agents/run"))
         .header("Authorization", format!("Bearer {agent_auth}"))
+        .json(&json!({ "tool": tool, "params": params }))
         .send()
         .await
         .unwrap()
         .json()
         .await
-        .unwrap();
-    assert_eq!(
-        attempts["total"], 1,
-        "agent should see the owner's attempts, got {attempts}"
-    );
-    assert_eq!(attempts["attempts"].as_array().unwrap().len(), 1);
+        .unwrap()
 }
