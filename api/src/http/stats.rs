@@ -271,7 +271,11 @@ pub async fn me_stats(
     user: AuthenticatedUser,
     Query(q): Query<MeStatsQuery>,
 ) -> Result<Json<MeStatsResponse>, ApiError> {
-    let uid = user.user.id;
+    // Scope to the owner, not the calling identity: an agent sub-account shares
+    // its owner's learning record, so an agent token must read the owner's
+    // attempts/sessions/ratings. For a human token owner_id == user.id, so this
+    // leaves their view unchanged.
+    let uid = user.owner_id;
     let days = window_days(q.window.as_deref());
 
     let attempts_row = sqlx::query(

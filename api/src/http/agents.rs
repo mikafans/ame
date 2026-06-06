@@ -321,6 +321,23 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("assessment.write"),
             strict,
         ),
+        tool(
+            "assessment.generate",
+            "Generate candidate questions from the live bank for the given objectives (returns candidates; does not persist).",
+            json!({
+                "type":"object",
+                "properties":{
+                    "source":{"type":"string"},
+                    "questionCount":{"type":"integer"},
+                    "types":{"type":"array","items":{"type":"string","enum":["mc","tf","short","essay","code"]}},
+                    "objectives":{"type":"array","items":{"type":"string"}}
+                }
+            }),
+            "POST",
+            "/v1/assessments/generate",
+            Some("assessment.read"),
+            strict,
+        ),
         // Questions
         tool(
             "question.list",
@@ -378,6 +395,24 @@ fn build_skill_manifest(strict: bool) -> Value {
             strict,
         ),
         tool(
+            "session.answer",
+            "Submit an answer for one question in an active session.",
+            json!({
+                "type":"object",
+                "required":["id","questionId","response"],
+                "properties":{
+                    "id":{"type":"string","format":"uuid","description":"session id (path)"},
+                    "questionId":{"type":"string","format":"uuid"},
+                    "response":{"type":"object","description":"AttemptResponse payload for the question kind"},
+                    "timeToAnswerMs":{"type":"integer"}
+                }
+            }),
+            "POST",
+            "/v1/sessions/{id}/answer",
+            Some("attempt.write"),
+            strict,
+        ),
+        tool(
             "session.finish",
             "Finish a session and compute results.",
             id_only(),
@@ -419,6 +454,44 @@ fn build_skill_manifest(strict: bool) -> Value {
             Some("attempt.write"),
             strict,
         ),
+        // Agent self — run-only tools (POST /v1/agents/run). These operate on the
+        // calling agent's own profile/plan and are available to any agent token.
+        tool(
+            "profile.get",
+            "Get the agent's own config (label, focus tags, goal, memory) plus the owner's per-tag ELO ratings.",
+            json!({"type":"object","properties":{}}),
+            "POST",
+            "/v1/agents/run",
+            None,
+            strict,
+        ),
+        tool(
+            "memory.set",
+            "Replace the agent's memory blob wholesale.",
+            json!({"type":"object","required":["memory"],"properties":{"memory":{"type":"object"}}}),
+            "POST",
+            "/v1/agents/run",
+            None,
+            strict,
+        ),
+        tool(
+            "memory.append",
+            "Shallow-merge the given keys into the agent's memory blob.",
+            json!({"type":"object","required":["append"],"properties":{"append":{"type":"object"}}}),
+            "POST",
+            "/v1/agents/run",
+            None,
+            strict,
+        ),
+        tool(
+            "target.set",
+            "Update the agent's current goal and/or next target.",
+            json!({"type":"object","properties":{"currentGoal":{"type":"string"},"nextTarget":{"type":"string"}}}),
+            "POST",
+            "/v1/agents/run",
+            None,
+            strict,
+        ),
     ];
 
     json!({
@@ -437,7 +510,11 @@ fn build_skill_manifest(strict: bool) -> Value {
                 "assessment.update",
                 "question.create",
                 "question.promote",
-                "attempt.grade"
+                "attempt.grade",
+                "profile.get",
+                "memory.set",
+                "memory.append",
+                "target.set"
             ],
             "description": "Execute a composite or write tool.",
         },
