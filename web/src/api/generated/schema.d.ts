@@ -89,6 +89,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/admin/tokens — list all API tokens with filtering */
+        get: operations["list_tokens"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** DELETE /v1/admin/tokens/{id} — revoke an API token (idempotent) */
+        delete: operations["delete_token_admin"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -1147,6 +1181,15 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListTokensResponse: {
+            /** Format: int64 */
+            page: number;
+            /** Format: int64 */
+            pageSize: number;
+            tokens: components["schemas"]["TokenEntry"][];
+            /** Format: int64 */
+            total: number;
+        };
         ListUsersResponse: {
             /** Format: int64 */
             total: number;
@@ -1406,6 +1449,24 @@ export interface components {
             id: string;
             name: string;
         };
+        TokenEntry: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            name: string;
+            ownerEmail?: string | null;
+            /** Format: uuid */
+            ownerId: string;
+            ownerRole: string;
+            /** Format: date-time */
+            revokedAt?: string | null;
+            scopes: string[];
+        };
         UpdateAgentBody: {
             focusTags?: string[] | null;
             label?: string | null;
@@ -1652,6 +1713,89 @@ export interface operations {
             };
             /** @description Forbidden (Admin required) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tokens: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                q?: string;
+                status?: string;
+                role?: string;
+                ownerId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token list successfully retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTokensResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_token_admin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Token ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token revoked successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

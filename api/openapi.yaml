@@ -171,6 +171,84 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
+  /v1/admin/tokens:
+    get:
+      tags:
+      - admin
+      summary: GET /v1/admin/tokens — list all API tokens with filtering
+      operationId: list_tokens
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: ownerId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Token list successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTokensResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
+  /v1/admin/tokens/{id}:
+    delete:
+      tags:
+      - admin
+      summary: DELETE /v1/admin/tokens/{id} — revoke an API token (idempotent)
+      operationId: delete_token_admin
+      parameters:
+      - name: id
+        in: path
+        description: Token ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Token revoked successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+        '404':
+          description: Token not found
+      security:
+      - bearer: []
   /v1/admin/users:
     get:
       tags:
@@ -2710,6 +2788,27 @@ components:
         total:
           type: integer
           format: int64
+    ListTokensResponse:
+      type: object
+      required:
+      - tokens
+      - total
+      - page
+      - pageSize
+      properties:
+        page:
+          type: integer
+          format: int64
+        pageSize:
+          type: integer
+          format: int64
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokenEntry'
+        total:
+          type: integer
+          format: int64
     ListUsersResponse:
       type: object
       required:
@@ -3356,6 +3455,51 @@ components:
           format: uuid
         name:
           type: string
+    TokenEntry:
+      type: object
+      required:
+      - id
+      - name
+      - ownerId
+      - ownerRole
+      - scopes
+      - expiresAt
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        lastUsedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        name:
+          type: string
+        ownerEmail:
+          type:
+          - string
+          - 'null'
+        ownerId:
+          type: string
+          format: uuid
+        ownerRole:
+          type: string
+        revokedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        scopes:
+          type: array
+          items:
+            type: string
     UpdateAgentBody:
       type: object
       properties:
