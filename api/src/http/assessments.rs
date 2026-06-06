@@ -262,9 +262,7 @@ pub async fn list_assessments(
                     ORDER BY s.finished_at DESC LIMIT 1
                 ) AS last_session_id
          FROM tb_assessments a
-         WHERE (a.created_by = $1 OR EXISTS (
-             SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
-         )) AND a.deleted_at IS NULL",
+         WHERE a.owner_id = $1 AND a.deleted_at IS NULL",
     );
 
     let mut args = PgArguments::default();
@@ -427,8 +425,8 @@ pub async fn create_assessment(
         "INSERT INTO tb_assessments \
          (id, title, description, mode, status, objectives, course, duration_min, \
           time_limit_seconds, passing_points, show_results_during, affects_rating, \
-          method, created_by, total_points) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+          method, created_by, owner_id, total_points) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
     )
     .bind(assessment_id)
     .bind(payload.title.clone())
@@ -444,6 +442,7 @@ pub async fn create_assessment(
     .bind(payload.affects_rating)
     .bind(&payload.method)
     .bind(user.user.id)
+    .bind(user.owner_id)
     .bind(total_points)
     .execute(&mut *tx)
     .await
@@ -561,8 +560,7 @@ pub async fn get_assessment(
     // Owner-scoped access: the owner and any of their agents.
     let row = sqlx::query(
         "SELECT * FROM tb_assessments WHERE id = $1 \
-         AND (created_by = $2 \
-              OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2)) \
+         AND owner_id = $2 \
          AND deleted_at IS NULL",
     )
     .bind(id)
@@ -1284,9 +1282,7 @@ pub async fn count_assessments(
 ) -> Result<Json<CountAssessmentsResponse>, ApiError> {
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM tb_assessments a
-         WHERE (a.created_by = $1 OR EXISTS (
-             SELECT 1 FROM tb_users u WHERE u.id = a.created_by AND u.owner_user_id = $1
-         ))
+         WHERE a.owner_id = $1
            AND ($2::text IS NULL OR a.mode = $2)
            AND a.deleted_at IS NULL",
     )

@@ -71,20 +71,6 @@ fn decode_cursor(cursor: &str) -> Option<(OffsetDateTime, Uuid)> {
     Some((ts, Uuid::parse_str(id).ok()?))
 }
 
-async fn get_accessible_accounts(
-    pool: &sqlx::PgPool,
-    owner_id: Uuid,
-) -> Result<Vec<Uuid>, ApiError> {
-    let rows =
-        sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1")
-            .bind(owner_id)
-            .fetch_all(pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok(rows.into_iter().map(|(id,)| id).collect())
-}
-
 /// GET /v1/explore — searchable, paginated assessment exploration.
 #[utoipa::path(
     get,
@@ -106,20 +92,17 @@ pub async fn explore(
     let uid = auth.owner_id;
     let limit = q.limit.clamp(1, 200);
 
-    // Get accessible account ids (owner + sub-accounts)
-    let accounts = get_accessible_accounts(pool, uid).await?;
-
     // Build dynamic query
-    // Strict isolation: only view own items (including agent's)
+    // Strict isolation: only view own items (by owner_id)
     let mut sql = String::from(
         "SELECT id, title, status, mode, objectives, created_at
          FROM tb_assessments
-         WHERE created_by = ANY($1) AND deleted_at IS NULL",
+         WHERE owner_id = $1 AND deleted_at IS NULL",
     );
     let mut args = PgArguments::default();
-    args.add(accounts)
+    args.add(uid)
         .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
-    let mut param_idx = 2; // $1 is already used for account array
+    let mut param_idx = 2; // $1 is already used for owner_id
 
     if let Some(status) = q.kind {
         sql.push_str(&format!(" AND status = ${}", param_idx));
@@ -243,19 +226,16 @@ pub async fn explore_facets(
         }
     }
 
-    // Get accessible account ids (owner + sub-accounts)
-    let accounts = get_accessible_accounts(pool, uid).await?;
-
     // 1. Get counts grouped by mode
     // Facets must mirror the list (which is active-only): counting drafts or
     // archived assessments here over-reports vs. what Explore actually shows.
     let count_rows = sqlx::query(
         "SELECT mode, count(*) as cnt
          FROM tb_assessments
-         WHERE created_by = ANY($1) AND deleted_at IS NULL AND status = 'active'
+         WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'active'
          GROUP BY mode",
     )
-    .bind(&accounts)
+    .bind(uid)
     .fetch_all(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -276,11 +256,11 @@ pub async fn explore_facets(
     let tag_rows = sqlx::query(
         "SELECT DISTINCT unnest(objectives) AS t
          FROM tb_assessments
-         WHERE created_by = ANY($1) AND deleted_at IS NULL AND status = 'active'
+         WHERE owner_id = $1 AND deleted_at IS NULL AND status = 'active'
          ORDER BY t
          LIMIT 200",
     )
-    .bind(&accounts)
+    .bind(uid)
     .fetch_all(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;

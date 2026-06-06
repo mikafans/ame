@@ -123,8 +123,9 @@ async fn test_export_premium_gate_and_rate_limit() {
 
     // Seed some data for premium owner to export
     let assessment_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_assessments (id, title, objectives, course, status, mode, created_by) VALUES ($1, 'Exportable Assessment', '{}', 'Test Course', 'draft', 'practice', $2)")
+    sqlx::query("INSERT INTO tb_assessments (id, title, objectives, course, status, mode, created_by, owner_id) VALUES ($1, 'Exportable Assessment', '{}', 'Test Course', 'draft', 'practice', $2, $3)")
         .bind(assessment_id)
+        .bind(prem_id)
         .bind(prem_id)
         .execute(&pool)
         .await

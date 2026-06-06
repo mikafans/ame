@@ -780,13 +780,13 @@ async fn run_assessment_batch_create(
     let is_admin = auth.user.role == crate::domain::user::Role::Admin;
     crate::http::db::set_rls_guc(&mut tx, auth.owner_id, is_admin).await?;
 
-    // Bulk insert assessments (15 columns)
+    // Bulk insert assessments (16 columns)
     {
         let mut qb = QueryBuilder::new(
             "INSERT INTO tb_assessments \
              (id, title, description, mode, status, objectives, course, duration_min, \
               time_limit_seconds, passing_points, show_results_during, affects_rating, \
-              method, created_by, total_points) ",
+              method, created_by, owner_id, total_points) ",
         );
 
         qb.push_values(&validated, |mut b, item| {
@@ -804,6 +804,7 @@ async fn run_assessment_batch_create(
                 .push_bind(item.affects_rating)
                 .push_bind(&item.method)
                 .push_bind(auth.user.id)
+                .push_bind(auth.owner_id)
                 .push_bind(item.total_points);
         });
 

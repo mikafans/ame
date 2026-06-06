@@ -186,9 +186,10 @@ async fn test_assessment_and_question_quota_check() {
 
     // 2. Let's create some assessments in the DB for this user
     for i in 0..2 {
-        sqlx::query("INSERT INTO tb_assessments (id, title, mode, status, created_by, total_points) VALUES ($1, $2, 'practice', 'draft', $3, 0)")
+        sqlx::query("INSERT INTO tb_assessments (id, title, mode, status, created_by, owner_id, total_points) VALUES ($1, $2, 'practice', 'draft', $3, $4, 0)")
             .bind(Uuid::now_v7())
             .bind(format!("Assessment {i}"))
+            .bind(user_id)
             .bind(user_id)
             .execute(&pool)
             .await

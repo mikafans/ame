@@ -173,8 +173,7 @@ pub async fn create_session(
         sqlx::query(
             "SELECT 1 FROM tb_assessments \
              WHERE id = $1 \
-               AND (created_by = $2 \
-                    OR EXISTS (SELECT 1 FROM tb_users u WHERE u.id = created_by AND u.owner_user_id = $2)) \
+               AND owner_id = $2 \
                AND deleted_at IS NULL",
         )
         .bind(assessment_id)

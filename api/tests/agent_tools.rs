@@ -299,9 +299,10 @@ async fn test_agent_reads_owner_record_via_run() {
     .unwrap();
 
     let assessment_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO tb_assessments (title, mode, status, created_by) \
-         VALUES ('A', 'practice', 'active', $1) RETURNING id",
+        "INSERT INTO tb_assessments (title, mode, status, created_by, owner_id) \
+         VALUES ('A', 'practice', 'active', $1, $2) RETURNING id",
     )
+    .bind(owner_id)
     .bind(owner_id)
     .fetch_one(&pool)
     .await

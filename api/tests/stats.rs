@@ -103,11 +103,20 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
     .get("id")
 }
 
-async fn make_assessment(pool: &PgPool, owner_id: Uuid) -> Uuid {
+async fn make_assessment(pool: &PgPool, created_by: Uuid) -> Uuid {
+    // Resolve the owner: if created_by is a sub-account, use their owner; else use created_by
+    let owner_id: Uuid =
+        sqlx::query_scalar("SELECT COALESCE(owner_user_id, id) FROM tb_users WHERE id = $1")
+            .bind(created_by)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+
     sqlx::query(
-        "INSERT INTO tb_assessments (title, mode, status, created_by) VALUES ($1, 'practice', 'active', $2) RETURNING id",
+        "INSERT INTO tb_assessments (title, mode, status, created_by, owner_id) VALUES ($1, 'practice', 'active', $2, $3) RETURNING id",
     )
     .bind("Test Assessment")
+    .bind(created_by)
     .bind(owner_id)
     .fetch_one(pool)
     .await
