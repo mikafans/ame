@@ -285,7 +285,7 @@ pub async fn list_assessments(
         param_idx += 1;
     }
     if let Some(tag) = params.tag {
-        sql.push_str(&format!(" AND a.tags @> ARRAY[${}]", param_idx));
+        sql.push_str(&format!(" AND a.objectives @> ARRAY[${}]", param_idx));
         args.add(tag)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
         param_idx += 1;

@@ -790,7 +790,7 @@ pub async fn list_webhooks(
     user: AuthenticatedUser,
 ) -> Result<Json<ListWebhooksResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, url, events, is_active, created_at FROM tb_webhooks WHERE user_id = $1 ORDER BY created_at DESC"
+        "SELECT id, url, events, (revoked_at IS NULL) AS is_active, created_at FROM tb_webhooks WHERE user_id = $1 ORDER BY created_at DESC"
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)
