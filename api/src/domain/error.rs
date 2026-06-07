@@ -55,6 +55,29 @@ pub struct FieldError {
     pub message: String,
 }
 
+impl ApiError {
+    /// The HTTP status this error maps to. Kept in sync with `into_response`;
+    /// used by callers (e.g. the agent run-door activity log) that need the
+    /// status without consuming the error into a `Response`.
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiError::Forbidden(_) | ApiError::ScopeRequired(_) => StatusCode::FORBIDDEN,
+            ApiError::NotFound { .. } => StatusCode::NOT_FOUND,
+            ApiError::Validation(_)
+            | ApiError::InvalidPayload { .. }
+            | ApiError::ExamPoolInsufficient { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+            ApiError::SessionFinished | ApiError::IdempotencyConflict => StatusCode::CONFLICT,
+            ApiError::ExamExpired => StatusCode::GONE,
+            ApiError::ScoringUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+            ApiError::TooManyRequests | ApiError::QuotaExceeded { .. } => {
+                StatusCode::TOO_MANY_REQUESTS
+            }
+            ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, code, message, details) = match &self {

@@ -54,6 +54,34 @@ fn derive_tool_name(method: &str, path: &str) -> String {
     .to_string()
 }
 
+/// Insert one activity-log row, swallowing any error.
+///
+/// `agent_id` MUST reference `tb_agents(id)` — the FK rejects any other id, so
+/// only agent callers should be passed here (human ids silently fail the
+/// insert). Errors are swallowed: a DB hiccup must never break the request
+/// path. Callers run this fire-and-forget (`tokio::spawn`). Shared by the path
+/// middleware and the run-door (`http::agents::run`).
+pub(crate) async fn insert_activity_log(
+    pool: &sqlx::PgPool,
+    agent_id: uuid::Uuid,
+    tool_name: &str,
+    method: &str,
+    path: &str,
+    status: i32,
+) {
+    let _ = sqlx::query(
+        "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(agent_id)
+    .bind(tool_name)
+    .bind(method)
+    .bind(path)
+    .bind(status)
+    .execute(pool)
+    .await;
+}
+
 pub async fn activity_log_middleware(
     State(state): State<AppState>,
     req: Request,
@@ -66,6 +94,13 @@ pub async fn activity_log_middleware(
         .map(|p| p.as_str().to_string())
         .unwrap_or_else(|| req.uri().path().to_string());
 
+    // The run-door (POST /v1/agents/run) records its own activity entry with
+    // the resolved inner tool name (see http::agents::run). Skip it here to
+    // avoid a duplicate, uninformative "POST /v1/agents/run" row.
+    if path == "/v1/agents/run" {
+        return next.run(req).await;
+    }
+
     let auth_header = req
         .headers()
         .get(axum::http::header::AUTHORIZATION)
@@ -77,54 +112,38 @@ pub async fn activity_log_middleware(
     let response = next.run(req).await;
     let status = response.status().as_u16() as i32;
 
+    // Only agent callers are logged — `tb_activity_log.agent_id` references
+    // `tb_agents(id)`, so a human id would fail the FK. When the auth extractor
+    // already ran we know the role; otherwise we resolve the token's `agent_id`
+    // (NULL for human tokens, which we then skip).
     if let Some(auth) = auth_extension {
-        let pool = state.pool.clone();
-        let tool_name = derive_tool_name(&method, &path);
-        let path_clone = path.clone();
-        let agent_id = auth.user.id;
-
-        tokio::spawn(async move {
-            let _ = sqlx::query(
-                "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
-                         VALUES ($1, $2, $3, $4, $5)",
-            )
-            .bind(agent_id)
-            .bind(&tool_name)
-            .bind(&method)
-            .bind(&path_clone)
-            .bind(status)
-            .execute(&pool)
-            .await;
-        });
+        if auth.user.role == crate::domain::user::Role::Agent {
+            let pool = state.pool.clone();
+            let tool_name = derive_tool_name(&method, &path);
+            let agent_id = auth.user.id;
+            tokio::spawn(async move {
+                insert_activity_log(&pool, agent_id, &tool_name, &method, &path, status).await;
+            });
+        }
     } else if let Some(auth_str) = auth_header
         && let Some(parsed) = parse_bearer_token(&auth_str)
     {
         let pool = state.pool.clone();
         let tool_name = derive_tool_name(&method, &path);
-        let path_clone = path.clone();
         let token_id = parsed.id;
 
         tokio::spawn(async move {
             let result = sqlx::query(
-                "SELECT COALESCE(user_id, agent_id) as user_id FROM tb_api_tokens WHERE id = $1 AND revoked_at IS NULL",
+                "SELECT agent_id FROM tb_api_tokens WHERE id = $1 AND revoked_at IS NULL",
             )
             .bind(token_id)
             .fetch_optional(&pool)
             .await;
 
-            if let Ok(Some(row)) = result {
-                let agent_id: uuid::Uuid = row.get("user_id");
-                let _ = sqlx::query(
-                    "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
-                         VALUES ($1, $2, $3, $4, $5)",
-                )
-                .bind(agent_id)
-                .bind(&tool_name)
-                .bind(&method)
-                .bind(&path_clone)
-                .bind(status)
-                .execute(&pool)
-                .await;
+            if let Ok(Some(row)) = result
+                && let Some(agent_id) = row.get::<Option<uuid::Uuid>, _>("agent_id")
+            {
+                insert_activity_log(&pool, agent_id, &tool_name, &method, &path, status).await;
             }
         });
     }

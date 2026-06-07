@@ -219,10 +219,6 @@ pub async fn rate_limit_middleware(
     {
         Ok(next.run(req).await)
     } else {
-        println!(
-            "RATE LIMIT REJECTION: key={}, burst={}, refill_rate={}, cost={}",
-            key, burst, refill_rate, cost
-        );
         metrics::counter!("ratelimit_rejection_total").increment(1);
         Err(crate::domain::error::ApiError::TooManyRequests)
     }
