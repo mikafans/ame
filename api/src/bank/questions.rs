@@ -414,39 +414,24 @@ pub async fn update_question(
         .map_err(internal)?;
     }
 
-    // Apply patch fields.
-    if let Some(prompt) = &patch.prompt {
-        sqlx::query("UPDATE tb_questions SET prompt = $1, updated_at = now() WHERE id = $2")
-            .bind(prompt)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
-    if let Some(explanation) = &patch.explanation {
-        sqlx::query("UPDATE tb_questions SET explanation = $1, updated_at = now() WHERE id = $2")
-            .bind(explanation)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
-    if let Some(points) = patch.points {
-        sqlx::query("UPDATE tb_questions SET points = $1, updated_at = now() WHERE id = $2")
-            .bind(points)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
-    if let Some(payload) = &patch.payload {
-        sqlx::query("UPDATE tb_questions SET payload = $1, updated_at = now() WHERE id = $2")
-            .bind(payload)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
+    // Apply patch fields in a single UPDATE statement.
+    sqlx::query(
+        "UPDATE tb_questions \
+         SET prompt = COALESCE($1, prompt), \
+             explanation = COALESCE($2, explanation), \
+             points = COALESCE($3, points), \
+             payload = COALESCE($4, payload), \
+             updated_at = now() \
+         WHERE id = $5",
+    )
+    .bind(patch.prompt.as_deref())
+    .bind(patch.explanation.as_deref())
+    .bind(patch.points)
+    .bind(patch.payload)
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal)?;
     if let Some(tags) = &patch.tags {
         // Replace tags: delete existing, re-insert new ones.
         sqlx::query("DELETE FROM tb_question_tags WHERE question_id = $1")
