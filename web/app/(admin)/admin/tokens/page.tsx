@@ -479,9 +479,14 @@ export default function TokensAuditPage() {
                         {row.name}
                       </Typography>
                     </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight={600} noWrap>
+                    <TableCell sx={{ maxWidth: 220 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          noWrap
+                          title={row.ownerDisplayName || undefined}
+                        >
                           {row.ownerDisplayName || "—"}
                         </Typography>
                         {row.ownerEmail && (
@@ -490,6 +495,7 @@ export default function TokensAuditPage() {
                             color="text.secondary"
                             noWrap
                             display="block"
+                            title={row.ownerEmail}
                           >
                             {row.ownerEmail}
                           </Typography>
