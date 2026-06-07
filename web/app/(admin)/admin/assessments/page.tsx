@@ -38,6 +38,7 @@ import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 import { formatDateTime } from "@/utils/format";
 import { vibrantTagColor } from "@/lib/tagColor";
 
@@ -98,7 +99,9 @@ export default function AdminAssessmentsPage() {
       });
 
       if (error) {
-        setPageError("Failed to load assessments: " + (error as any)?.message);
+        setPageError(
+          "Failed to load assessments: " + errorMessage(error, "Unknown error"),
+        );
         return;
       }
 
@@ -183,9 +186,7 @@ export default function AdminAssessmentsPage() {
       });
 
       if (error) {
-        setDialogError(
-          (error as any)?.message || "Failed to delete assessment.",
-        );
+        setDialogError(errorMessage(error, "Failed to delete assessment."));
       } else {
         setDeleteDialogOpen(false);
         fetchAssessments();
@@ -215,9 +216,7 @@ export default function AdminAssessmentsPage() {
       });
 
       if (error) {
-        setDialogError(
-          (error as any)?.message || "Failed to restore assessment.",
-        );
+        setDialogError(errorMessage(error, "Failed to restore assessment."));
       } else {
         setRestoreDialogOpen(false);
         fetchAssessments();
@@ -230,7 +229,7 @@ export default function AdminAssessmentsPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>

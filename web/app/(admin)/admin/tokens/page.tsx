@@ -34,6 +34,7 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 import { formatDateTime } from "@/utils/format";
 
 interface TokenEntry {
@@ -93,7 +94,9 @@ export default function TokensAuditPage() {
       });
 
       if (error) {
-        setPageError("Failed to load tokens: " + (error as any)?.message);
+        setPageError(
+          "Failed to load tokens: " + errorMessage(error, "Unknown error"),
+        );
         return;
       }
 
@@ -178,8 +181,7 @@ export default function TokensAuditPage() {
 
       if (error) {
         setDialogError(
-          "Failed to revoke token: " +
-            ((error as any)?.message || "Unknown error"),
+          "Failed to revoke token: " + errorMessage(error, "Unknown error"),
         );
       } else {
         setRevokeDialogOpen(false);
@@ -242,7 +244,7 @@ export default function TokensAuditPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
       {/* Title */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
@@ -430,7 +432,10 @@ export default function TokensAuditPage() {
                 <TableCell>Last Used</TableCell>
                 <TableCell>Expires</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell align="right" sx={{ pr: 3 }}>
+                <TableCell
+                  align="right"
+                  sx={{ pr: 3, width: 1, whiteSpace: "nowrap" }}
+                >
                   Actions
                 </TableCell>
               </TableRow>
@@ -578,22 +583,32 @@ export default function TokensAuditPage() {
                       </Typography>
                     </TableCell>
                     <TableCell>{getStatusChip(row)}</TableCell>
-                    <TableCell align="right" sx={{ pr: 2 }}>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenScopesDialog(row)}
-                        sx={{ mr: 1 }}
+                    <TableCell
+                      align="right"
+                      sx={{ pr: 3, width: 1, whiteSpace: "nowrap" }}
+                    >
+                      <Box
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                        }}
                       >
-                        <RemoveRedEyeOutlinedIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        disabled={!canRevoke(row)}
-                        onClick={() => handleOpenRevokeDialog(row)}
-                        color="error"
-                      >
-                        <DeleteOutlinedIcon fontSize="small" />
-                      </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenScopesDialog(row)}
+                        >
+                          <RemoveRedEyeOutlinedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          disabled={!canRevoke(row)}
+                          onClick={() => handleOpenRevokeDialog(row)}
+                          color="error"
+                        >
+                          <DeleteOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -657,9 +672,9 @@ export default function TokensAuditPage() {
         open={scopesDialogOpen}
         onClose={() => setScopesDialogOpen(false)}
         fullWidth
-        maxWidth="xs"
+        maxWidth="sm"
       >
-        <DialogTitle fontWeight="bold">Token Capability Scopes</DialogTitle>
+        <DialogTitle fontWeight="bold">Token Details</DialogTitle>
         <DialogContent dividers>
           <Box sx={{ mb: 2 }}>
             <Typography
@@ -670,6 +685,96 @@ export default function TokensAuditPage() {
               TOKEN NAME
             </Typography>
             <Typography variant="body2">{selectedToken?.name}</Typography>
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 600, display: "block", mb: 0.5 }}
+            >
+              OWNER
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2" fontWeight={600}>
+                {selectedToken?.ownerDisplayName || "—"}
+              </Typography>
+              {selectedToken && (
+                <Chip
+                  label={selectedToken.ownerRole.toUpperCase()}
+                  size="small"
+                  color={
+                    selectedToken.ownerRole === "admin"
+                      ? "primary"
+                      : selectedToken.ownerRole === "agent"
+                        ? "secondary"
+                        : "default"
+                  }
+                  sx={{ fontWeight: 600, fontSize: 10, borderRadius: 1.5 }}
+                />
+              )}
+            </Box>
+            {selectedToken?.ownerEmail && (
+              <Typography variant="caption" color="text.secondary">
+                {selectedToken.ownerEmail}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 1.5,
+              mb: 2,
+            }}
+          >
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600, display: "block" }}
+              >
+                STATUS
+              </Typography>
+              {selectedToken && getStatusChip(selectedToken)}
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600, display: "block" }}
+              >
+                LAST USED
+              </Typography>
+              <Typography variant="body2">
+                {selectedToken?.lastUsedAt
+                  ? formatDateTime(selectedToken.lastUsedAt)
+                  : "Never"}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600, display: "block" }}
+              >
+                CREATED
+              </Typography>
+              <Typography variant="body2">
+                {selectedToken ? formatDateTime(selectedToken.createdAt) : "—"}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600, display: "block" }}
+              >
+                EXPIRES
+              </Typography>
+              <Typography variant="body2">
+                {selectedToken ? formatDateTime(selectedToken.expiresAt) : "—"}
+              </Typography>
+            </Box>
           </Box>
           <Box>
             <Typography

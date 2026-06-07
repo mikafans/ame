@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
       {/* Header */}
       <Box sx={{ mb: 6, display: "flex", alignItems: "center", gap: 2 }}>
         <ShieldOutlinedIcon color="primary" sx={{ fontSize: 48 }} />
