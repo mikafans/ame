@@ -603,7 +603,7 @@ pub async fn get_assessment(
         updated_at: to_jst(row.get("updated_at")),
     };
 
-    // Fetch sections
+    // Fetch all sections and their items in a single query
     let section_rows = sqlx::query(
         "SELECT * FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index ASC",
     )
@@ -612,37 +612,48 @@ pub async fn get_assessment(
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
+    // Fetch all items for all sections in a single JOIN query
+    let item_rows = sqlx::query(
+        "SELECT sec.id AS section_id, sec.order_index AS sec_order_index,
+                q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
+                COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
+         FROM tb_assessment_items ai
+         JOIN tb_assessment_sections sec ON sec.id = ai.section_id
+         JOIN tb_questions q ON q.id = ai.question_id
+         WHERE sec.assessment_id = $1
+         ORDER BY sec.order_index ASC, ai.order_index ASC",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    // Build a map of section_id -> questions
+    let mut items_by_section: std::collections::HashMap<Uuid, Vec<AssessmentQuestion>> =
+        std::collections::HashMap::new();
+    for row in item_rows {
+        let section_id: Uuid = row.get("section_id");
+        let question = AssessmentQuestion {
+            id: row.get("id"),
+            kind: row.get("kind"),
+            prompt: row.get("prompt"),
+            code_snippet: row.get("code_snippet"),
+            payload: row.get("payload"),
+            explanation: row.get("explanation"),
+            points: row.get("points"),
+            status: row.get("status"),
+            order_index: row.get("order_index"),
+        };
+        items_by_section
+            .entry(section_id)
+            .or_default()
+            .push(question);
+    }
+
     let mut sections = Vec::new();
     for sec_row in section_rows {
         let sec_id: Uuid = sec_row.get("id");
-
-        let item_rows = sqlx::query(
-            "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
-                    COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
-             FROM tb_assessment_items ai
-             JOIN tb_questions q ON q.id = ai.question_id
-             WHERE ai.section_id = $1
-             ORDER BY ai.order_index ASC",
-        )
-        .bind(sec_id)
-        .fetch_all(&mut *conn)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
-
-        let questions = item_rows
-            .into_iter()
-            .map(|r| AssessmentQuestion {
-                id: r.get("id"),
-                kind: r.get("kind"),
-                prompt: r.get("prompt"),
-                code_snippet: r.get("code_snippet"),
-                payload: r.get("payload"),
-                explanation: r.get("explanation"),
-                points: r.get("points"),
-                status: r.get("status"),
-                order_index: r.get("order_index"),
-            })
-            .collect();
+        let questions = items_by_section.remove(&sec_id).unwrap_or_default();
 
         sections.push(AssessmentSectionDetail {
             id: sec_id,
