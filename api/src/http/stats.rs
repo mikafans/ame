@@ -95,50 +95,50 @@ pub async fn assessment_stats(
 
     let window_filter = window_sql_filter(params.window.as_deref());
 
-    // avg + median of session percent scores
-    let agg_row = sqlx::query(&format!(
-        "SELECT
-            coalesce(avg((result->>'percent')::double precision), 0) as avg,
-            coalesce(percentile_cont(0.5) within group (order by (result->>'percent')::double precision), 0) as median
-         FROM tb_sessions
-         WHERE assessment_id = $1
-           AND status = 'finished'
-           AND result is not null
-           {window_filter}"
-    ))
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let avg: f64 = agg_row.get("avg");
-    let median: f64 = agg_row.get("median");
-
-    // distribution: 10 buckets 0-9
-    let dist_rows = sqlx::query(&format!(
-        "SELECT
-            floor((result->>'percent')::double precision * 10)::int as bucket,
-            count(*) as count
-         FROM tb_sessions
-         WHERE assessment_id = $1
-           AND status = 'finished'
-           AND result is not null
-           {window_filter}
-         GROUP BY 1
-         ORDER BY 1"
+    // avg + median + distribution in a single scan over the filtered sessions.
+    // GROUPING SETS ((), (bucket)) yields one grand-total row (bucket NULL) with
+    // the overall avg/median, plus one row per score bucket with its count.
+    let agg_dist_rows = sqlx::query(&format!(
+        "WITH filtered AS (
+            SELECT
+                (result->>'percent')::double precision AS pct,
+                least(floor((result->>'percent')::double precision * 10)::int, 9) AS bucket
+            FROM tb_sessions
+            WHERE assessment_id = $1
+              AND status = 'finished'
+              AND result is not null
+              {window_filter}
+        )
+        SELECT
+            bucket,
+            coalesce(avg(pct), 0) AS avg,
+            coalesce(percentile_cont(0.5) within group (order by pct), 0) AS median,
+            count(*) AS count
+         FROM filtered
+         GROUP BY GROUPING SETS ((), (bucket))
+         ORDER BY bucket NULLS FIRST"
     ))
     .bind(id)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let distribution = dist_rows
-        .iter()
-        .map(|r| DistributionBucket {
-            bucket: r.get::<i32, _>("bucket").min(9),
-            count: r.get("count"),
-        })
-        .collect();
+    let mut avg = 0.0;
+    let mut median = 0.0;
+    let mut distribution = Vec::new();
+    for row in &agg_dist_rows {
+        match row.get::<Option<i32>, _>("bucket") {
+            // grand-total grouping set: overall avg/median
+            None => {
+                avg = row.get("avg");
+                median = row.get("median");
+            }
+            Some(bucket) => distribution.push(DistributionBucket {
+                bucket,
+                count: row.get("count"),
+            }),
+        }
+    }
 
     // Per-question stats
     let item_rows = sqlx::query(&format!(
