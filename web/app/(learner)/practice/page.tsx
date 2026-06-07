@@ -24,6 +24,7 @@ const QUESTION_TYPES = [
   { value: "tf", label: "True or false" },
   { value: "short", label: "Short answer" },
   { value: "essay", label: "Essay" },
+  { value: "code", label: "Code" },
 ];
 
 export default function PracticePage() {

@@ -528,6 +528,7 @@ function QuestionInput({
         onChange={onChange}
         disabled={disabled}
         language={question.language ?? question.codeSnippet?.language}
+        starter={question.codeSnippet?.body}
       />
     );
   }
