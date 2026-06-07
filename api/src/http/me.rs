@@ -469,22 +469,20 @@ pub async fn create_agent(
         }]));
     }
     for scope_str in &body.scopes {
-        if scope_str.parse::<crate::domain::user::Scope>().is_err() {
+        let scope = scope_str
+            .parse::<crate::domain::user::Scope>()
+            .map_err(|_| {
+                ApiError::Validation(vec![FieldError {
+                    field: "scopes".into(),
+                    message: format!("unknown scope: {}", scope_str),
+                }])
+            })?;
+        if !scope.is_agent_grantable() {
             return Err(ApiError::Validation(vec![FieldError {
                 field: "scopes".into(),
-                message: format!("unknown scope: {}", scope_str),
+                message: format!("scope not grantable to an agent: {}", scope_str),
             }]));
         }
-    }
-
-    // Agents are authoring/analysis tools scoped to their owner; they must never
-    // hold the admin scope (admin power is role-gated and agents are confined to
-    // the run-door, so the scope would be a dormant escalation footgun anyway).
-    if body.scopes.iter().any(|s| s == "admin") {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "scopes".into(),
-            message: "agents cannot hold the admin scope".into(),
-        }]));
     }
 
     let mut tx = state
@@ -560,20 +558,20 @@ pub async fn create_agent_token(
         }]));
     }
     for scope_str in &body.scopes {
-        if scope_str.parse::<crate::domain::user::Scope>().is_err() {
+        let scope = scope_str
+            .parse::<crate::domain::user::Scope>()
+            .map_err(|_| {
+                ApiError::Validation(vec![FieldError {
+                    field: "scopes".into(),
+                    message: format!("unknown scope: {}", scope_str),
+                }])
+            })?;
+        if !scope.is_agent_grantable() {
             return Err(ApiError::Validation(vec![FieldError {
                 field: "scopes".into(),
-                message: format!("unknown scope: {}", scope_str),
+                message: format!("scope not grantable to an agent: {}", scope_str),
             }]));
         }
-    }
-
-    // Agents must never hold the admin scope (see create_agent).
-    if body.scopes.iter().any(|s| s == "admin") {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "scopes".into(),
-            message: "agents cannot hold the admin scope".into(),
-        }]));
     }
 
     let exists = sqlx::query(

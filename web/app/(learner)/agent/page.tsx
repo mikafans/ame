@@ -447,41 +447,43 @@ function KeysTab() {
       value: "assessment.read",
       label: "assessment.read",
       desc: "Read assessments and questions",
+      tools: [
+        "assessment.list",
+        "assessment.get",
+        "question.list",
+        "activity.list",
+      ],
     },
     {
       value: "assessment.write",
       label: "assessment.write",
       desc: "Create, edit, and archive assessments",
+      tools: [
+        "assessment.create",
+        "assessment.batchCreate",
+        "assessment.update",
+        "assessment.addQuestion",
+        "question.create",
+        "question.promote",
+      ],
     },
     {
       value: "attempt.read",
       label: "attempt.read",
       desc: "Read session attempt details",
+      tools: ["attempt.list"],
     },
     {
       value: "attempt.write",
       label: "attempt.write",
       desc: "Answer questions and submit attempts",
+      tools: ["attempt.grade"],
     },
     {
       value: "stats.read",
       label: "stats.read",
       desc: "Read metrics and user ELO",
-    },
-    {
-      value: "feedback.write",
-      label: "feedback.write",
-      desc: "Submit essay grades and notes",
-    },
-    {
-      value: "plan.read",
-      label: "plan.read",
-      desc: "Read recommended study plans",
-    },
-    {
-      value: "plan.write",
-      label: "plan.write",
-      desc: "Generate and configure study plans",
+      tools: ["assessment.stats", "stats.user"],
     },
   ];
 
@@ -1134,11 +1136,66 @@ function KeysTab() {
                         >
                           {s.desc}
                         </Typography>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 0.5,
+                            mt: 0.75,
+                          }}
+                        >
+                          {s.tools.map((tool) => (
+                            <Chip
+                              key={tool}
+                              size="small"
+                              variant="outlined"
+                              label={tool}
+                              sx={{
+                                fontFamily: "monospace",
+                                fontSize: 10,
+                                height: 18,
+                              }}
+                            />
+                          ))}
+                        </Box>
                       </Box>
                     </Box>
                   ))}
                 </Box>
               </FormGroup>
+              <Box
+                sx={{ mt: 1.5, pt: 1.25, borderTop: 1, borderColor: "divider" }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 600, display: "block", mb: 0.5 }}
+                >
+                  Always available (no scope required)
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: 11, display: "block", mb: 0.75 }}
+                >
+                  Every agent token can manage its own profile and memory.
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {[
+                    "profile.get",
+                    "memory.set",
+                    "memory.append",
+                    "target.set",
+                  ].map((tool) => (
+                    <Chip
+                      key={tool}
+                      size="small"
+                      variant="outlined"
+                      label={tool}
+                      sx={{ fontFamily: "monospace", fontSize: 10, height: 18 }}
+                    />
+                  ))}
+                </Box>
+              </Box>
             </Box>
 
             <Button

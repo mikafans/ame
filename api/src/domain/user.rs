@@ -94,6 +94,19 @@ impl Scope {
             Scope::Admin => "admin",
         }
     }
+
+    /// Whether an agent token may hold this scope. Agents reach the platform
+    /// only through the run-door (`POST /v1/agents/run`); `admin` is role-gated,
+    /// and `feedback.write` / `plan.read` / `plan.write` have no agent tool
+    /// behind them (they gate human-only REST routes). Granting any of these to
+    /// an agent would be a dormant no-op or an escalation footgun. The human
+    /// personal-token surface keeps all scopes.
+    pub fn is_agent_grantable(&self) -> bool {
+        !matches!(
+            self,
+            Scope::Admin | Scope::FeedbackWrite | Scope::PlanRead | Scope::PlanWrite
+        )
+    }
 }
 
 impl std::fmt::Display for Scope {
