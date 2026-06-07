@@ -49,7 +49,7 @@ pub async fn list_questions(
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
            AND ($2::text IS NULL OR q.kind = $2)
-           AND ($3::text IS NULL OR q.prompt ILIKE '%' || $3 || '%')
+           AND ($3::text IS NULL OR q.prompt_tsv @@ websearch_to_tsquery('english', $3))
            AND ($4::double precision IS NULL OR q.rating >= $4)
            AND ($5::double precision IS NULL OR q.rating <= $5)
            AND ($6::text IS NULL OR EXISTS (
@@ -101,7 +101,7 @@ pub async fn list_questions_paged(
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
            AND ($2::text IS NULL OR q.kind = $2)
-           AND ($3::text IS NULL OR q.prompt ILIKE '%' || $3 || '%')
+           AND ($3::text IS NULL OR q.prompt_tsv @@ websearch_to_tsquery('english', $3))
            AND ($4::double precision IS NULL OR q.rating >= $4)
            AND ($5::double precision IS NULL OR q.rating <= $5)
            AND ($6::text IS NULL OR EXISTS (
