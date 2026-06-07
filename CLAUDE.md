@@ -47,6 +47,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 ## Shell Habits
 
 - **Never `cd` before a command** — cwd is always the repo root. Use `make <target>` or absolute paths.
+- **Never echo exit status** — no `; echo EXIT=$?`, no `echo "exit=$status"`, no `echo $pipestatus`. The Bash tool already reports exit codes; judge success from the command's real output. Avoid shell expansions (`$?`, `$status`, `$(...)`, backticks) and `;`-chains — they defeat the permission allowlist and prompt every time.
 - **Search with `rg`, find with `fd`** — never `grep -r` or `find`.
 - **Read files directly** — if `rg` gives you a path, use the Read tool. Never pipe into `xargs rg`.
 - **Long `make` output** — redirect to a file (`make check > /tmp/check.log 2>&1`) then Read it. `grep` on rtk-truncated output silently misses content.
