@@ -7,7 +7,8 @@
  * - Owner revokes an agent via DELETE /v1/me/agents/{id}
  * - Agent can list assessments and create questions (assessment.read + assessment.write)
  * - Agent can fetch user stats (stats.read)
- * - Agent can create and retrieve a study plan (plan.write + plan.read)
+ * - Owner can create and retrieve a study plan (plan.write + plan.read are
+ *   human-only scopes — not grantable to agents)
  * - MCP skill manifest is public and lists expected tool names
  *
  * See also: roles/agent-api.spec.ts (now superseded by this file).
@@ -36,13 +37,7 @@ test.describe("agent management (owner API)", () => {
       headers: { Authorization: `Bearer ${ownerToken}` },
       data: {
         label: `e2e-agent-${ts}`,
-        scopes: [
-          "assessment.read",
-          "assessment.write",
-          "stats.read",
-          "plan.write",
-          "plan.read",
-        ],
+        scopes: ["assessment.read", "assessment.write", "stats.read"],
       },
     });
     expect(r.status()).toBe(201);

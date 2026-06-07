@@ -209,3 +209,150 @@ async fn test_me_agents_crud() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn create_agent_rejects_non_grantable_scope() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let app = router(pool.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr: SocketAddr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{addr}");
+
+    // 1. Create a human user
+    let user_id = uuid::Uuid::now_v7();
+    let user_email = format!("test-user-{}@example.com", user_id);
+    sqlx::query("INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, $3, 'user')")
+        .bind(user_id)
+        .bind(&user_email)
+        .bind("Test User")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let token_id = uuid::Uuid::now_v7();
+    let secret = "very-secret-token";
+    let hash = ame_api::auth::token::hash_secret(secret);
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test-key', $3, $4)")
+        .bind(token_id)
+        .bind(user_id)
+        .bind(&hash)
+        .bind(vec!["assessment.read", "assessment.write", "admin"])
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let auth_header = format!("{token_id}_{secret}");
+
+    // 2. Attempt to create agent with plan.read scope -> should 422
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth_header}"))
+        .json(&json!({
+            "label": "test-agent",
+            "scopes": ["assessment.read", "plan.read"]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let body: serde_json::Value = res.json().await.unwrap();
+    // Validation errors have nested structure: error.details.fields
+    let error_msg = body["error"]["details"]["fields"][0]["message"].as_str();
+    assert!(
+        error_msg.is_some()
+            && error_msg
+                .unwrap()
+                .contains("scope not grantable to an agent"),
+        "Unexpected error message: {:?}",
+        body
+    );
+
+    // 3. Attempt to create agent with feedback.write scope -> should 422
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth_header}"))
+        .json(&json!({
+            "label": "test-agent-2",
+            "scopes": ["feedback.write"]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    // 4. Attempt to create agent with plan.write scope -> should 422
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth_header}"))
+        .json(&json!({
+            "label": "test-agent-3",
+            "scopes": ["plan.write"]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    // 5. Attempt to create agent with admin scope -> should 422
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth_header}"))
+        .json(&json!({
+            "label": "test-agent-4",
+            "scopes": ["admin"]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    // 6. Verify that a valid grantable scope still works
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth_header}"))
+        .json(&json!({
+            "label": "valid-agent",
+            "scopes": ["assessment.read"]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let agent_id = body["id"].as_str().unwrap();
+
+    // 7. Test create_agent_token with non-grantable scope -> should 422
+    let res = client
+        .post(format!("{base_url}/v1/me/agents/{agent_id}/tokens"))
+        .header("Authorization", format!("Bearer {auth_header}"))
+        .json(&json!({
+            "name": "invalid-token",
+            "scopes": ["plan.read"]
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
