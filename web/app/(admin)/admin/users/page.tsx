@@ -43,6 +43,7 @@ import Radio from "@mui/material/Radio";
 import Checkbox from "@mui/material/Checkbox";
 import CircularProgress from "@mui/material/CircularProgress";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 import { formatDateTime } from "@/utils/format";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -103,7 +104,9 @@ export default function ManageUsersPage() {
       });
 
       if (error) {
-        setPageError("Failed to load users: " + (error as any)?.message);
+        setPageError(
+          "Failed to load users: " + errorMessage(error, "Unknown error"),
+        );
         return;
       }
 
@@ -188,18 +191,9 @@ export default function ManageUsersPage() {
     handleCloseMenu();
   };
 
-  // Error Helper
-  const getErrorMessage = (error: any): string => {
-    if (!error) return "An error occurred";
-    const errObj = error?.error;
-    if (errObj?.code === "validation_failed") {
-      const fields = errObj?.details?.fields;
-      if (Array.isArray(fields) && fields.length > 0) {
-        return fields.map((f: any) => f.message).join(", ");
-      }
-    }
-    return errObj?.message || error?.message || "An unexpected error occurred.";
-  };
+  // Error Helper — delegates to the shared extractor (see @/api/errors).
+  const getErrorMessage = (error: unknown): string =>
+    errorMessage(error, "An unexpected error occurred.");
 
   // API submit helpers
   const handleSaveRole = async () => {
@@ -296,7 +290,7 @@ export default function ManageUsersPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
       {/* Title */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>

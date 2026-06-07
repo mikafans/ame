@@ -34,6 +34,7 @@ import Tooltip from "@mui/material/Tooltip";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
+import { APP_VERSION } from "@/version";
 
 export const DRAWER_WIDTH = 232;
 
@@ -186,18 +187,27 @@ export function Sidebar({
     <>
       <Box sx={{ p: 2.5, pb: 2, borderBottom: 1, borderColor: "divider" }}>
         <Logo />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            letterSpacing: 1.2,
-            textTransform: "none",
-            display: "block",
-            mt: 0.5,
-          }}
+        <Box
+          sx={{ display: "flex", alignItems: "baseline", gap: 0.75, mt: 0.5 }}
         >
-          AME
-        </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              letterSpacing: 1.2,
+              textTransform: "none",
+            }}
+          >
+            AME
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.disabled"
+            sx={{ fontFamily: "monospace", fontSize: 11 }}
+          >
+            v{APP_VERSION}
+          </Typography>
+        </Box>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>

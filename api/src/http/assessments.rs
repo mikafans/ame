@@ -285,7 +285,7 @@ pub async fn list_assessments(
         param_idx += 1;
     }
     if let Some(tag) = params.tag {
-        sql.push_str(&format!(" AND a.tags @> ARRAY[${}]", param_idx));
+        sql.push_str(&format!(" AND a.objectives @> ARRAY[${}]", param_idx));
         args.add(tag)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{e}")))?;
         param_idx += 1;
@@ -603,7 +603,7 @@ pub async fn get_assessment(
         updated_at: to_jst(row.get("updated_at")),
     };
 
-    // Fetch sections
+    // Fetch all sections and their items in a single query
     let section_rows = sqlx::query(
         "SELECT * FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index ASC",
     )
@@ -612,37 +612,48 @@ pub async fn get_assessment(
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
 
+    // Fetch all items for all sections in a single JOIN query
+    let item_rows = sqlx::query(
+        "SELECT sec.id AS section_id, sec.order_index AS sec_order_index,
+                q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
+                COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
+         FROM tb_assessment_items ai
+         JOIN tb_assessment_sections sec ON sec.id = ai.section_id
+         JOIN tb_questions q ON q.id = ai.question_id
+         WHERE sec.assessment_id = $1
+         ORDER BY sec.order_index ASC, ai.order_index ASC",
+    )
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+    // Build a map of section_id -> questions
+    let mut items_by_section: std::collections::HashMap<Uuid, Vec<AssessmentQuestion>> =
+        std::collections::HashMap::new();
+    for row in item_rows {
+        let section_id: Uuid = row.get("section_id");
+        let question = AssessmentQuestion {
+            id: row.get("id"),
+            kind: row.get("kind"),
+            prompt: row.get("prompt"),
+            code_snippet: row.get("code_snippet"),
+            payload: row.get("payload"),
+            explanation: row.get("explanation"),
+            points: row.get("points"),
+            status: row.get("status"),
+            order_index: row.get("order_index"),
+        };
+        items_by_section
+            .entry(section_id)
+            .or_default()
+            .push(question);
+    }
+
     let mut sections = Vec::new();
     for sec_row in section_rows {
         let sec_id: Uuid = sec_row.get("id");
-
-        let item_rows = sqlx::query(
-            "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
-                    COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
-             FROM tb_assessment_items ai
-             JOIN tb_questions q ON q.id = ai.question_id
-             WHERE ai.section_id = $1
-             ORDER BY ai.order_index ASC",
-        )
-        .bind(sec_id)
-        .fetch_all(&mut *conn)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
-
-        let questions = item_rows
-            .into_iter()
-            .map(|r| AssessmentQuestion {
-                id: r.get("id"),
-                kind: r.get("kind"),
-                prompt: r.get("prompt"),
-                code_snippet: r.get("code_snippet"),
-                payload: r.get("payload"),
-                explanation: r.get("explanation"),
-                points: r.get("points"),
-                status: r.get("status"),
-                order_index: r.get("order_index"),
-            })
-            .collect();
+        let questions = items_by_section.remove(&sec_id).unwrap_or_default();
 
         sections.push(AssessmentSectionDetail {
             id: sec_id,
@@ -895,16 +906,21 @@ pub async fn add_assessment_question(
         )
         .await?;
 
+        // created_by is the human owner (FK → tb_users); agent attribution is
+        // captured separately in agent_id (FK → tb_agents). Binding the agent's
+        // own id as created_by violates tb_questions_created_by_fkey.
+        let agent_id = (auth.user.role == crate::domain::user::Role::Agent).then_some(auth.user.id);
         sqlx::query_scalar(
-            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by)
-             VALUES ($1, $2, $3, $4, 'draft', 1, $5)
+            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by, agent_id)
+             VALUES ($1, $2, $3, $4, 'draft', 1, $5, $6)
              RETURNING id",
         )
         .bind(auth.owner_id)
         .bind(kind.as_str())
         .bind(&prompt)
         .bind(&default_payload)
-        .bind(auth.user.id)
+        .bind(auth.owner_id)
+        .bind(agent_id)
         .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
@@ -1360,9 +1376,69 @@ pub async fn generate_assessment(
     let conn = &mut *db;
     let plan = planner::plan_assessment(conn, auth.user.id, &req).await?;
 
+    // Batch fetch all questions by id using = ANY($1) instead of N individual queries
+    let plan_ids: Vec<Uuid> = plan
+        .question_plan
+        .items
+        .iter()
+        .map(|i| i.question_id)
+        .collect();
+
+    let by_id = if !plan_ids.is_empty() {
+        let rows = sqlx::query(
+            "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+                    COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
+             FROM tb_questions q WHERE q.id = ANY($1)",
+        )
+        .bind(&plan_ids)
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+        rows.into_iter()
+            .filter_map(|row| {
+                use std::str::FromStr;
+                let id = row.get::<Uuid, _>("id");
+                let kind_str: String = row.get("kind");
+                let status_str: String = row.get("status");
+                let kind = match crate::domain::question::QuestionKind::from_str(&kind_str) {
+                    Ok(k) => k,
+                    Err(_) => return None,
+                };
+                let status = match crate::domain::question::QuestionStatus::from_str(&status_str) {
+                    Ok(s) => s,
+                    Err(_) => return None,
+                };
+                Some((
+                    id,
+                    crate::domain::question::Question {
+                        id,
+                        kind,
+                        prompt: row.get("prompt"),
+                        tags: row.get("tags"),
+                        version: row.get("version"),
+                        status,
+                        points: row.get("points"),
+                        code_snippet: row.get("code_snippet"),
+                        payload: row.get("payload"),
+                        explanation: row.get("explanation"),
+                        source: row.get("source"),
+                        rating: row.get("rating"),
+                        attempts_count: row.get("attempts_count"),
+                        created_by: row.get("created_by"),
+                        created_at: row.get("created_at"),
+                        updated_at: row.get("updated_at"),
+                    },
+                ))
+            })
+            .collect::<std::collections::HashMap<_, _>>()
+    } else {
+        std::collections::HashMap::new()
+    };
+
     let mut candidates = Vec::new();
     for item in &plan.question_plan.items {
-        if let Some(q) = crate::bank::questions::get_question(conn, item.question_id).await? {
+        if let Some(q) = by_id.get(&item.question_id).cloned() {
             if let Some(types) = &body.types
                 && !types.is_empty()
                 && !types.contains(&q.kind)

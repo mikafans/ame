@@ -43,6 +43,6 @@ SELECT
   p.created_at,
   p.updated_at,
   u.deactivated_at
-FROM tb_users u
-JOIN tb_agent_profiles p ON p.agent_user_id = u.id
+FROM tb_users AS u
+INNER JOIN tb_agent_profiles AS p ON u.id = p.agent_user_id
 WHERE u.role = 'agent';

@@ -23,6 +23,7 @@ import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 
 interface HealthData {
   database: string;
@@ -50,7 +51,8 @@ export default function SystemHealthPage() {
 
       if (apiError) {
         setError(
-          "Failed to fetch system status: " + (apiError as any)?.message,
+          "Failed to fetch system status: " +
+            errorMessage(apiError, "Unknown error"),
         );
         return;
       }
@@ -112,7 +114,7 @@ export default function SystemHealthPage() {
   const valkeyStatus = health?.valkey ?? "unknown";
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
       {/* Header */}
       <Box
         sx={{

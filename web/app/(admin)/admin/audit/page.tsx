@@ -25,6 +25,7 @@ import DialogActions from "@mui/material/DialogActions";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 import { formatDateTime } from "@/utils/format";
 
 interface AuditLogEntry {
@@ -82,7 +83,9 @@ export default function AuditLogsPage() {
       });
 
       if (error) {
-        setPageError("Failed to load audit logs: " + (error as any)?.message);
+        setPageError(
+          "Failed to load audit logs: " + errorMessage(error, "Unknown error"),
+        );
         return;
       }
 
@@ -163,7 +166,7 @@ export default function AuditLogsPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
       {/* Title */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>

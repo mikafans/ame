@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+);
+
 const allowedDevOrigins = [
   "harus-mini",
   ...(process.env.NEXT_ALLOWED_ORIGINS?.split(",").filter(Boolean) ?? []),
@@ -45,6 +51,9 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_APP_VERSION: pkg.version,
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

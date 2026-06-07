@@ -810,6 +810,12 @@ async fn run_assessment_batch_create(
         });
     }
 
+    let agent_id = if auth.user.role == crate::domain::user::Role::Agent {
+        Some(auth.user.id)
+    } else {
+        None
+    };
+
     // Open transaction
     let mut tx = state
         .pool
@@ -820,13 +826,13 @@ async fn run_assessment_batch_create(
     let is_admin = auth.user.role == crate::domain::user::Role::Admin;
     crate::http::db::set_rls_guc(&mut tx, auth.owner_id, is_admin).await?;
 
-    // Bulk insert assessments (16 columns)
+    // Bulk insert assessments (17 columns)
     {
         let mut qb = QueryBuilder::new(
             "INSERT INTO tb_assessments \
              (id, title, description, mode, status, objectives, course, duration_min, \
               time_limit_seconds, passing_points, show_results_during, affects_rating, \
-              method, created_by, owner_id, total_points) ",
+              method, created_by, owner_id, total_points, agent_id) ",
         );
 
         qb.push_values(&validated, |mut b, item| {
@@ -843,9 +849,10 @@ async fn run_assessment_batch_create(
                 .push_bind(item.show_results_during)
                 .push_bind(item.affects_rating)
                 .push_bind(&item.method)
-                .push_bind(auth.user.id)
                 .push_bind(auth.owner_id)
-                .push_bind(item.total_points);
+                .push_bind(auth.owner_id)
+                .push_bind(item.total_points)
+                .push_bind(agent_id);
         });
 
         qb.build()
@@ -886,6 +893,7 @@ async fn run_assessment_batch_create(
         explanation: Option<String>,
         points: i32,
         created_by: Uuid,
+        agent_id: Option<Uuid>,
     }
 
     #[derive(Debug)]
@@ -911,7 +919,8 @@ async fn run_assessment_batch_create(
                 payload: q.payload.clone(),
                 explanation: q.explanation.clone(),
                 points: q.points.unwrap_or(1),
-                created_by: auth.user.id,
+                created_by: auth.owner_id,
+                agent_id,
             });
 
             all_assessment_items.push(AssessmentItemRecord {
@@ -930,10 +939,10 @@ async fn run_assessment_batch_create(
         }
     }
 
-    // Bulk insert questions (9 columns: id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
+    // Bulk insert questions (10 columns: id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id)
     if !all_questions.is_empty() {
         let mut qb = QueryBuilder::new(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by) ",
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id) ",
         );
 
         qb.push_values(&all_questions, |mut b, q| {
@@ -945,7 +954,8 @@ async fn run_assessment_batch_create(
                 .push_bind(&q.explanation)
                 .push_bind("live")
                 .push_bind(q.points)
-                .push_bind(q.created_by);
+                .push_bind(q.created_by)
+                .push_bind(q.agent_id);
         });
 
         qb.build()

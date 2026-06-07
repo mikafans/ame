@@ -748,3 +748,180 @@ async fn run_tool(
         .await
         .unwrap()
 }
+
+/// Regression for the db-bulk FK violation (`tb_assessments_created_by_fkey`).
+///
+/// `assessment.batchCreate` is the tool `make db-bulk` drives, and it was the
+/// only authoring path with no test. After agents moved from `tb_users` to
+/// `tb_agents`, binding the agent id as `created_by` (an FK → tb_users) is a
+/// constraint violation. This asserts the *values*: content is attributed to the
+/// human owner (created_by / owner_id) while the agent is recorded in agent_id.
+#[tokio::test]
+async fn test_agent_batch_create_attribution_via_run() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (owner_id, agent_id, agent_auth) =
+        seed_agent(&pool, &["assessment.read", "assessment.write"]).await;
+
+    // One active + one draft item, each carrying questions — mirrors db-bulk.
+    let resp = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.batchCreate",
+        json!({
+            "items": [
+                {
+                    "title": "Batch Active",
+                    "mode": "practice",
+                    "status": "active",
+                    "questions": [
+                        { "kind": "mc", "prompt": "q1",
+                          "payload": { "options": ["a", "b"], "correct_index": 1 },
+                          "points": 1, "tags": ["batch"] }
+                    ],
+                },
+                {
+                    "title": "Batch Draft",
+                    "mode": "graded",
+                    "status": "draft",
+                    "questions": [
+                        { "kind": "tf", "prompt": "q2",
+                          "payload": { "correct": true },
+                          "points": 1, "tags": ["batch"] }
+                    ],
+                },
+            ]
+        }),
+    )
+    .await;
+
+    assert!(
+        resp["ok"].as_bool().unwrap_or(false),
+        "batchCreate should succeed: {resp}"
+    );
+    assert_eq!(resp["result"]["count"], 2, "expected 2 created: {resp}");
+
+    // Assessments: created_by + owner_id are the human; agent_id is the agent.
+    let assessments: Vec<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
+        "SELECT created_by, owner_id, agent_id FROM tb_assessments WHERE owner_id = $1",
+    )
+    .bind(owner_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(assessments.len(), 2, "expected 2 assessment rows");
+    for (created_by, row_owner, row_agent) in &assessments {
+        assert_eq!(
+            *created_by, owner_id,
+            "assessment.created_by must be the owner"
+        );
+        assert_eq!(
+            *row_owner, owner_id,
+            "assessment.owner_id must be the owner"
+        );
+        assert_eq!(
+            *row_agent,
+            Some(agent_id),
+            "assessment.agent_id must be the agent"
+        );
+    }
+
+    // Questions inserted by the batch carry the same attribution.
+    let questions: Vec<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
+        "SELECT created_by, owner_id, agent_id FROM tb_questions WHERE owner_id = $1",
+    )
+    .bind(owner_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(questions.len(), 2, "expected 2 question rows");
+    for (created_by, row_owner, row_agent) in &questions {
+        assert_eq!(
+            *created_by, owner_id,
+            "question.created_by must be the owner"
+        );
+        assert_eq!(*row_owner, owner_id, "question.owner_id must be the owner");
+        assert_eq!(
+            *row_agent,
+            Some(agent_id),
+            "question.agent_id must be the agent"
+        );
+    }
+}
+
+/// Regression for `assessment.addQuestion` with an inline `kind` (no questionId).
+///
+/// This branch inserts a fresh `tb_questions` row and was binding the agent id
+/// as `created_by` (FK → tb_users) while never recording agent_id. The existing
+/// authoring-loop test only ever passes an existing `questionId`, so this branch
+/// was uncovered.
+#[tokio::test]
+async fn test_agent_add_inline_question_attribution_via_run() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (owner_id, agent_id, agent_auth) =
+        seed_agent(&pool, &["assessment.read", "assessment.write"]).await;
+
+    let assessment = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.create",
+        json!({ "title": "Inline host", "mode": "practice", "status": "draft" }),
+    )
+    .await;
+    let assessment_id = assessment["result"]["id"]
+        .as_str()
+        .expect("created assessment id")
+        .to_string();
+
+    // Inline branch: no questionId, so the handler creates a new question.
+    let added = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.addQuestion",
+        json!({ "id": assessment_id, "kind": "mc", "prompt": "inline q" }),
+    )
+    .await;
+    assert!(
+        added["ok"].as_bool().unwrap_or(false),
+        "inline addQuestion should succeed: {added}"
+    );
+
+    let (created_by, row_owner, row_agent): (Uuid, Uuid, Option<Uuid>) = sqlx::query_as(
+        "SELECT created_by, owner_id, agent_id FROM tb_questions WHERE owner_id = $1",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        created_by, owner_id,
+        "inline question.created_by must be the owner"
+    );
+    assert_eq!(
+        row_owner, owner_id,
+        "inline question.owner_id must be the owner"
+    );
+    assert_eq!(
+        row_agent,
+        Some(agent_id),
+        "inline question.agent_id must be the agent"
+    );
+}

@@ -49,7 +49,7 @@ pub async fn list_questions(
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
            AND ($2::text IS NULL OR q.kind = $2)
-           AND ($3::text IS NULL OR q.prompt ILIKE '%' || $3 || '%')
+           AND ($3::text IS NULL OR q.prompt_tsv @@ websearch_to_tsquery('english', $3))
            AND ($4::double precision IS NULL OR q.rating >= $4)
            AND ($5::double precision IS NULL OR q.rating <= $5)
            AND ($6::text IS NULL OR EXISTS (
@@ -101,7 +101,7 @@ pub async fn list_questions_paged(
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
            AND ($2::text IS NULL OR q.kind = $2)
-           AND ($3::text IS NULL OR q.prompt ILIKE '%' || $3 || '%')
+           AND ($3::text IS NULL OR q.prompt_tsv @@ websearch_to_tsquery('english', $3))
            AND ($4::double precision IS NULL OR q.rating >= $4)
            AND ($5::double precision IS NULL OR q.rating <= $5)
            AND ($6::text IS NULL OR EXISTS (
@@ -308,9 +308,17 @@ pub async fn create_questions(
         let id = Uuid::now_v7();
         let status = q.status.unwrap_or(QuestionStatus::Draft);
 
-        sqlx::query(
+        // Normalize tags upfront so we can use them in the final Question object
+        let normalized_tags: Vec<String> = q
+            .tags
+            .iter()
+            .map(|t| crate::bank::tags::normalize_tag(t))
+            .collect();
+
+        let q_row = sqlx::query(
             "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             RETURNING id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, '{}'::text[] AS tags"
         )
         .bind(id)
         .bind(owner_id)
@@ -322,16 +330,15 @@ pub async fn create_questions(
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
         .bind(agent_id)
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
         .await
         .map_err(internal)?;
 
-        for tag_name in q.tags {
-            let normalized = crate::bank::tags::normalize_tag(&tag_name);
+        for tag_name in &normalized_tags {
             let tag_id: Uuid = sqlx::query_scalar(
                 "INSERT INTO tb_tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"
             )
-            .bind(&normalized)
+            .bind(tag_name)
             .fetch_one(&mut *tx)
             .await
             .map_err(internal)?;
@@ -344,12 +351,14 @@ pub async fn create_questions(
                 .map_err(internal)?;
         }
 
-        let q_row = sqlx::query("SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags FROM tb_questions q WHERE q.id = $1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(internal)?;
-        created.push(row_to_question(q_row)?);
+        // Build Question from the INSERT result. The RETURNING tags column is
+        // empty (tag rows are inserted after the question), so attach the
+        // in-memory tags, sorted to match the old ORDER BY t.name projection.
+        let mut question = row_to_question(q_row)?;
+        let mut tags = normalized_tags;
+        tags.sort();
+        question.tags = tags;
+        created.push(question);
     }
 
     tx.commit().await.map_err(internal)?;
@@ -414,39 +423,24 @@ pub async fn update_question(
         .map_err(internal)?;
     }
 
-    // Apply patch fields.
-    if let Some(prompt) = &patch.prompt {
-        sqlx::query("UPDATE tb_questions SET prompt = $1, updated_at = now() WHERE id = $2")
-            .bind(prompt)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
-    if let Some(explanation) = &patch.explanation {
-        sqlx::query("UPDATE tb_questions SET explanation = $1, updated_at = now() WHERE id = $2")
-            .bind(explanation)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
-    if let Some(points) = patch.points {
-        sqlx::query("UPDATE tb_questions SET points = $1, updated_at = now() WHERE id = $2")
-            .bind(points)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
-    if let Some(payload) = &patch.payload {
-        sqlx::query("UPDATE tb_questions SET payload = $1, updated_at = now() WHERE id = $2")
-            .bind(payload)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(internal)?;
-    }
+    // Apply patch fields in a single UPDATE statement.
+    sqlx::query(
+        "UPDATE tb_questions \
+         SET prompt = COALESCE($1, prompt), \
+             explanation = COALESCE($2, explanation), \
+             points = COALESCE($3, points), \
+             payload = COALESCE($4, payload), \
+             updated_at = now() \
+         WHERE id = $5",
+    )
+    .bind(patch.prompt.as_deref())
+    .bind(patch.explanation.as_deref())
+    .bind(patch.points)
+    .bind(patch.payload)
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal)?;
     if let Some(tags) = &patch.tags {
         // Replace tags: delete existing, re-insert new ones.
         sqlx::query("DELETE FROM tb_question_tags WHERE question_id = $1")

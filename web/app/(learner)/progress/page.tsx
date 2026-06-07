@@ -14,6 +14,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import { formatScore, formatDuration } from "@/utils/format";
 import { useTheme } from "@mui/material/styles";
 import { PageShell } from "@/components/PageShell";
+import { APP_VERSION } from "@/version";
 
 type WindowType = "4w" | "all";
 
@@ -119,6 +120,7 @@ export default function ProgressPage() {
     <PageShell
       kicker="All courses"
       title="Progress dashboard"
+      subtitle={`AME v${APP_VERSION}`}
       action={
         <ToggleButtonGroup
           value={win}

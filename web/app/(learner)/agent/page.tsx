@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { formatDate, formatTime } from "@/utils/format";
 import { copyToClipboard } from "@/utils/clipboard";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -393,6 +394,24 @@ function KeysTab() {
   ]);
   const [newAgentFocus, setNewAgentFocus] = useState("");
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
+  // Copy feedback for the post-creation secret dialog. `copyValue` awaits the
+  // clipboard result so we can confirm success (or surface a manual-copy hint
+  // when the insecure-context fallback is blocked).
+  const [copiedField, setCopiedField] = useState<"secret" | "prompt" | null>(
+    null,
+  );
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  async function copyValue(text: string, field: "secret" | "prompt") {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopyFailed(false);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } else {
+      setCopyFailed(true);
+    }
+  }
 
   // Edit agent modal state
   const [editAgent, setEditAgent] = useState<AgentSummary | null>(null);
@@ -520,7 +539,7 @@ function KeysTab() {
         },
       });
       if (error) {
-        setCreateError((error as any)?.message || "Failed to create agent.");
+        setCreateError(errorMessage(error, "Failed to create agent."));
       } else if (data?.apiKey) {
         setCreatedSecret(data.apiKey);
         setNewAgentLabel("");
@@ -598,11 +617,7 @@ function KeysTab() {
         },
       });
       if (error) {
-        setGenerateTokenError(
-          (error as any)?.error?.message ||
-            (error as any)?.message ||
-            "Failed to generate token.",
-        );
+        setGenerateTokenError(errorMessage(error, "Failed to generate token."));
       } else if (data?.secret) {
         setCreatedSecret(data.secret);
         setCreateTokenAgent(null);
@@ -1446,6 +1461,10 @@ function KeysTab() {
           onClose={() => setCreatedSecret(null)}
           maxWidth="sm"
           fullWidth
+          // The insecure-context (non-localhost, e.g. http://harus-mini) copy
+          // fallback uses a temporary textarea it must focus + select; the
+          // modal's default focus trap would steal focus and break it.
+          disableEnforceFocus
         >
           <DialogTitle sx={{ fontWeight: 600 }}>
             API Token Generated Successfully
@@ -1469,28 +1488,44 @@ function KeysTab() {
                 fontFamily: "monospace",
                 fontSize: 13,
                 color: "primary.main",
-                wordBreak: "break-all",
                 mb: 3,
                 userSelect: "all",
                 display: "flex",
+                gap: 1,
                 justifyContent: "space-between",
                 alignItems: "center",
               }}
             >
               <Box
                 component="span"
-                sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
               >
                 {createdSecret}
               </Box>
               <Button
                 size="small"
-                onClick={() => copyToClipboard(createdSecret)}
-                sx={{ minWidth: 0, ml: 1, p: 0.5 }}
+                onClick={() => copyValue(createdSecret, "secret")}
+                sx={{ minWidth: 0, p: 0.5, flexShrink: 0 }}
               >
-                Copy
+                {copiedField === "secret" ? "Copied! ✓" : "Copy"}
               </Button>
             </Box>
+            {copyFailed && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ display: "block", mt: -2, mb: 2 }}
+              >
+                Couldn&apos;t copy automatically — select the secret above and
+                copy it manually.
+              </Typography>
+            )}
 
             <Box sx={{ borderTop: 1, borderColor: "divider", pt: 2.5 }}>
               <Chip
@@ -1556,12 +1591,12 @@ Authenticate all your requests using this API Key:
 Bearer ${createdSecret}
 
 Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`;
-                copyToClipboard(promptText);
+                copyValue(promptText, "prompt");
               }}
               startIcon={<ContentCopyOutlinedIcon />}
               sx={{ mr: "auto" }}
             >
-              Copy Boot Prompt
+              {copiedField === "prompt" ? "Copied! ✓" : "Copy Boot Prompt"}
             </Button>
             <Button
               variant="contained"

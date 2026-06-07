@@ -651,51 +651,23 @@ pub async fn update_agent(
         return Err(ApiError::NotFound { resource: "agent" });
     }
 
-    if let Some(label) = &body.label {
-        sqlx::query("UPDATE tb_agents SET label = $1 WHERE id = $2 AND owner_user_id = $3")
-            .bind(label)
-            .bind(id)
-            .bind(user.user.id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-    }
-
-    if let Some(tags) = &body.focus_tags {
-        sqlx::query(
-            "UPDATE tb_agents \
-             SET focus_tags = $1 \
-             WHERE id = $2 \
-               AND owner_user_id = $3 \
-               AND deactivated_at IS NULL",
-        )
-        .bind(tags)
-        .bind(id)
-        .bind(user.user.id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-    }
-
-    if let Some(goal) = &body.current_goal {
-        sqlx::query("UPDATE tb_agents SET current_goal = $1 WHERE id = $2 AND owner_user_id = $3")
-            .bind(goal)
-            .bind(id)
-            .bind(user.user.id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-    }
-
-    if let Some(target) = &body.next_target {
-        sqlx::query("UPDATE tb_agents SET next_target = $1 WHERE id = $2 AND owner_user_id = $3")
-            .bind(target)
-            .bind(id)
-            .bind(user.user.id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-    }
+    sqlx::query(
+        "UPDATE tb_agents \
+         SET label = COALESCE($1, label), \
+             focus_tags = COALESCE($2, focus_tags), \
+             current_goal = COALESCE($3, current_goal), \
+             next_target = COALESCE($4, next_target) \
+         WHERE id = $5 AND owner_user_id = $6 AND deactivated_at IS NULL",
+    )
+    .bind(body.label.as_deref())
+    .bind(body.focus_tags.as_ref())
+    .bind(body.current_goal.as_deref())
+    .bind(body.next_target.as_deref())
+    .bind(id)
+    .bind(user.user.id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
     tx.commit()
         .await
@@ -790,7 +762,7 @@ pub async fn list_webhooks(
     user: AuthenticatedUser,
 ) -> Result<Json<ListWebhooksResponse>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, url, events, is_active, created_at FROM tb_webhooks WHERE user_id = $1 ORDER BY created_at DESC"
+        "SELECT id, url, events, (revoked_at IS NULL) AS is_active, created_at FROM tb_webhooks WHERE user_id = $1 ORDER BY created_at DESC"
     )
     .bind(user.user.id)
     .fetch_all(&state.pool)

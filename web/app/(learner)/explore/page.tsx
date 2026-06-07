@@ -23,6 +23,7 @@ import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
 import Link from "next/link";
 import { api } from "@/api/client";
+import { errorMessage } from "@/api/errors";
 import { useAuth } from "@/hooks/useAuth";
 import { vibrantTagColor } from "@/lib/tagColor";
 import { useColorMode } from "@/components/ThemeRegistry";
@@ -119,7 +120,7 @@ export default function ExplorePage() {
         body: { assessmentId },
       });
       if (error) {
-        setStartError((error as any)?.message ?? "Failed to start assessment");
+        setStartError(errorMessage(error, "Failed to start assessment"));
         return;
       }
       if (data?.sessionId) {
