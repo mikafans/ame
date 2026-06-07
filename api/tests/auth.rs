@@ -69,6 +69,7 @@ fn create_test_router(pool: PgPool) -> Router {
             free: 50,
             premium: 500,
         },
+        login: ame_api::config::LoginConfig::default(),
     });
     let valkey = ame_api::config::create_valkey_pool(&config).unwrap();
     let limiter = std::sync::Arc::new(ame_api::ratelimit::RateLimiter::new(valkey.clone()));
@@ -560,6 +561,7 @@ async fn test_per_account_login_rate_limiting() {
             free: 1000,
             premium: 1000,
         },
+        login: ame_api::config::LoginConfig::default(),
     };
 
     let valkey = ame_api::config::create_valkey_pool(&config).unwrap();

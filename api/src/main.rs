@@ -50,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
                 free: 50,
                 premium: 500,
             },
+            login: ame_api::config::LoginConfig::default(),
         }
     });
 
