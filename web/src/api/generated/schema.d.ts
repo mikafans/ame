@@ -806,6 +806,8 @@ export interface components {
         };
         AdminHealthResponse: {
             /** Format: int64 */
+            agentsCount: number;
+            /** Format: int64 */
             assessmentsCount: number;
             /** Format: int64 */
             auditLogCount: number;

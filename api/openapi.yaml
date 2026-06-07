@@ -1742,12 +1742,16 @@ components:
       - database
       - valkey
       - usersCount
+      - agentsCount
       - assessmentsCount
       - sessionsCount
       - questionsCount
       - auditLogCount
       - quotaRejectionsTotal
       properties:
+        agentsCount:
+          type: integer
+          format: int64
         assessmentsCount:
           type: integer
           format: int64

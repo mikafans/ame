@@ -17,6 +17,7 @@ import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import PlayCircleOutlinedIcon from "@mui/icons-material/PlayCircleOutlined";
 import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import Alert from "@mui/material/Alert";
@@ -27,6 +28,7 @@ interface HealthData {
   database: string;
   valkey: string;
   usersCount: number;
+  agentsCount: number;
   assessmentsCount: number;
   sessionsCount: number;
   questionsCount: number;
@@ -277,6 +279,15 @@ export default function SystemHealthPage() {
             ),
           },
           {
+            title: "Total Agents",
+            count: health?.agentsCount ?? 0,
+            icon: (
+              <SmartToyOutlinedIcon
+                sx={{ color: "secondary.main", fontSize: 28 }}
+              />
+            ),
+          },
+          {
             title: "Assessments",
             count: health?.assessmentsCount ?? 0,
             icon: (
@@ -304,7 +315,7 @@ export default function SystemHealthPage() {
             ),
           },
         ].map((item) => (
-          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={item.title}>
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={item.title}>
             <Paper
               variant="outlined"
               sx={{
