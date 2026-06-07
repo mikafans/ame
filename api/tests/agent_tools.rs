@@ -657,6 +657,77 @@ async fn test_activity_list_after_agent_table_migration() {
     assert_eq!(question_create_entry["agentName"], "Loop Agent");
 }
 
+/// Regression: agents must never hold the `admin` scope. POST /v1/me/agents with
+/// scopes:["admin"] is rejected even for an admin owner — admin power is
+/// role-gated and agents are confined to the run-door, so the scope would be a
+/// dormant privilege-escalation footgun.
+#[tokio::test]
+async fn test_create_agent_rejects_admin_scope() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    // Seed an ADMIN human owner + a user token for them (admin role is the only
+    // role the old code let through; it must be rejected now regardless).
+    let owner_id = Uuid::now_v7();
+    let owner_email = format!("admin-owner-{owner_id}@example.com");
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role) VALUES ($1, $2, $3, 'admin')",
+    )
+    .bind(owner_id)
+    .bind(&owner_email)
+    .bind("Admin Owner")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let token_id = Uuid::now_v7();
+    let secret = "admin-secret-123";
+    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
+        .bind(token_id)
+        .bind(owner_id)
+        .bind("admin-key")
+        .bind(ame_api::auth::token::hash_secret(secret))
+        .bind(vec!["admin".to_string()])
+        .execute(&pool)
+        .await
+        .unwrap();
+    let auth = format!("{token_id}_{secret}");
+
+    // Even an admin owner cannot mint an agent carrying the admin scope.
+    let resp = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth}"))
+        .json(&json!({ "label": "rogue", "scopes": ["admin"] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "agent creation with admin scope must be rejected"
+    );
+
+    // A normal authoring scope still works.
+    let resp = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", format!("Bearer {auth}"))
+        .json(&json!({ "label": "helper", "scopes": ["assessment.read"] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "agent creation with a normal scope should succeed"
+    );
+}
+
 /// POST a single run-tool call and return the parsed JSON envelope
 /// (`{ ok, tool, result, error }`). Panics on transport failure.
 async fn run_tool(

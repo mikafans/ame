@@ -35,7 +35,6 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import TagOutlinedIcon from "@mui/icons-material/TagOutlined";
-import { useAuth } from "@/hooks/useAuth";
 import { PageShell } from "@/components/PageShell";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { CLIENT_PY } from "@/generated/clientSource";
@@ -382,7 +381,6 @@ function CodeBlock({
 // ── API Keys / Agents tab ──────────────────────────────────────────────────────
 
 function KeysTab() {
-  const { user } = useAuth();
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -485,15 +483,6 @@ function KeysTab() {
       label: "plan.write",
       desc: "Generate and configure study plans",
     },
-    ...(user?.role === "admin"
-      ? [
-          {
-            value: "admin",
-            label: "admin",
-            desc: "Full administrative access",
-          },
-        ]
-      : []),
   ];
 
   function loadAgents() {

@@ -140,6 +140,7 @@ pub struct AdminHealthResponse {
     pub database: String,
     pub valkey: String,
     pub users_count: i64,
+    pub agents_count: i64,
     pub assessments_count: i64,
     pub sessions_count: i64,
     pub questions_count: i64,
@@ -824,39 +825,49 @@ pub async fn get_admin_health(
     };
 
     // 3. Query table row counts
-    let (users_count, assessments_count, sessions_count, questions_count, audit_log_count) =
-        if database == "ok" {
-            let mut conn = state
-                .pool
-                .acquire()
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-            crate::http::db::set_rls_guc(&mut conn, admin.0.user.id, true).await?;
+    let (
+        users_count,
+        agents_count,
+        assessments_count,
+        sessions_count,
+        questions_count,
+        audit_log_count,
+    ) = if database == "ok" {
+        let mut conn = state
+            .pool
+            .acquire()
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        crate::http::db::set_rls_guc(&mut conn, admin.0.user.id, true).await?;
 
-            let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_users")
-                .fetch_one(&mut *conn)
-                .await
-                .unwrap_or(0);
-            let assessments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_assessments")
-                .fetch_one(&mut *conn)
-                .await
-                .unwrap_or(0);
-            let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions")
-                .fetch_one(&mut *conn)
-                .await
-                .unwrap_or(0);
-            let questions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_questions")
-                .fetch_one(&mut *conn)
-                .await
-                .unwrap_or(0);
-            let audit: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_audit_log")
-                .fetch_one(&mut *conn)
-                .await
-                .unwrap_or(0);
-            (users, assessments, sessions, questions, audit)
-        } else {
-            (0, 0, 0, 0, 0)
-        };
+        let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_users")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(0);
+        let agents: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_agents")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(0);
+        let assessments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_assessments")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(0);
+        let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_sessions")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(0);
+        let questions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_questions")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(0);
+        let audit: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_audit_log")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(0);
+        (users, agents, assessments, sessions, questions, audit)
+    } else {
+        (0, 0, 0, 0, 0, 0)
+    };
 
     // 4. Retrieve recent quota-rejection count from Valkey
     let quota_rejections_total = if valkey_status == "ok" {
@@ -879,6 +890,7 @@ pub async fn get_admin_health(
         database: database.to_string(),
         valkey: valkey_status.to_string(),
         users_count,
+        agents_count,
         assessments_count,
         sessions_count,
         questions_count,

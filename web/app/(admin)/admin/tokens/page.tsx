@@ -19,6 +19,7 @@ import TableRow from "@mui/material/TableRow";
 import TablePagination from "@mui/material/TablePagination";
 import Chip from "@mui/material/Chip";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import RemoveRedEyeOutlinedIcon from "@mui/icons-material/RemoveRedEyeOutlined";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -70,6 +71,7 @@ export default function TokensAuditPage() {
 
   // Dialog states
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+  const [scopesDialogOpen, setScopesDialogOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenEntry | null>(null);
   const [dialogLoading, setDialogLoading] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -150,6 +152,11 @@ export default function TokensAuditPage() {
     setSelectedToken(token);
     setDialogError(null);
     setRevokeDialogOpen(true);
+  };
+
+  const handleOpenScopesDialog = (token: TokenEntry) => {
+    setSelectedToken(token);
+    setScopesDialogOpen(true);
   };
 
   const handleCloseRevokeDialog = () => {
@@ -568,6 +575,13 @@ export default function TokensAuditPage() {
                     <TableCell align="right" sx={{ pr: 2 }}>
                       <IconButton
                         size="small"
+                        onClick={() => handleOpenScopesDialog(row)}
+                        sx={{ mr: 1 }}
+                      >
+                        <RemoveRedEyeOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
                         disabled={!canRevoke(row)}
                         onClick={() => handleOpenRevokeDialog(row)}
                         color="error"
@@ -629,6 +643,62 @@ export default function TokensAuditPage() {
             disabled={dialogLoading}
           >
             {dialogLoading ? <CircularProgress size={20} /> : "Revoke"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Dialog: View Scopes */}
+      <Dialog
+        open={scopesDialogOpen}
+        onClose={() => setScopesDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle fontWeight="bold">Token Capability Scopes</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 600 }}
+            >
+              TOKEN NAME
+            </Typography>
+            <Typography variant="body2">{selectedToken?.name}</Typography>
+          </Box>
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 600, display: "block", mb: 1 }}
+            >
+              ASSIGNED SCOPES
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {selectedToken?.scopes.map((scope) => (
+                <Chip
+                  key={scope}
+                  label={scope}
+                  size="small"
+                  variant="outlined"
+                  sx={{ borderRadius: 1 }}
+                />
+              ))}
+              {selectedToken?.scopes.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No scopes assigned.
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button
+            onClick={() => setScopesDialogOpen(false)}
+            variant="contained"
+            fullWidth
+            sx={{ borderRadius: 2 }}
+          >
+            Close
           </Button>
         </DialogActions>
       </Dialog>
