@@ -297,7 +297,7 @@ export default function SystemHealthPage() {
             ),
           },
           {
-            title: "Active Sessions",
+            title: "Sessions",
             count: health?.sessionsCount ?? 0,
             icon: (
               <PlayCircleOutlinedIcon
@@ -306,7 +306,7 @@ export default function SystemHealthPage() {
             ),
           },
           {
-            title: "Questions Bank",
+            title: "Questions",
             count: health?.questionsCount ?? 0,
             icon: (
               <FormatListBulletedOutlinedIcon
@@ -339,11 +339,13 @@ export default function SystemHealthPage() {
               >
                 {item.icon}
               </Box>
-              <Box>
+              <Box sx={{ minWidth: 0 }}>
                 <Typography
                   variant="caption"
                   color="text.secondary"
                   fontWeight={500}
+                  noWrap
+                  display="block"
                 >
                   {item.title}
                 </Typography>
