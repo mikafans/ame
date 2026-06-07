@@ -224,16 +224,6 @@ fn window_days(window: Option<&str>) -> Option<i32> {
     }
 }
 
-async fn get_agent_ids(pool: &sqlx::PgPool, owner_id: Uuid) -> Result<Vec<Uuid>, ApiError> {
-    let rows = sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_agents WHERE owner_user_id = $1")
-        .bind(owner_id)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok(rows.into_iter().map(|(id,)| id).collect())
-}
-
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MeStatsResponse {
     pub avg_score: f64,
@@ -276,120 +266,152 @@ pub async fn me_stats(
     let uid = user.owner_id;
     let days = window_days(q.window.as_deref());
 
-    let attempts_row = sqlx::query(
-        "SELECT COUNT(*) AS total, \
-                COUNT(*) FILTER (WHERE created_at > now() - interval '7 days') AS this_week \
-         FROM tb_attempts WHERE user_id = $1",
-    )
-    .bind(uid)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
-    let attempts_total: i64 = attempts_row.get("total");
-    let attempts_this_week: i64 = attempts_row.get("this_week");
+    // These eight read-only stat queries are independent and share no state, so
+    // run them concurrently — each future acquires its own pooled connection.
+    let attempts_fut = async {
+        let row = sqlx::query(
+            "SELECT COUNT(*) AS total, \
+                    COUNT(*) FILTER (WHERE created_at > now() - interval '7 days') AS this_week \
+             FROM tb_attempts WHERE user_id = $1",
+        )
+        .bind(uid)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(internal)?;
+        Ok::<_, ApiError>((row.get::<i64, _>("total"), row.get::<i64, _>("this_week")))
+    };
 
-    let score_row = sqlx::query(
-        "SELECT \
-            AVG(CASE WHEN (result->>'max_points')::float > 0 \
-                THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
-                ELSE NULL END) FILTER (WHERE finished_at > now() - interval '28 days') AS avg_recent, \
-            AVG(CASE WHEN (result->>'max_points')::float > 0 \
-                THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
-                ELSE NULL END) FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days') AS avg_prior \
-         FROM tb_sessions WHERE user_id = $1 AND status = 'finished' AND result IS NOT NULL",
-    )
-    .bind(uid)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
-    let avg_score: f64 = score_row.try_get::<f64, _>("avg_recent").unwrap_or(0.0);
-    let avg_prior: f64 = score_row.try_get::<f64, _>("avg_prior").unwrap_or(0.0);
-    let avg_score_delta = avg_score - avg_prior;
+    let score_fut = async {
+        let row = sqlx::query(
+            "SELECT \
+                AVG(CASE WHEN (result->>'max_points')::float > 0 \
+                    THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
+                    ELSE NULL END) FILTER (WHERE finished_at > now() - interval '28 days') AS avg_recent, \
+                AVG(CASE WHEN (result->>'max_points')::float > 0 \
+                    THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
+                    ELSE NULL END) FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days') AS avg_prior \
+             FROM tb_sessions WHERE user_id = $1 AND status = 'finished' AND result IS NOT NULL",
+        )
+        .bind(uid)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(internal)?;
+        Ok::<_, ApiError>((
+            row.try_get::<f64, _>("avg_recent").unwrap_or(0.0),
+            row.try_get::<f64, _>("avg_prior").unwrap_or(0.0),
+        ))
+    };
 
-    let hours_row = sqlx::query(
-        "SELECT \
-            COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
-                FILTER (WHERE $2::int IS NULL \
-                    OR finished_at > now() - make_interval(days => $2::int)), 0)::float8 AS hours_recent, \
-            COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
-                FILTER (WHERE $2::int IS NOT NULL \
-                    AND finished_at BETWEEN now() - make_interval(days => $2::int * 2) \
-                                        AND now() - make_interval(days => $2::int)), 0)::float8 AS hours_prior \
-         FROM tb_sessions WHERE user_id = $1 AND status = 'finished'",
-    )
-    .bind(uid)
-    .bind(days)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
-    let hours_spent: f64 = hours_row.get("hours_recent");
-    let hours_prior: f64 = hours_row.get("hours_prior");
-    let hours_spent_delta = hours_spent - hours_prior;
+    let hours_fut = async {
+        let row = sqlx::query(
+            "SELECT \
+                COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
+                    FILTER (WHERE $2::int IS NULL \
+                        OR finished_at > now() - make_interval(days => $2::int)), 0)::float8 AS hours_recent, \
+                COALESCE(SUM(EXTRACT(EPOCH FROM (finished_at - started_at)) / 3600.0) \
+                    FILTER (WHERE $2::int IS NOT NULL \
+                        AND finished_at BETWEEN now() - make_interval(days => $2::int * 2) \
+                                            AND now() - make_interval(days => $2::int)), 0)::float8 AS hours_prior \
+             FROM tb_sessions WHERE user_id = $1 AND status = 'finished'",
+        )
+        .bind(uid)
+        .bind(days)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(internal)?;
+        Ok::<_, ApiError>((
+            row.get::<f64, _>("hours_recent"),
+            row.get::<f64, _>("hours_prior"),
+        ))
+    };
 
-    let streak_row = sqlx::query(
-        "WITH daily AS ( \
-            SELECT DISTINCT date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day \
-            FROM tb_attempts WHERE user_id = $1 \
-        ), \
-        gaps AS ( \
-            SELECT day, ROW_NUMBER() OVER (ORDER BY day) - \
-                   (day - '2000-01-01'::date) AS grp \
-            FROM daily \
-        ), \
-        runs AS ( \
-            SELECT grp, COUNT(*) AS run_len, MAX(day) AS last_day \
-            FROM gaps GROUP BY grp \
-        ) \
-        SELECT \
-            COALESCE((SELECT run_len FROM runs WHERE last_day >= now()::date - 1 ORDER BY last_day DESC LIMIT 1), 0)::bigint AS current_streak, \
-            COALESCE(MAX(run_len), 0)::bigint AS best_streak \
-        FROM runs",
-    )
-    .bind(uid)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
-    let current_streak: i64 = streak_row.get("current_streak");
-    let best_streak: i64 = streak_row.get("best_streak");
+    let streak_fut = async {
+        let row = sqlx::query(
+            "WITH daily AS ( \
+                SELECT DISTINCT date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day \
+                FROM tb_attempts WHERE user_id = $1 \
+            ), \
+            gaps AS ( \
+                SELECT day, ROW_NUMBER() OVER (ORDER BY day) - \
+                       (day - '2000-01-01'::date) AS grp \
+                FROM daily \
+            ), \
+            runs AS ( \
+                SELECT grp, COUNT(*) AS run_len, MAX(day) AS last_day \
+                FROM gaps GROUP BY grp \
+            ) \
+            SELECT \
+                COALESCE((SELECT run_len FROM runs WHERE last_day >= now()::date - 1 ORDER BY last_day DESC LIMIT 1), 0)::bigint AS current_streak, \
+                COALESCE(MAX(run_len), 0)::bigint AS best_streak \
+            FROM runs",
+        )
+        .bind(uid)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(internal)?;
+        Ok::<_, ApiError>((
+            row.get::<i64, _>("current_streak"),
+            row.get::<i64, _>("best_streak"),
+        ))
+    };
 
-    let mastery_row = sqlx::query(
-        "SELECT \
-            COUNT(*) FILTER (WHERE rating >= 1400) AS mastered, \
-            COUNT(*) AS total \
-         FROM tb_user_tag_ratings WHERE user_id = $1",
-    )
-    .bind(uid)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
-    let mastered_topics: i64 = mastery_row.get("mastered");
-    let mastered_topics_total: i64 = mastery_row.get("total");
+    let mastery_fut = async {
+        let row = sqlx::query(
+            "SELECT \
+                COUNT(*) FILTER (WHERE rating >= 1400) AS mastered, \
+                COUNT(*) AS total \
+             FROM tb_user_tag_ratings WHERE user_id = $1",
+        )
+        .bind(uid)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(internal)?;
+        Ok::<_, ApiError>((row.get::<i64, _>("mastered"), row.get::<i64, _>("total")))
+    };
 
-    // Agent metrics
-    let agent_active_count: i64 = sqlx::query_scalar(
+    let agent_active_fut = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL",
     )
     .bind(uid)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
+    .fetch_one(&state.pool);
 
-    let agent_ids = get_agent_ids(&state.pool, uid).await?;
-    let agent_graded_attempts: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_activity_log WHERE tool_name = 'attempt.grade' AND status = 200 AND agent_id = ANY($1)"
-    )
-    .bind(&agent_ids)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
-
-    let agent_curated_assessments: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND owner_id = $1 AND deleted_at IS NULL"
+    // Fold the former get_agent_ids round trip into a correlated subquery.
+    let agent_graded_fut = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM tb_activity_log \
+         WHERE tool_name = 'attempt.grade' AND status = 200 \
+           AND agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $1)",
     )
     .bind(uid)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(internal)?;
+    .fetch_one(&state.pool);
+
+    let agent_curated_fut = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM tb_assessments WHERE method = 'agent' AND owner_id = $1 AND deleted_at IS NULL",
+    )
+    .bind(uid)
+    .fetch_one(&state.pool);
+
+    let (
+        (attempts_total, attempts_this_week),
+        (avg_score, avg_prior),
+        (hours_spent, hours_prior),
+        (current_streak, best_streak),
+        (mastered_topics, mastered_topics_total),
+        agent_active_count,
+        agent_graded_attempts,
+        agent_curated_assessments,
+    ) = tokio::try_join!(
+        attempts_fut,
+        score_fut,
+        hours_fut,
+        streak_fut,
+        mastery_fut,
+        async { agent_active_fut.await.map_err(internal) },
+        async { agent_graded_fut.await.map_err(internal) },
+        async { agent_curated_fut.await.map_err(internal) },
+    )?;
+
+    let avg_score_delta = avg_score - avg_prior;
+    let hours_spent_delta = hours_spent - hours_prior;
 
     Ok(Json(MeStatsResponse {
         avg_score,
