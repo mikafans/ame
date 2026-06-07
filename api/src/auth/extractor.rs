@@ -163,14 +163,23 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             return Err(ApiError::Unauthorized);
         }
 
-        // Update last_used_at in background
+        // Update last_used_at in the background, throttled to at most once per
+        // minute per token. Without the staleness guard, every request from a
+        // single token contends on that one row's lock (concurrent requests
+        // serialize and pile up — observed as multi-second waits on a PK
+        // update). The guard makes all but the first writer in each window a
+        // no-op, so they take no lasting lock.
         let pool = state.pool.clone();
         let token_id = parsed.id;
         tokio::spawn(async move {
-            let _ = sqlx::query("UPDATE tb_api_tokens SET last_used_at = now() WHERE id = $1")
-                .bind(token_id)
-                .execute(&pool)
-                .await;
+            let _ = sqlx::query(
+                "UPDATE tb_api_tokens SET last_used_at = now() \
+                 WHERE id = $1 \
+                   AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')",
+            )
+            .bind(token_id)
+            .execute(&pool)
+            .await;
         });
 
         let role = match info.role.as_str() {

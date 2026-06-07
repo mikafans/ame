@@ -906,16 +906,21 @@ pub async fn add_assessment_question(
         )
         .await?;
 
+        // created_by is the human owner (FK → tb_users); agent attribution is
+        // captured separately in agent_id (FK → tb_agents). Binding the agent's
+        // own id as created_by violates tb_questions_created_by_fkey.
+        let agent_id = (auth.user.role == crate::domain::user::Role::Agent).then_some(auth.user.id);
         sqlx::query_scalar(
-            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by)
-             VALUES ($1, $2, $3, $4, 'draft', 1, $5)
+            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by, agent_id)
+             VALUES ($1, $2, $3, $4, 'draft', 1, $5, $6)
              RETURNING id",
         )
         .bind(auth.owner_id)
         .bind(kind.as_str())
         .bind(&prompt)
         .bind(&default_payload)
-        .bind(auth.user.id)
+        .bind(auth.owner_id)
+        .bind(agent_id)
         .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
