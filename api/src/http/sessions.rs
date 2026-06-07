@@ -1226,30 +1226,28 @@ pub async fn list_my_sessions(
     .await
     .map_err(internal)?;
 
-    // 2. Fetch paginated session list with scalar subqueries for attempt number / totals
+    // 2. Fetch paginated session list with window functions for attempt number / totals
+    // Use CTE to compute windows over the full unfiltered set, then paginate the result
     let rows = sqlx::query(
-        "SELECT s.id, s.kind, s.status, s.assessment_id, s.result, \
-                s.started_at, s.finished_at, a.title AS assessment_title, \
-                ( \
-                    SELECT COUNT(*) \
-                    FROM tb_sessions s2 \
-                    WHERE s2.user_id = s.user_id \
-                      AND s2.assessment_id IS NOT DISTINCT FROM s.assessment_id \
-                      AND s2.status = 'finished' \
-                      AND s2.started_at <= s.started_at \
-                ) AS attempt_number, \
-                ( \
-                    SELECT COUNT(*) \
-                    FROM tb_sessions s3 \
-                    WHERE s3.user_id = s.user_id \
-                      AND s3.assessment_id IS NOT DISTINCT FROM s.assessment_id \
-                      AND s3.status = 'finished' \
-                ) AS total_attempts \
-         FROM tb_sessions s \
-         LEFT JOIN tb_assessments a ON a.id = s.assessment_id \
-         WHERE s.user_id = $1 AND s.status = 'finished' \
-           AND ($2::uuid IS NULL OR s.assessment_id = $2) \
-         ORDER BY s.started_at DESC \
+        "WITH sessions_with_windows AS ( \
+           SELECT s.id, s.kind, s.status, s.assessment_id, s.result, \
+                   s.started_at, s.finished_at, a.title AS assessment_title, \
+                   ROW_NUMBER() OVER ( \
+                       PARTITION BY s.assessment_id \
+                       ORDER BY s.started_at ASC \
+                   ) AS attempt_number, \
+                   COUNT(*) OVER ( \
+                       PARTITION BY s.assessment_id \
+                   ) AS total_attempts \
+            FROM tb_sessions s \
+            LEFT JOIN tb_assessments a ON a.id = s.assessment_id \
+            WHERE s.user_id = $1 AND s.status = 'finished' \
+              AND ($2::uuid IS NULL OR s.assessment_id = $2) \
+         ) \
+         SELECT id, kind, status, assessment_id, result, \
+                started_at, finished_at, assessment_title, attempt_number, total_attempts \
+         FROM sessions_with_windows \
+         ORDER BY started_at DESC \
          LIMIT $3 OFFSET $4",
     )
     .bind(user.user.id)
