@@ -308,9 +308,17 @@ pub async fn create_questions(
         let id = Uuid::now_v7();
         let status = q.status.unwrap_or(QuestionStatus::Draft);
 
-        sqlx::query(
+        // Normalize tags upfront so we can use them in the final Question object
+        let normalized_tags: Vec<String> = q
+            .tags
+            .iter()
+            .map(|t| crate::bank::tags::normalize_tag(t))
+            .collect();
+
+        let q_row = sqlx::query(
             "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             RETURNING id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, '{}'::text[] AS tags"
         )
         .bind(id)
         .bind(owner_id)
@@ -322,16 +330,15 @@ pub async fn create_questions(
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
         .bind(agent_id)
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
         .await
         .map_err(internal)?;
 
-        for tag_name in q.tags {
-            let normalized = crate::bank::tags::normalize_tag(&tag_name);
+        for tag_name in &normalized_tags {
             let tag_id: Uuid = sqlx::query_scalar(
                 "INSERT INTO tb_tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id"
             )
-            .bind(&normalized)
+            .bind(tag_name)
             .fetch_one(&mut *tx)
             .await
             .map_err(internal)?;
@@ -344,12 +351,14 @@ pub async fn create_questions(
                 .map_err(internal)?;
         }
 
-        let q_row = sqlx::query("SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags FROM tb_questions q WHERE q.id = $1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(internal)?;
-        created.push(row_to_question(q_row)?);
+        // Build Question from the INSERT result. The RETURNING tags column is
+        // empty (tag rows are inserted after the question), so attach the
+        // in-memory tags, sorted to match the old ORDER BY t.name projection.
+        let mut question = row_to_question(q_row)?;
+        let mut tags = normalized_tags;
+        tags.sort();
+        question.tags = tags;
+        created.push(question);
     }
 
     tx.commit().await.map_err(internal)?;
