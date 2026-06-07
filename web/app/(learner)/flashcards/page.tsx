@@ -91,7 +91,7 @@ export default function FlashcardsPage() {
               },
             },
           });
-          return ((data?.questions ?? []) as FlashQuestion[]) ?? [];
+          return (data?.questions ?? []) as FlashQuestion[];
         });
         const results = await Promise.all(queries);
         const seen = new Set<string>();
@@ -112,7 +112,7 @@ export default function FlashcardsPage() {
             },
           },
         });
-        all = ((data?.questions ?? []) as FlashQuestion[]) ?? [];
+        all = (data?.questions ?? []) as FlashQuestion[];
       }
 
       const filtered = filterByTypes(all, selectedTypes);
