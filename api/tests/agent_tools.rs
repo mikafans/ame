@@ -576,6 +576,87 @@ async fn test_agent_full_authoring_loop_via_run() {
     );
 }
 
+/// Regression: activity.list works after agents were moved from tb_users to tb_agents.
+/// The agent performs a tool call that writes an activity log entry, then calls
+/// activity.list to verify the entry appears with the agent's label.
+#[tokio::test]
+async fn test_activity_list_after_agent_table_migration() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (_owner_id, _agent_id, agent_auth) =
+        seed_agent(&pool, &["assessment.read", "assessment.write"]).await;
+
+    // 1. Perform a tool call that writes to tb_activity_log (e.g., question.create).
+    let created = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "question.create",
+        json!({
+            "questions": [{
+                "kind": "mc",
+                "prompt": "Test question for activity log",
+                "payload": { "options": ["a", "b"], "correct_index": 0 },
+                "tags": ["activity"],
+                "status": "live",
+            }]
+        }),
+    )
+    .await;
+    assert!(
+        created["ok"].as_bool().unwrap_or(false),
+        "question.create should succeed: {created}"
+    );
+
+    // 2. Call activity.list and verify the entry appears with the agent's label.
+    // The run-door writes the activity row via a fire-and-forget tokio::spawn,
+    // so the feed is eventually consistent — poll briefly for the entry.
+    let mut items = Vec::new();
+    for _ in 0..40 {
+        let activity = run_tool(&client, &base_url, &agent_auth, "activity.list", json!({})).await;
+        assert!(
+            activity["ok"].as_bool().unwrap_or(false),
+            "activity.list should succeed: {activity}"
+        );
+        items = activity["result"]["items"]
+            .as_array()
+            .expect("activity list should have items array")
+            .clone();
+        if items
+            .iter()
+            .any(|item| item["toolName"] == "question.create")
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    // Feed must be non-empty (regression: it returned empty when the query still
+    // joined tb_users) and every entry must resolve agentName from
+    // tb_agents.label (regression: it was null when joined to the deleted user).
+    assert!(!items.is_empty(), "activity log should not be empty");
+    assert!(
+        items.iter().all(|item| item["agentName"] == "Loop Agent"),
+        "every activity entry should resolve agentName to the agent's label: {items:?}"
+    );
+
+    // The run-door must record the *inner* tool name, not "POST /v1/agents/run"
+    // (regression: path-based logging collapsed every run-door call to the same
+    // opaque label, breaking the feed and attempt.grade stats).
+    let question_create_entry = items
+        .iter()
+        .find(|item| item["toolName"] == "question.create")
+        .expect("activity log should contain a question.create entry");
+    assert_eq!(question_create_entry["agentName"], "Loop Agent");
+}
+
 /// POST a single run-tool call and return the parsed JSON envelope
 /// (`{ ok, tool, result, error }`). Panics on transport failure.
 async fn run_tool(

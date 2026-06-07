@@ -224,8 +224,8 @@ fn window_days(window: Option<&str>) -> Option<i32> {
     }
 }
 
-async fn get_sub_account_ids(pool: &sqlx::PgPool, owner_id: Uuid) -> Result<Vec<Uuid>, ApiError> {
-    let rows = sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_users WHERE owner_user_id = $1")
+async fn get_agent_ids(pool: &sqlx::PgPool, owner_id: Uuid) -> Result<Vec<Uuid>, ApiError> {
+    let rows = sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_agents WHERE owner_user_id = $1")
         .bind(owner_id)
         .fetch_all(pool)
         .await
@@ -367,18 +367,18 @@ pub async fn me_stats(
 
     // Agent metrics
     let agent_active_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_users WHERE owner_user_id = $1 AND role = 'agent' AND deactivated_at IS NULL"
+        "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL",
     )
     .bind(uid)
     .fetch_one(&state.pool)
     .await
     .map_err(internal)?;
 
-    let sub_accounts = get_sub_account_ids(&state.pool, uid).await?;
+    let agent_ids = get_agent_ids(&state.pool, uid).await?;
     let agent_graded_attempts: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM tb_activity_log WHERE tool_name = 'attempt.grade' AND status = 200 AND agent_id = ANY($1)"
     )
-    .bind(&sub_accounts)
+    .bind(&agent_ids)
     .fetch_one(&state.pool)
     .await
     .map_err(internal)?;

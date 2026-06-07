@@ -838,8 +838,14 @@ function KeysTab() {
                               >
                                 Created: {formatDate(token.createdAt)}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                                {token.expiresAt ? `Expires: ${formatDate(token.expiresAt)}` : "No expiry"}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: "block" }}
+                              >
+                                {token.expiresAt
+                                  ? `Expires: ${formatDate(token.expiresAt)}`
+                                  : "No expiry"}
                               </Typography>
                             </Box>
                             <Tooltip title="Revoke Token">

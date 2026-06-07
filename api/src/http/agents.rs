@@ -90,12 +90,13 @@ async fn get_accessible_accounts(
     pool: &sqlx::PgPool,
     owner_id: Uuid,
 ) -> Result<Vec<Uuid>, ApiError> {
-    let rows =
-        sqlx::query_as::<_, (Uuid,)>("SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1")
-            .bind(owner_id)
-            .fetch_all(pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    let rows = sqlx::query_as::<_, (Uuid,)>(
+        "SELECT id FROM tb_agents WHERE owner_user_id = $1 OR id = $1",
+    )
+    .bind(owner_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
     Ok(rows.into_iter().map(|(id,)| id).collect())
 }
@@ -111,9 +112,9 @@ pub async fn activity(
 
     let rows = if let Some(cursor) = q.cursor {
         sqlx::query(
-            "SELECT a.id, a.ts, a.agent_id, u.display_name as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+            "SELECT a.id, a.ts, a.agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
-             LEFT JOIN tb_users u ON a.agent_id = u.id
+             LEFT JOIN tb_agents ag ON a.agent_id = ag.id
              WHERE a.agent_id = ANY($1) AND a.id < $2
              ORDER BY a.id DESC
              LIMIT $3",
@@ -125,9 +126,9 @@ pub async fn activity(
         .await
     } else {
         sqlx::query(
-            "SELECT a.id, a.ts, a.agent_id, u.display_name as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+            "SELECT a.id, a.ts, a.agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
-             LEFT JOIN tb_users u ON a.agent_id = u.id
+             LEFT JOIN tb_agents ag ON a.agent_id = ag.id
              WHERE a.agent_id = ANY($1)
              ORDER BY a.id DESC
              LIMIT $2",
@@ -516,6 +517,45 @@ pub async fn run(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
     Json(body): Json<RunBody>,
+) -> Result<Json<RunResponse>, ApiError> {
+    let tool = body.tool.clone();
+    // The path-based activity middleware records every run-door call as
+    // "POST /v1/agents/run" — it can't see which inner tool ran. Capture the
+    // context to log the real tool name here so the activity feed and stats
+    // (e.g. attempt.grade counts) stay meaningful. Only agent callers are
+    // logged: tb_activity_log.agent_id references tb_agents, so a human
+    // caller's id would violate the FK. The middleware skips /v1/agents/run to
+    // avoid double-logging.
+    let log_ctx = (auth.user.role == crate::domain::user::Role::Agent)
+        .then(|| (state.pool.clone(), auth.user.id));
+
+    let result = dispatch_run(state, auth, body).await;
+
+    if let Some((pool, agent_id)) = log_ctx {
+        let status = match &result {
+            Ok(_) => 200i32,
+            Err(e) => e.status_code().as_u16() as i32,
+        };
+        tokio::spawn(async move {
+            crate::http::activity::insert_activity_log(
+                &pool,
+                agent_id,
+                &tool,
+                "POST",
+                "/v1/agents/run",
+                status,
+            )
+            .await;
+        });
+    }
+
+    result
+}
+
+async fn dispatch_run(
+    state: AppState,
+    auth: AuthenticatedUser,
+    body: RunBody,
 ) -> Result<Json<RunResponse>, ApiError> {
     let user_id = auth.user.id;
     match body.tool.as_str() {
