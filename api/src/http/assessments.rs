@@ -1371,9 +1371,69 @@ pub async fn generate_assessment(
     let conn = &mut *db;
     let plan = planner::plan_assessment(conn, auth.user.id, &req).await?;
 
+    // Batch fetch all questions by id using = ANY($1) instead of N individual queries
+    let plan_ids: Vec<Uuid> = plan
+        .question_plan
+        .items
+        .iter()
+        .map(|i| i.question_id)
+        .collect();
+
+    let by_id = if !plan_ids.is_empty() {
+        let rows = sqlx::query(
+            "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+                    COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
+             FROM tb_questions q WHERE q.id = ANY($1)",
+        )
+        .bind(&plan_ids)
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+        rows.into_iter()
+            .filter_map(|row| {
+                use std::str::FromStr;
+                let id = row.get::<Uuid, _>("id");
+                let kind_str: String = row.get("kind");
+                let status_str: String = row.get("status");
+                let kind = match crate::domain::question::QuestionKind::from_str(&kind_str) {
+                    Ok(k) => k,
+                    Err(_) => return None,
+                };
+                let status = match crate::domain::question::QuestionStatus::from_str(&status_str) {
+                    Ok(s) => s,
+                    Err(_) => return None,
+                };
+                Some((
+                    id,
+                    crate::domain::question::Question {
+                        id,
+                        kind,
+                        prompt: row.get("prompt"),
+                        tags: row.get("tags"),
+                        version: row.get("version"),
+                        status,
+                        points: row.get("points"),
+                        code_snippet: row.get("code_snippet"),
+                        payload: row.get("payload"),
+                        explanation: row.get("explanation"),
+                        source: row.get("source"),
+                        rating: row.get("rating"),
+                        attempts_count: row.get("attempts_count"),
+                        created_by: row.get("created_by"),
+                        created_at: row.get("created_at"),
+                        updated_at: row.get("updated_at"),
+                    },
+                ))
+            })
+            .collect::<std::collections::HashMap<_, _>>()
+    } else {
+        std::collections::HashMap::new()
+    };
+
     let mut candidates = Vec::new();
     for item in &plan.question_plan.items {
-        if let Some(q) = crate::bank::questions::get_question(conn, item.question_id).await? {
+        if let Some(q) = by_id.get(&item.question_id).cloned() {
             if let Some(types) = &body.types
                 && !types.is_empty()
                 && !types.contains(&q.kind)
