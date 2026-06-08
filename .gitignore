@@ -39,6 +39,7 @@ __pycache__/
 .agents/CURRENT_TASK.md
 .agents/MEMORY.md
 .agents/sessions/
+.agents/plans/
 
 # Local agent CLI scratch (not part of repo)
 .antigravitycli/

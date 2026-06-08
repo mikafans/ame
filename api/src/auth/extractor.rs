@@ -73,24 +73,96 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             })
             .ok_or(ApiError::Unauthorized)?;
 
-        // 1. Try to fetch from Valkey token cache
-        let cache_key = format!("ame:token:{}", parsed.id);
-        let mut cached_info: Option<CachedTokenInfo> = None;
+        let mut info_opt: Option<CachedTokenInfo> = None;
+        let mut is_login = false;
 
+        // 1. Try cache `ame:login:{id}`
+        let login_key = format!("ame:login:{}", parsed.id);
         if let Ok(mut conn) = state.valkey.get().await {
             use redis::AsyncCommands;
             if let Some(info) = conn
-                .get::<_, String>(&cache_key)
+                .get::<_, String>(&login_key)
                 .await
                 .ok()
                 .and_then(|val| serde_json::from_str::<CachedTokenInfo>(&val).ok())
             {
-                cached_info = Some(info);
+                info_opt = Some(info);
+                is_login = true;
             }
         }
 
-        // 2. Fall back to PostgreSQL if cache miss or error
-        let info = if let Some(info) = cached_info {
+        // 2. Else try cache `ame:token:{id}`
+        let token_cache_key = format!("ame:token:{}", parsed.id);
+        if info_opt.is_none()
+            && let Ok(mut conn) = state.valkey.get().await
+        {
+            use redis::AsyncCommands;
+            if let Some(info) = conn
+                .get::<_, String>(&token_cache_key)
+                .await
+                .ok()
+                .and_then(|val| serde_json::from_str::<CachedTokenInfo>(&val).ok())
+            {
+                info_opt = Some(info);
+                is_login = false;
+            }
+        }
+
+        // 3. Else PG `tb_login_sessions` by id. A login session is always a
+        // top-level human (only agents have an owner, and agents authenticate via
+        // tb_api_tokens, never login sessions) — so owner == self: owner_user_id is
+        // NULL, owner_plan is the user's own plan, and there is no owner to deactivate.
+        if info_opt.is_none() {
+            let record = sqlx::query(
+                r#"
+                SELECT s.token_hash, s.scopes, s.expires_at, s.user_id,
+                       u.email, u.display_name, u.role, u.plan, u.created_at,
+                       u.deactivated_at AS user_deactivated_at
+                FROM tb_login_sessions s
+                JOIN tb_users u ON s.user_id = u.id
+                WHERE s.id = $1
+                "#,
+            )
+            .bind(parsed.id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+
+            if let Some(row) = record {
+                let plan: String = row.get("plan");
+                let db_info = CachedTokenInfo {
+                    token_hash: row.get("token_hash"),
+                    scopes: row.get("scopes"),
+                    revoked_at: None,
+                    expires_at: row.get("expires_at"),
+                    user_id: row.get("user_id"),
+                    email: row.get("email"),
+                    display_name: row.get("display_name"),
+                    role: row.get("role"),
+                    plan: plan.clone(),
+                    created_at: row.get("created_at"),
+                    owner_user_id: None,
+                    user_deactivated_at: row.get("user_deactivated_at"),
+                    owner_deactivated_at: None,
+                    owner_plan: plan,
+                };
+
+                // Warm cache (fail-open)
+                if let Ok(mut conn) = state.valkey.get().await {
+                    use redis::AsyncCommands;
+                    if let Ok(serialized) = serde_json::to_string(&db_info) {
+                        let ttl = state.config.login.ttl_seconds;
+                        let _: Result<(), _> = conn.set_ex(&login_key, serialized, ttl).await;
+                    }
+                }
+
+                info_opt = Some(db_info);
+                is_login = true;
+            }
+        }
+
+        // 4. Else PG `tb_api_tokens` (existing query)
+        let info = if let Some(info) = info_opt {
             info
         } else {
             let record = sqlx::query(
@@ -117,10 +189,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .bind(parsed.id)
             .fetch_optional(&state.pool)
             .await
-            .map_err(|e| {
-                eprintln!("EXTRACTOR QUERY ERROR: {:?}", e);
-                ApiError::Internal(e.into())
-            })?
+            .map_err(|e| ApiError::Internal(e.into()))?
             .ok_or(ApiError::Unauthorized)?;
 
             let db_info = CachedTokenInfo {
@@ -144,7 +213,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             if let Ok(mut conn) = state.valkey.get().await {
                 use redis::AsyncCommands;
                 if let Ok(serialized) = serde_json::to_string(&db_info) {
-                    let _: Result<(), _> = conn.set_ex(&cache_key, serialized, 30).await;
+                    let _: Result<(), _> = conn.set_ex(&token_cache_key, serialized, 30).await;
                 }
             }
 
@@ -163,24 +232,58 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             return Err(ApiError::Unauthorized);
         }
 
-        // Update last_used_at in the background, throttled to at most once per
-        // minute per token. Without the staleness guard, every request from a
-        // single token contends on that one row's lock (concurrent requests
-        // serialize and pile up — observed as multi-second waits on a PK
-        // update). The guard makes all but the first writer in each window a
-        // no-op, so they take no lasting lock.
-        let pool = state.pool.clone();
-        let token_id = parsed.id;
-        tokio::spawn(async move {
-            let _ = sqlx::query(
-                "UPDATE tb_api_tokens SET last_used_at = now() \
-                 WHERE id = $1 \
-                   AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')",
-            )
-            .bind(token_id)
-            .execute(&pool)
-            .await;
-        });
+        if is_login {
+            let now = time::OffsetDateTime::now_utc();
+            let ttl = state.config.login.ttl_seconds;
+            let refresh_window = (ttl / 4).clamp(1, 60) as i64;
+            let due = now
+                >= info.expires_at - time::Duration::seconds(ttl as i64)
+                    + time::Duration::seconds(refresh_window);
+            if due {
+                let new_expires = now + time::Duration::seconds(ttl as i64);
+                // Update cache blob inline (fail-open) so the next request sees the slide.
+                if let Ok(mut conn) = state.valkey.get().await {
+                    use redis::AsyncCommands;
+                    let mut refreshed = info.clone();
+                    refreshed.expires_at = new_expires;
+                    if let Ok(serialized) = serde_json::to_string(&refreshed) {
+                        let _: Result<(), _> = conn
+                            .set_ex(format!("ame:login:{}", parsed.id), serialized, ttl)
+                            .await;
+                    }
+                }
+                // Persist to PG in the background (durability / cross-replica truth).
+                let pool = state.pool.clone();
+                let id = parsed.id;
+                tokio::spawn(async move {
+                    let _ =
+                        sqlx::query("UPDATE tb_login_sessions SET expires_at = $2 WHERE id = $1")
+                            .bind(id)
+                            .bind(new_expires)
+                            .execute(&pool)
+                            .await;
+                });
+            }
+        } else {
+            // Update last_used_at in the background, throttled to at most once per
+            // minute per token. Without the staleness guard, every request from a
+            // single token contends on that one row's lock (concurrent requests
+            // serialize and pile up — observed as multi-second waits on a PK
+            // update). The guard makes all but the first writer in each window a
+            // no-op, so they take no lasting lock.
+            let pool = state.pool.clone();
+            let token_id = parsed.id;
+            tokio::spawn(async move {
+                let _ = sqlx::query(
+                    "UPDATE tb_api_tokens SET last_used_at = now() \
+                     WHERE id = $1 \
+                       AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')",
+                )
+                .bind(token_id)
+                .execute(&pool)
+                .await;
+            });
+        }
 
         let role = match info.role.as_str() {
             "user" => crate::domain::user::Role::User,
@@ -253,6 +356,7 @@ pub async fn invalidate_user_tokens(
     valkey: &deadpool_redis::Pool,
     user_id: Uuid,
 ) {
+    // 1. Get database-backed token IDs
     let token_ids: Vec<Uuid> = sqlx::query_scalar(
         r#"
         SELECT t.id FROM tb_api_tokens t
@@ -265,11 +369,29 @@ pub async fn invalidate_user_tokens(
     .await
     .unwrap_or_default();
 
+    // 2. Login sessions for this user: collect ids, delete rows, drop caches.
+    let login_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM tb_login_sessions WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+    let _ = sqlx::query("DELETE FROM tb_login_sessions WHERE user_id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await;
+
+    // 3. Delete DB tokens from cache & login tokens from Valkey
     if let Ok(mut conn) = valkey.get().await {
         use redis::AsyncCommands;
         for tid in token_ids {
             let cache_key = format!("ame:token:{}", tid);
             let _: Result<(), _> = conn.del(&cache_key).await;
+        }
+        for lid in login_ids {
+            let login_key = format!("ame:login:{}", lid);
+            let _: Result<(), _> = conn.del(&login_key).await;
         }
     }
 
