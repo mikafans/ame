@@ -730,7 +730,7 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
     if primary:
         body = {
             "label": "Ada's Study Assistant",
-            "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
+            "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read"],
             "focusTags": ["algorithms", "python"],
         }
         agent_resp = create_agent_for_user(primary, body)
@@ -747,7 +747,7 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
     if second:
         body = {
             "label": "Mira's Music Theory Assistant",
-            "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read", "plan.read", "plan.write"],
+            "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read"],
             "focusTags": ["music-theory", "harmony", "scales", "ear-training", "intervals"],
         }
         agent_resp = create_agent_for_user(second, body)
