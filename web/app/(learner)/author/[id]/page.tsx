@@ -258,21 +258,20 @@ export default function AuthorStudioPage({
   async function publish() {
     setPublishing(true);
     setPublishError(null);
-    try {
-      await api.PATCH("/v1/assessments/{id}", {
-        params: { path: { id } },
-        body: { status: "active" },
-      });
-      load();
-    } catch (err) {
+    const { error } = await api.PATCH("/v1/assessments/{id}", {
+      params: { path: { id } },
+      body: { status: "active" },
+    });
+    setPublishing(false);
+    if (error) {
       const msg =
-        typeof err === "object" && err && "message" in err
-          ? String((err as { message: string }).message)
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message: string }).message)
           : "Failed to publish";
       setPublishError(msg);
-    } finally {
-      setPublishing(false);
+      return;
     }
+    router.push(`/assessments/${id}/preview`);
   }
 
   const outlineComplete =
