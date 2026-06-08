@@ -3,6 +3,7 @@ use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use std::net::SocketAddr;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 use ame_api::http::{
@@ -212,17 +213,18 @@ async fn test_login_sessions_logout_and_admin_demote() {
     let secret = "supersecret";
     let hash = ame_api::auth::token::hash_secret(secret);
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at)
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(admin_token_id)
     .bind(admin_id)
     .bind(&hash)
     .bind(vec!["admin".to_string()])
+    .bind(OffsetDateTime::now_utc() + Duration::days(7))
     .execute(&pool)
     .await
     .unwrap();
-    let admin_auth = format!("{admin_token_id}_{secret}");
+    let admin_auth = format!("lgn_{admin_token_id}_{secret}");
 
     // Register user
     let email = format!("test-logout-{}@example.com", Uuid::now_v7());
@@ -271,8 +273,8 @@ async fn test_login_sessions_logout_and_admin_demote() {
         .as_str()
         .unwrap()
         .to_string();
-    let token1_id = Uuid::parse_str(token1.split('_').next().unwrap()).unwrap();
-    let token2_id = Uuid::parse_str(token2.split('_').next().unwrap()).unwrap();
+    let token1_id = Uuid::parse_str(token1.split('_').nth(1).unwrap()).unwrap();
+    let token2_id = Uuid::parse_str(token2.split('_').nth(1).unwrap()).unwrap();
 
     // Assert rows exist in tb_login_sessions
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_login_sessions WHERE id = $1")
@@ -375,8 +377,8 @@ async fn test_login_sessions_logout_and_admin_demote() {
     let audit_json: Value = audit_res.json().await.unwrap();
     let tokens = audit_json["tokens"].as_array().unwrap();
 
-    let id1 = token1.split('_').next().unwrap();
-    let id2 = token2.split('_').next().unwrap();
+    let id1 = token1.split('_').nth(1).unwrap();
+    let id2 = token2.split('_').nth(1).unwrap();
 
     for t in tokens {
         let id = t["id"].as_str().unwrap();
@@ -433,17 +435,18 @@ async fn test_admin_plan_change_preserves_login_session() {
     let secret = "supersecret";
     let hash = ame_api::auth::token::hash_secret(secret);
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
-         VALUES ($1, $2, 'admin-key', $3, $4::text[])",
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at)
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(admin_token_id)
     .bind(admin_id)
     .bind(&hash)
     .bind(vec!["admin".to_string()])
+    .bind(OffsetDateTime::now_utc() + Duration::days(7))
     .execute(&pool)
     .await
     .unwrap();
-    let admin_auth = format!("{admin_token_id}_{secret}");
+    let admin_auth = format!("lgn_{admin_token_id}_{secret}");
 
     // Register a normal user
     let email = format!("plan-user-{}@example.com", Uuid::now_v7());
@@ -476,7 +479,7 @@ async fn test_admin_plan_change_preserves_login_session() {
     assert_eq!(login_res.status(), StatusCode::OK);
     let login_json: Value = login_res.json().await.unwrap();
     let user_token = login_json["token"].as_str().unwrap().to_string();
-    let user_token_id = Uuid::parse_str(user_token.split('_').next().unwrap()).unwrap();
+    let user_token_id = Uuid::parse_str(user_token.split('_').nth(1).unwrap()).unwrap();
 
     // Verify user can authenticate with their token
     let me_before = client

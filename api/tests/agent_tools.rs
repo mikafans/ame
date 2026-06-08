@@ -75,7 +75,7 @@ async fn seed_agent(pool: &PgPool, scopes: &[&str]) -> (Uuid, Uuid, String) {
         .await
         .unwrap();
 
-    (owner_id, agent_id, format!("{token_id}_{secret}"))
+    (owner_id, agent_id, format!("agt_{token_id}_{secret}"))
 }
 
 #[tokio::test]
@@ -157,7 +157,7 @@ async fn test_agent_behavioral_tools() {
         .await
         .unwrap();
 
-    let agent_auth = format!("{token_id}_{secret}");
+    let agent_auth = format!("agt_{token_id}_{secret}");
 
     // 3. Test profile.get (Shared Truth check)
     let res = client
@@ -347,7 +347,7 @@ async fn test_agent_reads_owner_record_via_run() {
         .execute(&pool)
         .await
         .unwrap();
-    let agent_auth = format!("{token_id}_{secret}");
+    let agent_auth = format!("agt_{token_id}_{secret}");
 
     // stats.user — agent must see the owner's aggregate, not an empty record.
     let stats = run_tool(&client, &base_url, &agent_auth, "stats.user", json!({})).await;
@@ -688,16 +688,16 @@ async fn test_create_agent_rejects_admin_scope() {
 
     let token_id = Uuid::now_v7();
     let secret = "admin-secret-123";
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(owner_id)
-        .bind("admin-key")
         .bind(ame_api::auth::token::hash_secret(secret))
         .bind(vec!["admin".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let auth = format!("{token_id}_{secret}");
+    let auth = format!("lgn_{token_id}_{secret}");
 
     // Even an admin owner cannot mint an agent carrying the admin scope.
     let resp = client

@@ -374,7 +374,11 @@ async fn issue_token(
         let _: Result<(), _> = conn.set_ex(&login_key, serialized, ttl_seconds).await;
     }
 
-    Ok(format!("{token_id}_{secret}"))
+    Ok(crate::auth::token::format_token(
+        crate::auth::token::TokenKind::Login,
+        token_id,
+        &secret,
+    ))
 }
 
 fn scopes_for_role(role: &str) -> Vec<&'static str> {

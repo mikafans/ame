@@ -7,6 +7,7 @@ use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
 use std::net::SocketAddr;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -70,11 +71,17 @@ async fn make_bearer(pool: &PgPool) -> String {
         .await
         .unwrap();
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'exam token', $3, $4)",
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)",
     )
-    .bind(token_id).bind(user_id).bind(hash).bind(vec!["assessment.write".to_string(), "attempt.write".to_string()])
-    .execute(pool).await.unwrap();
-    format!("{token_id}_{secret}")
+    .bind(token_id)
+    .bind(user_id)
+    .bind(hash)
+    .bind(vec!["assessment.write".to_string(), "attempt.write".to_string()])
+    .bind(OffsetDateTime::now_utc() + Duration::days(7))
+    .execute(pool)
+    .await
+    .unwrap();
+    format!("lgn_{token_id}_{secret}")
 }
 
 async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
@@ -145,15 +152,19 @@ async fn static_exam_compose_get_and_session_roundtrip() {
 
     // Link the two questions into the default section
     for qid in [q1, q2] {
-        client
+        println!("Linking question ID: {}", qid);
+        let res = client
             .post(format!("{base}/v1/assessments/{exam_id}/questions"))
             .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
             .json(&json!({ "questionId": qid }))
             .send()
             .await
-            .unwrap()
-            .error_for_status()
             .unwrap();
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap();
+            panic!("Expected success, got {status}: {body}");
+        }
     }
 
     // get exam via the unified assessment endpoint

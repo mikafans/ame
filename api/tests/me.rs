@@ -3,6 +3,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
 use std::net::SocketAddr;
+use time::{Duration, OffsetDateTime};
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
 
@@ -61,16 +62,17 @@ async fn test_me_agents_crud() {
     let token_id = uuid::Uuid::now_v7();
     let secret = "very-secret-token";
     let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test-key', $3, $4)")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(alice_id)
         .bind(&hash)
-        .bind(vec!["assessment.read", "assessment.write", "admin"]) // Admin for registration/creation
+        .bind(vec!["assessment.read", "assessment.write", "admin"])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
 
-    let auth_header = format!("{token_id}_{secret}");
+    let auth_header = format!("lgn_{token_id}_{secret}");
 
     // 2. Create agent
     let res = client
@@ -155,15 +157,16 @@ async fn test_me_agents_crud() {
         .await
         .unwrap();
     let bob_token_id = uuid::Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'bob-key', $3, $4)")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(bob_token_id)
         .bind(bob_id)
         .bind(&hash)
         .bind(vec!["assessment.read"])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let bob_auth = format!("{bob_token_id}_{secret}");
+    let bob_auth = format!("lgn_{bob_token_id}_{secret}");
 
     let res = client
         .patch(format!("{base_url}/v1/me/agents/{agent_id}"))
@@ -248,16 +251,17 @@ async fn create_agent_rejects_non_grantable_scope() {
     let token_id = uuid::Uuid::now_v7();
     let secret = "very-secret-token";
     let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test-key', $3, $4)")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(user_id)
         .bind(&hash)
         .bind(vec!["assessment.read", "assessment.write", "admin"])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
 
-    let auth_header = format!("{token_id}_{secret}");
+    let auth_header = format!("lgn_{token_id}_{secret}");
 
     // 2. Attempt to create agent with plan.read scope -> should 422
     let res = client

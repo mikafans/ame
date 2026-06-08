@@ -637,9 +637,9 @@ function KeysTab() {
     if (!revokeToken || !revokeTokenAgentId) return;
     setRevokingToken(true);
     try {
-      const res = await api.DELETE("/v1/me/keys/{id}", {
+      const res = await api.DELETE("/v1/me/agents/{id}/tokens/{token_id}", {
         params: {
-          path: { id: revokeToken.id },
+          path: { id: revokeTokenAgentId, token_id: revokeToken.id },
         },
       });
       if (res.response.ok) {

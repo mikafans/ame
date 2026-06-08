@@ -467,6 +467,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/agents/{id}/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["revoke_agent_token"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/attempts": {
         parameters: {
             query?: never;
@@ -494,54 +510,6 @@ export interface paths {
         get: operations["get_cohort_stats"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_keys"];
-        put?: never;
-        post: operations["create_key"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/keys/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["revoke_key"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/keys/{id}/rotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["rotate_key"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1126,10 +1094,6 @@ export interface components {
             timeLimitSeconds?: number | null;
             title: string;
         };
-        CreateKeyBody: {
-            name: string;
-            scopes?: string[] | null;
-        };
         CreateKeyResponse: {
             /** Format: uuid */
             id: string;
@@ -1254,15 +1218,6 @@ export interface components {
             /** Format: uuid */
             questionId: string;
         };
-        KeySummary: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: date-time */
-            lastUsedAt?: string | null;
-            name: string;
-        };
         ListAgentsResponse: {
             agents: components["schemas"]["AgentSummary"][];
         };
@@ -1280,9 +1235,6 @@ export interface components {
             logs: components["schemas"]["AuditLogEntry"][];
             /** Format: int64 */
             total: number;
-        };
-        ListKeysResponse: {
-            keys: components["schemas"]["KeySummary"][];
         };
         ListMySessionsResponse: {
             sessions: components["schemas"]["SessionSummary"][];
@@ -1448,9 +1400,6 @@ export interface components {
         };
         /** @enum {string} */
         Role: "user" | "admin" | "agent";
-        RotateKeyResponse: {
-            secret: string;
-        };
         RunResponse: {
             error?: string | null;
             ok: boolean;
@@ -2919,6 +2868,43 @@ export interface operations {
             };
         };
     };
+    revoke_agent_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent id */
+                id: string;
+                /** @description Token id */
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such agent or token */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_attempts: {
         parameters: {
             query?: {
@@ -2976,136 +2962,6 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_keys: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of API keys */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListKeysResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_key: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateKeyBody"];
-            };
-        };
-        responses: {
-            /** @description Key created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateKeyResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    revoke_key: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Key id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Key revoked */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such key */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    rotate_key: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Key id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Key rotated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RotateKeyResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such key */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
