@@ -56,6 +56,7 @@ test-engine: ## Engine unit and integration-test compile gate
 
 test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test auth -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test login_sessions -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test bank -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test me -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test agent_tools -- --nocapture

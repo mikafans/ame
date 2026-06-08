@@ -4,6 +4,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use sqlx::Row;
 use std::net::SocketAddr;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -85,7 +86,7 @@ async fn test_cross_owner_agent_visibility() {
         .execute(&pool)
         .await
         .unwrap();
-    let agent_auth = format!("{token_id}_{secret}");
+    let agent_auth = format!("agt_{token_id}_{secret}");
 
     // Agent authors through the single run-door — direct POST /v1/assessments
     // is 403 for agent tokens (agent_guard_middleware confines agents to /run).
@@ -159,17 +160,17 @@ async fn test_cross_owner_agent_visibility() {
 
     // 3. Test: Owner GET agent's private assessment should succeed
     let owner_token_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(owner_token_id)
         .bind(owner_id)
-        .bind("owner-key")
         .bind(&hash) // Same hash for simplicity
         .bind(vec!["assessment.read".to_string(), "attempt.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
 
-    let owner_auth = format!("{owner_token_id}_{secret}");
+    let owner_auth = format!("lgn_{owner_token_id}_{secret}");
 
     let res = client
         .get(format!("{base_url}/v1/assessments/{qid}"))
@@ -191,16 +192,16 @@ async fn test_cross_owner_agent_visibility() {
     .await
     .unwrap();
     let stranger_token_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(stranger_token_id)
         .bind(stranger_id)
-        .bind("stranger-key")
         .bind(&hash)
         .bind(vec!["assessment.read".to_string(), "attempt.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let stranger_auth = format!("{stranger_token_id}_{secret}");
+    let stranger_auth = format!("lgn_{stranger_token_id}_{secret}");
 
     let res = client
         .get(format!("{base_url}/v1/assessments/{qid}"))
@@ -276,16 +277,16 @@ async fn test_cross_owner_list_isolation() {
     .await
     .unwrap();
     let a_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(a_token)
         .bind(owner_a)
-        .bind("a-key")
         .bind(&hash)
         .bind(vec!["assessment.read".to_string(), "assessment.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let a_auth = format!("{a_token}_{secret}");
+    let a_auth = format!("lgn_{a_token}_{secret}");
 
     // A creates an assessment, then we force it active — the exact shape
     // the old count query leaked across owners.
@@ -336,16 +337,16 @@ async fn test_cross_owner_list_isolation() {
     .await
     .unwrap();
     let b_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(b_token)
         .bind(owner_b)
-        .bind("b-key")
         .bind(&hash)
         .bind(vec!["assessment.read".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let b_auth = format!("{b_token}_{secret}");
+    let b_auth = format!("lgn_{b_token}_{secret}");
 
     // B's assessment list must not include A's public assessment.
     let res = client
@@ -432,12 +433,12 @@ async fn test_cross_owner_tags_isolation() {
     .await
     .unwrap();
     let a_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(a_token)
         .bind(owner_a)
-        .bind("a-key")
         .bind(&hash)
         .bind(vec!["assessment.write".to_string()])
+        .bind(OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
@@ -481,16 +482,16 @@ async fn test_cross_owner_tags_isolation() {
     .await
     .unwrap();
     let b_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(b_token)
         .bind(owner_b)
-        .bind("b-key")
         .bind(&hash)
         .bind(vec!["assessment.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let b_auth = format!("{b_token}_{secret}");
+    let b_auth = format!("lgn_{b_token}_{secret}");
 
     let res = client
         .get(format!("{base_url}/v1/tags"))
@@ -547,12 +548,12 @@ async fn test_cross_owner_pending_attempts_isolation() {
     .await
     .unwrap();
     let a_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(a_token)
         .bind(owner_a)
-        .bind("a-key")
         .bind(&hash)
         .bind(vec!["attempt.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
@@ -619,16 +620,16 @@ async fn test_cross_owner_pending_attempts_isolation() {
     .await
     .unwrap();
     let b_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(b_token)
         .bind(owner_b)
-        .bind("b-key")
         .bind(&hash)
         .bind(vec!["attempt.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let b_auth = format!("{b_token}_{secret}");
+    let b_auth = format!("lgn_{b_token}_{secret}");
 
     let res = client
         .get(format!("{base_url}/v1/attempts/pending"))
@@ -685,12 +686,12 @@ async fn test_cross_owner_grade_isolation() {
     .await
     .unwrap();
     let a_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(a_token)
         .bind(owner_a)
-        .bind("a-key")
         .bind(&hash)
         .bind(vec!["attempt.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
@@ -755,16 +756,16 @@ async fn test_cross_owner_grade_isolation() {
     .await
     .unwrap();
     let b_token = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(b_token)
         .bind(owner_b)
-        .bind("b-key")
         .bind(&hash)
-        .bind(vec!["attempt.write".to_string()])
+        .bind(vec!["assessment.write".to_string()])
+        .bind(time::OffsetDateTime::now_utc() + time::Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let b_auth = format!("{b_token}_{secret}");
+    let b_auth = format!("lgn_{b_token}_{secret}");
 
     let res = client
         .patch(format!("{base_url}/v1/attempts/{}/grade", attempt_id))

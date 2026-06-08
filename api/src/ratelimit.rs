@@ -161,7 +161,12 @@ pub async fn rate_limit_middleware(
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, crate::domain::error::ApiError> {
     let path = req.uri().path();
-    if path == "/healthz" || path == "/metrics" {
+    if path == "/healthz"
+        || path == "/metrics"
+        || path == "/skill.json"
+        || path == "/llms.txt"
+        || path == "/openapi.yaml"
+    {
         return Ok(next.run(req).await);
     }
 

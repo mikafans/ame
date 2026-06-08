@@ -18,7 +18,31 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenKind {
+    Login,
+    Agent,
+}
+
+impl TokenKind {
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            Self::Login => "lgn",
+            Self::Agent => "agt",
+        }
+    }
+
+    pub fn parse(prefix: &str) -> Option<Self> {
+        match prefix {
+            "lgn" => Some(Self::Login),
+            "agt" => Some(Self::Agent),
+            _ => None,
+        }
+    }
+}
+
 pub struct ParsedToken {
+    pub kind: TokenKind,
     pub id: Uuid,
     pub secret: String,
 }
@@ -34,13 +58,22 @@ pub fn parse_bearer_token(bearer: &str) -> Option<ParsedToken> {
 
 /// Parse a raw token value without the "Bearer " prefix.
 /// Used for both Authorization header (after stripping "Bearer ") and Cookie header.
+/// Expects `<kind>_<uuid>_<secret>`.
 pub fn parse_token_value(token: &str) -> Option<ParsedToken> {
-    let (id, secret) = token.split_once('_')?;
+    let mut parts = token.splitn(3, '_');
+    let kind_str = parts.next()?;
+    let id_str = parts.next()?;
+    let secret = parts.next()?;
+
     if secret.is_empty() {
         return None;
     }
-    let id = Uuid::parse_str(id).ok()?;
+
+    let kind = TokenKind::parse(kind_str)?;
+    let id = Uuid::parse_str(id_str).ok()?;
+
     Some(ParsedToken {
+        kind,
         id,
         secret: secret.to_string(),
     })
@@ -51,6 +84,11 @@ pub fn generate_secret() -> String {
     let mut bytes = [0u8; 24];
     OsRng.fill_bytes(&mut bytes);
     hex::encode(bytes)
+}
+
+/// Format a token as `<kind>_<uuid>_<secret>`.
+pub fn format_token(kind: TokenKind, id: Uuid, secret: &str) -> String {
+    format!("{}_{}_{}", kind.prefix(), id, secret)
 }
 
 /// Hash a token secret for storage. Returns the lowercase hex of `sha256(secret)`.
@@ -111,17 +149,30 @@ mod tests {
     #[test]
     fn parse_bearer_token_allows_underscores_in_secret() {
         let token_id = uuid::Uuid::now_v7();
-        let parsed = parse_bearer_token(&format!("Bearer {token_id}_my_secret_token")).unwrap();
+        let parsed = parse_bearer_token(&format!("Bearer lgn_{token_id}_my_secret_token")).unwrap();
 
+        assert_eq!(parsed.kind, TokenKind::Login);
         assert_eq!(parsed.id, token_id);
         assert_eq!(parsed.secret, "my_secret_token");
+    }
+
+    #[test]
+    fn parse_bearer_token_rejects_missing_prefix() {
+        let token_id = uuid::Uuid::now_v7();
+        assert!(parse_bearer_token(&format!("Bearer {token_id}_secret")).is_none());
+    }
+
+    #[test]
+    fn parse_bearer_token_rejects_invalid_prefix() {
+        let token_id = uuid::Uuid::now_v7();
+        assert!(parse_bearer_token(&format!("Bearer bad_{token_id}_secret")).is_none());
     }
 
     #[test]
     fn parse_bearer_token_rejects_missing_secret() {
         let token_id = uuid::Uuid::now_v7();
 
-        assert!(parse_bearer_token(&format!("Bearer {token_id}_")).is_none());
+        assert!(parse_bearer_token(&format!("Bearer lgn_{token_id}_")).is_none());
     }
 
     #[test]

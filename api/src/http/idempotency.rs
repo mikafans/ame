@@ -70,25 +70,55 @@ pub async fn idempotency_middleware(
         None => return Ok(next.run(req).await),
     };
     let token_id = parsed_token.id;
+    let is_login = parsed_token.kind == crate::auth::token::TokenKind::Login;
 
-    let token_record = sqlx::query(
-        r#"
-        SELECT token_hash, revoked_at
-        FROM tb_api_tokens
-        WHERE id = $1
-        "#,
-    )
-    .bind(token_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    let token_info = if is_login {
+        let rec = sqlx::query(
+            r#"
+            SELECT token_hash
+            FROM tb_login_sessions
+            WHERE id = $1
+            "#,
+        )
+        .bind(token_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let Some(token_record) = token_record else {
+        match rec {
+            Some(r) => {
+                let h: String = r.get("token_hash");
+                Some((h, None))
+            }
+            None => None,
+        }
+    } else {
+        let rec = sqlx::query(
+            r#"
+            SELECT token_hash, revoked_at
+            FROM tb_api_tokens
+            WHERE id = $1
+            "#,
+        )
+        .bind(token_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+
+        match rec {
+            Some(r) => {
+                let h: String = r.get("token_hash");
+                let rev: Option<time::OffsetDateTime> = r.get("revoked_at");
+                Some((h, rev))
+            }
+            None => None,
+        }
+    };
+
+    let Some((token_hash, revoked_at)) = token_info else {
         return Ok(next.run(req).await);
     };
 
-    let revoked_at: Option<time::OffsetDateTime> = token_record.get("revoked_at");
-    let token_hash: String = token_record.get("token_hash");
     if revoked_at.is_some() || !verify_token_secret(&token_hash, &parsed_token.secret) {
         return Ok(next.run(req).await);
     }

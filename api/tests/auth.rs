@@ -69,6 +69,7 @@ fn create_test_router(pool: PgPool) -> Router {
             free: 50,
             premium: 500,
         },
+        login: ame_api::config::LoginConfig::default(),
     });
     let valkey = ame_api::config::create_valkey_pool(&config).unwrap();
     let limiter = std::sync::Arc::new(ame_api::ratelimit::RateLimiter::new(valkey.clone()));
@@ -158,6 +159,7 @@ async fn test_auth_and_idempotency() {
 
     // Setup User and Token
     let user_id = uuid::Uuid::now_v7();
+    let agent_id = uuid::Uuid::now_v7();
     let token_id = uuid::Uuid::now_v7();
     let secret = "my_secret_token_123";
 
@@ -173,19 +175,28 @@ async fn test_auth_and_idempotency() {
     .await
     .unwrap();
 
-    let scopes = vec!["assessment.read".to_string()];
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, 'test-agent')")
+        .bind(agent_id)
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let scopes = vec!["assessment.read".to_string(), "attempt.write".to_string()];
+    let expires_at = time::OffsetDateTime::now_utc() + time::Duration::days(7);
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'test token', $3, $4)",
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at) VALUES ($1, $2, 'test-key', $3, $4, $5)",
     )
     .bind(token_id)
-    .bind(user_id)
+    .bind(agent_id)
     .bind(hash)
     .bind(&scopes)
+    .bind(expires_at)
     .execute(&pool)
     .await
     .unwrap();
 
-    let bearer_token = format!("{}_{}", token_id, secret);
+    let bearer_token = format!("agt_{}_{}", token_id, secret);
 
     // Test 2: Valid token
     let res = client
@@ -196,7 +207,7 @@ async fn test_auth_and_idempotency() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let body: Value = res.json().await.unwrap();
-    assert_eq!(body["user_id"].as_str().unwrap(), user_id.to_string());
+    assert_eq!(body["user_id"].as_str().unwrap(), agent_id.to_string());
 
     // Test 3: Scope required but missing
     let res = client
@@ -307,20 +318,30 @@ async fn revoked_token_returns_unauthorized() {
 
     // revoked_at set at insert time — the secret hash is still valid, so any
     // 200 here would prove the extractor stopped checking revocation.
+    let agent_id = uuid::Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, 'test')")
+        .bind(agent_id)
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
     let scopes = vec!["assessment.read".to_string()];
+    let expires_at = time::OffsetDateTime::now_utc() + time::Duration::days(7);
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes, revoked_at) \
-         VALUES ($1, $2, 'revoked token', $3, $4, now())",
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at, revoked_at) \
+         VALUES ($1, $2, 'test-key', $3, $4, $5, now())",
     )
     .bind(token_id)
-    .bind(user_id)
+    .bind(agent_id)
     .bind(hash)
     .bind(&scopes)
+    .bind(expires_at)
     .execute(&pool)
     .await
     .unwrap();
 
-    let bearer_token = format!("{}_{}", token_id, secret);
+    let bearer_token = format!("agt_{}_{}", token_id, secret);
     let client = reqwest::Client::new();
     let res = client
         .get(format!("http://{addr}/protected"))
@@ -373,19 +394,31 @@ async fn test_token_caching_and_invalidation() {
     .await
     .unwrap();
 
-    let scopes = vec!["assessment.read".to_string()];
+    let agent_id = uuid::Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, 'cached token', $3, $4)",
+        "INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, 'cache_test_agent')",
     )
-    .bind(token_id)
+    .bind(agent_id)
     .bind(user_id)
-    .bind(hash)
-    .bind(&scopes)
     .execute(&pool)
     .await
     .unwrap();
 
-    let bearer_token = format!("{}_{}", token_id, secret);
+    let scopes = vec!["assessment.read".to_string()];
+    let expires_at = time::OffsetDateTime::now_utc() + time::Duration::days(7);
+    sqlx::query(
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at) VALUES ($1, $2, 'test-key', $3, $4, $5)",
+    )
+    .bind(token_id)
+    .bind(agent_id)
+    .bind(hash)
+    .bind(&scopes)
+    .bind(expires_at)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let bearer_token = format!("agt_{}_{}", token_id, secret);
 
     // 1. Initial request: should populate cache
     let res = client
@@ -560,6 +593,7 @@ async fn test_per_account_login_rate_limiting() {
             free: 1000,
             premium: 1000,
         },
+        login: ame_api::config::LoginConfig::default(),
     };
 
     let valkey = ame_api::config::create_valkey_pool(&config).unwrap();

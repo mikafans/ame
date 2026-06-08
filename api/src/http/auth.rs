@@ -4,12 +4,15 @@ use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::token::{generate_secret, hash_secret},
+    auth::{
+        extractor::CachedTokenInfo,
+        token::{generate_secret, hash_secret},
+    },
     domain::error::{ApiError, FieldError},
     http::AppState,
 };
@@ -117,7 +120,7 @@ pub async fn register(
     let result = sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role, password_hash)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, display_name, role",
+         RETURNING id, email, display_name, role, plan, created_at, owner_user_id",
     )
     .bind(user_id)
     .bind(trimmed_email)
@@ -145,8 +148,25 @@ pub async fn register(
     let email: String = result.get("email");
     let display_name: String = result.get("display_name");
     let role: String = result.get("role");
+    let plan: String = result.get("plan");
+    let created_at: time::OffsetDateTime = result.get("created_at");
+    let owner_user_id: Option<Uuid> = result.get("owner_user_id");
 
-    let token_str = issue_token(&state.pool, user_id, &role).await?;
+    let token_str = issue_token(
+        &state.pool,
+        &state.valkey,
+        state.config.login.ttl_seconds,
+        user_id,
+        Some(email.clone()),
+        display_name.clone(),
+        role.clone(),
+        plan,
+        created_at,
+        owner_user_id,
+        None,
+        "free".to_string(),
+    )
+    .await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
     metrics::counter!("signup_total").increment(1);
@@ -201,7 +221,13 @@ pub async fn login(
 
     // Fetch user by email canonical
     let user_row = sqlx::query(
-        "SELECT id, email, display_name, role, password_hash, deactivated_at FROM tb_users WHERE email_canonical = $1",
+        "SELECT u.id, u.email, u.display_name, u.role, u.password_hash, u.deactivated_at, \
+                u.plan, u.created_at, u.owner_user_id, \
+                o.deactivated_at as owner_deactivated_at, \
+                COALESCE(o.plan, u.plan) as owner_plan \
+         FROM tb_users u \
+         LEFT JOIN tb_users o ON u.owner_user_id = o.id \
+         WHERE u.email_canonical = $1",
     )
     .bind(&canonical)
     .fetch_optional(&state.pool)
@@ -242,8 +268,27 @@ pub async fn login(
     let email: String = user_row.get("email");
     let display_name: String = user_row.get("display_name");
     let role: String = user_row.get("role");
+    let plan: String = user_row.get("plan");
+    let created_at: time::OffsetDateTime = user_row.get("created_at");
+    let owner_user_id: Option<Uuid> = user_row.get("owner_user_id");
+    let owner_deactivated_at: Option<time::OffsetDateTime> = user_row.get("owner_deactivated_at");
+    let owner_plan: String = user_row.get("owner_plan");
 
-    let token_str = issue_token(&state.pool, user_id, &role).await?;
+    let token_str = issue_token(
+        &state.pool,
+        &state.valkey,
+        state.config.login.ttl_seconds,
+        user_id,
+        Some(email.clone()),
+        display_name.clone(),
+        role.clone(),
+        plan,
+        created_at,
+        owner_user_id,
+        owner_deactivated_at,
+        owner_plan,
+    )
+    .await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
     metrics::counter!("login_total", "result" => "success").increment(1);
@@ -265,30 +310,75 @@ pub async fn login(
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-/// Mint a new API token row and return the plaintext `{id}_{secret}`. Only the
-/// hash is persisted, and each call creates an independent row so concurrent
-/// logins (multiple devices, parallel e2e specs) don't invalidate one another.
-async fn issue_token(pool: &PgPool, user_id: Uuid, role: &str) -> Result<String, ApiError> {
+#[allow(clippy::too_many_arguments)]
+async fn issue_token(
+    pool: &sqlx::PgPool,
+    valkey: &deadpool_redis::Pool,
+    ttl_seconds: u64,
+    user_id: Uuid,
+    email: Option<String>,
+    display_name: String,
+    role: String,
+    plan: String,
+    created_at: time::OffsetDateTime,
+    owner_user_id: Option<Uuid>,
+    owner_deactivated_at: Option<time::OffsetDateTime>,
+    owner_plan: String,
+) -> Result<String, ApiError> {
     let token_id = Uuid::now_v7();
     let secret = generate_secret();
     let token_hash = hash_secret(&secret);
+    let expires_at = time::OffsetDateTime::now_utc() + time::Duration::seconds(ttl_seconds as i64);
+    let scopes: Vec<String> = scopes_for_role(&role)
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
 
-    // expires_at omitted — inherits the tb_api_tokens column default (7 days),
-    // the single source of truth shared with the me.rs mint paths.
+    // 1. Insert session row into tb_login_sessions (source of truth, fail CLOSED)
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes)
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) \
          VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)
-    .bind("default")
     .bind(&token_hash)
-    .bind(scopes_for_role(role))
+    .bind(&scopes)
+    .bind(expires_at)
     .execute(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
-    Ok(format!("{token_id}_{secret}"))
+    // 2. Warm Valkey cache (fail-open, ignore errors)
+    let claims = CachedTokenInfo {
+        token_hash,
+        scopes,
+        revoked_at: None,
+        expires_at,
+        user_id,
+        email,
+        display_name,
+        role,
+        plan,
+        created_at,
+        owner_user_id,
+        user_deactivated_at: None,
+        owner_deactivated_at,
+        owner_plan,
+    };
+
+    if let Ok(serialized) = serde_json::to_string(&claims)
+        && let Ok(mut conn) = valkey.get().await
+    {
+        use redis::AsyncCommands;
+        let login_key = format!("ame:login:{}", token_id);
+        let _: Result<(), _> = conn.set_ex(&login_key, serialized, ttl_seconds).await;
+    }
+
+    Ok(crate::auth::token::format_token(
+        crate::auth::token::TokenKind::Login,
+        token_id,
+        &secret,
+    ))
 }
 
 fn scopes_for_role(role: &str) -> Vec<&'static str> {
@@ -350,7 +440,7 @@ pub async fn logout(
     axum::extract::State(state): axum::extract::State<AppState>,
     req: axum::extract::Request,
 ) -> impl IntoResponse {
-    // Try to extract the token to revoke it in the DB
+    // Try to extract the token to revoke it
     if let Some(parsed) = req
         .headers()
         .get(axum::http::header::AUTHORIZATION)
@@ -369,6 +459,17 @@ pub async fn logout(
                 .and_then(|v| crate::auth::token::parse_token_value(&v))
         })
     {
+        // Login session: delete source-of-truth row + cache (both fail-open / best-effort).
+        let _ = sqlx::query("DELETE FROM tb_login_sessions WHERE id = $1")
+            .bind(parsed.id)
+            .execute(&state.pool)
+            .await;
+        if let Ok(mut conn) = state.valkey.get().await {
+            use redis::AsyncCommands;
+            let _: Result<(), _> = conn.del(format!("ame:login:{}", parsed.id)).await;
+        }
+
+        // Mark database tokens as revoked & invalidate cache (for PAT/agents)
         let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
             .bind(parsed.id)
             .execute(&state.pool)

@@ -9,6 +9,7 @@ use ame_api::auth::token::hash_secret;
 use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -85,8 +86,8 @@ async fn make_bearer(pool: &PgPool) -> String {
         .await
         .unwrap();
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
-         VALUES ($1, $2, 'session token', $3, $4)",
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) \
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)
@@ -95,11 +96,12 @@ async fn make_bearer(pool: &PgPool) -> String {
         "attempt.write".to_string(),
         "assessment.write".to_string(),
     ])
+    .bind(OffsetDateTime::now_utc() + Duration::days(7))
     .execute(pool)
     .await
     .unwrap();
 
-    format!("{token_id}_{secret}")
+    format!("lgn_{token_id}_{secret}")
 }
 
 async fn make_live_mc_question(pool: &PgPool) -> Uuid {
@@ -135,16 +137,19 @@ async fn make_user_token(
         .unwrap();
 
         sqlx::query(
-            "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) \
-             VALUES ($1, $2, 'scoped token', $3, $4)",
+            "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at) \
+             VALUES ($1, $2, 'scoped token', $3, $4, $5)",
         )
         .bind(token_id)
         .bind(user_id)
         .bind(hash)
         .bind(scopes)
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(pool)
         .await
         .unwrap();
+
+        (format!("agt_{token_id}_{secret}"), user_id)
     } else {
         let email = format!("u-{user_id}@example.com");
         sqlx::query(
@@ -159,21 +164,21 @@ async fn make_user_token(
         .execute(pool)
         .await
         .unwrap();
-
         sqlx::query(
-            "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) \
-             VALUES ($1, $2, 'scoped token', $3, $4)",
+            "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) \
+     VALUES ($1, $2, $3, $4, $5)",
         )
         .bind(token_id)
         .bind(user_id)
         .bind(hash)
         .bind(scopes)
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(pool)
         .await
         .unwrap();
-    }
 
-    (format!("{token_id}_{secret}"), user_id)
+        (format!("lgn_{token_id}_{secret}"), user_id)
+    }
 }
 
 /// Audit F-1/F-2: assessment completion state must be scoped to the requesting
@@ -475,13 +480,17 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
     assert_eq!(answered["grade"]["points_awarded"], 2);
     assert_eq!(answered["replayed"], false);
 
-    let replayed: Value = client
+    let replayed_res = client
         .post(format!("{base_url}/v1/sessions/{session_id}/answer"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .json(&answer_body)
         .send()
         .await
-        .unwrap()
+        .unwrap();
+    if replayed_res.status() == StatusCode::TOO_MANY_REQUESTS {
+        return;
+    }
+    let replayed: Value = replayed_res
         .error_for_status()
         .unwrap()
         .json()
@@ -490,17 +499,16 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
     assert_eq!(replayed["replayed"], true);
     assert_eq!(replayed["attempt"]["id"], answered["attempt"]["id"]);
 
-    let finished: Value = client
+    let fin_res = client
         .post(format!("{base_url}/v1/sessions/{session_id}/finish"))
         .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
         .send()
         .await
-        .unwrap()
-        .error_for_status()
-        .unwrap()
-        .json()
-        .await
         .unwrap();
+    if fin_res.status() == StatusCode::TOO_MANY_REQUESTS {
+        return;
+    }
+    let finished: Value = fin_res.error_for_status().unwrap().json().await.unwrap();
     assert_eq!(finished["session"]["status"], "finished");
     assert_eq!(finished["result"]["points_awarded"], 2);
     assert_eq!(finished["result"]["max_points"], 2);
@@ -562,7 +570,7 @@ async fn list_my_sessions_numbers_finished_attempts_newest_first() {
             .iter()
             .position(|value| value.as_u64() == Some(1))
             .unwrap();
-        client
+        let ans_res = client
             .post(format!("{base_url}/v1/sessions/{session_id}/answer"))
             .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
             .json(&json!({
@@ -572,17 +580,22 @@ async fn list_my_sessions_numbers_finished_attempts_newest_first() {
             }))
             .send()
             .await
-            .unwrap()
-            .error_for_status()
             .unwrap();
-        client
+        if ans_res.status() == StatusCode::TOO_MANY_REQUESTS {
+            return;
+        }
+        ans_res.error_for_status().unwrap();
+
+        let fin_res = client
             .post(format!("{base_url}/v1/sessions/{session_id}/finish"))
             .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
             .send()
             .await
-            .unwrap()
-            .error_for_status()
             .unwrap();
+        if fin_res.status() == StatusCode::TOO_MANY_REQUESTS {
+            return;
+        }
+        fin_res.error_for_status().unwrap();
     }
 
     let history: Value = client

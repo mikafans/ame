@@ -52,7 +52,6 @@ test.describe("learner UI (seeded account)", () => {
 
   test("explore page loads and shows sidebar identity", async ({ page }) => {
     await page.goto("/explore");
-    await page.screenshot({ path: "sidebar.png" });
     await expect(page.getByText(/Ada Lovelace/i).first()).toBeVisible({
       timeout: 10000,
     });

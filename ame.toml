@@ -45,3 +45,8 @@ premium = 5000
 [quota.questions]
 free = 50
 premium = 5000
+
+[login]
+# Interactive login (browser auth) TTL in seconds; sliding — refreshed on each
+# authenticated request. 3 hours.
+ttl_seconds = 10800

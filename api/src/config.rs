@@ -65,11 +65,24 @@ pub struct QuotaConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct LoginConfig {
+    pub ttl_seconds: u64,
+}
+
+impl Default for LoginConfig {
+    fn default() -> Self {
+        Self { ttl_seconds: 10800 }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
     pub ratelimit: RateLimitConfig,
     pub quota: QuotaConfig,
     pub batch: BatchConfig,
+    #[serde(default)]
+    pub login: LoginConfig,
 }
 
 impl Config {
@@ -133,4 +146,112 @@ pub fn create_valkey_pool(config: &Config) -> anyhow::Result<deadpool_redis::Poo
     let cfg = deadpool_redis::Config::from_url(valkey_url);
     let pool = cfg.create_pool(Some(deadpool_redis::Runtime::Tokio1))?;
     Ok(pool)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_login_config_custom_ttl() {
+        let toml_str = r#"
+[server]
+port = 8080
+production = false
+cors_origins = "http://localhost"
+log_format = "compact"
+
+[ratelimit]
+[ratelimit.free]
+burst = 60
+rate = 1
+
+[ratelimit.premium]
+burst = 600
+rate = 10
+
+[ratelimit.public]
+burst = 10
+period_secs = 2
+
+[ratelimit.export]
+burst = 1
+period_secs = 60
+
+[ratelimit.cost]
+read = 1
+write = 5
+
+[batch]
+free = 50
+premium = 500
+
+[quota.agents]
+free = 1
+premium = 100
+
+[quota.assessments]
+free = 50
+premium = 5000
+
+[quota.questions]
+free = 50
+premium = 5000
+
+[login]
+ttl_seconds = 60
+"#;
+        let config: Config = toml::from_str(toml_str).expect("Failed to parse TOML");
+        assert_eq!(config.login.ttl_seconds, 60);
+    }
+
+    #[test]
+    fn test_login_config_default_ttl() {
+        let toml_str = r#"
+[server]
+port = 8080
+production = false
+cors_origins = "http://localhost"
+log_format = "compact"
+
+[ratelimit]
+[ratelimit.free]
+burst = 60
+rate = 1
+
+[ratelimit.premium]
+burst = 600
+rate = 10
+
+[ratelimit.public]
+burst = 10
+period_secs = 2
+
+[ratelimit.export]
+burst = 1
+period_secs = 60
+
+[ratelimit.cost]
+read = 1
+write = 5
+
+[batch]
+free = 50
+premium = 500
+
+[quota.agents]
+free = 1
+premium = 100
+
+[quota.assessments]
+free = 50
+premium = 5000
+
+[quota.questions]
+free = 50
+premium = 5000
+"#;
+        let config: Config = toml::from_str(toml_str).expect("Failed to parse TOML");
+        assert_eq!(config.login.ttl_seconds, 10800);
+    }
 }

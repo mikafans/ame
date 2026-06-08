@@ -2,6 +2,7 @@ use ame_api::http::router;
 use reqwest::StatusCode;
 use sqlx::PgPool;
 use std::net::SocketAddr;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -58,10 +59,9 @@ async fn test_export_premium_gate_and_rate_limit() {
     let free_token_id = Uuid::now_v7();
     let secret = "secret";
     let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(free_token_id)
         .bind(free_id)
-        .bind("free-key")
         .bind(&hash)
         .bind(vec![
             "assessment.read".to_string(),
@@ -73,10 +73,11 @@ async fn test_export_premium_gate_and_rate_limit() {
             "plan.read".to_string(),
             "plan.write".to_string(),
         ])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let free_auth = format!("{free_token_id}_{secret}");
+    let free_auth = format!("lgn_{free_token_id}_{secret}");
 
     // 2. Assert free user gets 403 Forbidden
     let res = client
@@ -101,10 +102,9 @@ async fn test_export_premium_gate_and_rate_limit() {
         .unwrap();
 
     let prem_token_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(prem_token_id)
         .bind(prem_id)
-        .bind("prem-key")
         .bind(&hash)
         .bind(vec![
             "assessment.read".to_string(),
@@ -116,10 +116,11 @@ async fn test_export_premium_gate_and_rate_limit() {
             "plan.read".to_string(),
             "plan.write".to_string(),
         ])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let prem_auth = format!("{prem_token_id}_{secret}");
+    let prem_auth = format!("lgn_{prem_token_id}_{secret}");
 
     // Seed some data for premium owner to export
     let assessment_id = Uuid::now_v7();

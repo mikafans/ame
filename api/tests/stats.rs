@@ -7,6 +7,7 @@ use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
 use std::net::SocketAddr;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -69,17 +70,17 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
         .unwrap();
     let scopes_vec: Vec<String> = scopes.iter().map(|s| s.to_string()).collect();
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(token_id)
     .bind(user_id)
-    .bind("test token")
     .bind(&hash)
     .bind(&scopes_vec)
+    .bind(OffsetDateTime::now_utc() + Duration::days(7))
     .execute(pool)
     .await
     .unwrap();
-    (user_id, format!("{token_id}_{secret}"))
+    (user_id, format!("lgn_{token_id}_{secret}"))
 }
 
 async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
@@ -447,91 +448,4 @@ async fn post_message_email_channel_queues_without_sending() {
     .await
     .unwrap();
     assert_eq!(row.0, "queued");
-}
-
-// ── Task 4 & 6: key management ──────────────────────────────────────────────
-
-#[tokio::test]
-async fn key_rotation_invalidates_old_token() {
-    if skip_if_no_db() {
-        return;
-    }
-    let pool = setup_db().await;
-    let (user_id, bearer) = make_user_with_scopes(&pool, &["assessment.read"]).await;
-    let base = serve(pool.clone()).await;
-    let client = reqwest::Client::new();
-
-    // list keys — should include current key
-    let keys: Value = client
-        .get(format!("{base}/v1/me/keys"))
-        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
-        .send()
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-    let key_id = keys["keys"].as_array().unwrap()[0]["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    // rotate
-    let rotated: Value = client
-        .post(format!("{base}/v1/me/keys/{key_id}/rotate"))
-        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
-        .send()
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-    assert!(
-        rotated["secret"].is_string(),
-        "rotate should return new key"
-    );
-
-    // old bearer must now be rejected
-    let protected = client
-        .get(format!("{base}/v1/me/keys"))
-        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(
-        protected.status(),
-        StatusCode::UNAUTHORIZED,
-        "old token must be revoked after rotation"
-    );
-    let _ = user_id; // bind to avoid warning
-}
-
-#[tokio::test]
-async fn create_key_requires_admin_scope_for_admin_key() {
-    if skip_if_no_db() {
-        return;
-    }
-    let pool = setup_db().await;
-    // non-admin user without admin scope
-    let (_, bearer) = make_user_with_scopes(&pool, &["assessment.read"]).await;
-    let base = serve(pool).await;
-    let client = reqwest::Client::new();
-
-    let resp = client
-        .post(format!("{base}/v1/me/keys"))
-        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
-        .json(&json!({ "name": "admin key attempt", "scopes": ["admin"] }))
-        .send()
-        .await
-        .unwrap();
-
-    assert_eq!(
-        resp.status(),
-        StatusCode::FORBIDDEN,
-        "non-admin must not create admin-scoped keys"
-    );
 }

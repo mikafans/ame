@@ -3,6 +3,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
 use std::net::SocketAddr;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../db/migrations");
@@ -60,16 +61,16 @@ async fn test_quota_enforcement() {
     let token_id = Uuid::now_v7();
     let secret = "free-secret";
     let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(token_id)
         .bind(user_id)
-        .bind("free-key")
         .bind(&hash)
         .bind(vec!["assessment.read".to_string(), "assessment.write".to_string(), "admin".to_string()])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let auth = format!("{token_id}_{secret}");
+    let auth = format!("lgn_{token_id}_{secret}");
 
     // 2. Test Agent Creation Quota (Free plan: 1 limit)
     let res = client
@@ -105,16 +106,16 @@ async fn test_quota_enforcement() {
         .unwrap();
 
     let prem_token_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5::text[])")
+    sqlx::query("INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) VALUES ($1, $2, $3, $4, $5)")
         .bind(prem_token_id)
         .bind(prem_id)
-        .bind("prem-key")
         .bind(&hash)
         .bind(vec!["assessment.read".to_string(), "assessment.write".to_string(), "admin".to_string()])
+        .bind(OffsetDateTime::now_utc() + Duration::days(7))
         .execute(&pool)
         .await
         .unwrap();
-    let prem_auth = format!("{prem_token_id}_{secret}");
+    let prem_auth = format!("lgn_{prem_token_id}_{secret}");
 
     // Create 2nd agent (should succeed because limit is 100)
     client

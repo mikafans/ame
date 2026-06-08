@@ -50,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
                 free: 50,
                 premium: 500,
             },
+            login: ame_api::config::LoginConfig::default(),
         }
     });
 
@@ -69,6 +70,20 @@ async fn main() -> anyhow::Result<()> {
     // time and applied idempotently, so this is a no-op once the schema is
     // current (and the deploy needs no separate migration step).
     sqlx::migrate!("../db/migrations").run(&pool).await?;
+
+    let sweep_pool = pool.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            if let Err(e) = sqlx::query("DELETE FROM tb_login_sessions WHERE expires_at < now()")
+                .execute(&sweep_pool)
+                .await
+            {
+                tracing::warn!("login-session sweep failed: {e}");
+            }
+        }
+    });
 
     let addr: SocketAddr = format!("0.0.0.0:{}", config.server.port).parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;

@@ -39,6 +39,7 @@ __pycache__/
 .agents/CURRENT_TASK.md
 .agents/MEMORY.md
 .agents/sessions/
+.agents/plans/
 
 # Local agent CLI scratch (not part of repo)
 .antigravitycli/
@@ -49,6 +50,7 @@ __pycache__/
 # Web tooling artifacts
 .fastembed_cache
 test-results
+web/sidebar.png
 
 # K8s deploy secrets (real values; commit only the .example files)
 deploy/k8s/overlays/*/secret.env

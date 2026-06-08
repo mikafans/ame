@@ -29,39 +29,8 @@ use crate::{
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct KeySummary {
-    pub id: Uuid,
-    pub name: String,
-    #[serde(with = "time::serde::rfc3339::option")]
-    #[schema(value_type = Option<String>, format = DateTime)]
-    pub last_used_at: Option<OffsetDateTime>,
-    #[serde(with = "time::serde::rfc3339")]
-    #[schema(value_type = String, format = DateTime)]
-    pub created_at: OffsetDateTime,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ListKeysResponse {
-    pub keys: Vec<KeySummary>,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateKeyBody {
-    pub name: String,
-    #[serde(default)]
-    pub scopes: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateKeyResponse {
     pub id: Uuid,
-    pub secret: String,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RotateKeyResponse {
     pub secret: String,
 }
 
@@ -166,200 +135,6 @@ pub struct CreateWebhookResponse {
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────
-
-#[utoipa::path(
-    get,
-    path = "/v1/me/keys",
-    responses(
-        (status = 200, description = "List of API keys", body = ListKeysResponse),
-        (status = 401, description = "Unauthorized"),
-    ),
-    security(("bearer" = [])),
-    tag = "me"
-)]
-pub async fn list_keys(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-) -> Result<Json<ListKeysResponse>, ApiError> {
-    let rows = sqlx::query(
-        "SELECT id, name, last_used_at, created_at FROM tb_api_tokens WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC"
-    )
-    .bind(user.user.id)
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let keys = rows
-        .into_iter()
-        .map(|r| KeySummary {
-            id: r.get("id"),
-            name: r.get("name"),
-            last_used_at: r.get("last_used_at"),
-            created_at: r.get("created_at"),
-        })
-        .collect();
-
-    Ok(Json(ListKeysResponse { keys }))
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/me/keys",
-    request_body = CreateKeyBody,
-    responses(
-        (status = 201, description = "Key created", body = CreateKeyResponse),
-        (status = 401, description = "Unauthorized"),
-    ),
-    security(("bearer" = [])),
-    tag = "me"
-)]
-pub async fn create_key(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Json(body): Json<CreateKeyBody>,
-) -> Result<(StatusCode, Json<CreateKeyResponse>), ApiError> {
-    let effective_scopes: Vec<String> = body.scopes.unwrap_or_else(|| {
-        vec![
-            "assessment.read".into(),
-            "assessment.write".into(),
-            "attempt.read".into(),
-            "attempt.write".into(),
-            "stats.read".into(),
-            "feedback.write".into(),
-        ]
-    });
-
-    // Validate scopes
-    if effective_scopes.is_empty() {
-        return Err(ApiError::Validation(vec![FieldError {
-            field: "scopes".into(),
-            message: "must contain at least one scope".into(),
-        }]));
-    }
-    for scope_str in &effective_scopes {
-        if scope_str.parse::<crate::domain::user::Scope>().is_err() {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "scopes".into(),
-                message: format!("unknown scope: {}", scope_str),
-            }]));
-        }
-    }
-
-    // Non-admin users may not create keys with the admin scope.
-    if effective_scopes.iter().any(|s| s == "admin") && user.user.role != Role::Admin {
-        return Err(ApiError::ScopeRequired("admin".into()));
-    }
-
-    let token_id = Uuid::now_v7();
-    let secret = crate::auth::token::generate_secret();
-    let hash = crate::auth::token::hash_secret(&secret);
-
-    sqlx::query(
-        "INSERT INTO tb_api_tokens (id, user_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
-    )
-    .bind(token_id)
-    .bind(user.user.id)
-    .bind(&body.name)
-    .bind(&hash)
-    .bind(effective_scopes)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateKeyResponse {
-            id: token_id,
-            secret: format!("{}_{}", token_id, secret),
-        }),
-    ))
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/me/keys/{id}/rotate",
-    params(("id" = Uuid, Path, description = "Key id")),
-    responses(
-        (status = 200, description = "Key rotated", body = RotateKeyResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "No such key"),
-    ),
-    security(("bearer" = [])),
-    tag = "me"
-)]
-pub async fn rotate_key(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Path(id): Path<Uuid>,
-) -> Result<Json<RotateKeyResponse>, ApiError> {
-    let secret = crate::auth::token::generate_secret();
-    let hash = crate::auth::token::hash_secret(&secret);
-
-    let affected = sqlx::query(
-        "UPDATE tb_api_tokens SET token_hash = $1 
-         WHERE id = $2 
-         AND (user_id = $3 OR agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $3)) 
-         AND revoked_at IS NULL",
-    )
-    .bind(&hash)
-    .bind(id)
-    .bind(user.user.id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound {
-            resource: "api_key",
-        });
-    }
-
-    crate::auth::extractor::invalidate_token(&state.valkey, id).await;
-
-    Ok(Json(RotateKeyResponse {
-        secret: format!("{}_{}", id, secret),
-    }))
-}
-
-#[utoipa::path(
-    delete,
-    path = "/v1/me/keys/{id}",
-    params(("id" = Uuid, Path, description = "Key id")),
-    responses(
-        (status = 204, description = "Key revoked"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "No such key"),
-    ),
-    security(("bearer" = [])),
-    tag = "me"
-)]
-pub async fn revoke_key(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Path(id): Path<Uuid>,
-) -> Result<StatusCode, ApiError> {
-    let affected = sqlx::query(
-        "UPDATE tb_api_tokens SET revoked_at = now() 
-         WHERE id = $1 
-         AND (user_id = $2 OR agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $2)) 
-         AND revoked_at IS NULL",
-    )
-    .bind(id)
-    .bind(user.user.id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
-
-    if affected.rows_affected() == 0 {
-        return Err(ApiError::NotFound {
-            resource: "api_key",
-        });
-    }
-
-    crate::auth::extractor::invalidate_token(&state.valkey, id).await;
-
-    Ok(StatusCode::NO_CONTENT)
-}
 
 #[utoipa::path(
     get,
@@ -527,7 +302,11 @@ pub async fn create_agent(
         StatusCode::CREATED,
         Json(CreateAgentResponse {
             id: agent_id,
-            api_key: format!("{}_{}", token_id, secret),
+            api_key: crate::auth::token::format_token(
+                crate::auth::token::TokenKind::Agent,
+                token_id,
+                &secret,
+            ),
         }),
     ))
 }
@@ -607,9 +386,55 @@ pub async fn create_agent_token(
         StatusCode::CREATED,
         Json(CreateKeyResponse {
             id: token_id,
-            secret: format!("{}_{}", token_id, secret),
+            secret: crate::auth::token::format_token(
+                crate::auth::token::TokenKind::Agent,
+                token_id,
+                &secret,
+            ),
         }),
     ))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/v1/me/agents/{id}/tokens/{token_id}",
+    params(
+        ("id" = Uuid, Path, description = "Agent id"),
+        ("token_id" = Uuid, Path, description = "Token id")
+    ),
+    responses(
+        (status = 204, description = "Token revoked"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No such agent or token"),
+    ),
+    security(("bearer" = [])),
+    tag = "me"
+)]
+pub async fn revoke_agent_token(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path((id, token_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    let result = sqlx::query(
+        "UPDATE tb_api_tokens SET revoked_at = now() 
+         WHERE id = $1 AND agent_id = $2 
+         AND agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $3)
+         AND revoked_at IS NULL",
+    )
+    .bind(token_id)
+    .bind(id)
+    .bind(user.user.id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound { resource: "token" });
+    }
+
+    crate::auth::extractor::invalidate_token(&state.valkey, token_id).await;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(
@@ -1293,19 +1118,19 @@ pub async fn add_cohort_member(
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/me", get(get_me))
-        .route("/v1/me/keys", get(list_keys))
-        .route("/v1/me/keys", post(create_key))
-        .route("/v1/me/keys/{id}/rotate", post(rotate_key))
-        .route("/v1/me/keys/{id}", delete(revoke_key))
+        .route("/v1/me/attempts", get(list_attempts))
         .route("/v1/me/agents", get(list_agents))
         .route("/v1/me/agents", post(create_agent))
         .route("/v1/me/agents/{id}", patch(update_agent))
         .route("/v1/me/agents/{id}", delete(delete_agent))
         .route("/v1/me/agents/{id}/tokens", post(create_agent_token))
+        .route(
+            "/v1/me/agents/{id}/tokens/{token_id}",
+            delete(revoke_agent_token),
+        )
         .route("/v1/me/webhooks", get(list_webhooks))
         .route("/v1/me/webhooks", post(create_webhook))
         .route("/v1/me/webhooks/{id}", delete(delete_webhook))
-        .route("/v1/me/attempts", get(list_attempts))
         .route("/v1/me/cohort-stats", get(get_cohort_stats))
         .route("/v1/cohorts", post(create_cohort))
         .route("/v1/cohorts/{id}/members", post(add_cohort_member))
