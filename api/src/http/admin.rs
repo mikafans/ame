@@ -257,9 +257,8 @@ pub async fn list_tokens(
     // 1. Get total count
     let mut count_qb = sqlx::QueryBuilder::new(
         "SELECT COUNT(*) FROM tb_api_tokens t \
-         LEFT JOIN tb_users u ON u.id = t.user_id \
-         LEFT JOIN tb_agents a ON a.id = t.agent_id \
-         LEFT JOIN tb_users o ON a.owner_user_id = o.id",
+         JOIN tb_agents a ON a.id = t.agent_id \
+         JOIN tb_users o ON a.owner_user_id = o.id",
     );
     let mut has_where = false;
 
@@ -267,11 +266,7 @@ pub async fn list_tokens(
         let search_pat = format!("%{}%", search.trim());
         count_qb.push(" WHERE (t.name ILIKE ");
         count_qb.push_bind(search_pat.clone());
-        count_qb.push(" OR u.email ILIKE ");
-        count_qb.push_bind(search_pat.clone());
         count_qb.push(" OR o.email ILIKE ");
-        count_qb.push_bind(search_pat.clone());
-        count_qb.push(" OR u.display_name ILIKE ");
         count_qb.push_bind(search_pat.clone());
         count_qb.push(" OR a.label ILIKE ");
         count_qb.push_bind(search_pat);
@@ -281,11 +276,9 @@ pub async fn list_tokens(
 
     if let Some(role) = query.role.as_deref().filter(|s| !s.trim().is_empty()) {
         if has_where {
-            count_qb
-                .push(" AND (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
+            count_qb.push(" AND 'agent' = ");
         } else {
-            count_qb
-                .push(" WHERE (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
+            count_qb.push(" WHERE 'agent' = ");
             has_where = true;
         }
         count_qb.push_bind(role);
@@ -293,9 +286,9 @@ pub async fn list_tokens(
 
     if let Some(owner_id) = query.owner_id {
         if has_where {
-            count_qb.push(" AND COALESCE(t.user_id, t.agent_id) = ");
+            count_qb.push(" AND t.agent_id = ");
         } else {
-            count_qb.push(" WHERE COALESCE(t.user_id, t.agent_id) = ");
+            count_qb.push(" WHERE t.agent_id = ");
             has_where = true;
         }
         count_qb.push_bind(owner_id);
@@ -330,15 +323,12 @@ pub async fn list_tokens(
 
     // 2. Get paginated tokens
     let mut qb = sqlx::QueryBuilder::new(
-        "SELECT t.id, t.name, COALESCE(t.user_id, t.agent_id) as user_id, \
-         CASE WHEN t.agent_id IS NOT NULL THEN o.email ELSE u.email END as email, \
-         CASE WHEN t.agent_id IS NOT NULL THEN a.label ELSE u.display_name END as display_name, \
-         CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END as role, \
+        "SELECT t.id, t.name, t.agent_id as user_id, \
+         o.email as email, a.label as display_name, 'agent' as role, \
          t.scopes, t.last_used_at, t.revoked_at, t.expires_at, t.created_at \
          FROM tb_api_tokens t \
-         LEFT JOIN tb_users u ON u.id = t.user_id \
-         LEFT JOIN tb_agents a ON a.id = t.agent_id \
-         LEFT JOIN tb_users o ON a.owner_user_id = o.id",
+         JOIN tb_agents a ON a.id = t.agent_id \
+         JOIN tb_users o ON a.owner_user_id = o.id",
     );
 
     has_where = false;
@@ -347,11 +337,7 @@ pub async fn list_tokens(
         let search_pat = format!("%{}%", search.trim());
         qb.push(" WHERE (t.name ILIKE ");
         qb.push_bind(search_pat.clone());
-        qb.push(" OR u.email ILIKE ");
-        qb.push_bind(search_pat.clone());
         qb.push(" OR o.email ILIKE ");
-        qb.push_bind(search_pat.clone());
-        qb.push(" OR u.display_name ILIKE ");
         qb.push_bind(search_pat.clone());
         qb.push(" OR a.label ILIKE ");
         qb.push_bind(search_pat);
@@ -361,9 +347,9 @@ pub async fn list_tokens(
 
     if let Some(role) = query.role.as_deref().filter(|s| !s.trim().is_empty()) {
         if has_where {
-            qb.push(" AND (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
+            qb.push(" AND 'agent' = ");
         } else {
-            qb.push(" WHERE (CASE WHEN t.agent_id IS NOT NULL THEN 'agent' ELSE u.role END) = ");
+            qb.push(" WHERE 'agent' = ");
             has_where = true;
         }
         qb.push_bind(role);
@@ -371,9 +357,9 @@ pub async fn list_tokens(
 
     if let Some(owner_id) = query.owner_id {
         if has_where {
-            qb.push(" AND COALESCE(t.user_id, t.agent_id) = ");
+            qb.push(" AND t.agent_id = ");
         } else {
-            qb.push(" WHERE COALESCE(t.user_id, t.agent_id) = ");
+            qb.push(" WHERE t.agent_id = ");
             has_where = true;
         }
         qb.push_bind(owner_id);
@@ -592,15 +578,6 @@ pub async fn patch_user_admin(
                 .await
                 .map_err(|e| ApiError::Internal(e.into()))?;
 
-            sqlx::query(
-                "UPDATE tb_api_tokens SET revoked_at = now()
-                 WHERE user_id = $1 AND revoked_at IS NULL",
-            )
-            .bind(user_id)
-            .execute(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-
             crate::audit::audit(
                 state.pool.clone(),
                 Some(admin.0.user.id),
@@ -647,17 +624,6 @@ pub async fn patch_user_admin(
             .execute(&state.pool)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
-
-        if current_role == "admin" && role != "admin" {
-            sqlx::query(
-                "UPDATE tb_api_tokens SET revoked_at = now()
-                 WHERE user_id = $1 AND revoked_at IS NULL",
-            )
-            .bind(user_id)
-            .execute(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
-        }
 
         crate::audit::audit(
             state.pool.clone(),
@@ -1202,7 +1168,7 @@ pub async fn delete_token_admin(
 ) -> Result<impl IntoResponse, ApiError> {
     // 1. Fetch token details (owner, name, status) for auditing and existence check.
     let token_info: Option<(Uuid, String, Option<time::OffsetDateTime>)> = sqlx::query_as(
-        "SELECT COALESCE(user_id, agent_id) as owner_id, name, revoked_at \
+        "SELECT agent_id as owner_id, name, revoked_at \
          FROM tb_api_tokens WHERE id = $1",
     )
     .bind(id)
