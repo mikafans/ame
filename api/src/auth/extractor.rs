@@ -351,6 +351,54 @@ pub async fn invalidate_token(valkey: &deadpool_redis::Pool, token_id: Uuid) {
     }
 }
 
+/// Bust Valkey caches (token and login session) without deleting database rows.
+/// Used when a plan change requires cache invalidation but the session should remain valid.
+pub async fn invalidate_user_caches(
+    pool: &sqlx::PgPool,
+    valkey: &deadpool_redis::Pool,
+    user_id: Uuid,
+) {
+    // 1. Collect API token IDs
+    let token_ids: Vec<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT t.id FROM tb_api_tokens t
+        LEFT JOIN tb_agents a ON t.agent_id = a.id
+        WHERE t.user_id = $1 OR a.owner_user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    // 2. Collect login session IDs (do NOT delete rows)
+    let login_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM tb_login_sessions WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+    // 3. Delete caches from Valkey (fail-open)
+    if let Ok(mut conn) = valkey.get().await {
+        use redis::AsyncCommands;
+        for tid in token_ids {
+            let cache_key = format!("ame:token:{}", tid);
+            let _: Result<(), _> = conn.del(&cache_key).await;
+        }
+        for lid in login_ids {
+            let login_key = format!("ame:login:{}", lid);
+            let _: Result<(), _> = conn.del(&login_key).await;
+        }
+    }
+
+    if let Ok(mut conn) = valkey.get().await {
+        use redis::AsyncCommands;
+        let limit_key = format!("ame:limiter:owner:{}", user_id);
+        let _: Result<(), _> = conn.del(&limit_key).await;
+    }
+}
+
 pub async fn invalidate_user_tokens(
     pool: &sqlx::PgPool,
     valkey: &deadpool_redis::Pool,
@@ -369,7 +417,7 @@ pub async fn invalidate_user_tokens(
     .await
     .unwrap_or_default();
 
-    // 2. Login sessions for this user: collect ids, delete rows, drop caches.
+    // 2. Login sessions for this user: collect ids before deletion
     let login_ids: Vec<Uuid> =
         sqlx::query_scalar("SELECT id FROM tb_login_sessions WHERE user_id = $1")
             .bind(user_id)
@@ -377,12 +425,13 @@ pub async fn invalidate_user_tokens(
             .await
             .unwrap_or_default();
 
+    // 3. Delete login session rows from database (forces re-login)
     let _ = sqlx::query("DELETE FROM tb_login_sessions WHERE user_id = $1")
         .bind(user_id)
         .execute(pool)
         .await;
 
-    // 3. Delete DB tokens from cache & login tokens from Valkey
+    // 4. Delete caches from Valkey (fail-open)
     if let Ok(mut conn) = valkey.get().await {
         use redis::AsyncCommands;
         for tid in token_ids {

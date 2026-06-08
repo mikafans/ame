@@ -671,7 +671,14 @@ pub async fn patch_user_admin(
         );
     }
 
-    crate::auth::extractor::invalidate_user_tokens(&state.pool, &state.valkey, user_id).await;
+    // Invalidate caches: if role or disabled status changed, force re-login (delete sessions);
+    // otherwise (plan-only change), just bust the cache to pick up the new plan on next load.
+    if body.role.is_some() || body.disabled.is_some() {
+        crate::auth::extractor::invalidate_user_tokens(&state.pool, &state.valkey, user_id).await;
+    } else {
+        crate::auth::extractor::invalidate_user_caches(&state.pool, &state.valkey, user_id).await;
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 
