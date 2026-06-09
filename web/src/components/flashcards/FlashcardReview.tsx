@@ -32,8 +32,6 @@ interface Props {
   onFinish?: () => void;
 }
 
-export default function FlashcardReview_Placeholder() {} // dummy definition to align types cleanly if needed, but not needed
-
 export function FlashcardReview({
   question,
   index,
