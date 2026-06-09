@@ -54,7 +54,7 @@ Install the pre-commit hook with `make hooks-install`.
 make e2e            # auto-starts API + seeds + runs Playwright suite
 ```
 
-For interactive visual audits use `bunx @playwright/cli` — see `AGENTS.md` for the auth cookie pattern.
+For interactive visual audits use `bunx @playwright/cli` — see `CLAUDE.md` for the auth cookie pattern.
 
 ## Deploy
 
@@ -89,10 +89,17 @@ make db-down
 - `design/source/src/*.jsx` — pixel-faithful UI design source of truth.
 - `docs/specs/` — design specs (`2026-05-20-harus-platform-design.md` is canonical).
 - `docs/plans/` — implementation plans.
+- `docs/ROADMAP.md` — versioned roadmap toward v1.1 "Admin Console GA".
 - `.tmp/` — gitignored scratch space for screenshots and Playwright artifacts.
+
+## Roadmap
+
+[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the path to **v1.1 "Admin Console GA"**.
+Current: **v0.1** (platform + admin foundation). Next: **v0.2** operational control
+plane — Token Audit (shipped) and Settings & Feature Flags (next up).
 
 ## Contributing
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, conventions, and the test workflow. Security issues: see [`SECURITY.md`](./SECURITY.md).
 
-`AGENTS.md` is the full working agreement (originally written for AI assistants but useful for humans too).
+`CLAUDE.md` is the full working agreement — stack, conventions, shell discipline, data-model constraints, and the agent/e2e playbooks (written for AI assistants but useful for humans too).

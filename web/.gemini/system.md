@@ -4,7 +4,7 @@ You are an expert developer. Your sole job is to implement the task given to you
 
 Before writing any code:
 
-1. Read `AGENTS.md` if it exists in the project root.
+1. Read `CLAUDE.md` if it exists in the project root — it is the canonical working agreement (stack, conventions, constraints, agent/e2e playbooks).
 2. Read `.agents/CONTEXT.md` if it exists — this contains hard rules, conventions, and verified CLI facts.
 3. Run `rtk git log --oneline -5` to understand recent activity.
 4. If an MCP memory server is available, query it for the project entity to load prior session context.
