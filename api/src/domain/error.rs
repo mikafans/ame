@@ -38,6 +38,8 @@ pub enum ApiError {
     ScoringUnavailable,
     #[error("too many requests")]
     TooManyRequests,
+    #[error("service in maintenance mode")]
+    Maintenance,
     #[error("quota exceeded")]
     QuotaExceeded {
         kind: String,
@@ -69,7 +71,7 @@ impl ApiError {
             | ApiError::ExamPoolInsufficient { .. } => StatusCode::UNPROCESSABLE_ENTITY,
             ApiError::SessionFinished | ApiError::IdempotencyConflict => StatusCode::CONFLICT,
             ApiError::ExamExpired => StatusCode::GONE,
-            ApiError::ScoringUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+            ApiError::ScoringUnavailable | ApiError::Maintenance => StatusCode::SERVICE_UNAVAILABLE,
             ApiError::TooManyRequests | ApiError::QuotaExceeded { .. } => {
                 StatusCode::TOO_MANY_REQUESTS
             }
@@ -150,6 +152,12 @@ impl IntoResponse for ApiError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "rate_limited",
                 "rate limit exceeded".to_string(),
+                None,
+            ),
+            ApiError::Maintenance => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "maintenance",
+                "the service is temporarily in maintenance mode".to_string(),
                 None,
             ),
             ApiError::QuotaExceeded { kind, limit, usage } => (
