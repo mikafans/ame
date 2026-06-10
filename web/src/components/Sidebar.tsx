@@ -29,6 +29,7 @@ import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import { Logo } from "@/components/Logo";
@@ -66,6 +67,7 @@ const ICON_MAP: Record<string, React.ReactElement> = {
   "admin-tokens": <VpnKeyOutlinedIcon fontSize="small" />,
   "admin-audit": <HistoryOutlinedIcon fontSize="small" />,
   "admin-health": <MonitorHeartOutlinedIcon fontSize="small" />,
+  "admin-settings": <SettingsOutlinedIcon fontSize="small" />,
 };
 
 interface SidebarProps {
@@ -125,6 +127,12 @@ export function Sidebar({
             id: "admin-health",
             label: "System Health",
             icon: "admin-health",
+            section: "Admin",
+          },
+          {
+            id: "admin-settings",
+            label: "Platform Settings",
+            icon: "admin-settings",
             section: "Admin",
           },
         ]

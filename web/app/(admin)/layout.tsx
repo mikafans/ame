@@ -30,6 +30,7 @@ export default function AdminLayout({
     if (pathname.startsWith("/admin/tokens")) return "admin-tokens";
     if (pathname.startsWith("/admin/audit")) return "admin-audit";
     if (pathname.startsWith("/admin/health")) return "admin-health";
+    if (pathname.startsWith("/admin/settings")) return "admin-settings";
     if (pathname.startsWith("/admin")) return "admin-dashboard";
     return "admin-dashboard";
   };
@@ -42,6 +43,7 @@ export default function AdminLayout({
       "admin-tokens": "/admin/tokens",
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
+      "admin-settings": "/admin/settings",
       explore: "/explore",
       assessment: "/practice",
       flashcards: "/flashcards",
