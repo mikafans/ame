@@ -140,10 +140,9 @@ test.describe("agent management (owner API)", () => {
     const r = await request.delete(`${API_URL}/v1/me/agents/${agentId}`, {
       headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    // 204 = deleted cleanly; 500 can occur if the agent has FK-constrained rows
-    // (api_tokens, agent_profiles) that the DELETE does not cascade — backend bug.
-    // Accept both until the backend handles cascading deletes.
-    expect([204, 500]).toContain(r.status());
+    // Soft-delete: deactivates the agent and revokes its tokens in one tx, no
+    // hard DELETE, so the old FK-cascade 500 path is gone. Must be a clean 204.
+    expect(r.status()).toBe(204);
   });
 });
 

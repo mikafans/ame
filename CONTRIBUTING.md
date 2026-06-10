@@ -41,7 +41,7 @@ CI runs `make check` + `cargo audit` on every PR (see `.github/workflows/ci.yml`
 - Schema: `db/migrations/` (sqlx). Additive after the squash baseline; never edit a migration that has been applied. Use `make db-reset` to wipe and re-apply locally.
 - Specs: `docs/specs/2026-05-20-harus-platform-design.md` is canonical.
 
-See `AGENTS.md` for the full working agreement, shell discipline notes, and tool-by-tool guidance (useful for humans too).
+See `CLAUDE.md` for the full working agreement, shell discipline notes, and tool-by-tool guidance (useful for humans too).
 
 ## Reporting issues
 

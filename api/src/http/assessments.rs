@@ -1319,7 +1319,10 @@ pub async fn count_assessments(
     Ok(Json(CountAssessmentsResponse { count }))
 }
 
-// ── generate (stub) ───────────────────────────────────────────────────────────
+// ── generate ──────────────────────────────────────────────────────────────────
+// Plans assessment candidates from the live question bank by objective tags
+// (exposed to agents as the `assessment.generate` run-tool). Not AI generation —
+// bank selection with type filtering and shortfall warnings.
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
