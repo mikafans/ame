@@ -89,6 +89,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /v1/admin/settings — current effective platform settings (config
+         *     defaults overlaid with any tb_settings overrides).
+         */
+        get: operations["get_settings"];
+        /**
+         * PUT /v1/admin/settings — upsert one or more setting overrides. Each changed
+         *     key is written to tb_settings, the settings cache is busted, and one audit
+         *     row is emitted. Returns the new effective settings.
+         */
+        put: operations["put_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/tokens": {
         parameters: {
             query?: never;
@@ -849,7 +874,7 @@ export interface components {
                 required: number;
                 section: string;
             };
-        } | "SessionFinished" | "ExamExpired" | "IdempotencyConflict" | "ScoringUnavailable" | "TooManyRequests" | {
+        } | "SessionFinished" | "ExamExpired" | "IdempotencyConflict" | "ScoringUnavailable" | "TooManyRequests" | "Maintenance" | {
             QuotaExceeded: {
                 kind: string;
                 /** Format: int64 */
@@ -1139,6 +1164,15 @@ export interface components {
             /** Format: int64 */
             count: number;
         };
+        /**
+         * @description The effective platform settings: config defaults with `tb_settings` overrides
+         *     applied. Serialized both as the admin API response and as the cache blob.
+         */
+        EffectiveSettings: {
+            maintenanceMode: boolean;
+            quota: components["schemas"]["QuotaSettings"];
+            ratelimit: components["schemas"]["RateLimitSettings"];
+        };
         ExploreCounts: {
             /** Format: int64 */
             graded: number;
@@ -1392,6 +1426,15 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        QuotaSettings: {
+            agents: components["schemas"]["TierQuota"];
+            assessments: components["schemas"]["TierQuota"];
+            questions: components["schemas"]["TierQuota"];
+        };
+        RateLimitSettings: {
+            free: components["schemas"]["TierLimit"];
+            premium: components["schemas"]["TierLimit"];
+        };
         RegisterBody: {
             email: string;
             name: string;
@@ -1515,6 +1558,18 @@ export interface components {
             id: string;
             name: string;
         };
+        TierLimit: {
+            /** Format: int32 */
+            burst: number;
+            /** Format: int32 */
+            rate: number;
+        };
+        TierQuota: {
+            /** Format: int64 */
+            free: number;
+            /** Format: int64 */
+            premium: number;
+        };
         TokenEntry: {
             /** Format: date-time */
             createdAt: string;
@@ -1552,6 +1607,12 @@ export interface components {
             title?: string | null;
             /** Format: double */
             weight?: number | null;
+        };
+        /** @description Partial update for platform settings — any omitted field is left unchanged. */
+        UpdateSettingsBody: {
+            maintenanceMode?: boolean | null;
+            quota?: null | components["schemas"]["QuotaSettings"];
+            ratelimit?: null | components["schemas"]["RateLimitSettings"];
         };
         User: {
             /** Format: date-time */
@@ -1771,6 +1832,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminHealthResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Effective platform settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EffectiveSettings"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    put_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSettingsBody"];
+            };
+        };
+        responses: {
+            /** @description Updated effective platform settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EffectiveSettings"];
                 };
             };
             /** @description Unauthorized */

@@ -171,6 +171,54 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
+  /v1/admin/settings:
+    get:
+      tags:
+      - admin
+      summary: |-
+        GET /v1/admin/settings — current effective platform settings (config
+        defaults overlaid with any tb_settings overrides).
+      operationId: get_settings
+      responses:
+        '200':
+          description: Effective platform settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EffectiveSettings'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
+    put:
+      tags:
+      - admin
+      summary: |-
+        PUT /v1/admin/settings — upsert one or more setting overrides. Each changed
+        key is written to tb_settings, the settings cache is busted, and one audit
+        row is emitted. Returns the new effective settings.
+      operationId: put_settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsBody'
+        required: true
+      responses:
+        '200':
+          description: Updated effective platform settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EffectiveSettings'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (Admin required)
+      security:
+      - bearer: []
   /v1/admin/tokens:
     get:
       tags:
@@ -1899,6 +1947,9 @@ components:
       - type: string
         enum:
         - TooManyRequests
+      - type: string
+        enum:
+        - Maintenance
       - type: object
         required:
         - QuotaExceeded
@@ -2627,6 +2678,22 @@ components:
         count:
           type: integer
           format: int64
+    EffectiveSettings:
+      type: object
+      description: |-
+        The effective platform settings: config defaults with `tb_settings` overrides
+        applied. Serialized both as the admin API response and as the cache blob.
+      required:
+      - maintenanceMode
+      - ratelimit
+      - quota
+      properties:
+        maintenanceMode:
+          type: boolean
+        quota:
+          $ref: '#/components/schemas/QuotaSettings'
+        ratelimit:
+          $ref: '#/components/schemas/RateLimitSettings'
     ExploreCounts:
       type: object
       required:
@@ -3286,6 +3353,29 @@ components:
         version:
           type: integer
           format: int32
+    QuotaSettings:
+      type: object
+      required:
+      - agents
+      - assessments
+      - questions
+      properties:
+        agents:
+          $ref: '#/components/schemas/TierQuota'
+        assessments:
+          $ref: '#/components/schemas/TierQuota'
+        questions:
+          $ref: '#/components/schemas/TierQuota'
+    RateLimitSettings:
+      type: object
+      required:
+      - free
+      - premium
+      properties:
+        free:
+          $ref: '#/components/schemas/TierLimit'
+        premium:
+          $ref: '#/components/schemas/TierLimit'
     RegisterBody:
       type: object
       required:
@@ -3588,6 +3678,32 @@ components:
           format: uuid
         name:
           type: string
+    TierLimit:
+      type: object
+      required:
+      - burst
+      - rate
+      properties:
+        burst:
+          type: integer
+          format: int32
+          minimum: 0
+        rate:
+          type: integer
+          format: int32
+          minimum: 0
+    TierQuota:
+      type: object
+      required:
+      - free
+      - premium
+      properties:
+        free:
+          type: integer
+          format: int64
+        premium:
+          type: integer
+          format: int64
     TokenEntry:
       type: object
       required:
@@ -3695,6 +3811,22 @@ components:
           - number
           - 'null'
           format: double
+    UpdateSettingsBody:
+      type: object
+      description: Partial update for platform settings — any omitted field is left unchanged.
+      properties:
+        maintenanceMode:
+          type:
+          - boolean
+          - 'null'
+        quota:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/QuotaSettings'
+        ratelimit:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/RateLimitSettings'
     User:
       type: object
       required:

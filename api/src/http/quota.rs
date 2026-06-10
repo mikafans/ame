@@ -70,14 +70,19 @@ pub async fn check_quota(
     // 1. Resolve owner plan
     let plan = resolve_plan(pool, owner_id).await?;
 
-    // 2. Define quota limits from config
+    // 2. Define quota limits from the effective settings (operator overrides in
+    //    tb_settings overlaid on config; fail-open to config if Valkey is absent).
+    let quota = match valkey {
+        Some(vk) => crate::settings::get_effective(pool, vk, config).await.quota,
+        None => crate::settings::EffectiveSettings::from_config(config).quota,
+    };
     let limit = match (plan, kind) {
-        (Plan::Premium, QuotaKind::AgentCreation) => config.quota.agents.premium,
-        (Plan::Free, QuotaKind::AgentCreation) => config.quota.agents.free,
-        (Plan::Premium, QuotaKind::Assessment) => config.quota.assessments.premium,
-        (Plan::Free, QuotaKind::Assessment) => config.quota.assessments.free,
-        (Plan::Premium, QuotaKind::Question) => config.quota.questions.premium,
-        (Plan::Free, QuotaKind::Question) => config.quota.questions.free,
+        (Plan::Premium, QuotaKind::AgentCreation) => quota.agents.premium,
+        (Plan::Free, QuotaKind::AgentCreation) => quota.agents.free,
+        (Plan::Premium, QuotaKind::Assessment) => quota.assessments.premium,
+        (Plan::Free, QuotaKind::Assessment) => quota.assessments.free,
+        (Plan::Premium, QuotaKind::Question) => quota.questions.premium,
+        (Plan::Free, QuotaKind::Question) => quota.questions.free,
     };
 
     // 3. Count current usage

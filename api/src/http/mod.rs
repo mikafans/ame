@@ -69,6 +69,45 @@ pub async fn agent_guard_middleware(
     next.run(req).await
 }
 
+/// Resolves the effective platform settings once per request, stashes them in
+/// request extensions (so `rate_limit_middleware` reuses the same blob), and
+/// returns 503 for non-admins while maintenance mode is on. Runs AFTER
+/// `auth_extract_middleware` so the admin check sees the cached user.
+///
+/// A small allowlist always passes — health/readiness probes and the login +
+/// discovery endpoints — so an operator can still authenticate and recover.
+pub async fn maintenance_mode_middleware(
+    State(state): State<AppState>,
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use crate::auth::extractor::AuthenticatedUser;
+    use crate::domain::user::Scope;
+    use axum::response::IntoResponse;
+
+    let settings = crate::settings::get_effective(&state.pool, &state.valkey, &state.config).await;
+
+    if settings.maintenance_mode {
+        let path = req.uri().path();
+        let exempt = matches!(
+            path,
+            "/v1/auth/login" | "/llms.txt" | "/skill.json" | "/openapi.yaml" | "/metrics"
+        );
+        let is_admin = req
+            .extensions()
+            .get::<AuthenticatedUser>()
+            .map(|a| a.token_scopes.contains(&Scope::Admin))
+            .unwrap_or(false);
+        if !exempt && !is_admin {
+            return crate::domain::error::ApiError::Maintenance.into_response();
+        }
+    }
+
+    // Reused downstream by the rate limiter to avoid a second settings lookup.
+    req.extensions_mut().insert(settings);
+    next.run(req).await
+}
+
 pub mod activity;
 pub mod admin;
 pub mod agents;
@@ -172,6 +211,10 @@ pub fn router(pool: PgPool) -> Router {
             crate::ratelimit::rate_limit_middleware,
         ))
         .layer(middleware::from_fn(agent_guard_middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            maintenance_mode_middleware,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,

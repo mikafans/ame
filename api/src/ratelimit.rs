@@ -189,15 +189,30 @@ pub async fn rate_limit_middleware(
         }
     } else if let Some(auth) = auth {
         let key = format!("ame:limiter:owner:{}", auth.owner_id);
+        // Prefer the operator-tunable tiers resolved by the maintenance
+        // middleware (stashed in extensions); fall back to config if absent.
+        let (free, premium) = req
+            .extensions()
+            .get::<crate::settings::EffectiveSettings>()
+            .map(|s| {
+                (
+                    (s.ratelimit.free.burst, s.ratelimit.free.rate),
+                    (s.ratelimit.premium.burst, s.ratelimit.premium.rate),
+                )
+            })
+            .unwrap_or((
+                (
+                    state.config.ratelimit.free.burst,
+                    state.config.ratelimit.free.rate,
+                ),
+                (
+                    state.config.ratelimit.premium.burst,
+                    state.config.ratelimit.premium.rate,
+                ),
+            ));
         let (burst, rate) = match auth.owner_plan.as_str() {
-            "premium" => (
-                state.config.ratelimit.premium.burst,
-                state.config.ratelimit.premium.rate as f64,
-            ),
-            _ => (
-                state.config.ratelimit.free.burst,
-                state.config.ratelimit.free.rate as f64,
-            ),
+            "premium" => (premium.0, premium.1 as f64),
+            _ => (free.0, free.1 as f64),
         };
         let is_read = matches!(
             method,

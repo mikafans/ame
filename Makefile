@@ -69,6 +69,7 @@ test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test agent_manifest -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test export -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test admin -- --nocapture
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test admin_settings -- --nocapture --test-threads=1
 
 test-bank: ## Bank integration tests only (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test bank -- --nocapture
