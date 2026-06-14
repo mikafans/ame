@@ -3287,6 +3287,10 @@ components:
         createdBy:
           type: string
           format: uuid
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3354,6 +3358,10 @@ components:
       - payload
       - tags
       properties:
+        deep_dive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3387,6 +3395,10 @@ components:
     QuestionPatch:
       type: object
       properties:
+        deep_dive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3453,6 +3465,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string

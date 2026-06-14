@@ -1377,7 +1377,7 @@ pub async fn generate_assessment(
 
     let by_id = if !plan_ids.is_empty() {
         let rows = sqlx::query(
-            "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+            "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, deep_dive, source, rating, attempts_count, created_by, created_at, updated_at,
                     COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
              FROM tb_questions q WHERE q.id = ANY($1)",
         )
@@ -1413,6 +1413,7 @@ pub async fn generate_assessment(
                         code_snippet: row.get("code_snippet"),
                         payload: row.get("payload"),
                         explanation: row.get("explanation"),
+                        deep_dive: row.get("deep_dive"),
                         source: row.get("source"),
                         rating: row.get("rating"),
                         attempts_count: row.get("attempts_count"),

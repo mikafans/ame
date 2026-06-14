@@ -1385,6 +1385,7 @@ export interface components {
             createdAt: string;
             /** Format: uuid */
             createdBy: string;
+            deepDive?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;
@@ -1413,6 +1414,7 @@ export interface components {
             tags?: string[];
         };
         QuestionInsert: {
+            deep_dive?: string | null;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
             payload: unknown;
@@ -1425,6 +1427,7 @@ export interface components {
         /** @enum {string} */
         QuestionKind: "mc" | "tf" | "short" | "essay" | "code";
         QuestionPatch: {
+            deep_dive?: string | null;
             explanation?: string | null;
             payload?: unknown;
             /** Format: int32 */
@@ -1449,6 +1452,7 @@ export interface components {
             codeSnippet?: unknown;
             /** Format: date-time */
             createdAt: string;
+            deepDive?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;

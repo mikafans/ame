@@ -18,6 +18,7 @@ dashboard depends on the metrics pipeline (Phase D) and so comes last.
 | v0.1 (now) | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
 | v0.2 | Operational control plane | **#1 Token Audit**, **#2 Settings & Feature Flags** | admin shell (done) |
 | v0.3 | Content integrity + data hygiene | **#3 Feedback / Flags / Support Queue**, **data retention & pruning**, **learner mobile (H5)** | learner session UI |
+| v0.4 | Learn Deeper *(parallel learner track)* | **Deepen panel** (related-by-tag, author deep-dive, reference URL), **async deepen notes** (agent-generated) | v0.3 learner session UI |
 | v1.0 | Insight + hardening | **#4 Analytics Dashboard** | Phase D metrics |
 | v1.1 | GA polish | (all four integrated) | v1.0 |
 
@@ -146,6 +147,38 @@ PG size is bounded by usage, not by uptime.
 
 **Exit criteria:** a learner can complete a graded session end-to-end on an
 Android/iOS phone browser without horizontal scroll or an uncollapsible sidebar.
+
+---
+
+## v0.4 — Learn Deeper *(parallel learner track)*
+
+Spec: [`docs/specs/2026-06-14-learn-deeper.md`](specs/2026-06-14-learn-deeper.md)
+
+The first deliberately **learner-facing** track (the v0.2→v1.1 line is the
+operator console; this runs alongside it, not blocking it). When a learner
+finishes a question, let them *push further* on that question or topic.
+
+- **A1 — Deepen panel** *(ready to build)*: per-question review surface with
+  related-questions-by-tag, an author `deep_dive` field, an external reference
+  URL, and a dual-surface read contract (`GET /v1/questions/{id}/deepen`) so the
+  learner's **own agent** can consume it. Shared sanitized renderer
+  (`react-markdown` + existing Prism + `mermaid`).
+- **A2 — Async deepen notes**: an in-session "flag for dive deeper" → the user's
+  agent reads the attempt's flags, generates content, writes it back
+  (`deepen.write` via `/v1/agents/run`) → learner reads later. AME hosts no LLM;
+  the agent is the tutor.
+
+### Good to have *(defer-friendly)*
+
+- **A2.1 — Deepen-notes export to a KM tool (Notion):** mirror generated notes
+  into the learner's own Notion. Agent-first (the generating agent writes to
+  Notion itself; near-zero AME code) — retention play, not acquisition.
+- **Notion authoring pipeline (Track B):** two-way sync of question-bank content
+  with a Notion workspace. Separate axis (authoring, not learning), highest risk,
+  own design pass; pull-first/draft-only. Lowest priority.
+
+**Exit criteria:** a learner can dive deeper on any answered question — see
+related practice, author deep-dives, and (with an agent) generated study notes.
 
 ---
 
