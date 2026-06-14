@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAs, setAuthCookie } from "./helpers";
+import { loginAs, setAuthCookie, API_URL } from "./helpers";
 
 test.describe("admin portal", () => {
   let token: string;
@@ -54,5 +54,60 @@ test.describe("admin portal", () => {
     await expect(
       page.getByRole("heading", { name: "System Health" }),
     ).toBeVisible();
+  });
+
+  test("assessment preview drawer reveals questions and answers", async ({
+    page,
+    request,
+  }) => {
+    // Admins own no assessments, so resolve a known MCQ-bearing one via the
+    // admin endpoints (cross-owner). This also exercises the moderation path.
+    const list = await request.get(
+      `${API_URL}/v1/admin/assessments?status=active&limit=50`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(list.ok(), "list admin assessments").toBeTruthy();
+    const { assessments } = await list.json();
+    let title: string | undefined;
+    for (const a of assessments as Array<{ id: string; title: string }>) {
+      const detail = await request.get(
+        `${API_URL}/v1/admin/assessments/${a.id}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!detail.ok()) continue;
+      const d = await detail.json();
+      const hasMc = (d.questions ?? []).some(
+        (q: { kind: string; payload?: { correct_index?: number } }) =>
+          q.kind === "mc" && typeof q.payload?.correct_index === "number",
+      );
+      if (hasMc) {
+        title = a.title;
+        break;
+      }
+    }
+    expect(title, "an active assessment with an MC question").toBeTruthy();
+    const targetTitle = title as string;
+
+    await page.goto("/admin/assessments");
+    await expect(
+      page.getByRole("heading", { name: "Manage Assessments" }),
+    ).toBeVisible({ timeout: 8000 });
+
+    // Filter to the target assessment, then open its preview drawer.
+    await page.getByPlaceholder(/Search title/i).fill(targetTitle);
+    await page.getByRole("button", { name: "Search" }).click();
+    const row = page
+      .locator("table tbody tr", { hasText: targetTitle })
+      .first();
+    await expect(row).toBeVisible({ timeout: 8000 });
+    await row.getByRole("button", { name: "Preview content" }).click();
+
+    // Drawer shows the question list; the answer reveal (CORRECT chip) is admin-only.
+    const drawer = page.locator(".MuiDrawer-paper").first();
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByText(/question/i).first()).toBeVisible();
+    await expect(drawer.getByText("CORRECT").first()).toBeVisible({
+      timeout: 8000,
+    });
   });
 });
