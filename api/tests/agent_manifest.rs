@@ -51,7 +51,7 @@ async fn skill_manifest_contains_assessment_tools() {
     let tools = manifest["tools"].as_array().unwrap();
     let tool_names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
-    // Writes: assessment.create, assessment.batchCreate, assessment.update, assessment.addQuestion, question.create, question.promote, attempt.grade
+    // Writes: assessment.create, assessment.batchCreate, assessment.update, assessment.addQuestion, assessment.delete, assessment.archive, assessment.publish, question.create, question.promote, question.update, attempt.grade
     // Reads: assessment.list, assessment.get, assessment.stats, question.list, activity.list, stats.user
     // Self: profile.get, memory.set, memory.append, target.set
     let all_expected = [
@@ -61,6 +61,9 @@ async fn skill_manifest_contains_assessment_tools() {
         "assessment.batchCreate",
         "assessment.update",
         "assessment.addQuestion",
+        "assessment.delete",
+        "assessment.archive",
+        "assessment.publish",
         "assessment.stats",
         "question.list",
         "question.create",
@@ -84,7 +87,6 @@ async fn skill_manifest_contains_assessment_tools() {
 
     // Assert that dead tools are NOT present
     let dead_tools = [
-        "assessment.delete",
         "assessment.generate",
         "session.create",
         "session.answer",
@@ -98,20 +100,25 @@ async fn skill_manifest_contains_assessment_tools() {
         );
     }
 
-    // Direct REST API contract: tools should advertise their direct REST path and method,
-    // or /v1/agents/run dispatcher for run-only tools.
+    // API contract: read tools advertise their direct GET paths; write tools use POST /v1/agents/run.
     for t in tools {
         let name = t["name"].as_str().unwrap();
         let expected_method = match name {
+            // Reads: direct GET
             "assessment.list" | "assessment.get" | "question.list" | "assessment.stats"
             | "activity.list" | "stats.user" | "attempt.list" => "GET",
-            "assessment.archive" | "assessment.publish" | "assessment.update"
-            | "question.update" | "attempt.grade" => "PATCH",
+            // Writes: all via POST /v1/agents/run
             "assessment.create"
             | "assessment.batchCreate"
+            | "assessment.update"
+            | "assessment.archive"
+            | "assessment.publish"
             | "assessment.addQuestion"
+            | "assessment.delete"
             | "question.create"
             | "question.promote"
+            | "question.update"
+            | "attempt.grade"
             | "profile.get"
             | "memory.set"
             | "memory.append"
@@ -119,24 +126,30 @@ async fn skill_manifest_contains_assessment_tools() {
             _ => panic!("unknown tool name: {}", name),
         };
         let expected_path = match name {
+            // Reads: direct GET paths
             "assessment.list" => "/v1/assessments",
             "assessment.get" => "/v1/assessments/{id}",
-            "assessment.archive" | "assessment.publish" | "assessment.update" => {
-                "/v1/assessments/{id}"
-            }
-            "assessment.create" => "/v1/assessments",
-            "assessment.batchCreate" => "/v1/agents/run",
-            "assessment.addQuestion" => "/v1/assessments/{id}/questions",
-            "question.list" => "/v1/questions",
-            "question.create" => "/v1/questions",
-            "question.promote" => "/v1/questions/{id}/promote",
-            "question.update" => "/v1/questions/{id}",
             "assessment.stats" => "/v1/assessments/{id}/stats",
+            "question.list" => "/v1/questions",
             "activity.list" => "/v1/agents/activity",
             "stats.user" => "/v1/me/stats",
             "attempt.list" => "/v1/me/attempts",
-            "attempt.grade" => "/v1/attempts/{id}/grade",
-            "profile.get" | "memory.set" | "memory.append" | "target.set" => "/v1/agents/run",
+            // Writes: all via /v1/agents/run
+            "assessment.create"
+            | "assessment.batchCreate"
+            | "assessment.update"
+            | "assessment.archive"
+            | "assessment.publish"
+            | "assessment.addQuestion"
+            | "assessment.delete"
+            | "question.create"
+            | "question.promote"
+            | "question.update"
+            | "attempt.grade"
+            | "profile.get"
+            | "memory.set"
+            | "memory.append"
+            | "target.set" => "/v1/agents/run",
             _ => panic!("unknown tool name: {}", name),
         };
 

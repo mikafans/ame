@@ -1313,35 +1313,12 @@ pub async fn list_my_sessions(
     }))
 }
 
-pub async fn sessions_agent_guard(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
-    use crate::auth::extractor::AuthenticatedUser;
-    use crate::domain::user::Role;
-    use axum::response::IntoResponse;
-
-    if let Some(auth) = req.extensions().get::<AuthenticatedUser>()
-        && auth.user.role == Role::Agent
-    {
-        return crate::domain::error::ApiError::Forbidden(std::borrow::Cow::Borrowed(
-            "agents cannot hold sessions or take assessments",
-        ))
-        .into_response();
-    }
-    next.run(req).await
-}
-
 pub fn router(state: AppState) -> Router<AppState> {
-    let session_routes = Router::new()
-        .route("/", post(create_session).get(list_my_sessions))
-        .route("/{id}", get(get_session).patch(patch_session))
-        .route("/{id}/answer", post(answer))
-        .route("/{id}/finish", post(finish))
-        .route_layer(axum::middleware::from_fn(sessions_agent_guard));
-
     Router::new()
-        .nest("/v1/sessions", session_routes)
+        .route("/v1/sessions", post(create_session).get(list_my_sessions))
+        .route("/v1/sessions/{id}", get(get_session).patch(patch_session))
+        .route("/v1/sessions/{id}/answer", post(answer))
+        .route("/v1/sessions/{id}/finish", post(finish))
         .route("/v1/attempts/pending", get(list_pending_attempts))
         .route("/v1/attempts/{id}/grade", patch(grade_attempt))
         .with_state(state)

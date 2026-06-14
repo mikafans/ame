@@ -36,6 +36,57 @@ pub async fn auth_extract_middleware(
     next.run(req).await
 }
 
+/// Agent-role tokens (sub-accounts) are confined to a small allowlist of endpoints.
+/// All other REST paths return 403 Forbidden. Runs AFTER `auth_extract_middleware`
+/// so the cached user is available for the role check.
+pub async fn agent_guard_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use crate::auth::extractor::AuthenticatedUser;
+    use crate::domain::user::Role;
+    use axum::response::IntoResponse;
+
+    if let Some(auth) = req.extensions().get::<AuthenticatedUser>()
+        && auth.user.role == Role::Agent
+    {
+        let path = req.uri().path();
+        let method = req.method().as_str();
+
+        // Allowlist: method + pattern (using routed MatchedPath when available,
+        // or raw path as fallback).
+        let matched_path = req
+            .extensions()
+            .get::<axum::extract::MatchedPath>()
+            .map(|p| p.as_str())
+            .unwrap_or(path);
+
+        let allowed = matches!(
+            (method, matched_path),
+            ("GET", "/v1/assessments")
+                | ("GET", "/v1/assessments/{id}")
+                | ("GET", "/v1/assessments/{id}/stats")
+                | ("GET", "/v1/questions")
+                | ("GET", "/v1/me/attempts")
+                | ("GET", "/v1/me/stats")
+                | ("GET", "/v1/agents/activity")
+                | ("POST", "/v1/agents/run")
+                | ("GET", "/llms.txt")
+                | ("GET", "/skill.json")
+                | ("GET", "/openapi.yaml")
+        );
+
+        if !allowed {
+            return crate::domain::error::ApiError::Forbidden(std::borrow::Cow::Borrowed(
+                "agents are limited to read endpoints and POST /v1/agents/run",
+            ))
+            .into_response();
+        }
+    }
+
+    next.run(req).await
+}
+
 /// Resolves the effective platform settings once per request, stashes them in
 /// request extensions (so `rate_limit_middleware` reuses the same blob), and
 /// returns 503 for non-admins while maintenance mode is on. Runs AFTER
@@ -185,6 +236,7 @@ pub fn router(pool: PgPool) -> Router {
             state.clone(),
             maintenance_mode_middleware,
         ))
+        .layer(middleware::from_fn(agent_guard_middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,
