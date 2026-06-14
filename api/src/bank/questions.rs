@@ -26,6 +26,7 @@ pub struct QuestionFilter {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     pub created_by: Option<Uuid>,
+    pub assessment_id: Option<Uuid>,
 }
 
 pub struct PagedQuestions {
@@ -85,6 +86,7 @@ pub async fn list_questions_paged(
     after: Option<(OffsetDateTime, Uuid)>,
 ) -> Result<PagedQuestions, ApiError> {
     let limit = filter.limit.unwrap_or(50);
+    let query_limit = limit + 1;
     let offset = filter.offset.unwrap_or(0);
     let status_str = filter.status.map(|s| s.as_str().to_string());
     let kind_str = filter.kind.map(|k| k.as_str().to_string());
@@ -113,6 +115,11 @@ pub async fn list_questions_paged(
            AND ($11::uuid IS NULL OR q.created_by = $11 OR EXISTS (
                SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $11
            ))
+           AND ($12::uuid IS NULL OR EXISTS (
+               SELECT 1 FROM tb_assessment_items ai
+               JOIN tb_assessment_sections asec ON ai.section_id = asec.id
+               WHERE ai.question_id = q.id AND asec.assessment_id = $12
+           ))
          ORDER BY q.created_at DESC, q.id DESC
          LIMIT $7 OFFSET $8"
     )
@@ -122,20 +129,26 @@ pub async fn list_questions_paged(
     .bind(filter.min_rating)
     .bind(filter.max_rating)
     .bind(&filter.tag)
-    .bind(limit)
+    .bind(query_limit)
     .bind(offset)
     .bind(after_ts)
     .bind(after_id)
     .bind(filter.created_by)
+    .bind(filter.assessment_id)
     .fetch_all(conn)
     .await
     .map_err(internal)?;
 
     let total = rows.first().map(|r| r.get("total")).unwrap_or(0);
     let questions: Result<Vec<_>, _> = rows.into_iter().map(row_to_question).collect();
-    let rows_vec = questions?;
+    let mut rows_vec = questions?;
 
-    let next_cursor = if rows_vec.len() as i64 == limit {
+    let has_more = rows_vec.len() as i64 > limit;
+    if has_more {
+        rows_vec.truncate(limit as usize);
+    }
+
+    let next_cursor = if has_more {
         rows_vec
             .last()
             .map(|q| format!("{}_{}", q.created_at.unix_timestamp(), q.id))

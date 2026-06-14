@@ -874,7 +874,9 @@ export interface components {
                 required: number;
                 section: string;
             };
-        } | "SessionFinished" | "ExamExpired" | "IdempotencyConflict" | "ScoringUnavailable" | "TooManyRequests" | "Maintenance" | {
+        } | "SessionFinished" | "ExamExpired" | "IdempotencyConflict" | "ScoringUnavailable" | "TooManyRequests" | {
+            UnknownTool: string;
+        } | "Maintenance" | {
             QuotaExceeded: {
                 kind: string;
                 /** Format: int64 */
@@ -3203,6 +3205,7 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 after?: string;
+                assessment_id?: string;
             };
             header?: never;
             path?: never;

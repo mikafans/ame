@@ -44,7 +44,10 @@ pub struct ListQuestionsQuery {
     pub max_rating: Option<f64>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    #[serde(alias = "cursor")]
     pub after: Option<String>,
+    #[serde(alias = "assessmentId")]
+    pub assessment_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -109,6 +112,7 @@ pub async fn list_questions(
         limit: q.limit,
         offset: q.offset,
         created_by,
+        assessment_id: q.assessment_id,
     };
 
     let after = match q.after {

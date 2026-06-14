@@ -216,11 +216,29 @@ fn build_skill_manifest(strict: bool) -> Value {
         ),
         tool(
             "assessment.get",
-            "Get a single assessment with its questions and sections.",
+            "Get assessment details.",
             id_only(),
             "POST",
             "/v1/agents/run",
             Some("assessment.read"),
+            strict,
+        ),
+        tool(
+            "assessment.archive",
+            "Archive an assessment.",
+            id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
+            "assessment.publish",
+            "Publish an assessment to make it active and promote draft questions to live.",
+            id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
             strict,
         ),
         tool(
@@ -341,7 +359,7 @@ fn build_skill_manifest(strict: bool) -> Value {
         tool(
             "question.list",
             "List questions in the bank.",
-            json!({"type":"object","properties":{"tag":{"type":"string"},"status":{"type":"string","enum":["draft","live","archived"]},"limit":{"type":"integer"},"offset":{"type":"integer"}}}),
+            json!({"type":"object","properties":{"tag":{"type":"string"},"status":{"type":"string","enum":["draft","live","archived"]},"limit":{"type":"integer"},"offset":{"type":"integer"},"after":{"type":"string"},"cursor":{"type":"string"},"assessmentId":{"type":"string","format":"uuid"}}}),
             "POST",
             "/v1/agents/run",
             Some("assessment.read"),
@@ -360,6 +378,26 @@ fn build_skill_manifest(strict: bool) -> Value {
             "question.promote",
             "Promote one draft question to live.",
             id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
+            "question.update",
+            "Update a question in the bank.",
+            json!({
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "prompt": { "type": "string" },
+                    "explanation": { "type": "string" },
+                    "points": { "type": "integer" },
+                    "tags": { "type": "array", "items": { "type": "string" } },
+                    "payload": { "type": "object" }
+                }
+            }),
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
@@ -583,6 +621,10 @@ async fn dispatch_run(
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_question_promote(&state, &auth, body.params).await
         }
+        "question.update" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_question_update(&state, &auth, body.params).await
+        }
         "attempt.grade" => {
             require_scope(&auth, Scope::AttemptWrite)?;
             run_attempt_grade(&state, &auth, body.params).await
@@ -594,6 +636,18 @@ async fn dispatch_run(
         "assessment.get" => {
             require_scope(&auth, Scope::AssessmentRead)?;
             run_assessment_get(&state, &auth, body.params).await
+        }
+        "assessment.delete" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_delete(&state, &auth, body.params).await
+        }
+        "assessment.archive" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_archive(&state, &auth, body.params).await
+        }
+        "assessment.publish" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_publish(&state, &auth, body.params).await
         }
         "question.list" => {
             require_scope(&auth, Scope::AssessmentRead)?;
@@ -619,12 +673,7 @@ async fn dispatch_run(
         "memory.set" => run_memory_set(&state, &user_id, body.params).await,
         "memory.append" => run_memory_append(&state, &user_id, body.params).await,
         "target.set" => run_target_set(&state, &user_id, body.params).await,
-        other => Ok(Json(RunResponse {
-            ok: false,
-            tool: other.to_string(),
-            result: Value::Null,
-            error: Some(format!("unknown or non-runnable tool: {other}")),
-        })),
+        other => Err(ApiError::UnknownTool(other.to_string())),
     }
 }
 
@@ -646,6 +695,75 @@ async fn run_assessment_create(
         ok: true,
         tool: "assessment.create".into(),
         result: serde_json::to_value(res.1.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_delete(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    super::assessments::delete_assessment(auth.clone(), State(state.clone()), Path(id)).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.delete".into(),
+        result: Value::Null,
+        error: None,
+    }))
+}
+
+async fn run_assessment_archive(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let req = crate::domain::assessment::UpdateAssessmentRequest {
+        title: None,
+        description: None,
+        status: Some(crate::domain::assessment::AssessmentStatus::Archived),
+        objectives: None,
+    };
+    let res = super::assessments::patch_assessment(
+        auth.clone(),
+        State(state.clone()),
+        Path(id),
+        Json(req),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.archive".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_publish(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let req = crate::domain::assessment::UpdateAssessmentRequest {
+        title: None,
+        description: None,
+        status: Some(crate::domain::assessment::AssessmentStatus::Active),
+        objectives: None,
+    };
+    let res = super::assessments::patch_assessment(
+        auth.clone(),
+        State(state.clone()),
+        Path(id),
+        Json(req),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.publish".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
         error: None,
     }))
 }
@@ -1195,6 +1313,39 @@ async fn run_question_promote(
         ok: true,
         tool: "question.promote".into(),
         result: serde_json::to_value(question).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_question_update(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let patch: crate::bank::questions::QuestionPatch = serde_json::from_value(params.clone())
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid patch params: {e}"),
+            }])
+        })?;
+
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    let owner_id = auth.owner_id;
+
+    crate::http::db::set_rls_guc(conn, owner_id, false).await?;
+
+    let updated = crate::bank::questions::update_question(conn, id, patch).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.update".into(),
+        result: serde_json::to_value(updated).unwrap_or(Value::Null),
         error: None,
     }))
 }

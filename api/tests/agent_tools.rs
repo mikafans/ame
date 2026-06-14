@@ -483,6 +483,29 @@ async fn test_agent_full_authoring_loop_via_run() {
         .expect("created question id")
         .to_string();
 
+    // 1b. Update the created question.
+    let updated = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "question.update",
+        json!({
+            "id": question_id,
+            "prompt": "2 + 2 = ? (Updated)",
+            "explanation": "Simple arithmetic update."
+        }),
+    )
+    .await;
+    assert!(
+        updated["ok"].as_bool().unwrap_or(false),
+        "question.update: {updated}"
+    );
+    assert_eq!(updated["result"]["prompt"], "2 + 2 = ? (Updated)");
+    assert_eq!(
+        updated["result"]["explanation"],
+        "Simple arithmetic update."
+    );
+
     // 2. Create the assessment as a draft.
     let assessment = run_tool(
         &client,

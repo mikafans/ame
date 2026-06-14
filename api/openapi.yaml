@@ -4,7 +4,7 @@ info:
   description: Adaptive Mastery Engine — assessment platform with agent identity.
   license:
     name: ''
-  version: 0.1.0
+  version: 0.2.0
 paths:
   /v1/admin/assessments:
     get:
@@ -1233,6 +1233,12 @@ paths:
         required: false
         schema:
           type: string
+      - name: assessment_id
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: List of questions
@@ -1947,6 +1953,12 @@ components:
       - type: string
         enum:
         - TooManyRequests
+      - type: object
+        required:
+        - UnknownTool
+        properties:
+          UnknownTool:
+            type: string
       - type: string
         enum:
         - Maintenance

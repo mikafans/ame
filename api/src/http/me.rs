@@ -767,14 +767,17 @@ pub async fn list_attempts(
     let limit = q.limit.clamp(1, 50);
     let rows = if let Some(sid) = q.session_id {
         sqlx::query(
-            "SELECT id, user_id, question_id, question_version, session_id, response,
-                    presentation, is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms,
-                    rating_before_user_avg, rating_before_question,
-                    user_tag_deltas, question_delta, created_at,
+            "SELECT a.id, a.user_id, a.question_id, a.question_version, a.session_id, a.response,
+                    a.presentation, a.is_correct, a.score, a.grade_status,
+                    CASE WHEN s.id IS NULL OR s.status = 'finished' THEN a.correct_answer ELSE NULL END as correct_answer,
+                    a.grader_notes, a.time_to_answer_ms,
+                    a.rating_before_user_avg, a.rating_before_question,
+                    a.user_tag_deltas, a.question_delta, a.created_at,
                     COUNT(*) OVER() AS total
-             FROM tb_attempts
-             WHERE user_id = $1 AND session_id = $2
-             ORDER BY created_at DESC
+             FROM tb_attempts a
+             LEFT JOIN tb_sessions s ON a.session_id = s.id
+             WHERE a.user_id = $1 AND a.session_id = $2
+             ORDER BY a.created_at DESC
              LIMIT $3 OFFSET $4",
         )
         // Owner-scoped: an agent sub-account reads its owner's attempts
@@ -788,14 +791,17 @@ pub async fn list_attempts(
         .map_err(|e| ApiError::Internal(e.into()))?
     } else {
         sqlx::query(
-            "SELECT id, user_id, question_id, question_version, session_id, response,
-                    presentation, is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms,
-                    rating_before_user_avg, rating_before_question,
-                    user_tag_deltas, question_delta, created_at,
+            "SELECT a.id, a.user_id, a.question_id, a.question_version, a.session_id, a.response,
+                    a.presentation, a.is_correct, a.score, a.grade_status,
+                    CASE WHEN s.id IS NULL OR s.status = 'finished' THEN a.correct_answer ELSE NULL END as correct_answer,
+                    a.grader_notes, a.time_to_answer_ms,
+                    a.rating_before_user_avg, a.rating_before_question,
+                    a.user_tag_deltas, a.question_delta, a.created_at,
                     COUNT(*) OVER() AS total
-             FROM tb_attempts
-             WHERE user_id = $1
-             ORDER BY created_at DESC
+             FROM tb_attempts a
+             LEFT JOIN tb_sessions s ON a.session_id = s.id
+             WHERE a.user_id = $1
+             ORDER BY a.created_at DESC
              LIMIT $2 OFFSET $3",
         )
         // Owner-scoped: see the session_id branch above.

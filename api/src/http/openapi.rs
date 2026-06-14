@@ -214,7 +214,7 @@ use crate::{
     )),
     info(
         title = "ame API",
-        version = "0.1.0",
+        version = "0.2.0",
         description = "Adaptive Mastery Engine — assessment platform with agent identity."
     )
 )]

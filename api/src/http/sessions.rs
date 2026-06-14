@@ -421,6 +421,7 @@ pub async fn answer(
 ) -> Result<Json<AnswerSessionResponse>, ApiError> {
     let conn = &mut *db;
     let session = get_owned_session(conn, id, user.0.user.id).await?;
+    let is_finished = session.status == crate::domain::session::SessionStatus::Finished;
     let existing = existing_attempts_by_question(conn, session.id).await?;
     let runtime_question = load_runtime_question(conn, user.0.user.id, body.question_id).await?;
     let outcome = answer_session(
@@ -441,9 +442,16 @@ pub async fn answer(
         }
     }
 
+    let mut attempt = outcome.attempt.clone();
+    let mut grade = outcome.grade.clone();
+    if !is_finished {
+        attempt.correct_answer = None;
+        grade.correct_answer = serde_json::Value::Null;
+    }
+
     Ok(Json(AnswerSessionResponse {
-        attempt: outcome.attempt,
-        grade: outcome.grade,
+        attempt,
+        grade,
         replayed: outcome.replayed,
     }))
 }
@@ -823,11 +831,15 @@ async fn list_session_attempts(
     session_id: Uuid,
 ) -> Result<Vec<Attempt>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, user_id, question_id, question_version, session_id, response, presentation, \
-                 is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
-                 rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
-                 created_at \
-          FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
+        "SELECT a.id, a.user_id, a.question_id, a.question_version, a.session_id, a.response, a.presentation, \
+                 a.is_correct, a.score, a.grade_status, \
+                 CASE WHEN s.status = 'finished' THEN a.correct_answer ELSE NULL END as correct_answer, \
+                 a.grader_notes, a.time_to_answer_ms, \
+                 a.rating_before_user_avg, a.rating_before_question, a.user_tag_deltas, a.question_delta, \
+                 a.created_at \
+          FROM tb_attempts a \
+          JOIN tb_sessions s ON a.session_id = s.id \
+          WHERE a.session_id = $1 ORDER BY a.created_at ASC",
     )
     .bind(session_id)
     .fetch_all(&mut *conn)

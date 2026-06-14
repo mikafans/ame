@@ -65,6 +65,7 @@ async fn skill_manifest_contains_assessment_tools() {
         "question.list",
         "question.create",
         "question.promote",
+        "question.update",
         "activity.list",
         "stats.user",
         "attempt.list",
@@ -85,7 +86,6 @@ async fn skill_manifest_contains_assessment_tools() {
     let dead_tools = [
         "assessment.delete",
         "assessment.generate",
-        "question.update",
         "session.create",
         "session.answer",
         "session.finish",

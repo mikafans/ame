@@ -1,6 +1,6 @@
 # AME Roadmap — toward v1.1 "Admin Console GA"
 
-**Current version:** `v0.1.0` (`api/Cargo.toml`)
+**Current version:** `v0.2.0` (`api/Cargo.toml`)
 **Target:** `v1.1` — a complete, operable admin console. The four operator
 features below are the v1.1 epic; they ship incrementally across v0.2 → v1.0 and
 are integrated + hardened at v1.1.
