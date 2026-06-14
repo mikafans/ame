@@ -151,7 +151,7 @@ pub async fn list_questions_paged(
     let next_cursor = if has_more {
         rows_vec
             .last()
-            .map(|q| format!("{}_{}", q.created_at.unix_timestamp(), q.id))
+            .map(|q| format!("{}_{}", q.created_at.unix_timestamp_nanos(), q.id))
     } else {
         None
     };
@@ -185,7 +185,8 @@ pub fn decode_cursor(cursor: &str) -> Option<(OffsetDateTime, Uuid)> {
     if parts.len() != 2 {
         return None;
     }
-    let ts = OffsetDateTime::from_unix_timestamp(parts[0].parse().ok()?).ok()?;
+    let ns = parts[0].parse::<i128>().ok()?;
+    let ts = OffsetDateTime::from_unix_timestamp_nanos(ns).ok()?;
     let id = Uuid::parse_str(parts[1]).ok()?;
     Some((ts, id))
 }

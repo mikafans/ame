@@ -189,6 +189,10 @@ pub fn router(pool: PgPool) -> Router {
         .merge(agents::logged_router(state.clone()))
         .merge(messages::router(state.clone()))
         .route("/v1/me/export", axum::routing::get(export::export_data))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            idempotency::idempotency_middleware,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             activity::activity_log_middleware,

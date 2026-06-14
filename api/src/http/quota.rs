@@ -107,13 +107,13 @@ pub async fn check_quota(
         .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?,
-        QuotaKind::Question => {
-            sqlx::query_scalar("SELECT COUNT(*) FROM tb_questions WHERE owner_id = $1")
-                .bind(owner_id)
-                .fetch_one(&mut *conn)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?
-        }
+        QuotaKind::Question => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM tb_questions WHERE owner_id = $1 AND status != 'archived'",
+        )
+        .bind(owner_id)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?,
     };
 
     if usage + add_count > limit {

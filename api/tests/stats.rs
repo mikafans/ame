@@ -449,3 +449,68 @@ async fn post_message_email_channel_queues_without_sending() {
     .unwrap();
     assert_eq!(row.0, "queued");
 }
+
+#[tokio::test]
+async fn test_me_stats_includes_agent_activity() {
+    if skip_if_no_db() {
+        return;
+    }
+    let pool = setup_db().await;
+
+    // Create a human owner
+    let (_owner_id, bearer) = make_user_with_scopes(&pool, &["attempt.read", "stats.read"]).await;
+
+    // Create an agent owned by the human owner
+    let agent_id = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, 'Test Agent')")
+        .bind(agent_id)
+        .bind(TEST_OWNER_ID)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create an agent-curated assessment owned by the human owner
+    sqlx::query(
+        "INSERT INTO tb_assessments (id, title, mode, status, objectives, owner_id, created_by, agent_id, method) \
+         VALUES ($1, 'Agent Quiz', 'practice', 'active', $2, $3, $3, $4, 'agent')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(&["Objective"] as &[&str])
+    .bind(TEST_OWNER_ID)
+    .bind(agent_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Insert a graded attempt activity log for the agent
+    sqlx::query(
+        "INSERT INTO tb_activity_log (id, agent_id, tool_name, method, path, status) \
+         VALUES ($1, $2, 'attempt.grade', 'POST', '/v1/agents/run', 200)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(agent_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let base = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    // Get stats for the human owner
+    let stats: Value = client
+        .get(format!("{base}/v1/me/stats"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    // The stats should count the agent's activity
+    assert!(stats["agent_active_count"].as_i64().unwrap() >= 1);
+    assert!(stats["agent_graded_attempts"].as_i64().unwrap() >= 1);
+    assert!(stats["agent_curated_assessments"].as_i64().unwrap() >= 1);
+}

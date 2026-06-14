@@ -35,6 +35,7 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 subtle = "2"
+unicode-normalization = "0.1.24"
 http-body-util = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 utoipa = { version = "5", features = ["uuid", "time", "yaml"] }
