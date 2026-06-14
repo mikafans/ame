@@ -106,7 +106,7 @@ test.describe("admin portal", () => {
     const drawer = page.locator(".MuiDrawer-paper").first();
     await expect(drawer).toBeVisible();
     await expect(drawer.getByText(/question/i).first()).toBeVisible();
-    await expect(drawer.getByText("CORRECT").first()).toBeVisible({
+    await expect(drawer.getByText(/CORRECT/).first()).toBeVisible({
       timeout: 8000,
     });
   });

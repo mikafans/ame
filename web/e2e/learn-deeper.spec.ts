@@ -54,24 +54,56 @@ test.describe("Learn Deeper flow", () => {
     const promptInput = page.locator(
       'label:has-text("Question prompt") textarea',
     );
+    // Fill Prompt and wait for save
     await promptInput.fill("Paris is the capital of France.");
+    let savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await promptInput.blur();
+    await savePromise;
 
     const refUrlInput = page.locator('label:has-text("Reference URL") input');
+    // Fill Reference URL and wait for save
     await refUrlInput.fill("https://en.wikipedia.org/wiki/Paris");
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await refUrlInput.blur();
+    await savePromise;
 
     const deepDiveInput = page.locator(
       'label:has-text("Deep Dive Study Notes") textarea',
     );
+    // Fill Deep Dive and wait for save
     await deepDiveInput.fill(
       "### Paris Deep Dive\nParis has been a major settlement for over two millennia.",
     );
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await deepDiveInput.blur();
+    await savePromise;
 
     const tagInput = page.locator('label:has-text("Tag") input');
+    // Fill Tag and wait for save
     await tagInput.fill("geography, europe");
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await tagInput.blur();
+    await savePromise;
 
     // Set correct answer as True
     await page.getByRole("button", { name: "True" }).click();
@@ -85,18 +117,46 @@ test.describe("Learn Deeper flow", () => {
 
     // Wait and write Q2 prompt
     await promptInput.fill("Rome is the capital of Italy.");
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await promptInput.blur();
+    await savePromise;
 
     await refUrlInput.fill("https://en.wikipedia.org/wiki/Rome");
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await refUrlInput.blur();
+    await savePromise;
 
     await deepDiveInput.fill(
       "### Rome Deep Dive\nRome has a history spanning 28 centuries.",
     );
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await deepDiveInput.blur();
+    await savePromise;
 
     await tagInput.fill("geography, europe");
+    savePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes("/v1/assessments/") &&
+        r.method() === "GET" &&
+        r.status() === 200,
+    );
     await tagInput.blur();
+    await savePromise;
 
     // Set correct answer as True
     await page.getByRole("button", { name: "True" }).click();
