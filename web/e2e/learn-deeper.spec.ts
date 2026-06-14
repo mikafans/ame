@@ -59,7 +59,7 @@ test.describe("Learn Deeper flow", () => {
     let savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await promptInput.blur();
@@ -71,7 +71,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await refUrlInput.blur();
@@ -87,7 +87,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await deepDiveInput.blur();
@@ -99,7 +99,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await tagInput.blur();
@@ -120,7 +120,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await promptInput.blur();
@@ -130,7 +130,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await refUrlInput.blur();
@@ -142,7 +142,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await deepDiveInput.blur();
@@ -152,7 +152,7 @@ test.describe("Learn Deeper flow", () => {
     savePromise = page.waitForResponse(
       (r) =>
         r.url().includes("/v1/assessments/") &&
-        r.method() === "GET" &&
+        r.request().method() === "GET" &&
         r.status() === 200,
     );
     await tagInput.blur();
