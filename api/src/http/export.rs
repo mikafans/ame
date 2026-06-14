@@ -54,7 +54,7 @@ pub async fn export_data(
     let assessments: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
              SELECT * FROM tb_assessments 
-             WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
+             WHERE created_by = $1 OR created_by IN (SELECT id FROM tb_agents WHERE owner_user_id = $1)
          ) q",
     )
     .bind(owner_id)
@@ -66,7 +66,7 @@ pub async fn export_data(
     let questions: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
              SELECT * FROM tb_questions
-             WHERE created_by IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
+             WHERE created_by = $1 OR created_by IN (SELECT id FROM tb_agents WHERE owner_user_id = $1)
          ) q",
     )
     .bind(owner_id)
@@ -78,7 +78,7 @@ pub async fn export_data(
     let sessions: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
              SELECT * FROM tb_sessions 
-             WHERE user_id IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
+             WHERE owner_id = $1
          ) q",
     )
     .bind(owner_id)
@@ -90,10 +90,7 @@ pub async fn export_data(
     let attempts: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
              SELECT * FROM tb_attempts 
-             WHERE session_id IN (
-                 SELECT id FROM tb_sessions 
-                 WHERE user_id IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
-             )
+             WHERE owner_id = $1
          ) q",
     )
     .bind(owner_id)
@@ -105,7 +102,7 @@ pub async fn export_data(
     let tag_ratings: serde_json::Value = sqlx::query_scalar(
         "SELECT COALESCE(json_agg(q), '[]'::json) FROM (
              SELECT * FROM tb_user_tag_ratings 
-             WHERE user_id IN (SELECT id FROM tb_users WHERE id = $1 OR owner_user_id = $1)
+             WHERE user_id = $1
          ) q",
     )
     .bind(owner_id)

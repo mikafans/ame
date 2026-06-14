@@ -122,8 +122,8 @@ async fn test_cross_owner_agent_visibility() {
     // question (see build_assessment_plan), so give it one and activate it. It stays
     // private — the access checks below are what we're exercising.
     let question_id: Uuid = sqlx::query(
-        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by, agent_id) \
-         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $1, $3) RETURNING id",
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
+         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $3) RETURNING id",
     )
     .bind(owner_id)
     .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
@@ -583,21 +583,22 @@ async fn test_cross_owner_pending_attempts_isolation() {
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, kind, question_plan, status, started_at) \
-         VALUES ($1, $2, 'practice', '{\"items\": []}'::jsonb, 'in_progress', now())",
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, kind, question_plan, status, started_at) \
+         VALUES ($1, $2, $3, 'practice', '{\"items\": []}'::jsonb, 'in_progress', now())",
     )
     .bind(session_id)
+    .bind(learner_id)
     .bind(learner_id)
     .execute(&pool)
     .await
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO tb_attempts (id, user_id, question_id, question_version, session_id, response, \
+        "INSERT INTO tb_attempts (id, actor_id, owner_id, question_id, question_version, session_id, response, \
                                   presentation, is_correct, score, rating_before_user_avg, \
                                   rating_before_question, user_tag_deltas, question_delta, \
                                   grade_status, created_at) \
-         VALUES ($1, $2, $3, 1, $4, $5, $6, false, 0, 0, 0, '{}'::jsonb, 0, 'pending_manual', now())",
+         VALUES ($1, $2, $2, $3, 1, $4, $5, $6, false, 0, 0, 0, '{}'::jsonb, 0, 'pending_manual', now())",
     )
     .bind(attempt_id)
     .bind(learner_id)
@@ -719,21 +720,22 @@ async fn test_cross_owner_grade_isolation() {
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, kind, question_plan, status, started_at) \
-         VALUES ($1, $2, 'practice', '{\"items\": []}'::jsonb, 'in_progress', now())",
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, kind, question_plan, status, started_at) \
+         VALUES ($1, $2, $3, 'practice', '{\"items\": []}'::jsonb, 'in_progress', now())",
     )
     .bind(session_id)
+    .bind(learner_id)
     .bind(learner_id)
     .execute(&pool)
     .await
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO tb_attempts (id, user_id, question_id, question_version, session_id, response, \
+        "INSERT INTO tb_attempts (id, actor_id, owner_id, question_id, question_version, session_id, response, \
                                   presentation, is_correct, score, rating_before_user_avg, \
                                   rating_before_question, user_tag_deltas, question_delta, \
                                   grade_status, created_at) \
-         VALUES ($1, $2, $3, 1, $4, $5, $6, false, 0, 0, 0, '{}'::jsonb, 0, 'pending_manual', now())",
+         VALUES ($1, $2, $2, $3, 1, $4, $5, $6, false, 0, 0, 0, '{}'::jsonb, 0, 'pending_manual', now())",
     )
     .bind(attempt_id)
     .bind(learner_id)

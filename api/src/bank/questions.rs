@@ -59,7 +59,7 @@ pub async fn list_questions(
                WHERE qt.question_id = q.id AND t.name = $6
            ))
            AND ($9::uuid IS NULL OR q.created_by = $9 OR EXISTS (
-               SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $9
+               SELECT 1 FROM tb_agents ag WHERE ag.id = q.created_by AND ag.owner_user_id = $9
            ))
          ORDER BY q.created_at DESC
          LIMIT $7 OFFSET $8"
@@ -113,7 +113,7 @@ pub async fn list_questions_paged(
            ))
            AND ($9::timestamptz IS NULL OR (q.created_at, q.id) < ($9, $10))
            AND ($11::uuid IS NULL OR q.created_by = $11 OR EXISTS (
-               SELECT 1 FROM tb_users u WHERE u.id = q.created_by AND u.owner_user_id = $11
+               SELECT 1 FROM tb_agents ag WHERE ag.id = q.created_by AND ag.owner_user_id = $11
            ))
            AND ($12::uuid IS NULL OR EXISTS (
                SELECT 1 FROM tb_assessment_items ai
@@ -264,8 +264,8 @@ pub async fn question_in_owner_scope(
              SELECT 1 FROM tb_questions q
              WHERE q.id = $1
                AND (q.created_by = $2 OR EXISTS (
-                   SELECT 1 FROM tb_users u
-                   WHERE u.id = q.created_by AND u.owner_user_id = $2
+                   SELECT 1 FROM tb_agents ag
+                   WHERE ag.id = q.created_by AND ag.owner_user_id = $2
                ))
          )",
     )
@@ -304,7 +304,6 @@ pub async fn create_questions(
     conn: &mut sqlx::PgConnection,
     user_id: Uuid,
     owner_id: Uuid,
-    agent_id: Option<Uuid>,
     questions: Vec<QuestionInsert>,
 ) -> Result<Vec<Question>, ApiError> {
     if questions.len() > MAX_BATCH {
@@ -330,8 +329,8 @@ pub async fn create_questions(
             .collect();
 
         let q_row = sqlx::query(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, '{}'::text[] AS tags"
         )
         .bind(id)
@@ -343,7 +342,6 @@ pub async fn create_questions(
         .bind(status.as_str())
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
-        .bind(agent_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(internal)?;

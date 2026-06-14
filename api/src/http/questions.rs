@@ -234,19 +234,8 @@ pub async fn create_questions(
         .await?;
     }
 
-    let agent_id = if auth.0.user.role == crate::domain::user::Role::Agent {
-        Some(auth.0.user.id)
-    } else {
-        None
-    };
-    let questions = repo::create_questions(
-        &mut db,
-        auth.0.owner_id,
-        auth.0.owner_id,
-        agent_id,
-        body.questions,
-    )
-    .await?;
+    let questions =
+        repo::create_questions(&mut db, auth.0.user.id, auth.0.owner_id, body.questions).await?;
     Ok((
         StatusCode::CREATED,
         Json(CreateQuestionsResponse { questions }),

@@ -2258,6 +2258,7 @@ components:
       required:
       - id
       - user_id
+      - owner_id
       - question_id
       - question_version
       - response
@@ -2287,6 +2288,9 @@ components:
           format: uuid
         is_correct:
           type: boolean
+        owner_id:
+          type: string
+          format: uuid
         presentation:
           $ref: '#/components/schemas/AttemptPresentation'
         question_delta:
@@ -3450,6 +3454,7 @@ components:
       required:
       - id
       - user_id
+      - owner_id
       - kind
       - question_plan
       - status
@@ -3489,6 +3494,9 @@ components:
           format: uuid
         kind:
           $ref: '#/components/schemas/SessionKind'
+        owner_id:
+          type: string
+          format: uuid
         question_plan:
           $ref: '#/components/schemas/QuestionPlan'
         rating_snapshot:

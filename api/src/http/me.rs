@@ -767,7 +767,7 @@ pub async fn list_attempts(
     let limit = q.limit.clamp(1, 50);
     let rows = if let Some(sid) = q.session_id {
         sqlx::query(
-            "SELECT a.id, a.user_id, a.question_id, a.question_version, a.session_id, a.response,
+            "SELECT a.id, a.actor_id AS user_id, a.owner_id, a.question_id, a.question_version, a.session_id, a.response,
                     a.presentation, a.is_correct, a.score, a.grade_status,
                     CASE WHEN s.id IS NULL OR s.status = 'finished' THEN a.correct_answer ELSE NULL END as correct_answer,
                     a.grader_notes, a.time_to_answer_ms,
@@ -776,7 +776,7 @@ pub async fn list_attempts(
                     COUNT(*) OVER() AS total
              FROM tb_attempts a
              LEFT JOIN tb_sessions s ON a.session_id = s.id
-             WHERE a.user_id = $1 AND a.session_id = $2
+             WHERE a.owner_id = $1 AND a.session_id = $2
              ORDER BY a.created_at DESC
              LIMIT $3 OFFSET $4",
         )
@@ -791,7 +791,7 @@ pub async fn list_attempts(
         .map_err(|e| ApiError::Internal(e.into()))?
     } else {
         sqlx::query(
-            "SELECT a.id, a.user_id, a.question_id, a.question_version, a.session_id, a.response,
+            "SELECT a.id, a.actor_id AS user_id, a.owner_id, a.question_id, a.question_version, a.session_id, a.response,
                     a.presentation, a.is_correct, a.score, a.grade_status,
                     CASE WHEN s.id IS NULL OR s.status = 'finished' THEN a.correct_answer ELSE NULL END as correct_answer,
                     a.grader_notes, a.time_to_answer_ms,
@@ -800,7 +800,7 @@ pub async fn list_attempts(
                     COUNT(*) OVER() AS total
              FROM tb_attempts a
              LEFT JOIN tb_sessions s ON a.session_id = s.id
-             WHERE a.user_id = $1
+             WHERE a.owner_id = $1
              ORDER BY a.created_at DESC
              LIMIT $2 OFFSET $3",
         )
@@ -819,6 +819,7 @@ pub async fn list_attempts(
         .map(|r| Attempt {
             id: r.get("id"),
             user_id: r.get("user_id"),
+            owner_id: r.get("owner_id"),
             question_id: r.get("question_id"),
             question_version: r.get("question_version"),
             session_id: r.get("session_id"),

@@ -81,7 +81,7 @@ pub async fn list_users(
 
     // 2. Get paginated users
     let mut users_qb = sqlx::QueryBuilder::new(
-        "SELECT u.id, u.owner_user_id, u.email, u.display_name, u.role, COALESCE(o.plan, u.plan) as plan, u.created_at, u.deactivated_at FROM tb_users u LEFT JOIN tb_users o ON u.owner_user_id = o.id",
+        "SELECT u.id, NULL::uuid AS owner_user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.deactivated_at FROM tb_users u",
     );
     if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
         let search_pat = format!("%{}%", search.trim());

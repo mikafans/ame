@@ -98,19 +98,55 @@ async fn skill_manifest_contains_assessment_tools() {
         );
     }
 
-    // Single-door contract (audit F-3): every advertised tool is reachable ONLY
-    // via POST /v1/agents/run after the agent guard, so the manifest must not
-    // advertise any REST path that 403s for an agent token.
+    // Direct REST API contract: tools should advertise their direct REST path and method,
+    // or /v1/agents/run dispatcher for run-only tools.
     for t in tools {
+        let name = t["name"].as_str().unwrap();
+        let expected_method = match name {
+            "assessment.list" | "assessment.get" | "question.list" | "assessment.stats"
+            | "activity.list" | "stats.user" | "attempt.list" => "GET",
+            "assessment.archive" | "assessment.publish" | "assessment.update"
+            | "question.update" | "attempt.grade" => "PATCH",
+            "assessment.create"
+            | "assessment.batchCreate"
+            | "assessment.addQuestion"
+            | "question.create"
+            | "question.promote"
+            | "profile.get"
+            | "memory.set"
+            | "memory.append"
+            | "target.set" => "POST",
+            _ => panic!("unknown tool name: {}", name),
+        };
+        let expected_path = match name {
+            "assessment.list" => "/v1/assessments",
+            "assessment.get" => "/v1/assessments/{id}",
+            "assessment.archive" | "assessment.publish" | "assessment.update" => {
+                "/v1/assessments/{id}"
+            }
+            "assessment.create" => "/v1/assessments",
+            "assessment.batchCreate" => "/v1/agents/run",
+            "assessment.addQuestion" => "/v1/assessments/{id}/questions",
+            "question.list" => "/v1/questions",
+            "question.create" => "/v1/questions",
+            "question.promote" => "/v1/questions/{id}/promote",
+            "question.update" => "/v1/questions/{id}",
+            "assessment.stats" => "/v1/assessments/{id}/stats",
+            "activity.list" => "/v1/agents/activity",
+            "stats.user" => "/v1/me/stats",
+            "attempt.list" => "/v1/me/attempts",
+            "attempt.grade" => "/v1/attempts/{id}/grade",
+            "profile.get" | "memory.set" | "memory.append" | "target.set" => "/v1/agents/run",
+            _ => panic!("unknown tool name: {}", name),
+        };
+
         assert_eq!(
-            t["method"], "POST",
-            "tool {} must advertise method POST",
-            t["name"]
+            t["method"], expected_method,
+            "tool {name} must advertise method {expected_method}"
         );
         assert_eq!(
-            t["path"], "/v1/agents/run",
-            "tool {} must advertise the single-door endpoint, not a REST path",
-            t["name"]
+            t["path"], expected_path,
+            "tool {name} must advertise path {expected_path}"
         );
     }
 }

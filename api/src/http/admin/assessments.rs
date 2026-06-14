@@ -73,7 +73,9 @@ pub async fn list_assessments_admin(
 
     let mut count_qb = sqlx::QueryBuilder::new(
         "SELECT COUNT(*) FROM tb_assessments a
-         LEFT JOIN tb_users u ON a.created_by = u.id",
+         LEFT JOIN tb_users u ON a.created_by = u.id
+         LEFT JOIN tb_agents ag ON a.created_by = ag.id
+         LEFT JOIN tb_users o ON ag.owner_user_id = o.id",
     );
     let mut has_where = false;
 
@@ -87,9 +89,11 @@ pub async fn list_assessments_admin(
         count_qb.push_bind(search_pat.clone());
         count_qb.push(" OR u.display_name ILIKE ");
         count_qb.push_bind(search_pat.clone());
-        count_qb.push(" OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = u.owner_user_id AND ow.email ILIKE ");
-        count_qb.push_bind(search_pat);
-        count_qb.push("))");
+        count_qb.push(" OR ag.label ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(" OR o.email ILIKE ");
+        count_qb.push_bind(search_pat.clone());
+        count_qb.push(")");
         has_where = true;
     }
 
@@ -121,10 +125,12 @@ pub async fn list_assessments_admin(
 
     let mut qb = sqlx::QueryBuilder::new(
         "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by,
-                COALESCE(u.email, (SELECT email FROM tb_users WHERE id = u.owner_user_id), u.display_name) as created_by_email,
+                COALESCE(u.email, o.email, ag.label) as created_by_email,
                 a.objectives, a.created_at, a.deleted_at
          FROM tb_assessments a
-         LEFT JOIN tb_users u ON a.created_by = u.id"
+         LEFT JOIN tb_users u ON a.created_by = u.id
+         LEFT JOIN tb_agents ag ON a.created_by = ag.id
+         LEFT JOIN tb_users o ON ag.owner_user_id = o.id",
     );
 
     let mut has_where = false;
@@ -139,9 +145,11 @@ pub async fn list_assessments_admin(
         qb.push_bind(search_pat.clone());
         qb.push(" OR u.display_name ILIKE ");
         qb.push_bind(search_pat.clone());
-        qb.push(" OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = u.owner_user_id AND ow.email ILIKE ");
-        qb.push_bind(search_pat);
-        qb.push("))");
+        qb.push(" OR ag.label ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(" OR o.email ILIKE ");
+        qb.push_bind(search_pat.clone());
+        qb.push(")");
         has_where = true;
     }
 

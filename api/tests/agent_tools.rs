@@ -299,9 +299,9 @@ async fn test_agent_reads_owner_record_via_run() {
 
     let session_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, kind, assessment_id, question_plan, status, \
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, kind, assessment_id, question_plan, status, \
          affects_rating, rating_snapshot, result, finished_at) \
-         VALUES ($1, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
+         VALUES ($1, $2, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
     )
     .bind(session_id)
     .bind(owner_id)
@@ -313,10 +313,10 @@ async fn test_agent_reads_owner_record_via_run() {
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO tb_attempts (user_id, question_id, question_version, session_id, response, \
+        "INSERT INTO tb_attempts (actor_id, owner_id, question_id, question_version, session_id, response, \
          is_correct, score, rating_before_user_avg, rating_before_question, user_tag_deltas, \
          question_delta, time_to_answer_ms) \
-         VALUES ($1, $2, 1, $3, $4::jsonb, true, 1.0, 1200, 1400, '{}'::jsonb, 0, 5000)",
+         VALUES ($1, $1, $2, 1, $3, $4::jsonb, true, 1.0, 1200, 1400, '{}'::jsonb, 0, 5000)",
     )
     .bind(owner_id)
     .bind(question_id)
@@ -407,7 +407,7 @@ async fn test_agent_token_blocked_on_learner_rest() {
         "agent token must be 403 on POST /v1/sessions"
     );
 
-    // GET /v1/me/stats — learner record read is run-only for agents now.
+    // GET /v1/me/stats — direct REST is allowed for agents now.
     let res = client
         .get(format!("{base_url}/v1/me/stats"))
         .header("Authorization", &bearer)
@@ -416,11 +416,11 @@ async fn test_agent_token_blocked_on_learner_rest() {
         .unwrap();
     assert_eq!(
         res.status(),
-        StatusCode::FORBIDDEN,
-        "agent token must be 403 on GET /v1/me/stats"
+        StatusCode::OK,
+        "agent token must be 200 on GET /v1/me/stats"
     );
 
-    // POST /v1/assessments — authoring is run-only for agents.
+    // POST /v1/assessments — direct REST is allowed for agents now.
     let res = client
         .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", &bearer)
@@ -430,8 +430,8 @@ async fn test_agent_token_blocked_on_learner_rest() {
         .unwrap();
     assert_eq!(
         res.status(),
-        StatusCode::FORBIDDEN,
-        "agent token must be 403 on POST /v1/assessments"
+        StatusCode::CREATED,
+        "agent token must be 201 on POST /v1/assessments"
     );
 }
 
@@ -832,51 +832,39 @@ async fn test_agent_batch_create_attribution_via_run() {
     );
     assert_eq!(resp["result"]["count"], 2, "expected 2 created: {resp}");
 
-    // Assessments: created_by + owner_id are the human; agent_id is the agent.
-    let assessments: Vec<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
-        "SELECT created_by, owner_id, agent_id FROM tb_assessments WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_all(&pool)
-    .await
-    .unwrap();
+    // Assessments: created_by is the agent; owner_id is the human owner.
+    let assessments: Vec<(Uuid, Uuid)> =
+        sqlx::query_as("SELECT created_by, owner_id FROM tb_assessments WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(assessments.len(), 2, "expected 2 assessment rows");
-    for (created_by, row_owner, row_agent) in &assessments {
+    for (created_by, row_owner) in &assessments {
         assert_eq!(
-            *created_by, owner_id,
-            "assessment.created_by must be the owner"
+            *created_by, agent_id,
+            "assessment.created_by must be the agent"
         );
         assert_eq!(
             *row_owner, owner_id,
             "assessment.owner_id must be the owner"
         );
-        assert_eq!(
-            *row_agent,
-            Some(agent_id),
-            "assessment.agent_id must be the agent"
-        );
     }
 
     // Questions inserted by the batch carry the same attribution.
-    let questions: Vec<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
-        "SELECT created_by, owner_id, agent_id FROM tb_questions WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_all(&pool)
-    .await
-    .unwrap();
+    let questions: Vec<(Uuid, Uuid)> =
+        sqlx::query_as("SELECT created_by, owner_id FROM tb_questions WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(questions.len(), 2, "expected 2 question rows");
-    for (created_by, row_owner, row_agent) in &questions {
+    for (created_by, row_owner) in &questions {
         assert_eq!(
-            *created_by, owner_id,
-            "question.created_by must be the owner"
+            *created_by, agent_id,
+            "question.created_by must be the agent"
         );
         assert_eq!(*row_owner, owner_id, "question.owner_id must be the owner");
-        assert_eq!(
-            *row_agent,
-            Some(agent_id),
-            "question.agent_id must be the agent"
-        );
     }
 }
 
@@ -927,24 +915,18 @@ async fn test_agent_add_inline_question_attribution_via_run() {
         "inline addQuestion should succeed: {added}"
     );
 
-    let (created_by, row_owner, row_agent): (Uuid, Uuid, Option<Uuid>) = sqlx::query_as(
-        "SELECT created_by, owner_id, agent_id FROM tb_questions WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let (created_by, row_owner): (Uuid, Uuid) =
+        sqlx::query_as("SELECT created_by, owner_id FROM tb_questions WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(
-        created_by, owner_id,
-        "inline question.created_by must be the owner"
+        created_by, agent_id,
+        "inline question.created_by must be the agent"
     );
     assert_eq!(
         row_owner, owner_id,
         "inline question.owner_id must be the owner"
-    );
-    assert_eq!(
-        row_agent,
-        Some(agent_id),
-        "inline question.agent_id must be the agent"
     );
 }

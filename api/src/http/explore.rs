@@ -99,7 +99,7 @@ pub async fn explore(
          ( \
              SELECT EXISTS( \
                  SELECT 1 FROM tb_sessions s \
-                 WHERE s.assessment_id = tb_assessments.id AND s.user_id = $2 \
+                 WHERE s.assessment_id = tb_assessments.id AND s.actor_id = $2 \
                    AND s.status = 'finished' \
              ) \
          ) AS completed \

@@ -273,7 +273,7 @@ pub async fn me_stats(
             "SELECT COUNT(*) AS total, \
                     COUNT(*) FILTER (WHERE created_at > now() - interval '7 days') AS this_week \
              FROM tb_attempts \
-             WHERE user_id = $1",
+             WHERE owner_id = $1",
         )
         .bind(uid)
         .fetch_one(&state.pool)
@@ -292,7 +292,7 @@ pub async fn me_stats(
                     THEN (result->>'points_awarded')::float / (result->>'max_points')::float \
                     ELSE NULL END) FILTER (WHERE finished_at BETWEEN now() - interval '56 days' AND now() - interval '28 days') AS avg_prior \
              FROM tb_sessions \
-             WHERE user_id = $1 \
+             WHERE owner_id = $1 \
                AND status = 'finished' AND result IS NOT NULL",
         )
         .bind(uid)
@@ -316,7 +316,7 @@ pub async fn me_stats(
                         AND finished_at BETWEEN now() - make_interval(days => $2::int * 2) \
                                              AND now() - make_interval(days => $2::int)), 0)::float8 AS hours_prior \
              FROM tb_sessions \
-             WHERE user_id = $1 \
+             WHERE owner_id = $1 \
                AND status = 'finished'",
         )
         .bind(uid)
@@ -335,7 +335,7 @@ pub async fn me_stats(
             "WITH daily AS ( \
                 SELECT DISTINCT date_trunc('day', created_at AT TIME ZONE 'UTC')::date AS day \
                 FROM tb_attempts \
-                WHERE user_id = $1 \
+                WHERE owner_id = $1 \
             ), \
             gaps AS ( \
                 SELECT day, ROW_NUMBER() OVER (ORDER BY day) - \
@@ -385,7 +385,7 @@ pub async fn me_stats(
     let agent_graded_fut = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM tb_activity_log \
          WHERE tool_name = 'attempt.grade' AND status = 200 \
-           AND agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $1)",
+           AND actor_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $1)",
     )
     .bind(uid)
     .fetch_one(&state.pool);

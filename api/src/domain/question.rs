@@ -155,8 +155,34 @@ pub struct ArchivedQuestion {
     pub archived_at: OffsetDateTime,
 }
 
+pub fn deserialize_mc_options<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let values = Vec::<serde_json::Value>::deserialize(deserializer)?;
+    let mut options = Vec::new();
+    for v in values {
+        match v {
+            serde_json::Value::String(s) => options.push(s),
+            serde_json::Value::Object(ref obj) => {
+                if let Some(serde_json::Value::String(s)) = obj.get("text") {
+                    options.push(s.clone());
+                } else if let Some(serde_json::Value::String(s)) = obj.get("label") {
+                    options.push(s.clone());
+                } else {
+                    options.push(v.to_string());
+                }
+            }
+            _ => options.push(v.to_string()),
+        }
+    }
+    Ok(options)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct McPayload {
+    #[serde(deserialize_with = "deserialize_mc_options")]
     pub options: Vec<String>,
     pub correct_index: usize,
 }

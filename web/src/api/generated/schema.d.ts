@@ -1006,6 +1006,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             is_correct: boolean;
+            /** Format: uuid */
+            owner_id: string;
             presentation: components["schemas"]["AttemptPresentation"];
             /** Format: double */
             question_delta: number;
@@ -1475,6 +1477,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["SessionKind"];
+            /** Format: uuid */
+            owner_id: string;
             question_plan: components["schemas"]["QuestionPlan"];
             rating_snapshot: Record<string, never>;
             result?: Record<string, never>;

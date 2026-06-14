@@ -252,12 +252,12 @@ pub async fn list_assessments(
                            WHERE assessment_id = a.id), 0) AS question_count,
                 EXISTS(
                     SELECT 1 FROM tb_sessions s
-                    WHERE s.assessment_id = a.id AND s.user_id = $2
+                    WHERE s.assessment_id = a.id AND s.actor_id = $2
                       AND s.status = 'finished'
                 ) AS completed,
                 (
                     SELECT s.id FROM tb_sessions s
-                    WHERE s.assessment_id = a.id AND s.user_id = $2
+                    WHERE s.assessment_id = a.id AND s.actor_id = $2
                       AND s.status = 'finished'
                     ORDER BY s.finished_at DESC LIMIT 1
                 ) AS last_session_id
@@ -421,18 +421,12 @@ pub async fn create_assessment(
         .map(|q| q.points.unwrap_or(1))
         .sum();
 
-    let agent_id = if user.user.role == crate::domain::user::Role::Agent {
-        Some(user.user.id)
-    } else {
-        None
-    };
-
     sqlx::query(
         "INSERT INTO tb_assessments \
          (id, title, description, mode, status, objectives, course, duration_min, \
           time_limit_seconds, passing_points, show_results_during, affects_rating, \
-          method, created_by, owner_id, total_points, agent_id) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+          method, created_by, owner_id, total_points) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
     )
     .bind(assessment_id)
     .bind(payload.title.clone())
@@ -447,10 +441,9 @@ pub async fn create_assessment(
     .bind(payload.show_results_during)
     .bind(payload.affects_rating)
     .bind(&payload.method)
-    .bind(user.owner_id)
+    .bind(user.user.id)
     .bind(user.owner_id)
     .bind(total_points)
-    .bind(agent_id)
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
@@ -473,8 +466,8 @@ pub async fn create_assessment(
     for (i, q) in payload.questions.into_iter().enumerate() {
         let question_id = Uuid::now_v7();
         sqlx::query(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id) \
-             VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8, $9)"
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by) \
+             VALUES ($1, $2, $3, $4, $5, $6, 'live', $7, $8)"
         )
         .bind(question_id)
         .bind(user.owner_id)
@@ -483,8 +476,7 @@ pub async fn create_assessment(
         .bind(&q.payload)
         .bind(&q.explanation)
         .bind(q.points.unwrap_or(1))
-        .bind(user.owner_id)
-        .bind(agent_id)
+        .bind(user.user.id)
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
@@ -676,7 +668,7 @@ pub async fn get_assessment(
     // consistent with the list endpoint and the sessions endpoints (audit F-2).
     let last_session_id: Option<Uuid> = sqlx::query_scalar(
         "SELECT s.id FROM tb_sessions s
-         WHERE s.assessment_id = $1 AND s.user_id = $2 AND s.status = 'finished'
+         WHERE s.assessment_id = $1 AND s.actor_id = $2 AND s.status = 'finished'
          ORDER BY s.finished_at DESC LIMIT 1",
     )
     .bind(id)
@@ -906,21 +898,17 @@ pub async fn add_assessment_question(
         )
         .await?;
 
-        // created_by is the human owner (FK → tb_users); agent attribution is
-        // captured separately in agent_id (FK → tb_agents). Binding the agent's
-        // own id as created_by violates tb_questions_created_by_fkey.
-        let agent_id = (auth.user.role == crate::domain::user::Role::Agent).then_some(auth.user.id);
+        // created_by is the actual creator (FK -> tb_identities); owner_id is the human owner.
         sqlx::query_scalar(
-            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by, agent_id)
-             VALUES ($1, $2, $3, $4, 'draft', 1, $5, $6)
+            "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by)
+             VALUES ($1, $2, $3, $4, 'draft', 1, $5)
              RETURNING id",
         )
         .bind(auth.owner_id)
         .bind(kind.as_str())
         .bind(&prompt)
         .bind(&default_payload)
-        .bind(auth.owner_id)
-        .bind(agent_id)
+        .bind(auth.user.id)
         .fetch_one(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?

@@ -97,7 +97,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                     r#"
                     SELECT s.token_hash, s.scopes, s.expires_at, s.user_id,
                            u.email, u.display_name, u.role, u.plan, u.created_at,
-                           u.owner_user_id,
+                           NULL::uuid AS owner_user_id,
                            u.deactivated_at AS user_deactivated_at
                     FROM tb_login_sessions s
                     JOIN tb_users u ON s.user_id = u.id

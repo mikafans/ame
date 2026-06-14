@@ -1079,8 +1079,8 @@ async fn test_admin_assessments_moderation() {
 
     let session_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, assessment_id, kind, question_plan, status)
-         VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, assessment_id, kind, question_plan, status)
+         VALUES ($1, $2, $2, $3, $4, $5, $6)",
     )
     .bind(session_id)
     .bind(user_id)
@@ -1203,8 +1203,8 @@ async fn test_admin_assessment_soft_delete() {
     // 3. Create a session referencing the assessment
     let session_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, assessment_id, kind, question_plan, status)
-         VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, assessment_id, kind, question_plan, status)
+         VALUES ($1, $2, $2, $3, $4, $5, $6)",
     )
     .bind(session_id)
     .bind(user_id)

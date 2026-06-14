@@ -70,21 +70,21 @@ async fn ensure_test_owner(pool: &PgPool) {
         .await;
 }
 
-async fn make_bearer(pool: &PgPool) -> String {
+async fn make_bearer(pool: &PgPool) -> (String, Uuid) {
     ensure_test_owner(pool).await;
     let user_id = Uuid::now_v7();
     let token_id = Uuid::now_v7();
     let secret = "session_secret_123";
     let hash = hash_secret(secret);
 
-    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
         .bind(user_id)
-        .bind(TEST_OWNER_ID)
         .bind(format!("session-user-{user_id}"))
         .bind(format!("session-{user_id}@example.com"))
         .execute(pool)
         .await
         .unwrap();
+
     sqlx::query(
         "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) \
          VALUES ($1, $2, $3, $4, $5)",
@@ -101,11 +101,11 @@ async fn make_bearer(pool: &PgPool) -> String {
     .await
     .unwrap();
 
-    format!("lgn_{token_id}_{secret}")
+    (format!("lgn_{token_id}_{secret}"), user_id)
 }
 
-async fn make_live_mc_question(pool: &PgPool) -> Uuid {
-    make_live_mc_question_with_tag(pool, "rust").await
+async fn make_live_mc_question(pool: &PgPool, owner_id: Uuid) -> Uuid {
+    make_live_mc_question_with_tag(pool, owner_id, "rust").await
 }
 
 /// Create a user (or agent sub-account) with a scoped bearer token.
@@ -153,11 +153,10 @@ async fn make_user_token(
     } else {
         let email = format!("u-{user_id}@example.com");
         sqlx::query(
-            "INSERT INTO tb_users (id, owner_user_id, display_name, email, role, plan) \
-             VALUES ($1, $2, $3, $4, $5, 'premium')",
+            "INSERT INTO tb_users (id, display_name, email, role, plan) \
+             VALUES ($1, $2, $3, $4, 'premium')",
         )
         .bind(user_id)
-        .bind(owner_user_id)
         .bind(format!("user-{user_id}"))
         .bind(email)
         .bind(role)
@@ -373,12 +372,11 @@ async fn completion_state_is_scoped_to_caller_not_owner() {
 
 /// Insert a live MC question (correct_index = 1) tagged `tag`. Use a unique
 /// tag to make tag-filtered practice planning deterministic on a shared DB.
-async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
+async fn make_live_mc_question_with_tag(pool: &PgPool, owner_id: Uuid, tag: &str) -> Uuid {
     ensure_test_owner(pool).await;
     let author_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
         .bind(author_id)
-        .bind(TEST_OWNER_ID)
         .bind(format!("author-{author_id}"))
         .bind(format!("author-{author_id}@example.com"))
         .execute(pool)
@@ -390,7 +388,7 @@ async fn make_live_mc_question_with_tag(pool: &PgPool, tag: &str) -> Uuid {
          VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $3) \
           RETURNING id",
     )
-    .bind(TEST_OWNER_ID)
+    .bind(owner_id)
     .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
     .bind(author_id)
     .fetch_one(pool)
@@ -426,9 +424,9 @@ async fn practice_session_answer_replay_and_finish_roundtrip() {
     }
 
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
+    let (bearer, user_id) = make_bearer(&pool).await;
     let unique_tag = format!("rust-{}", uuid::Uuid::now_v7());
-    let question_id = make_live_mc_question_with_tag(&pool, &unique_tag).await;
+    let question_id = make_live_mc_question_with_tag(&pool, user_id, &unique_tag).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -530,14 +528,14 @@ async fn list_my_sessions_numbers_finished_attempts_newest_first() {
     }
 
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
+    let (bearer, user_id) = make_bearer(&pool).await;
     // Unique tag → only our questions are selectable, so planning is
     // deterministic on a shared DB. Two questions because the practice planner
     // won't re-serve a just-answered question on the second attempt. Both have
     // correct_index = 1, so a correct answer is always worth 2 points.
     let tag = format!("history-{}", Uuid::now_v7());
-    make_live_mc_question_with_tag(&pool, &tag).await;
-    make_live_mc_question_with_tag(&pool, &tag).await;
+    make_live_mc_question_with_tag(&pool, user_id, &tag).await;
+    make_live_mc_question_with_tag(&pool, user_id, &tag).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -629,8 +627,8 @@ async fn list_my_sessions_excludes_in_progress() {
     }
 
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
-    make_live_mc_question(&pool).await;
+    let (bearer, user_id) = make_bearer(&pool).await;
+    make_live_mc_question(&pool, user_id).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -671,8 +669,8 @@ async fn abandon_session_roundtrip() {
     }
 
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
-    make_live_mc_question(&pool).await;
+    let (bearer, user_id) = make_bearer(&pool).await;
+    make_live_mc_question(&pool, user_id).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -724,8 +722,8 @@ async fn patch_session_rejects_finished_target() {
     }
 
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
-    make_live_mc_question(&pool).await;
+    let (bearer, user_id) = make_bearer(&pool).await;
+    make_live_mc_question(&pool, user_id).await;
     let base_url = serve(pool).await;
     let client = reqwest::Client::new();
 
