@@ -29,7 +29,8 @@ use crate::{
     http::{
         AppState,
         admin::{
-            AdminAssessmentEntry, AdminHealthResponse, AdminListAssessmentsResponse, AuditLogEntry,
+            AdminAssessmentDetail, AdminAssessmentEntry, AdminHealthResponse,
+            AdminListAssessmentsResponse, AdminPreviewQuestion, AuditLogEntry,
             ListAuditLogsResponse, ListTokensResponse, ListUsersResponse, PatchUserAdminBody,
             TokenEntry, UpdateSettingsBody,
         },
@@ -110,6 +111,7 @@ use crate::{
         crate::http::admin::list_audit_logs,
         crate::http::admin::get_admin_health,
         crate::http::admin::list_assessments_admin,
+        crate::http::admin::get_assessment_admin,
         crate::http::admin::delete_assessment_admin,
         crate::http::admin::restore_assessment_admin,
         crate::http::admin::list_tokens,
@@ -189,6 +191,8 @@ use crate::{
         ListAuditLogsResponse,
         AdminHealthResponse,
         AdminAssessmentEntry,
+        AdminAssessmentDetail,
+        AdminPreviewQuestion,
         AdminListAssessmentsResponse,
         AuditLogEntry,
         AgentActivityResponse,

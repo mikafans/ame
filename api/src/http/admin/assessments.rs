@@ -9,7 +9,7 @@ use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{auth::scope::RequireScope, domain::error::ApiError, http::AppState};
+use crate::{auth::scope::RequireScope, domain::error::ApiError, http::AppState, http::db::DbConn};
 
 use super::AdminScope;
 
@@ -48,6 +48,37 @@ pub struct AdminAssessmentEntry {
 pub struct AdminListAssessmentsResponse {
     pub assessments: Vec<AdminAssessmentEntry>,
     pub total: i64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminPreviewQuestion {
+    pub id: Uuid,
+    pub kind: String,
+    pub prompt: String,
+    pub points: i32,
+    pub order_index: i32,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminAssessmentDetail {
+    pub id: Uuid,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub mode: String,
+    pub created_by: Uuid,
+    pub created_by_email: Option<String>,
+    pub objectives: Vec<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: time::OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub deleted_at: Option<time::OffsetDateTime>,
+    pub questions: Vec<AdminPreviewQuestion>,
 }
 
 /// GET /v1/admin/assessments — list all assessments on the platform
@@ -294,4 +325,92 @@ pub async fn restore_assessment_admin(
     );
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /v1/admin/assessments/{id} — retrieve a single assessment with all questions for admin preview
+#[utoipa::path(
+    get,
+    path = "/v1/admin/assessments/{id}",
+    params(("id" = Uuid, Path, description = "Assessment ID")),
+    responses(
+        (status = 200, description = "Assessment retrieved successfully", body = AdminAssessmentDetail),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden (Admin required)"),
+        (status = 404, description = "Assessment not found"),
+    ),
+    security(("bearer" = [])),
+    tag = "admin"
+)]
+pub async fn get_assessment_admin(
+    State(state): State<AppState>,
+    _admin: RequireScope<AdminScope>,
+    // DbConn sets the app.owner / app.is_admin RLS GUCs from the auth role; tb_questions
+    // enforces FORCE RLS, so the questions join must run on this connection — a raw
+    // &state.pool read silently returns zero questions for another owner's assessment.
+    mut db: DbConn,
+    Path(id): Path<Uuid>,
+) -> Result<Json<AdminAssessmentDetail>, ApiError> {
+    // Assessment metadata lives in tb_assessments (no RLS), so the pool read is fine here.
+    let mut qb = sqlx::QueryBuilder::new(
+        "SELECT a.id, a.title, a.description, a.status, a.mode, a.created_by,
+                COALESCE(u.email, o.email, ag.label) AS created_by_email,
+                a.objectives, a.created_at, a.deleted_at
+         FROM tb_assessments a
+         LEFT JOIN tb_users u ON a.created_by = u.id
+         LEFT JOIN tb_agents ag ON a.created_by = ag.id
+         LEFT JOIN tb_users o ON ag.owner_user_id = o.id
+         WHERE a.id = ",
+    );
+    qb.push_bind(id);
+
+    let row = qb
+        .build()
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .ok_or(ApiError::NotFound {
+            resource: "assessment",
+        })?;
+
+    // Questions join tb_questions (FORCE RLS) — run on the RLS-scoped DbConn, not the raw pool.
+    let question_rows = sqlx::query(
+        "SELECT sec.id AS section_id, sec.order_index AS sec_order_index,
+                q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
+                COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
+         FROM tb_assessment_items ai
+         JOIN tb_assessment_sections sec ON sec.id = ai.section_id
+         JOIN tb_questions q ON q.id = ai.question_id
+         WHERE sec.assessment_id = $1
+         ORDER BY sec.order_index ASC, ai.order_index ASC",
+    )
+    .bind(id)
+    .fetch_all(&mut *db)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
+
+    let questions: Vec<AdminPreviewQuestion> = question_rows
+        .into_iter()
+        .map(|qrow| AdminPreviewQuestion {
+            id: qrow.get("id"),
+            kind: qrow.get("kind"),
+            prompt: qrow.get("prompt"),
+            points: qrow.get("points"),
+            order_index: qrow.get("order_index"),
+            payload: qrow.get("payload"),
+        })
+        .collect();
+
+    Ok(Json(AdminAssessmentDetail {
+        id: row.get("id"),
+        title: row.get("title"),
+        description: row.get("description"),
+        status: row.get("status"),
+        mode: row.get("mode"),
+        created_by: row.get("created_by"),
+        created_by_email: row.get("created_by_email"),
+        objectives: row.get("objectives"),
+        created_at: row.get("created_at"),
+        deleted_at: row.get("deleted_at"),
+        questions,
+    }))
 }

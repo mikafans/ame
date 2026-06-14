@@ -28,7 +28,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** GET /v1/admin/assessments/{id} — retrieve a single assessment with all questions for admin preview */
+        get: operations["get_assessment_admin"];
         put?: never;
         post?: never;
         /** DELETE /v1/admin/assessments/{id} — soft-delete any assessment (moderation) */
@@ -781,6 +782,23 @@ export interface components {
             /** Format: uuid */
             questionId: string;
         };
+        AdminAssessmentDetail: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy: string;
+            createdByEmail?: string | null;
+            /** Format: date-time */
+            deletedAt?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            id: string;
+            mode: string;
+            objectives: string[];
+            questions: components["schemas"]["AdminPreviewQuestion"][];
+            status: string;
+            title: string;
+        };
         AdminAssessmentEntry: {
             /** Format: date-time */
             createdAt: string;
@@ -819,6 +837,17 @@ export interface components {
             assessments: components["schemas"]["AdminAssessmentEntry"][];
             /** Format: int64 */
             total: number;
+        };
+        AdminPreviewQuestion: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: int32 */
+            orderIndex: number;
+            payload: unknown;
+            /** Format: int32 */
+            points: number;
+            prompt: string;
         };
         AgentSummary: {
             /** Format: date-time */
@@ -1691,6 +1720,50 @@ export interface operations {
             };
             /** @description Forbidden (Admin required) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_assessment_admin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAssessmentDetail"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden (Admin required) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Assessment not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

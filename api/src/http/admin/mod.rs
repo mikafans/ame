@@ -62,7 +62,8 @@ pub fn router(state: AppState) -> Router<AppState> {
         )
         .route(
             "/v1/admin/assessments/{id}",
-            axum::routing::delete(assessments::delete_assessment_admin),
+            axum::routing::get(assessments::get_assessment_admin)
+                .delete(assessments::delete_assessment_admin),
         )
         .route(
             "/v1/admin/assessments/{id}/restore",
