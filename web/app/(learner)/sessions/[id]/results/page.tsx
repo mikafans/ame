@@ -5,6 +5,7 @@ import { formatDate } from "@/utils/format";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import { MarkdownView } from "@/components/MarkdownView";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -15,8 +16,11 @@ import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
+import Drawer from "@mui/material/Drawer";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircle";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CloseIcon from "@mui/icons-material/Close";
 import { HighlightedCode } from "@/components/HighlightedCode";
 
 interface Answer {
@@ -83,6 +87,87 @@ export default function ResultsPage({
   const [retaking, setRetaking] = useState(false);
 
   const [loading, setLoading] = useState(true);
+
+  // Deepen Drawer states
+  const [deepenOpen, setDeepenOpen] = useState(false);
+  const [deepenQid, setDeepenQid] = useState<string | null>(null);
+  const [deepenHistory, setDeepenHistory] = useState<string[]>([]);
+  const [deepenData, setDeepenData] = useState<{
+    question: {
+      id: string;
+      prompt: string;
+      kind: string;
+      payload: any;
+      explanation?: string | null;
+      deepDive?: string | null;
+      source?: string | null;
+      tags: string[];
+    };
+    related: Array<{
+      id: string;
+      prompt: string;
+      kind: string;
+      tags: string[];
+    }>;
+  } | null>(null);
+  const [deepenLoading, setDeepenLoading] = useState(false);
+  const [deepenError, setDeepenError] = useState<string | null>(null);
+
+  function handleOpenDeepen(qid: string, isFromHistory = false) {
+    setDeepenOpen(true);
+    setDeepenQid(qid);
+    if (!isFromHistory) {
+      setDeepenHistory([]);
+    }
+  }
+
+  const handleBack = () => {
+    const nextHistory = [...deepenHistory];
+    const prevQid = nextHistory.pop();
+    if (prevQid) {
+      setDeepenHistory(nextHistory);
+      handleOpenDeepen(prevQid, true);
+    }
+  };
+
+  useEffect(() => {
+    if (!deepenOpen || !deepenQid) {
+      setDeepenData(null);
+      return;
+    }
+
+    setDeepenLoading(true);
+    setDeepenError(null);
+
+    // Build exclude list (include currently viewed question and history questions)
+    const excludeIds = [deepenQid, ...deepenHistory];
+    const excludeQuery = excludeIds.join(",");
+
+    api
+      .GET(
+        "/v1/questions/{id}/deepen" as never,
+        {
+          params: {
+            path: { id: deepenQid },
+            query: { exclude: excludeQuery },
+          },
+        } as never,
+      )
+      .then(({ data: res }: { data?: any }) => {
+        if (res) {
+          setDeepenData(res);
+        } else {
+          setDeepenError("Failed to load question details.");
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setDeepenError(err?.message || "Failed to load question details.");
+      })
+      .finally(() => {
+        setDeepenLoading(false);
+      });
+  }, [deepenQid, deepenOpen, deepenHistory]);
 
   useEffect(() => {
     setLoading(true);
@@ -410,9 +495,21 @@ export default function ResultsPage({
                 </Typography>
                 <Stack
                   direction="row"
-                  spacing={0.75}
+                  spacing={1}
                   sx={{ alignItems: "center", flexShrink: 0 }}
                 >
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => handleOpenDeepen(a.qid)}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Dive deeper
+                  </Button>
                   {a.gradeStatus === "pending_manual" ? (
                     <Chip
                       label="Pending review"
@@ -654,6 +751,429 @@ export default function ResultsPage({
           </Stack>
         </Box>
       )}
+
+      {/* Deepen Drawer */}
+      <Drawer
+        anchor="right"
+        open={deepenOpen}
+        onClose={() => setDeepenOpen(false)}
+        slotProps={{
+          paper: {
+            sx: { width: { xs: "100%", sm: 540 }, maxWidth: "100%" },
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            bgcolor: "background.default",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              p: 3,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              bgcolor: "background.paper",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {deepenHistory.length > 0 && (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={handleBack}
+                  startIcon={<ArrowBackIcon />}
+                  sx={{ textTransform: "none", mr: 1 }}
+                >
+                  Back
+                </Button>
+              )}
+              <Typography variant="h6" fontWeight="bold">
+                Dive Deeper
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              onClick={() => setDeepenOpen(false)}
+              sx={{ minWidth: 40, p: 1, borderRadius: "50%" }}
+            >
+              <CloseIcon />
+            </Button>
+          </Box>
+
+          {/* Body */}
+          <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+            {deepenLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : deepenError ? (
+              <Alert severity="error">{deepenError}</Alert>
+            ) : deepenData ? (
+              <Stack spacing={3}>
+                {/* Question Prompt */}
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                      display: "block",
+                      mb: 1,
+                    }}
+                  >
+                    Question Prompt
+                  </Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {deepenData.question.prompt}
+                  </Typography>
+                </Box>
+
+                {/* Answer Options / Key (Live Preview matching admin style) */}
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                      display: "block",
+                      mb: 1.5,
+                    }}
+                  >
+                    Answer Key
+                  </Typography>
+
+                  {deepenData.question.kind === "mc" && (
+                    <Stack spacing={1}>
+                      {(
+                        ((deepenData.question.payload as any)
+                          ?.options as string[]) ?? []
+                      ).map((opt, idx) => {
+                        const isCorrect =
+                          idx ===
+                          (deepenData.question.payload as any)?.correct_index;
+                        return (
+                          <Box
+                            key={idx}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: isCorrect
+                                ? "success.light"
+                                : "divider",
+                              bgcolor: isCorrect
+                                ? "rgba(46, 125, 50, 0.08)"
+                                : "background.paper",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: isCorrect ? 600 : 400 }}
+                            >
+                              {opt}
+                            </Typography>
+                            {isCorrect && (
+                              <Typography
+                                variant="caption"
+                                color="success.main"
+                                sx={{ fontWeight: 600 }}
+                              >
+                                Correct Option
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  )}
+
+                  {deepenData.question.kind === "tf" && (
+                    <Stack direction="row" spacing={2}>
+                      {["True", "False"].map((opt) => {
+                        const val = opt === "True";
+                        const isCorrect =
+                          val === (deepenData.question.payload as any)?.correct;
+                        return (
+                          <Box
+                            key={opt}
+                            sx={{
+                              flex: 1,
+                              p: 1.5,
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: isCorrect
+                                ? "success.light"
+                                : "divider",
+                              bgcolor: isCorrect
+                                ? "rgba(46, 125, 50, 0.08)"
+                                : "background.paper",
+                              textAlign: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: isCorrect ? 600 : 400 }}
+                            >
+                              {opt}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  )}
+
+                  {deepenData.question.kind === "short" && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 1,
+                        bgcolor: "background.paper",
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ mb: 1, fontWeight: 500 }}
+                      >
+                        Accepted Answers:
+                      </Typography>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        {(
+                          ((deepenData.question.payload as any)
+                            ?.accepted as string[]) ?? []
+                        ).map((ans) => (
+                          <Chip
+                            key={ans}
+                            label={ans}
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+
+                  {(deepenData.question.kind === "essay" ||
+                    deepenData.question.kind === "code") && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 1,
+                        bgcolor: "background.paper",
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        Model/Exemplar Answer:
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 1, whiteSpace: "pre-wrap" }}
+                      >
+                        {(deepenData.question.payload as any)?.exemplar ||
+                          "No exemplar answer provided."}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Explanation */}
+                {deepenData.question.explanation && (
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        display: "block",
+                        mb: 1,
+                      }}
+                    >
+                      Explanation
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ lineHeight: 1.5 }}
+                    >
+                      {deepenData.question.explanation}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* External Link */}
+                {deepenData.question.source && (
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        display: "block",
+                        mb: 1.5,
+                      }}
+                    >
+                      Reference Link
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      href={deepenData.question.source}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ textTransform: "none" }}
+                    >
+                      Visit External Source
+                    </Button>
+                  </Box>
+                )}
+
+                {/* Study Notes */}
+                {deepenData.question.deepDive && (
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        display: "block",
+                        mb: 1.5,
+                      }}
+                    >
+                      Deep Dive Study Notes
+                    </Typography>
+                    <Box
+                      sx={{
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        p: 2,
+                        bgcolor: "background.paper",
+                      }}
+                    >
+                      <MarkdownView content={deepenData.question.deepDive} />
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Tags */}
+                {deepenData.question.tags &&
+                  deepenData.question.tags.length > 0 && (
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          textTransform: "uppercase",
+                          fontWeight: 600,
+                          display: "block",
+                          mb: 1.5,
+                        }}
+                      >
+                        Tags
+                      </Typography>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        {deepenData.question.tags.map((t) => (
+                          <Chip key={t} label={t} size="small" />
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+
+                {/* Related Questions */}
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                      display: "block",
+                      mb: 1.5,
+                    }}
+                  >
+                    Related Questions (By Shared Tags)
+                  </Typography>
+                  {deepenData.related && deepenData.related.length > 0 ? (
+                    <Stack spacing={1.5}>
+                      {deepenData.related.map((rq) => (
+                        <Card
+                          key={rq.id}
+                          variant="outlined"
+                          sx={{
+                            cursor: "pointer",
+                            bgcolor: "background.paper",
+                            "&:hover": {
+                              borderColor: "primary.main",
+                              bgcolor: "action.hover",
+                            },
+                          }}
+                          onClick={() => {
+                            setDeepenHistory([...deepenHistory, deepenQid!]);
+                            handleOpenDeepen(rq.id, true);
+                          }}
+                        >
+                          <CardContent sx={{ p: "12px !important" }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 500 }}
+                            >
+                              {rq.prompt}
+                            </Typography>
+                            <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+                              {rq.tags.map((t) => (
+                                <Chip
+                                  key={t}
+                                  label={t}
+                                  size="small"
+                                  sx={{ fontSize: 9, height: 16 }}
+                                />
+                              ))}
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      No related questions found.
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
+            ) : null}
+          </Box>
+        </Box>
+      </Drawer>
 
       {/* Footer */}
       <Stack direction="row" spacing={2} sx={{ justifyContent: "center" }}>
