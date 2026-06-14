@@ -45,10 +45,12 @@ test.describe("Learn Deeper flow", () => {
     const titleInput = page.locator('label:has-text("Title") input');
     await titleInput.fill("Geography of Europe");
     await titleInput.blur();
+    await page.waitForTimeout(500);
 
     // 3. Add Question 1: Paris T/F
     await page.getByRole("button", { name: "Add" }).first().click();
     await page.getByRole("button", { name: "T/F" }).click();
+    await page.waitForTimeout(500);
 
     // Wait for the prompt inputs to render/update for Q1
     const promptInput = page.locator(
@@ -64,6 +66,7 @@ test.describe("Learn Deeper flow", () => {
     );
     await promptInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     const refUrlInput = page.locator('label:has-text("Reference URL") input');
     // Fill Reference URL and wait for save
@@ -76,6 +79,7 @@ test.describe("Learn Deeper flow", () => {
     );
     await refUrlInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     const deepDiveInput = page.locator(
       'label:has-text("Deep Dive Study Notes") textarea',
@@ -92,6 +96,7 @@ test.describe("Learn Deeper flow", () => {
     );
     await deepDiveInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     const tagInput = page.locator('label:has-text("Tag") input');
     // Fill Tag and wait for save
@@ -104,9 +109,11 @@ test.describe("Learn Deeper flow", () => {
     );
     await tagInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     // Set correct answer as True
     await page.getByRole("button", { name: "True" }).click();
+    await page.waitForTimeout(500);
 
     // Verify live preview shows
     await expect(page.getByText("Paris Deep Dive")).toBeVisible();
@@ -114,6 +121,7 @@ test.describe("Learn Deeper flow", () => {
     // 4. Add Question 2: Rome T/F
     await page.getByRole("button", { name: "Add" }).first().click();
     await page.getByRole("button", { name: "T/F" }).click();
+    await page.waitForTimeout(500);
 
     // Wait and write Q2 prompt
     await promptInput.fill("Rome is the capital of Italy.");
@@ -125,6 +133,7 @@ test.describe("Learn Deeper flow", () => {
     );
     await promptInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     await refUrlInput.fill("https://en.wikipedia.org/wiki/Rome");
     savePromise = page.waitForResponse(
@@ -135,6 +144,7 @@ test.describe("Learn Deeper flow", () => {
     );
     await refUrlInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     await deepDiveInput.fill(
       "### Rome Deep Dive\nRome has a history spanning 28 centuries.",
@@ -147,6 +157,7 @@ test.describe("Learn Deeper flow", () => {
     );
     await deepDiveInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     await tagInput.fill("geography, europe");
     savePromise = page.waitForResponse(
@@ -157,9 +168,11 @@ test.describe("Learn Deeper flow", () => {
     );
     await tagInput.blur();
     await savePromise;
+    await page.waitForTimeout(500);
 
     // Set correct answer as True
     await page.getByRole("button", { name: "True" }).click();
+    await page.waitForTimeout(500);
 
     // Verify live preview shows for Q2
     await expect(page.getByText("Rome Deep Dive")).toBeVisible();
