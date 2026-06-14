@@ -222,7 +222,7 @@ pub async fn get_question_versions(
     question_id: Uuid,
 ) -> Result<Vec<QuestionVersion>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, question_id, version, prompt, code_snippet, payload, explanation, deep_dive, archived_at, created_at
+        "SELECT id, question_id, version, prompt, code_snippet, payload, explanation, deep_dive, source, archived_at, created_at
          FROM tb_question_versions
          WHERE question_id = $1
          ORDER BY version DESC"
@@ -243,6 +243,7 @@ pub async fn get_question_versions(
                 payload: row.get("payload"),
                 explanation: row.get("explanation"),
                 deep_dive: row.get("deep_dive"),
+                source: row.get("source"),
                 archived_at: row.get("archived_at"),
                 created_at: row.get("created_at"),
             })
@@ -289,6 +290,7 @@ pub struct QuestionInsert {
     pub payload: serde_json::Value,
     pub explanation: Option<String>,
     pub deep_dive: Option<String>,
+    pub source: Option<String>,
     pub tags: Vec<String>,
     pub points: Option<i32>,
     pub status: Option<QuestionStatus>,
@@ -299,6 +301,7 @@ pub struct QuestionPatch {
     pub prompt: Option<String>,
     pub explanation: Option<String>,
     pub deep_dive: Option<String>,
+    pub source: Option<String>,
     pub points: Option<i32>,
     pub tags: Option<Vec<String>>,
     pub payload: Option<serde_json::Value>,
@@ -322,6 +325,18 @@ pub async fn create_questions(
     let mut tx = conn.begin().await.map_err(internal)?;
 
     for q in questions {
+        if q.source
+            .as_ref()
+            .is_some_and(|s| !s.starts_with("http://") && !s.starts_with("https://"))
+        {
+            return Err(ApiError::Validation(vec![
+                crate::domain::error::FieldError {
+                    field: "source".to_string(),
+                    message: "reference URL must use http or https scheme".to_string(),
+                },
+            ]));
+        }
+
         let id = Uuid::now_v7();
         let status = q.status.unwrap_or(QuestionStatus::Draft);
 
@@ -333,8 +348,8 @@ pub async fn create_questions(
             .collect();
 
         let q_row = sqlx::query(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, deep_dive, status, points, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, deep_dive, source, status, points, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING id, kind, prompt, version, status, points, code_snippet, payload, explanation, deep_dive, source, rating, attempts_count, created_by, created_at, updated_at, '{}'::text[] AS tags"
         )
         .bind(id)
@@ -344,6 +359,7 @@ pub async fn create_questions(
         .bind(&q.payload)
         .bind(&q.explanation)
         .bind(&q.deep_dive)
+        .bind(&q.source)
         .bind(status.as_str())
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
@@ -389,9 +405,22 @@ pub async fn update_question(
 ) -> Result<Question, ApiError> {
     let mut tx = conn.begin().await.map_err(internal)?;
 
+    if patch
+        .source
+        .as_ref()
+        .is_some_and(|s| !s.starts_with("http://") && !s.starts_with("https://"))
+    {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "source".to_string(),
+                message: "reference URL must use http or https scheme".to_string(),
+            },
+        ]));
+    }
+
     // Fetch current state and check if editable.
     let current_row = sqlx::query(
-        "SELECT version, status, prompt, code_snippet, payload, explanation, deep_dive FROM tb_questions WHERE id = $1 FOR UPDATE"
+        "SELECT version, status, prompt, code_snippet, payload, explanation, deep_dive, source FROM tb_questions WHERE id = $1 FOR UPDATE"
     )
     .bind(id)
     .fetch_optional(&mut *tx)
@@ -417,10 +446,11 @@ pub async fn update_question(
         let current_payload: serde_json::Value = current_row.get("payload");
         let current_explanation: Option<String> = current_row.get("explanation");
         let current_deep_dive: Option<String> = current_row.get("deep_dive");
+        let current_source: Option<String> = current_row.get("source");
 
         sqlx::query(
-            "INSERT INTO tb_question_versions (question_id, version, prompt, code_snippet, payload, explanation, deep_dive) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7)"
+            "INSERT INTO tb_question_versions (question_id, version, prompt, code_snippet, payload, explanation, deep_dive, source) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
         )
         .bind(id)
         .bind(current_version)
@@ -429,6 +459,7 @@ pub async fn update_question(
         .bind(current_payload)
         .bind(current_explanation)
         .bind(current_deep_dive)
+        .bind(current_source)
         .execute(&mut *tx)
         .await
         .map_err(internal)?;
@@ -450,14 +481,16 @@ pub async fn update_question(
              deep_dive = COALESCE($3, deep_dive), \
              points = COALESCE($4, points), \
              payload = COALESCE($5, payload), \
+             source = COALESCE($6, source), \
              updated_at = now() \
-         WHERE id = $6",
+         WHERE id = $7",
     )
     .bind(patch.prompt.as_deref())
     .bind(patch.explanation.as_deref())
     .bind(patch.deep_dive.as_deref())
     .bind(patch.points)
     .bind(patch.payload)
+    .bind(patch.source.as_deref())
     .bind(id)
     .execute(&mut *tx)
     .await

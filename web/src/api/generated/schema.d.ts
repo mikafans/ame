@@ -1421,6 +1421,7 @@ export interface components {
             /** Format: int32 */
             points?: number | null;
             prompt: string;
+            source?: string | null;
             status?: null | components["schemas"]["QuestionStatus"];
             tags: string[];
         };
@@ -1433,6 +1434,7 @@ export interface components {
             /** Format: int32 */
             points?: number | null;
             prompt?: string | null;
+            source?: string | null;
             tags?: string[] | null;
         };
         QuestionPlan: {
@@ -1460,6 +1462,7 @@ export interface components {
             prompt: string;
             /** Format: uuid */
             questionId: string;
+            source?: string | null;
             /** Format: int32 */
             version: number;
         };

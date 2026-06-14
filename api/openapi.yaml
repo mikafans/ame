@@ -3376,6 +3376,10 @@ components:
           format: int32
         prompt:
           type: string
+        source:
+          type:
+          - string
+          - 'null'
         status:
           oneOf:
           - type: 'null'
@@ -3410,6 +3414,10 @@ components:
           - 'null'
           format: int32
         prompt:
+          type:
+          - string
+          - 'null'
+        source:
           type:
           - string
           - 'null'
@@ -3482,6 +3490,10 @@ components:
         questionId:
           type: string
           format: uuid
+        source:
+          type:
+          - string
+          - 'null'
         version:
           type: integer
           format: int32

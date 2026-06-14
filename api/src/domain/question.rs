@@ -131,6 +131,7 @@ pub struct QuestionVersion {
     pub payload: serde_json::Value,
     pub explanation: Option<String>,
     pub deep_dive: Option<String>,
+    pub source: Option<String>,
     pub archived_at: Option<OffsetDateTime>,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
