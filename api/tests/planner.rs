@@ -107,7 +107,6 @@ async fn assessment_planner_filters_live_questions_and_snapshots_mc_option_order
         &mut conn,
         user_id,
         user_id,
-        None,
         vec![
             mc_insert("planner live rust", &[&tag, "async"]),
             short_insert("planner live rust text", &[&tag]),
@@ -170,7 +169,6 @@ async fn assessment_planner_excludes_recent_attempts_for_user() {
         &mut conn,
         user_id,
         user_id,
-        None,
         vec![
             mc_insert("planner recent", &[&tag]),
             mc_insert("planner fresh", &[&tag]),
@@ -186,9 +184,9 @@ async fn assessment_planner_excludes_recent_attempts_for_user() {
 
     sqlx::query(
         "INSERT INTO tb_attempts \
-         (user_id, question_id, question_version, response, presentation, is_correct, score, \
+         (actor_id, owner_id, question_id, question_version, response, presentation, is_correct, score, \
           rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta) \
-         VALUES ($1, $2, $3, $4, $5, true, 1.0, 1200, 1400, '{}'::jsonb, 0)",
+         VALUES ($1, $1, $2, $3, $4, $5, true, 1.0, 1200, 1400, '{}'::jsonb, 0)",
     )
     .bind(user_id)
     .bind(questions[0].id)

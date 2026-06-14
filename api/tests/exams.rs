@@ -56,15 +56,14 @@ async fn ensure_test_owner(pool: &PgPool) {
         .await;
 }
 
-async fn make_bearer(pool: &PgPool) -> String {
+async fn make_bearer(pool: &PgPool) -> (String, Uuid) {
     ensure_test_owner(pool).await;
     let user_id = Uuid::now_v7();
     let token_id = Uuid::now_v7();
     let secret = "exam_secret_abc";
     let hash = hash_secret(secret);
-    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
         .bind(user_id)
-        .bind(TEST_OWNER_ID)
         .bind(format!("exam-user-{user_id}"))
         .bind(format!("exam-{user_id}@example.com"))
         .execute(pool)
@@ -81,15 +80,14 @@ async fn make_bearer(pool: &PgPool) -> String {
     .execute(pool)
     .await
     .unwrap();
-    format!("lgn_{token_id}_{secret}")
+    (format!("lgn_{token_id}_{secret}"), user_id)
 }
 
-async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
+async fn make_live_question(pool: &PgPool, owner_id: Uuid, kind: &str) -> Uuid {
     ensure_test_owner(pool).await;
     let author = Uuid::now_v7();
-    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
         .bind(author)
-        .bind(TEST_OWNER_ID)
         .bind(format!("author-{author}"))
         .bind(format!("author-{author}@example.com"))
         .execute(pool)
@@ -104,7 +102,7 @@ async fn make_live_question(pool: &PgPool, kind: &str) -> Uuid {
         "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by) \
          VALUES ($1, $2, $3, $4, 'live', 1, $5) RETURNING id",
     )
-    .bind(TEST_OWNER_ID)
+    .bind(owner_id)
     .bind(kind)
     .bind(format!("Q {kind}"))
     .bind(payload)
@@ -121,9 +119,9 @@ async fn static_exam_compose_get_and_session_roundtrip() {
         return;
     }
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
-    let q1 = make_live_question(&pool, "mc").await;
-    let q2 = make_live_question(&pool, "tf").await;
+    let (bearer, owner_id) = make_bearer(&pool).await;
+    let q1 = make_live_question(&pool, owner_id, "mc").await;
+    let q2 = make_live_question(&pool, owner_id, "tf").await;
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -194,7 +192,7 @@ async fn dynamic_exam_pool_insufficient_returns_422() {
         return;
     }
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
+    let (bearer, _) = make_bearer(&pool).await;
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 
@@ -222,7 +220,7 @@ async fn compose_body_validation_rejects_empty_name() {
         return;
     }
     let pool = setup_db().await;
-    let bearer = make_bearer(&pool).await;
+    let (bearer, _) = make_bearer(&pool).await;
     let base = serve(pool).await;
     let client = reqwest::Client::new();
 

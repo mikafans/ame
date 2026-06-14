@@ -51,7 +51,7 @@ async fn skill_manifest_contains_assessment_tools() {
     let tools = manifest["tools"].as_array().unwrap();
     let tool_names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
-    // Writes: assessment.create, assessment.batchCreate, assessment.update, assessment.addQuestion, question.create, question.promote, attempt.grade
+    // Writes: assessment.create, assessment.batchCreate, assessment.update, assessment.addQuestion, assessment.delete, assessment.archive, assessment.publish, question.create, question.promote, question.update, attempt.grade
     // Reads: assessment.list, assessment.get, assessment.stats, question.list, activity.list, stats.user
     // Self: profile.get, memory.set, memory.append, target.set
     let all_expected = [
@@ -61,10 +61,14 @@ async fn skill_manifest_contains_assessment_tools() {
         "assessment.batchCreate",
         "assessment.update",
         "assessment.addQuestion",
+        "assessment.delete",
+        "assessment.archive",
+        "assessment.publish",
         "assessment.stats",
         "question.list",
         "question.create",
         "question.promote",
+        "question.update",
         "activity.list",
         "stats.user",
         "attempt.list",
@@ -83,9 +87,7 @@ async fn skill_manifest_contains_assessment_tools() {
 
     // Assert that dead tools are NOT present
     let dead_tools = [
-        "assessment.delete",
         "assessment.generate",
-        "question.update",
         "session.create",
         "session.answer",
         "session.finish",
@@ -98,19 +100,66 @@ async fn skill_manifest_contains_assessment_tools() {
         );
     }
 
-    // Single-door contract (audit F-3): every advertised tool is reachable ONLY
-    // via POST /v1/agents/run after the agent guard, so the manifest must not
-    // advertise any REST path that 403s for an agent token.
+    // API contract: read tools advertise their direct GET paths; write tools use POST /v1/agents/run.
     for t in tools {
+        let name = t["name"].as_str().unwrap();
+        let expected_method = match name {
+            // Reads: direct GET
+            "assessment.list" | "assessment.get" | "question.list" | "assessment.stats"
+            | "activity.list" | "stats.user" | "attempt.list" => "GET",
+            // Writes: all via POST /v1/agents/run
+            "assessment.create"
+            | "assessment.batchCreate"
+            | "assessment.update"
+            | "assessment.archive"
+            | "assessment.publish"
+            | "assessment.addQuestion"
+            | "assessment.delete"
+            | "question.create"
+            | "question.promote"
+            | "question.update"
+            | "attempt.grade"
+            | "profile.get"
+            | "memory.set"
+            | "memory.append"
+            | "target.set" => "POST",
+            _ => panic!("unknown tool name: {}", name),
+        };
+        let expected_path = match name {
+            // Reads: direct GET paths
+            "assessment.list" => "/v1/assessments",
+            "assessment.get" => "/v1/assessments/{id}",
+            "assessment.stats" => "/v1/assessments/{id}/stats",
+            "question.list" => "/v1/questions",
+            "activity.list" => "/v1/agents/activity",
+            "stats.user" => "/v1/me/stats",
+            "attempt.list" => "/v1/me/attempts",
+            // Writes: all via /v1/agents/run
+            "assessment.create"
+            | "assessment.batchCreate"
+            | "assessment.update"
+            | "assessment.archive"
+            | "assessment.publish"
+            | "assessment.addQuestion"
+            | "assessment.delete"
+            | "question.create"
+            | "question.promote"
+            | "question.update"
+            | "attempt.grade"
+            | "profile.get"
+            | "memory.set"
+            | "memory.append"
+            | "target.set" => "/v1/agents/run",
+            _ => panic!("unknown tool name: {}", name),
+        };
+
         assert_eq!(
-            t["method"], "POST",
-            "tool {} must advertise method POST",
-            t["name"]
+            t["method"], expected_method,
+            "tool {name} must advertise method {expected_method}"
         );
         assert_eq!(
-            t["path"], "/v1/agents/run",
-            "tool {} must advertise the single-door endpoint, not a REST path",
-            t["name"]
+            t["path"], expected_path,
+            "tool {name} must advertise path {expected_path}"
         );
     }
 }

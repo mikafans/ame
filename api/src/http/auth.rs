@@ -120,7 +120,7 @@ pub async fn register(
     let result = sqlx::query(
         "INSERT INTO tb_users (id, email, display_name, role, password_hash)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, display_name, role, plan, created_at, owner_user_id",
+         RETURNING id, email, display_name, role, plan, created_at, NULL::uuid AS owner_user_id",
     )
     .bind(user_id)
     .bind(trimmed_email)
@@ -222,11 +222,10 @@ pub async fn login(
     // Fetch user by email canonical
     let user_row = sqlx::query(
         "SELECT u.id, u.email, u.display_name, u.role, u.password_hash, u.deactivated_at, \
-                u.plan, u.created_at, u.owner_user_id, \
-                o.deactivated_at as owner_deactivated_at, \
-                COALESCE(o.plan, u.plan) as owner_plan \
+                u.plan, u.created_at, NULL::uuid AS owner_user_id, \
+                NULL::timestamptz as owner_deactivated_at, \
+                u.plan as owner_plan \
          FROM tb_users u \
-         LEFT JOIN tb_users o ON u.owner_user_id = o.id \
          WHERE u.email_canonical = $1",
     )
     .bind(&canonical)

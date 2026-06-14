@@ -7,6 +7,28 @@ This project is pre-1.0; releases are not yet tagged.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-14
+
+### Added
+
+- Exposed new agent tool: `question.update` to support remote question modifications.
+- Exposed new agent tools: `assessment.archive`, `assessment.publish`, and `assessment.delete` to the agent platform (run-door, scope `assessment.write`).
+- Added keyboard shortcuts (`1`-`9`, `Enter`, `F` to flag) and a desktop sidebar navigation panel to the quiz session page.
+- Designed a side-by-side comparative correction panel for incorrect answers on the session results review page, featuring PTS chip animations and code exemplar highlighting.
+- Added operator-tunable settings and feature flags backed by DB/Valkey cache.
+
+### Fixed
+
+- Fixed question list pagination returning incorrect `next_cursor` leading to infinite loops.
+- Fixed question list ignoring the `assessmentId` query parameter.
+- Added a `Retry-After: 1` header to 429 Too Many Requests responses.
+- Consolidated agent-runner error formats, mapping unknown tools to HTTP 400 Bad Request.
+- Fixed average answer time tracking (`avgTimeMs`) in assessment statistics.
+- Fixed correct answer leaks in attempts list and session response endpoints prior to session completion.
+- Re-confined agent tokens to a read-only REST allowlist plus the `/v1/agents/run` dispatcher; all mutating tools are scope-checked at the dispatcher, closing a direct-REST scope-bypass on assessment writes and sub-account creation.
+
+## [0.1.0] - 2026-06-08
+
 ### Added
 
 - Assessment authoring + grading engine: unified `assessment` entity

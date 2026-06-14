@@ -299,9 +299,9 @@ async fn test_agent_reads_owner_record_via_run() {
 
     let session_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, kind, assessment_id, question_plan, status, \
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, kind, assessment_id, question_plan, status, \
          affects_rating, rating_snapshot, result, finished_at) \
-         VALUES ($1, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
+         VALUES ($1, $2, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
     )
     .bind(session_id)
     .bind(owner_id)
@@ -313,10 +313,10 @@ async fn test_agent_reads_owner_record_via_run() {
     .unwrap();
 
     sqlx::query(
-        "INSERT INTO tb_attempts (user_id, question_id, question_version, session_id, response, \
+        "INSERT INTO tb_attempts (actor_id, owner_id, question_id, question_version, session_id, response, \
          is_correct, score, rating_before_user_avg, rating_before_question, user_tag_deltas, \
          question_delta, time_to_answer_ms) \
-         VALUES ($1, $2, 1, $3, $4::jsonb, true, 1.0, 1200, 1400, '{}'::jsonb, 0, 5000)",
+         VALUES ($1, $1, $2, 1, $3, $4::jsonb, true, 1.0, 1200, 1400, '{}'::jsonb, 0, 5000)",
     )
     .bind(owner_id)
     .bind(question_id)
@@ -365,9 +365,8 @@ async fn test_agent_reads_owner_record_via_run() {
     assert_eq!(attempts["result"]["attempts"].as_array().unwrap().len(), 1);
 }
 
-/// Single-door boundary: an agent-role token is confined to POST /v1/agents/run.
-/// Any direct learner/authoring REST endpoint must be rejected with 403 by the
-/// agent guard middleware (task-4), regardless of the token's scopes.
+/// Regression: agent tokens are now confined to the allowlist by default.
+/// Direct learner/authoring REST endpoints return 403 Forbidden regardless of scopes.
 #[tokio::test]
 async fn test_agent_token_blocked_on_learner_rest() {
     if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
@@ -379,7 +378,7 @@ async fn test_agent_token_blocked_on_learner_rest() {
     let base_url = spawn_app(pool.clone()).await;
     let client = reqwest::Client::new();
 
-    // A generously-scoped agent token — the 403 comes from the role guard, not
+    // A generously-scoped agent token — the 403 comes from the agent guard, not
     // from a missing scope.
     let (_owner_id, _agent_id, agent_auth) = seed_agent(
         &pool,
@@ -407,7 +406,7 @@ async fn test_agent_token_blocked_on_learner_rest() {
         "agent token must be 403 on POST /v1/sessions"
     );
 
-    // GET /v1/me/stats — learner record read is run-only for agents now.
+    // GET /v1/me/stats — direct GET is allowed for agents (on the allowlist).
     let res = client
         .get(format!("{base_url}/v1/me/stats"))
         .header("Authorization", &bearer)
@@ -416,11 +415,11 @@ async fn test_agent_token_blocked_on_learner_rest() {
         .unwrap();
     assert_eq!(
         res.status(),
-        StatusCode::FORBIDDEN,
-        "agent token must be 403 on GET /v1/me/stats"
+        StatusCode::OK,
+        "agent token must be 200 on GET /v1/me/stats (allowlist)"
     );
 
-    // POST /v1/assessments — authoring is run-only for agents.
+    // POST /v1/assessments — direct REST write is now blocked.
     let res = client
         .post(format!("{base_url}/v1/assessments"))
         .header("Authorization", &bearer)
@@ -431,7 +430,34 @@ async fn test_agent_token_blocked_on_learner_rest() {
     assert_eq!(
         res.status(),
         StatusCode::FORBIDDEN,
-        "agent token must be 403 on POST /v1/assessments"
+        "agent token must be 403 on POST /v1/assessments (agent guard)"
+    );
+
+    // DELETE /v1/assessments/{id} — write operations are blocked.
+    let res = client
+        .delete(format!("{base_url}/v1/assessments/{}", Uuid::now_v7()))
+        .header("Authorization", &bearer)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on DELETE /v1/assessments/<id>"
+    );
+
+    // POST /v1/me/agents — agent cannot mint sub-agents.
+    let res = client
+        .post(format!("{base_url}/v1/me/agents"))
+        .header("Authorization", &bearer)
+        .json(&json!({ "label": "sub-agent", "scopes": ["assessment.read"] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on POST /v1/me/agents"
     );
 }
 
@@ -482,6 +508,29 @@ async fn test_agent_full_authoring_loop_via_run() {
         .as_str()
         .expect("created question id")
         .to_string();
+
+    // 1b. Update the created question.
+    let updated = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "question.update",
+        json!({
+            "id": question_id,
+            "prompt": "2 + 2 = ? (Updated)",
+            "explanation": "Simple arithmetic update."
+        }),
+    )
+    .await;
+    assert!(
+        updated["ok"].as_bool().unwrap_or(false),
+        "question.update: {updated}"
+    );
+    assert_eq!(updated["result"]["prompt"], "2 + 2 = ? (Updated)");
+    assert_eq!(
+        updated["result"]["explanation"],
+        "Simple arithmetic update."
+    );
 
     // 2. Create the assessment as a draft.
     let assessment = run_tool(
@@ -809,51 +858,39 @@ async fn test_agent_batch_create_attribution_via_run() {
     );
     assert_eq!(resp["result"]["count"], 2, "expected 2 created: {resp}");
 
-    // Assessments: created_by + owner_id are the human; agent_id is the agent.
-    let assessments: Vec<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
-        "SELECT created_by, owner_id, agent_id FROM tb_assessments WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_all(&pool)
-    .await
-    .unwrap();
+    // Assessments: created_by is the agent; owner_id is the human owner.
+    let assessments: Vec<(Uuid, Uuid)> =
+        sqlx::query_as("SELECT created_by, owner_id FROM tb_assessments WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(assessments.len(), 2, "expected 2 assessment rows");
-    for (created_by, row_owner, row_agent) in &assessments {
+    for (created_by, row_owner) in &assessments {
         assert_eq!(
-            *created_by, owner_id,
-            "assessment.created_by must be the owner"
+            *created_by, agent_id,
+            "assessment.created_by must be the agent"
         );
         assert_eq!(
             *row_owner, owner_id,
             "assessment.owner_id must be the owner"
         );
-        assert_eq!(
-            *row_agent,
-            Some(agent_id),
-            "assessment.agent_id must be the agent"
-        );
     }
 
     // Questions inserted by the batch carry the same attribution.
-    let questions: Vec<(Uuid, Uuid, Option<Uuid>)> = sqlx::query_as(
-        "SELECT created_by, owner_id, agent_id FROM tb_questions WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_all(&pool)
-    .await
-    .unwrap();
+    let questions: Vec<(Uuid, Uuid)> =
+        sqlx::query_as("SELECT created_by, owner_id FROM tb_questions WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
     assert_eq!(questions.len(), 2, "expected 2 question rows");
-    for (created_by, row_owner, row_agent) in &questions {
+    for (created_by, row_owner) in &questions {
         assert_eq!(
-            *created_by, owner_id,
-            "question.created_by must be the owner"
+            *created_by, agent_id,
+            "question.created_by must be the agent"
         );
         assert_eq!(*row_owner, owner_id, "question.owner_id must be the owner");
-        assert_eq!(
-            *row_agent,
-            Some(agent_id),
-            "question.agent_id must be the agent"
-        );
     }
 }
 
@@ -904,24 +941,249 @@ async fn test_agent_add_inline_question_attribution_via_run() {
         "inline addQuestion should succeed: {added}"
     );
 
-    let (created_by, row_owner, row_agent): (Uuid, Uuid, Option<Uuid>) = sqlx::query_as(
-        "SELECT created_by, owner_id, agent_id FROM tb_questions WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let (created_by, row_owner): (Uuid, Uuid) =
+        sqlx::query_as("SELECT created_by, owner_id FROM tb_questions WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(
-        created_by, owner_id,
-        "inline question.created_by must be the owner"
+        created_by, agent_id,
+        "inline question.created_by must be the agent"
     );
     assert_eq!(
         row_owner, owner_id,
         "inline question.owner_id must be the owner"
     );
+}
+
+/// Regression: agent guard blocks direct REST deletes while allowing run-door deletes.
+/// Agent tokens cannot use PATCH /v1/assessments/{id} or DELETE endpoints directly;
+/// they must use POST /v1/agents/run with assessment.delete.
+#[tokio::test]
+async fn test_agent_delete_via_run_only() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(&pool, &["assessment.write"]).await;
+    let bearer = format!("Bearer {agent_auth}");
+
+    // Create a test assessment to delete.
+    let created = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.create",
+        json!({"title": "To delete", "mode": "practice"}),
+    )
+    .await;
+    let assessment_id = created["result"]["id"]
+        .as_str()
+        .expect("created assessment id")
+        .to_string();
+
+    // Direct DELETE must be blocked.
+    let res = client
+        .delete(format!("{base_url}/v1/assessments/{assessment_id}"))
+        .header("Authorization", &bearer)
+        .send()
+        .await
+        .unwrap();
     assert_eq!(
-        row_agent,
-        Some(agent_id),
-        "inline question.agent_id must be the agent"
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on direct DELETE /v1/assessments/{{id}}"
+    );
+
+    // Via run-door, assessment.delete succeeds.
+    let deleted = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.delete",
+        json!({"id": assessment_id}),
+    )
+    .await;
+    assert!(
+        deleted["ok"].as_bool().unwrap_or(false),
+        "assessment.delete via run-door must succeed: {deleted}"
+    );
+}
+
+/// Regression: agent guard blocks direct PATCH writes while allowing run-door updates.
+/// Agent tokens with only read scopes cannot bypass the guard via scopes;
+/// agents with write scopes cannot use direct PATCH.
+#[tokio::test]
+async fn test_agent_patch_blocked_even_with_scopes() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(&pool, &["assessment.write"]).await;
+    let bearer = format!("Bearer {agent_auth}");
+
+    // Create a test assessment.
+    let created = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.create",
+        json!({"title": "To patch", "mode": "practice"}),
+    )
+    .await;
+    let assessment_id = created["result"]["id"]
+        .as_str()
+        .expect("created assessment id")
+        .to_string();
+
+    // Direct PATCH must be blocked (agent guard, not scope).
+    let res = client
+        .patch(format!("{base_url}/v1/assessments/{assessment_id}"))
+        .header("Authorization", &bearer)
+        .json(&json!({"title": "Updated"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "agent token must be 403 on direct PATCH /v1/assessments/{{id}}"
+    );
+
+    // Via run-door with assessment.update, it succeeds.
+    let updated = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.update",
+        json!({"id": assessment_id, "title": "Updated via run"}),
+    )
+    .await;
+    assert!(
+        updated["ok"].as_bool().unwrap_or(false),
+        "assessment.update via run-door must succeed: {updated}"
+    );
+}
+
+/// Regression: read-only agent tokens cannot write via run-door (scopes enforced).
+/// An agent with only assessment.read scope must NOT be able to call
+/// assessment.delete or other write tools via POST /v1/agents/run.
+#[tokio::test]
+async fn test_agent_run_door_enforces_scopes() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    // Agent with ONLY read scopes.
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(&pool, &["assessment.read"]).await;
+
+    // Create a dummy assessment as a read-write agent, then try to delete it as read-only.
+    let (_owner_id2, _agent_id2, write_agent_auth) = seed_agent(&pool, &["assessment.write"]).await;
+    let created = run_tool(
+        &client,
+        &base_url,
+        &write_agent_auth,
+        "assessment.create",
+        json!({"title": "To test", "mode": "practice"}),
+    )
+    .await;
+    let assessment_id = created["result"]["id"]
+        .as_str()
+        .expect("created assessment id")
+        .to_string();
+
+    // The read-only agent tries to call assessment.delete via run-door.
+    // The dispatcher enforces scopes: 403 Forbidden for missing assessment.write.
+    let res = client
+        .post(format!("{base_url}/v1/agents/run"))
+        .header("Authorization", format!("Bearer {agent_auth}"))
+        .json(&json!({"tool": "assessment.delete", "params": {"id": assessment_id}}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "read-only agent must be 403 on assessment.delete via run-door (scope check)"
+    );
+}
+
+/// Regression: agents can directly GET parameterized allowlist paths.
+/// `assessment.get` (/v1/assessments/{id}) and `assessment.stats`
+/// (/v1/assessments/{id}/stats) are advertised as direct-GET read tools; this
+/// pins that the agent guard's MatchedPath matching admits the {id} patterns
+/// (not just the flat /v1/me/stats path) so agents aren't false-403'd on reads.
+#[tokio::test]
+async fn test_agent_direct_get_parameterized_allowlist() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(
+        &pool,
+        &["assessment.read", "assessment.write", "stats.read"],
+    )
+    .await;
+    let bearer = format!("Bearer {agent_auth}");
+
+    // Create an assessment via the run-door.
+    let created = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "assessment.create",
+        json!({"title": "Allowlist test", "mode": "practice"}),
+    )
+    .await;
+    let assessment_id = created["result"]["id"]
+        .as_str()
+        .expect("created assessment id")
+        .to_string();
+
+    // Direct GET /v1/assessments/{id} -> 200
+    let res = client
+        .get(format!("{base_url}/v1/assessments/{assessment_id}"))
+        .header("Authorization", &bearer)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "agent must be 200 on direct GET /v1/assessments/{{id}} (allowlist + MatchedPath)"
+    );
+
+    // Direct GET /v1/assessments/{id}/stats -> 200
+    let res = client
+        .get(format!("{base_url}/v1/assessments/{assessment_id}/stats"))
+        .header("Authorization", &bearer)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "agent must be 200 on direct GET /v1/assessments/{{id}}/stats (allowlist + MatchedPath)"
     );
 }

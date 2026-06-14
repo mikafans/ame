@@ -60,9 +60,8 @@ async fn make_user_with_scopes(pool: &PgPool, scopes: &[&str]) -> (Uuid, String)
     let token_id = Uuid::now_v7();
     let secret = format!("secret_{}", token_id.simple());
     let hash = hash_secret(&secret);
-    sqlx::query("INSERT INTO tb_users (id, owner_user_id, display_name, email, role) VALUES ($1, $2, $3, $4, 'user')")
+    sqlx::query("INSERT INTO tb_users (id, display_name, email, role) VALUES ($1, $2, $3, 'user')")
         .bind(user_id)
-        .bind(TEST_OWNER_ID)
         .bind(format!("test-user-{user_id}"))
         .bind(format!("stats-{user_id}@example.com"))
         .execute(pool)
@@ -105,13 +104,14 @@ async fn make_live_question(pool: &PgPool, kind: &str, author: Uuid) -> Uuid {
 }
 
 async fn make_assessment(pool: &PgPool, created_by: Uuid) -> Uuid {
-    // Resolve the owner: if created_by is a sub-account, use their owner; else use created_by
-    let owner_id: Uuid =
-        sqlx::query_scalar("SELECT COALESCE(owner_user_id, id) FROM tb_users WHERE id = $1")
-            .bind(created_by)
-            .fetch_one(pool)
-            .await
-            .unwrap();
+    // Resolve the owner: if created_by is a sub-account (agent), use their owner; else use created_by
+    let owner_id: Uuid = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT owner_user_id FROM tb_agents WHERE id = $1), $1)",
+    )
+    .bind(created_by)
+    .fetch_one(pool)
+    .await
+    .unwrap();
 
     sqlx::query(
         "INSERT INTO tb_assessments (title, mode, status, created_by, owner_id) VALUES ($1, 'practice', 'active', $2, $3) RETURNING id",
@@ -144,9 +144,9 @@ async fn make_finished_session_for_assessment(
         "pending_manual_count": 0
     });
     sqlx::query(
-        "INSERT INTO tb_sessions (id, user_id, kind, assessment_id, question_plan, status, affects_rating, \
+        "INSERT INTO tb_sessions (id, actor_id, owner_id, kind, assessment_id, question_plan, status, affects_rating, \
          rating_snapshot, result, finished_at) \
-         VALUES ($1, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
+         VALUES ($1, $2, $2, 'assessment', $3, $4, 'finished', false, '{}'::jsonb, $5, now())",
     )
     .bind(session_id)
     .bind(user_id)
@@ -159,10 +159,10 @@ async fn make_finished_session_for_assessment(
 
     // insert attempt
     sqlx::query(
-        "INSERT INTO tb_attempts (user_id, question_id, question_version, session_id, response, \
+        "INSERT INTO tb_attempts (actor_id, owner_id, question_id, question_version, session_id, response, \
          is_correct, score, rating_before_user_avg, rating_before_question, user_tag_deltas, \
          question_delta, time_to_answer_ms) \
-         VALUES ($1, $2, 1, $3, $4::jsonb, $5, $6, 1200, 1400, '{}'::jsonb, 0, 5000)",
+         VALUES ($1, $1, $2, 1, $3, $4::jsonb, $5, $6, 1200, 1400, '{}'::jsonb, 0, 5000)",
     )
     .bind(user_id)
     .bind(question_id)
@@ -448,4 +448,68 @@ async fn post_message_email_channel_queues_without_sending() {
     .await
     .unwrap();
     assert_eq!(row.0, "queued");
+}
+
+#[tokio::test]
+async fn test_me_stats_includes_agent_activity() {
+    if skip_if_no_db() {
+        return;
+    }
+    let pool = setup_db().await;
+
+    // Create a human owner
+    let (owner_id, bearer) = make_user_with_scopes(&pool, &["attempt.read", "stats.read"]).await;
+
+    // Create an agent owned by the human owner
+    let agent_id = Uuid::now_v7();
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id, label) VALUES ($1, $2, 'Test Agent')")
+        .bind(agent_id)
+        .bind(owner_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Create an agent-curated assessment owned by the human owner
+    sqlx::query(
+        "INSERT INTO tb_assessments (id, title, mode, status, objectives, owner_id, created_by, method) \
+         VALUES ($1, 'Agent Quiz', 'practice', 'active', $2, $3, $3, 'agent')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(&["Objective"] as &[&str])
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Insert a graded attempt activity log for the agent
+    sqlx::query(
+        "INSERT INTO tb_activity_log (id, actor_id, tool_name, method, path, status) \
+         VALUES ($1, $2, 'attempt.grade', 'POST', '/v1/agents/run', 200)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(agent_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let base = serve(pool).await;
+    let client = reqwest::Client::new();
+
+    // Get stats for the human owner
+    let stats: Value = client
+        .get(format!("{base}/v1/me/stats"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    // The stats should count the agent's activity
+    assert!(stats["agent_active_count"].as_i64().unwrap() >= 1);
+    assert!(stats["agent_graded_attempts"].as_i64().unwrap() >= 1);
+    assert!(stats["agent_curated_assessments"].as_i64().unwrap() >= 1);
 }

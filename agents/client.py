@@ -18,11 +18,10 @@ canonical worked example. Copy it, import it, or run it directly:
     assessments = agent.run("assessment.list")
     print(f"Found {len(assessments['assessments'])} assessments")
 
-Single door (mirrors llms.txt): an agent token reaches the platform only through
+REST API and the run-door dispatcher: an agent token can call the standard REST
+endpoints directly (e.g., GET /v1/assessments) or use the dispatcher via
 ``POST /v1/agents/run``. Every operation — reads, writes, and self-management —
-is ``agent.run(tool, **params)``. The raw ``get/post/patch/delete`` verbs remain
-as a low-level escape hatch for an *owner* token (e.g. creating the agent); an
-agent token using them on any path other than the single door is rejected 403.
+can be called directly or as ``agent.run(tool, **params)`` for backward compatibility.
 
 The transport is resilient by default: every call has a timeout and retries
 transient failures (HTTP 429 / 5xx and network errors) with backoff, honouring a

@@ -30,6 +30,7 @@ pub struct AttemptPresentation {
 pub struct Attempt {
     pub id: Uuid,
     pub user_id: Uuid,
+    pub owner_id: Uuid,
     pub question_id: Uuid,
     pub question_version: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]

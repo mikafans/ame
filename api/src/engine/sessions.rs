@@ -30,6 +30,7 @@ pub struct SessionResult {
 #[derive(Debug, Clone)]
 pub struct StartSessionInput {
     pub user_id: Uuid,
+    pub owner_id: Uuid,
     pub kind: SessionKind,
     pub assessment_id: Option<Uuid>,
     pub filter: Option<serde_json::Value>,
@@ -76,6 +77,7 @@ pub fn start_session(input: StartSessionInput) -> Result<Session, ApiError> {
     Ok(Session {
         id: Uuid::now_v7(),
         user_id: input.user_id,
+        owner_id: input.owner_id,
         kind: input.kind,
         assessment_id: input.assessment_id,
         filter: input.filter,
@@ -172,6 +174,7 @@ pub fn answer_session(
     let attempt = Attempt {
         id: Uuid::now_v7(),
         user_id: input.session.user_id,
+        owner_id: input.session.owner_id,
         question_id: input.question.question_id,
         question_version: input.question.version,
         session_id: Some(input.session.id),
@@ -291,6 +294,7 @@ mod tests {
     fn start_session_computes_deadline_and_validates_kind_links() {
         let input = StartSessionInput {
             user_id: user_id(),
+            owner_id: user_id(),
             kind: SessionKind::Practice,
             assessment_id: None,
             filter: None,
@@ -315,6 +319,7 @@ mod tests {
         let session = Session {
             id: Uuid::now_v7(),
             user_id: user_id(),
+            owner_id: user_id(),
             kind: SessionKind::Practice,
             assessment_id: None,
             filter: None,
@@ -349,6 +354,7 @@ mod tests {
             Attempt {
                 id: Uuid::now_v7(),
                 user_id: session.user_id,
+                owner_id: session.owner_id,
                 question_id: qid1,
                 question_version: 1,
                 session_id: Some(session.id),
@@ -371,6 +377,7 @@ mod tests {
             Attempt {
                 id: Uuid::now_v7(),
                 user_id: session.user_id,
+                owner_id: session.owner_id,
                 question_id: qid2,
                 question_version: 1,
                 session_id: Some(session.id),

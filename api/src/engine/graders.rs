@@ -1,12 +1,19 @@
 //! Pure grading logic for question attempts.
 
 use serde::{Deserialize, Serialize};
+use unicode_normalization::UnicodeNormalization;
 use utoipa::ToSchema;
 
 use crate::domain::attempt::{AttemptPresentation, AttemptResponse};
 use crate::domain::question::{
     CodePayload, EssayPayload, McPayload, Normalize, QuestionKind, ShortPayload, TfPayload,
 };
+
+fn strip_accents(s: &str) -> String {
+    s.nfd()
+        .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+        .collect()
+}
 
 impl GradeStatus {
     pub fn as_str(&self) -> &'static str {
@@ -131,13 +138,17 @@ pub fn grade_response(
 
             let given = match payload.normalize {
                 Normalize::Exact => answer.trim().to_string(),
-                Normalize::CaseInsensitiveStripAccents => answer.trim().to_lowercase(),
+                Normalize::CaseInsensitiveStripAccents => {
+                    strip_accents(&answer.trim().to_lowercase())
+                }
             };
 
             let correct = payload.accepted.iter().any(|a| {
                 let accepted = match payload.normalize {
                     Normalize::Exact => a.trim().to_string(),
-                    Normalize::CaseInsensitiveStripAccents => a.trim().to_lowercase(),
+                    Normalize::CaseInsensitiveStripAccents => {
+                        strip_accents(&a.trim().to_lowercase())
+                    }
                 };
                 given == accepted
             });
@@ -186,13 +197,28 @@ pub fn grade_response(
                 note: None,
             })
         }
-        (QuestionKind::Code, AttemptResponse::Code { source: _, .. }) => {
+        (QuestionKind::Code, AttemptResponse::Code { source, .. }) => {
             let payload: CodePayload = serde_json::from_value(payload.clone()).map_err(|e| {
                 GradeError::InvalidPayload {
                     kind,
                     reason: e.to_string(),
                 }
             })?;
+
+            if let Some(ref exemplar) = payload.exemplar {
+                let trimmed_source = source.trim();
+                let trimmed_exemplar = exemplar.trim();
+                if trimmed_source == trimmed_exemplar {
+                    return Ok(GradeOutcome {
+                        status: GradeStatus::Graded,
+                        correct: true,
+                        points_awarded: max_points,
+                        max: max_points,
+                        correct_answer: serde_json::json!({ "language": payload.language, "exemplar": payload.exemplar }),
+                        note: Some("Matches exemplar exactly".to_string()),
+                    });
+                }
+            }
 
             Ok(GradeOutcome {
                 status: GradeStatus::PendingManual,

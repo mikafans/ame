@@ -70,7 +70,7 @@ pub(crate) async fn insert_activity_log(
     status: i32,
 ) {
     let _ = sqlx::query(
-        "INSERT INTO tb_activity_log (agent_id, tool_name, method, path, status)
+        "INSERT INTO tb_activity_log (actor_id, tool_name, method, path, status)
          VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(agent_id)

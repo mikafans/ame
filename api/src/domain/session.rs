@@ -111,6 +111,7 @@ pub struct PlanItem {
 pub struct Session {
     pub id: Uuid,
     pub user_id: Uuid,
+    pub owner_id: Uuid,
     pub kind: SessionKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assessment_id: Option<Uuid>,

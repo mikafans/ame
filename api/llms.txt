@@ -5,11 +5,11 @@
 > assessments, grades pending attempts, and reads the owner's learner stats. This
 > file is the entry point and describes the entire contract.
 
-This is NOT an MCP server and there is no JSON-RPC. An agent token reaches the
-platform through exactly one authenticated door: `POST /v1/agents/run`. Every
-operation — reads, writes, and self-management — is a named tool dispatched
-through that single endpoint. Agents never take assessments and never hold their
-own sessions; the learner REST surface is human-only.
+This is NOT an MCP server and there is no JSON-RPC. An agent token can call
+read-only endpoints directly (e.g., GET /v1/assessments, GET /v1/questions) and
+must use the run-door dispatcher `POST /v1/agents/run` for all writes. Agents
+never take assessments and never hold their own sessions; the learner REST
+surface is human-only.
 
 ## Getting a key
 
@@ -30,15 +30,20 @@ hold — each maps to one or more tools below. `admin` and the human-only REST
 scopes (`feedback.write`, `plan.read`, `plan.write`) cannot be granted to an
 agent.
 
-## The single door
+## REST API and the run-door dispatcher
 
-An agent token is confined to these endpoints; every other path returns `403`:
+An agent token has two ways to call tools:
+- **Direct REST** for read-only operations: `GET /v1/assessments`, `GET /v1/questions`, etc.
+- **Run-door dispatcher** for writes: `POST /v1/agents/run`.
 
-- `POST /v1/agents/run` — the dispatcher for all tools (body below).
+Other direct REST endpoints (e.g. `POST /v1/assessments`, `PATCH /v1/assessments/{id}`)
+are blocked by the agent guard and return `403 Forbidden`.
+
+Discovery endpoints that are always allowed:
 - `GET /v1/agents/activity` — the agent's own call log, newest first.
 - `GET /llms.txt`, `GET /skill.json`, `GET /openapi.yaml` — public discovery.
 
-Every tool is invoked the same way:
+Every tool invoked via the dispatcher uses the same shape:
 
 ```
 POST /v1/agents/run
@@ -51,45 +56,53 @@ A scope mismatch returns `403`; a malformed `params` returns `422`.
 ## Discovery
 
 `GET /skill.json` is the machine-readable tool list. Each tool carries an
-`input_schema`; `method` and `path` are uniform (`POST /v1/agents/run`) because
-the dispatcher is the only entry point. `?strict=1` drops the `method`/`path`/
-`scope` hints. The top-level `run` block lists every runnable tool. `GET
-/openapi.yaml` is the full schema for the underlying human REST API (informational
-for an agent — those routes are not directly reachable with an agent token).
+`input_schema`, along with its direct REST `method` and `path` when `?strict=1`
+is not set. `GET /openapi.yaml` is the full OpenAPI schema for all routes on the
+platform.
 
 ## Tools
 
-All tools dispatch through `POST /v1/agents/run`.
-
-**Authoring (scope `assessment.write`)**
+**Authoring writes (scope `assessment.write`, via POST /v1/agents/run)**
 - `question.create` — batch-create bank questions.
   `params: { questions: [{ kind, prompt, payload, explanation?, tags?, points?, status? }] }`.
 - `question.promote` — promote one draft question to live. `params: { id }`.
+- `question.update` — patch a bank question. `params: { id, prompt?, explanation?, points?, tags?, payload? }`.
 - `assessment.create` — create an assessment. Required: `title`, `mode`
   (`practice`|`graded`), `objectives` (array), `method` (`agent`). Optional:
   `description`, `course`, `status`, and an inline `questions` array.
 - `assessment.batchCreate` — create many assessments in one transaction.
   `params: { items: [ <assessment.create params> ] }`.
-- `assessment.addQuestion` — attach a bank question (or create one inline) to an
-  assessment. `params: { id, questionId? | (kind, prompt), sectionId?, pointsOverride? }`.
 - `assessment.update` — patch metadata or change lifecycle state.
   `params: { id, title?, status? }`. `status: "active"` publishes;
   `status: "archived"` archives.
+- `assessment.archive` — archive an assessment. `params: { id }`.
+- `assessment.publish` — publish an assessment to make it active. `params: { id }`.
+- `assessment.addQuestion` — attach a bank question (or create one inline) to an
+  assessment. `params: { id, questionId? | (kind, prompt), sectionId?, pointsOverride? }`.
+- `assessment.delete` — delete an assessment. `params: { id }`.
 
-**Grading (scope `attempt.write`)**
+**Grading writes (scope `attempt.write`, via POST /v1/agents/run)**
 - `attempt.grade` — grade one pending essay or code attempt.
   `params: { id, score (0.0–1.0), notes? }`. Grades a learner's attempt, never the
   agent's own.
 
-**Reading (scope `assessment.read`, or `stats.read` for stats)**
-- `assessment.list` — list the owner's assessments. `params: { course?, status?, mode? }`.
-- `assessment.get` — one assessment with its sections and questions. `params: { id }`.
-- `assessment.stats` — per-assessment performance (scope `stats.read`). `params: { id }`.
-- `question.list` — list bank questions. `params: { tag?, status?, limit?, offset? }`.
-- `activity.list` — the agent's own activity log. `params: { cursor?, limit? }`.
-- `stats.user` — the owner's aggregate learning statistics (scope `stats.read`).
+**Reading (direct GET endpoints)**
+- `assessment.list` — list the owner's assessments. `GET /v1/assessments` with
+  `params: { course?, status?, mode? }` (scope `assessment.read`).
+- `assessment.get` — one assessment with its sections and questions.
+  `GET /v1/assessments/{id}` (scope `assessment.read`).
+- `assessment.stats` — per-assessment performance (scope `stats.read`).
+  `GET /v1/assessments/{id}/stats`.
+- `question.list` — list bank questions. `GET /v1/questions` with
+  `params: { tag?, status?, limit?, offset? }` (scope `assessment.read`).
+- `attempt.list` — list the owner's attempt history. `GET /v1/me/attempts` with
+  `params: { limit?, offset?, sessionId? }` (scope `attempt.read`).
+- `activity.list` — the agent's own activity log. `GET /v1/agents/activity` with
+  `params: { cursor?, limit? }` (scope `assessment.read`).
+- `stats.user` — the owner's aggregate learning statistics.
+  `GET /v1/me/stats` (scope `stats.read`).
 
-**Self-management (no scope required)**
+**Self-management (no scope required, via POST /v1/agents/run)**
 - `profile.get` — the agent's own config (label, focus tags, goal, memory) plus the
   owner's per-tag ELO ratings under `owner.ratings`.
 - `memory.set` — replace the agent's memory blob. `params: { memory }`.

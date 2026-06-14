@@ -207,6 +207,7 @@ pub async fn create_session(
     let started_at = OffsetDateTime::now_utc();
     let session = start_session(StartSessionInput {
         user_id: auth.user.id,
+        owner_id: auth.owner_id,
         kind,
         assessment_id: body.assessment_id,
         filter,
@@ -249,7 +250,7 @@ pub async fn get_session(
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetSessionResponse>, ApiError> {
     let conn = &mut *db;
-    let mut session = get_owned_session(conn, id, user.user.id).await?;
+    let mut session = get_owned_session(conn, id, user.owner_id).await?;
     let attempts = list_session_attempts(conn, session.id).await?;
     let questions = hydrate_session_questions(conn, &session).await?;
 
@@ -369,7 +370,7 @@ pub async fn patch_session(
     Json(body): Json<PatchSessionBody>,
 ) -> Result<Json<Session>, ApiError> {
     let conn = &mut *db;
-    let mut session = get_owned_session(conn, id, user.0.user.id).await?;
+    let mut session = get_owned_session(conn, id, user.0.owner_id).await?;
 
     match (session.status, body.status) {
         (SessionStatus::InProgress, SessionStatus::Abandoned)
@@ -420,9 +421,10 @@ pub async fn answer(
     Json(body): Json<AnswerSessionBody>,
 ) -> Result<Json<AnswerSessionResponse>, ApiError> {
     let conn = &mut *db;
-    let session = get_owned_session(conn, id, user.0.user.id).await?;
+    let session = get_owned_session(conn, id, user.0.owner_id).await?;
+    let is_finished = session.status == crate::domain::session::SessionStatus::Finished;
     let existing = existing_attempts_by_question(conn, session.id).await?;
-    let runtime_question = load_runtime_question(conn, user.0.user.id, body.question_id).await?;
+    let runtime_question = load_runtime_question(conn, user.0.owner_id, body.question_id).await?;
     let outcome = answer_session(
         AnswerInput {
             session,
@@ -437,13 +439,20 @@ pub async fn answer(
     if !outcome.replayed {
         insert_attempt(conn, &outcome).await?;
         if let Some(ref elo) = outcome.elo {
-            persist_elo(conn, user.0.user.id, body.question_id, elo).await?;
+            persist_elo(conn, user.0.owner_id, body.question_id, elo).await?;
         }
     }
 
+    let mut attempt = outcome.attempt.clone();
+    let mut grade = outcome.grade.clone();
+    if !is_finished {
+        attempt.correct_answer = None;
+        grade.correct_answer = serde_json::Value::Null;
+    }
+
     Ok(Json(AnswerSessionResponse {
-        attempt: outcome.attempt,
-        grade: outcome.grade,
+        attempt,
+        grade,
         replayed: outcome.replayed,
     }))
 }
@@ -465,7 +474,7 @@ pub async fn finish(
     Path(id): Path<Uuid>,
 ) -> Result<Json<FinishSessionResponse>, ApiError> {
     let conn = &mut *db;
-    let session = get_owned_session(conn, id, user.0.user.id).await?;
+    let session = get_owned_session(conn, id, user.0.owner_id).await?;
     let attempts = list_session_attempts(conn, session.id).await?;
     let max_points = max_points_by_question(conn, &attempts).await?;
     let finished = finish_session(session, &attempts, &max_points, OffsetDateTime::now_utc())?;
@@ -522,7 +531,7 @@ async fn build_plan(
            )) \
            AND NOT EXISTS ( \
                 SELECT 1 FROM tb_attempts a \
-                WHERE a.user_id = $3 AND a.question_id = q.id \
+                WHERE a.actor_id = $3 AND a.question_id = q.id \
                   AND a.created_at >= now() - interval '24 hours' \
            ) \
          ORDER BY q.created_at DESC \
@@ -674,12 +683,13 @@ fn option_order(
 async fn insert_session(conn: &mut sqlx::PgConnection, session: &Session) -> Result<(), ApiError> {
     sqlx::query(
         "INSERT INTO tb_sessions \
-         (id, user_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
+         (id, actor_id, owner_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
           rating_snapshot, result, deadline_at, started_at, finished_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
     )
     .bind(session.id)
     .bind(session.user_id)
+    .bind(session.owner_id)
     .bind(session.kind.as_str())
     .bind(session.assessment_id)
     .bind(&session.filter)
@@ -700,15 +710,15 @@ async fn insert_session(conn: &mut sqlx::PgConnection, session: &Session) -> Res
 async fn get_owned_session(
     conn: &mut sqlx::PgConnection,
     id: Uuid,
-    user_id: Uuid,
+    owner_id: Uuid,
 ) -> Result<Session, ApiError> {
     let row = sqlx::query(
-        "SELECT id, user_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
+        "SELECT id, actor_id AS user_id, owner_id, kind, assessment_id, filter, question_plan, status, affects_rating, \
                  rating_snapshot, result, deadline_at, started_at, finished_at \
-          FROM tb_sessions WHERE id = $1 AND user_id = $2",
+          FROM tb_sessions WHERE id = $1 AND owner_id = $2",
     )
     .bind(id)
-    .bind(user_id)
+    .bind(owner_id)
     .fetch_optional(&mut *conn)
     .await
     .map_err(internal)?
@@ -727,6 +737,7 @@ fn row_to_session(row: &sqlx::postgres::PgRow) -> Result<Session, ApiError> {
     Ok(Session {
         id: row.get("id"),
         user_id: row.get("user_id"),
+        owner_id: row.get("owner_id"),
         kind: SessionKind::from_str(&kind_str)
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("invalid session kind: {e}")))?,
         assessment_id: row.get("assessment_id"),
@@ -823,11 +834,15 @@ async fn list_session_attempts(
     session_id: Uuid,
 ) -> Result<Vec<Attempt>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, user_id, question_id, question_version, session_id, response, presentation, \
-                 is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
-                 rating_before_user_avg, rating_before_question, user_tag_deltas, question_delta, \
-                 created_at \
-          FROM tb_attempts WHERE session_id = $1 ORDER BY created_at ASC",
+        "SELECT a.id, a.actor_id AS user_id, a.owner_id, a.question_id, a.question_version, a.session_id, a.response, a.presentation, \
+                 a.is_correct, a.score, a.grade_status, \
+                 CASE WHEN s.status = 'finished' THEN a.correct_answer ELSE NULL END as correct_answer, \
+                 a.grader_notes, a.time_to_answer_ms, \
+                 a.rating_before_user_avg, a.rating_before_question, a.user_tag_deltas, a.question_delta, \
+                 a.created_at \
+          FROM tb_attempts a \
+          JOIN tb_sessions s ON a.session_id = s.id \
+          WHERE a.session_id = $1 ORDER BY a.created_at ASC",
     )
     .bind(session_id)
     .fetch_all(&mut *conn)
@@ -844,6 +859,7 @@ pub(crate) fn row_to_attempt(row: sqlx::postgres::PgRow) -> Result<Attempt, ApiE
     Ok(Attempt {
         id: row.get("id"),
         user_id: row.get("user_id"),
+        owner_id: row.get("owner_id"),
         question_id: row.get("question_id"),
         question_version: row.get("question_version"),
         session_id: row.get("session_id"),
@@ -870,13 +886,14 @@ async fn insert_attempt(
     let attempt = &outcome.attempt;
     sqlx::query(
         "INSERT INTO tb_attempts \
-         (id, user_id, question_id, question_version, session_id, response, presentation, \
+         (id, actor_id, owner_id, question_id, question_version, session_id, response, presentation, \
           is_correct, score, grade_status, correct_answer, time_to_answer_ms, rating_before_user_avg, \
           rating_before_question, user_tag_deltas, question_delta, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
     )
     .bind(attempt.id)
     .bind(attempt.user_id)
+    .bind(attempt.owner_id)
     .bind(attempt.question_id)
     .bind(attempt.question_version)
     .bind(attempt.session_id)
@@ -1017,18 +1034,21 @@ pub async fn list_pending_attempts(
     }
 
     let rows = sqlx::query(
-        "SELECT a.id AS attempt_id, a.session_id, a.user_id, \
-                 u.email AS user_email, u.display_name AS user_display_name, \
+        "SELECT a.id AS attempt_id, a.session_id, a.actor_id AS user_id, \
+                 COALESCE(u.email, o.email) AS user_email, \
+                 COALESCE(u.display_name, ag.label) AS user_display_name, \
                  a.question_id, q.prompt AS question_prompt, \
                  (a.response->>'body') AS response_body, \
                  (a.response->>'word_count')::int AS response_word_count, \
                  a.created_at \
           FROM tb_attempts a \
-          JOIN tb_users u ON u.id = a.user_id \
+          LEFT JOIN tb_users u ON u.id = a.actor_id \
+          LEFT JOIN tb_agents ag ON ag.id = a.actor_id \
+          LEFT JOIN tb_users o ON o.id = ag.owner_user_id \
           JOIN tb_questions q ON q.id = a.question_id \
           WHERE a.grade_status = 'pending_manual' \
             AND (q.created_by = $1 \
-                 OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $1)) \
+                 OR EXISTS (SELECT 1 FROM tb_agents ag2 WHERE ag2.id = q.created_by AND ag2.owner_user_id = $1)) \
           ORDER BY a.created_at ASC",
     )
     .bind(user.owner_id)
@@ -1104,7 +1124,7 @@ pub async fn grade_attempt(
           JOIN tb_questions q ON q.id = a.question_id \
           WHERE a.id = $1 \
             AND (q.created_by = $2 \
-                 OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $2))",
+                 OR EXISTS (SELECT 1 FROM tb_agents ag WHERE ag.id = q.created_by AND ag.owner_user_id = $2))",
     )
     .bind(id)
     .bind(user.owner_id)
@@ -1127,10 +1147,10 @@ pub async fn grade_attempt(
         "UPDATE tb_attempts \
          SET score = $2, is_correct = ($2 > 0), grade_status = 'graded', grader_notes = $3 \
          WHERE id = $1 \
-         RETURNING id, user_id, question_id, question_version, session_id, response, presentation, \
-                   is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
-                   rating_before_user_avg, rating_before_question, user_tag_deltas, \
-                   question_delta, created_at",
+          RETURNING id, actor_id AS user_id, owner_id, question_id, question_version, session_id, response, presentation, \
+                    is_correct, score, grade_status, correct_answer, grader_notes, time_to_answer_ms, \
+                    rating_before_user_avg, rating_before_question, user_tag_deltas, \
+                    question_delta, created_at",
     )
     .bind(id)
     .bind(body.score)
@@ -1217,10 +1237,10 @@ pub async fn list_my_sessions(
     let total: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) \
          FROM tb_sessions \
-         WHERE user_id = $1 AND status = 'finished' \
+         WHERE owner_id = $1 AND status = 'finished' \
            AND ($2::uuid IS NULL OR assessment_id = $2)",
     )
-    .bind(user.user.id)
+    .bind(user.owner_id)
     .bind(q.assessment_id)
     .fetch_one(&mut *db)
     .await
@@ -1241,7 +1261,7 @@ pub async fn list_my_sessions(
                    ) AS total_attempts \
             FROM tb_sessions s \
             LEFT JOIN tb_assessments a ON a.id = s.assessment_id \
-            WHERE s.user_id = $1 AND s.status = 'finished' \
+            WHERE s.owner_id = $1 AND s.status = 'finished' \
               AND ($2::uuid IS NULL OR s.assessment_id = $2) \
          ) \
          SELECT id, kind, status, assessment_id, result, \
@@ -1250,7 +1270,7 @@ pub async fn list_my_sessions(
          ORDER BY started_at DESC \
          LIMIT $3 OFFSET $4",
     )
-    .bind(user.user.id)
+    .bind(user.owner_id)
     .bind(q.assessment_id)
     .bind(limit)
     .bind(q.offset)

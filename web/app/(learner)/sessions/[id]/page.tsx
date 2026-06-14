@@ -19,6 +19,8 @@ import DialogActions from "@mui/material/DialogActions";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import FlagIcon from "@mui/icons-material/Flag";
 import { McqRenderer } from "@/components/question/McqRenderer";
 import { ShortRenderer } from "@/components/question/ShortRenderer";
 import { EssayRenderer } from "@/components/question/EssayRenderer";
@@ -86,6 +88,12 @@ export default function ActiveQuizPage({
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
+  const [timesSpent, setTimesSpent] = useState<Record<string, number>>({});
+  const [questionStartTime, setQuestionStartTime] = useState<number>(
+    Date.now(),
+  );
+  const [lastIdx, setLastIdx] = useState(0);
+
   const questions = session?.questions ?? [];
   const answered = Object.keys(answers).length;
 
@@ -112,11 +120,33 @@ export default function ActiveQuizPage({
       .catch(console.error);
   }, [id]);
 
+  useEffect(() => {
+    const prevQuestion = questions[lastIdx];
+    if (prevQuestion) {
+      const elapsed = Date.now() - questionStartTime;
+      setTimesSpent((prev) => ({
+        ...prev,
+        [prevQuestion.questionId]:
+          (prev[prevQuestion.questionId] ?? 0) + elapsed,
+      }));
+    }
+    setQuestionStartTime(Date.now());
+    setLastIdx(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx, questions.length]);
+
   const handleFinish = useCallback(async () => {
     if (finishing) return;
     setFinishing(true);
     try {
       const client = api;
+      const currentQ = questions[idx];
+      const finalTimes = { ...timesSpent };
+      if (currentQ) {
+        const elapsed = Date.now() - questionStartTime;
+        finalTimes[currentQ.questionId] =
+          (finalTimes[currentQ.questionId] ?? 0) + elapsed;
+      }
       for (const [qid, val] of Object.entries(answers)) {
         const q = session?.questions.find((x) => x.questionId === qid);
         if (!q) continue;
@@ -153,7 +183,11 @@ export default function ActiveQuizPage({
           }
         ).POST("/v1/sessions/{id}/answer", {
           params: { path: { id } },
-          body: { questionId: qid, response },
+          body: {
+            questionId: qid,
+            response,
+            time_to_answer_ms: Math.round(finalTimes[qid] ?? 0),
+          },
         });
       }
       await (
@@ -218,22 +252,63 @@ export default function ActiveQuizPage({
     setSubmitDialogOpen(true);
   }, []);
 
-  // Enter advances to the next question. On the last question it opens the
-  // submit confirmation dialog rather than finishing outright — submitting ends
-  // the attempt and is destructive, so it must be confirmed exactly like the
-  // Submit button (never a silent one-keystroke submit). In multiline fields
-  // (essay/code) plain Enter inserts a newline, so advancing there requires
-  // Ctrl/Cmd+Enter.
+  // Keyboard shortcuts and Enter navigation. On the last question, Enter opens
+  // the submit confirmation dialog. Keyboard shortcuts (1-9) select options in
+  // MCQ/TF questions when not focused in an input. 'F' toggles the flag.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key !== "Enter" || e.shiftKey || !session) return;
+      if (!session) return;
+
       const target = e.target as HTMLElement | null;
-      const isTextarea = target?.tagName === "TEXTAREA";
-      if (isTextarea && !(e.ctrlKey || e.metaKey)) return;
-      e.preventDefault();
-      const last = session.questions.length - 1;
-      if (idx < last) setIdx((i) => Math.min(last, i + 1));
-      else setSubmitDialogOpen(true);
+      const isInput =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      // Enter advances
+      if (e.key === "Enter" && !e.shiftKey) {
+        const isTextarea = target?.tagName === "TEXTAREA";
+        if (isTextarea && !(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        const last = session.questions.length - 1;
+        if (idx < last) setIdx((i) => Math.min(last, i + 1));
+        else setSubmitDialogOpen(true);
+        return;
+      }
+
+      // If typing in an input/textarea, ignore shortcuts
+      if (isInput) return;
+
+      // 'f' or 'F' toggles flag
+      if (e.key === "f" || e.key === "F") {
+        const cur = session.questions[idx];
+        if (cur) {
+          e.preventDefault();
+          setFlagged((prev) => ({
+            ...prev,
+            [cur.questionId]: !prev[cur.questionId],
+          }));
+        }
+        return;
+      }
+
+      // Keys 1-9 select option for MCQ/TF
+      if (e.key >= "1" && e.key <= "9") {
+        const cur = session.questions[idx];
+        if (cur) {
+          const num = parseInt(e.key) - 1;
+          if (cur.kind === "tf" && num < 2) {
+            e.preventDefault();
+            const val = num === 0; // 1 = True, 2 = False
+            setAnswers((prev) => ({ ...prev, [cur.questionId]: val }));
+          } else if (cur.options && num < cur.options.length) {
+            e.preventDefault();
+            const order = cur.optionOrder ?? cur.options.map((_, i) => i);
+            const actualIndex = order[num];
+            setAnswers((prev) => ({ ...prev, [cur.questionId]: actualIndex }));
+          }
+        }
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -326,44 +401,176 @@ export default function ActiveQuizPage({
         value={questions.length ? (answered / questions.length) * 100 : 0}
       />
 
-      {/* Question */}
-      <Box
-        sx={{
-          flex: 1,
-          overflowY: "auto",
-          p: { xs: 2, sm: 4 },
-          maxWidth: 800,
-          mx: "auto",
-          width: "100%",
-        }}
-      >
-        {cur && (
-          <>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mb: 1 }}
-            >
-              Question {idx + 1} of {questions.length} ·{" "}
-              {QUESTION_TYPES[cur.kind] ?? cur.kind} · {cur.points}{" "}
-              {cur.points === 1 ? "pt" : "pts"}
-            </Typography>
-            <Typography variant="h6" sx={{ mb: 3 }}>
-              {cur.prompt}
-            </Typography>
+      {/* Main container splits left (question) and right (sidebar) */}
+      <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* Left: Question area */}
+        <Box
+          sx={{
+            flex: 1,
+            overflowY: "auto",
+            p: { xs: 2, sm: 4 },
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box sx={{ maxWidth: 800, mx: "auto", width: "100%" }}>
+            {cur && (
+              <>
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 1.5,
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    Question {idx + 1} of {questions.length} ·{" "}
+                    {QUESTION_TYPES[cur.kind] ?? cur.kind} · {cur.points}{" "}
+                    {cur.points === 1 ? "pt" : "pts"}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="text"
+                    color={flagged[cur.questionId] ? "warning" : "inherit"}
+                    startIcon={
+                      flagged[cur.questionId] ? (
+                        <FlagIcon sx={{ color: "warning.main" }} />
+                      ) : (
+                        <FlagOutlinedIcon />
+                      )
+                    }
+                    onClick={() =>
+                      setFlagged((prev) => ({
+                        ...prev,
+                        [cur.questionId]: !prev[cur.questionId],
+                      }))
+                    }
+                    sx={{ textTransform: "none", fontSize: 12 }}
+                  >
+                    {flagged[cur.questionId] ? "Flagged" : "Flag for review"}
+                  </Button>
+                </Stack>
+                <Typography variant="h6" sx={{ mb: 3 }}>
+                  {cur.prompt}
+                </Typography>
 
-            <Box data-testid="question-input">
-              <QuestionInput
-                question={cur}
-                value={curAnswer}
-                onChange={(v) =>
-                  setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
-                }
-                disabled={false}
-              />
-            </Box>
-          </>
-        )}
+                <Box data-testid="question-input">
+                  <QuestionInput
+                    question={cur}
+                    value={curAnswer}
+                    onChange={(v) =>
+                      setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
+                    }
+                    disabled={false}
+                  />
+                </Box>
+              </>
+            )}
+          </Box>
+        </Box>
+
+        {/* Right: Question Navigation Sidebar (Desktop only) */}
+        <Box
+          sx={{
+            width: 280,
+            borderLeft: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            display: { xs: "none", md: "flex" },
+            flexDirection: "column",
+            p: 3,
+            overflowY: "auto",
+          }}
+        >
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: 600, mb: 2, letterSpacing: 0.5 }}
+          >
+            Questions
+          </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: 1.25,
+            }}
+          >
+            {questions.map((q, qIdx) => {
+              const isCurrent = qIdx === idx;
+              const isAnswered =
+                answers[q.questionId] !== undefined &&
+                answers[q.questionId] !== null &&
+                answers[q.questionId] !== "";
+              const isFlagged = flagged[q.questionId] === true;
+
+              let btnBg = "transparent";
+              let btnBorderColor = "divider";
+              let btnColor = "text.primary";
+              let hoverBg = "action.hover";
+
+              if (isCurrent) {
+                btnBorderColor = "primary.main";
+                btnBg = "action.selected";
+                btnColor = "primary.main";
+              } else if (isAnswered) {
+                btnBg = "rgba(46, 125, 50, 0.08)";
+                btnBorderColor = "success.light";
+                btnColor = "success.main";
+                hoverBg = "rgba(46, 125, 50, 0.16)";
+              }
+
+              return (
+                <Box
+                  key={q.questionId}
+                  component="button"
+                  onClick={() => setIdx(qIdx)}
+                  sx={{
+                    position: "relative",
+                    aspectRatio: "1/1",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 1.5,
+                    border: "2px solid",
+                    borderColor: btnBorderColor,
+                    bgcolor: btnBg,
+                    color: btnColor,
+                    fontSize: 14,
+                    fontWeight: isCurrent ? 700 : 500,
+                    cursor: "pointer",
+                    transition: "all 0.12s",
+                    outline: "none",
+                    "&:hover": {
+                      bgcolor: hoverBg,
+                    },
+                    "&:focus-visible": {
+                      borderColor: "primary.main",
+                      boxShadow: "0 0 0 2px rgba(25, 118, 210, 0.2)",
+                    },
+                  }}
+                >
+                  {qIdx + 1}
+                  {isFlagged && (
+                    <FlagIcon
+                      sx={{
+                        position: "absolute",
+                        top: -4,
+                        right: -4,
+                        fontSize: 14,
+                        color: "warning.main",
+                        bgcolor: "background.paper",
+                        borderRadius: "50%",
+                        boxShadow: 1,
+                      }}
+                    />
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
       </Box>
 
       {/* Footer nav */}
@@ -450,12 +657,36 @@ export default function ActiveQuizPage({
       >
         <DialogTitle>Submit Assessment?</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            {questions.length - answered > 0
-              ? `You have ${questions.length - answered} unanswered question${
-                  questions.length - answered !== 1 ? "s" : ""
-                }. Are you sure you want to submit and finish this assessment?`
-              : "Are you sure you want to submit and finish this assessment?"}
+          <DialogContentText component="div">
+            {questions.length - answered > 0 ||
+            Object.values(flagged).filter(Boolean).length > 0 ? (
+              <>
+                {questions.length - answered > 0 && (
+                  <Box component="span" sx={{ display: "block", mb: 1 }}>
+                    You have {questions.length - answered} unanswered question
+                    {questions.length - answered !== 1 ? "s" : ""}.
+                  </Box>
+                )}
+                {Object.values(flagged).filter(Boolean).length > 0 && (
+                  <Box
+                    component="span"
+                    sx={{ display: "block", color: "warning.main", mb: 1 }}
+                  >
+                    You have {Object.values(flagged).filter(Boolean).length}{" "}
+                    question
+                    {Object.values(flagged).filter(Boolean).length !== 1
+                      ? "s"
+                      : ""}{" "}
+                    flagged for review.
+                  </Box>
+                )}
+                <Box component="span" sx={{ display: "block" }}>
+                  Are you sure you want to submit and finish this assessment?
+                </Box>
+              </>
+            ) : (
+              "Are you sure you want to submit and finish this assessment?"
+            )}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

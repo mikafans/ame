@@ -21,6 +21,10 @@ import TablePagination from "@mui/material/TablePagination";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import Drawer from "@mui/material/Drawer";
+import Divider from "@mui/material/Divider";
+import Tooltip from "@mui/material/Tooltip";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -55,6 +59,144 @@ interface AssessmentEntry {
   deletedAt?: string | null;
 }
 
+interface PreviewQuestion {
+  id: string;
+  kind: string;
+  prompt: string;
+  points: number;
+  orderIndex: number;
+  payload: unknown;
+}
+
+interface AssessmentDetail extends AssessmentEntry {
+  questions: PreviewQuestion[];
+}
+
+const KIND_LABEL: Record<string, string> = {
+  mc: "MC",
+  tf: "T/F",
+  short: "Short",
+  essay: "Essay",
+  code: "Code",
+};
+
+// Admin-only answer reveal: renders the moderation-relevant slice of a question's
+// payload per kind. The learner preview deliberately omits this.
+function QuestionAnswer({ kind, payload }: { kind: string; payload: unknown }) {
+  const p = (payload ?? {}) as Record<string, unknown>;
+
+  if (kind === "mc") {
+    const options = Array.isArray(p.options) ? (p.options as string[]) : [];
+    const correct = typeof p.correct_index === "number" ? p.correct_index : -1;
+    if (options.length === 0) return null;
+    return (
+      <Stack spacing={0.5} sx={{ mt: 1 }}>
+        {options.map((opt, i) => {
+          const isCorrect = i === correct;
+          return (
+            <Stack
+              key={i}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ color: isCorrect ? "success.main" : "text.secondary" }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ fontFamily: "monospace", minWidth: 20 }}
+              >
+                {String.fromCharCode(65 + i)}.
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: isCorrect ? 600 : 400 }}
+              >
+                {opt}
+              </Typography>
+              {isCorrect && (
+                <Chip
+                  label="CORRECT"
+                  size="small"
+                  color="success"
+                  sx={{ height: 16, fontSize: 9, fontWeight: 700 }}
+                />
+              )}
+            </Stack>
+          );
+        })}
+      </Stack>
+    );
+  }
+
+  if (kind === "tf") {
+    const correct =
+      p.correct === true ? "True" : p.correct === false ? "False" : "—";
+    return (
+      <Typography
+        variant="body2"
+        sx={{ mt: 1, color: "success.main", fontWeight: 600 }}
+      >
+        Answer: {correct}
+      </Typography>
+    );
+  }
+
+  if (kind === "short") {
+    const accepted = Array.isArray(p.accepted) ? (p.accepted as string[]) : [];
+    if (accepted.length === 0) return null;
+    return (
+      <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+        {accepted.map((a, i) => (
+          <Chip
+            key={i}
+            label={a}
+            size="small"
+            color="success"
+            variant="outlined"
+          />
+        ))}
+      </Box>
+    );
+  }
+
+  if (kind === "code") {
+    const exemplar = typeof p.exemplar === "string" ? p.exemplar : null;
+    if (!exemplar) return null;
+    return (
+      <Box
+        component="pre"
+        sx={{
+          mt: 1,
+          p: 1.5,
+          borderRadius: 1.5,
+          bgcolor: "action.hover",
+          fontSize: 12,
+          overflow: "auto",
+          fontFamily: "monospace",
+          m: 0,
+        }}
+      >
+        {exemplar}
+      </Box>
+    );
+  }
+
+  if (kind === "essay") {
+    const rubric = typeof p.rubric === "string" ? p.rubric : null;
+    return (
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mt: 1, fontStyle: "italic" }}
+      >
+        {rubric ? `Rubric: ${rubric}` : "Manually graded — no fixed answer."}
+      </Typography>
+    );
+  }
+
+  return null;
+}
+
 export default function AdminAssessmentsPage() {
   const { mode } = useColorMode();
   const isDark = mode === "dark";
@@ -81,6 +223,15 @@ export default function AdminAssessmentsPage() {
   const [understandDelete, setUnderstandDelete] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+
+  // Preview Drawer State
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewRow, setPreviewRow] = useState<AssessmentEntry | null>(null);
+  const [previewDetail, setPreviewDetail] = useState<AssessmentDetail | null>(
+    null,
+  );
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const fetchAssessments = useCallback(async () => {
     setLoading(true);
@@ -161,6 +312,31 @@ export default function AdminAssessmentsPage() {
     setPage(0);
   };
 
+  const handleOpenPreview = async (assessment: AssessmentEntry) => {
+    setPreviewRow(assessment);
+    setPreviewDetail(null);
+    setPreviewError(null);
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    try {
+      const { data, error } = await api.GET("/v1/admin/assessments/{id}", {
+        params: { path: { id: assessment.id } },
+      });
+      if (error) {
+        setPreviewError(errorMessage(error, "Failed to load assessment."));
+      } else if (data) {
+        setPreviewDetail(data as AssessmentDetail);
+      }
+    } catch (err) {
+      console.error(err);
+      setPreviewError(
+        "An unexpected error occurred while loading the preview.",
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const handleOpenDelete = (assessment: AssessmentEntry) => {
     setSelectedAssessment(assessment);
     setUnderstandDelete(false);
@@ -189,6 +365,7 @@ export default function AdminAssessmentsPage() {
         setDialogError(errorMessage(error, "Failed to delete assessment."));
       } else {
         setDeleteDialogOpen(false);
+        setPreviewOpen(false);
         fetchAssessments();
       }
     } catch (err) {
@@ -219,6 +396,7 @@ export default function AdminAssessmentsPage() {
         setDialogError(errorMessage(error, "Failed to restore assessment."));
       } else {
         setRestoreDialogOpen(false);
+        setPreviewOpen(false);
         fetchAssessments();
       }
     } catch (err) {
@@ -565,6 +743,16 @@ export default function AdminAssessmentsPage() {
                       </Typography>
                     </TableCell>
                     <TableCell align="right" sx={{ pr: 2 }}>
+                      <Tooltip title="Preview content">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenPreview(row)}
+                          color="primary"
+                          aria-label="Preview content"
+                        >
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       {row.deletedAt ? (
                         <IconButton
                           size="small"
@@ -601,6 +789,211 @@ export default function AdminAssessmentsPage() {
           sx={{ borderTop: "1px solid", borderColor: "divider" }}
         />
       </Paper>
+
+      {/* Preview Drawer */}
+      <Drawer
+        anchor="right"
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        slotProps={{
+          paper: {
+            sx: { width: { xs: "100%", sm: 540 }, maxWidth: "100%" },
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+          }}
+        >
+          {/* Drawer header */}
+          <Box sx={{ p: 3, borderBottom: "1px solid", borderColor: "divider" }}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              {previewRow?.title ?? "Assessment"}
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {previewRow && (
+                <Chip
+                  label={previewRow.mode.toUpperCase()}
+                  size="small"
+                  color={previewRow.mode === "graded" ? "error" : "primary"}
+                  variant="outlined"
+                  sx={{ fontWeight: 600, fontSize: 10 }}
+                />
+              )}
+              {previewRow && (
+                <Chip
+                  label={previewRow.status.toUpperCase()}
+                  size="small"
+                  color={
+                    previewRow.status === "active"
+                      ? "success"
+                      : previewRow.status === "draft"
+                        ? "default"
+                        : "warning"
+                  }
+                  sx={{ fontWeight: 600, fontSize: 10 }}
+                />
+              )}
+              {previewRow?.deletedAt && (
+                <Chip
+                  label="DELETED"
+                  size="small"
+                  color="error"
+                  sx={{ fontWeight: 600, fontSize: 10 }}
+                />
+              )}
+            </Stack>
+            {previewDetail && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 1.5, fontFamily: "monospace" }}
+              >
+                {previewDetail.questions.length} question
+                {previewDetail.questions.length !== 1 ? "s" : ""} ·{" "}
+                {previewDetail.questions.reduce((s, q) => s + q.points, 0)} pts
+                · {previewRow?.createdByEmail || "Unknown creator"}
+              </Typography>
+            )}
+          </Box>
+
+          {/* Drawer body */}
+          <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
+            {previewLoading ? (
+              <Box sx={{ textAlign: "center", py: 8 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : previewError ? (
+              <Alert severity="error">{previewError}</Alert>
+            ) : previewDetail ? (
+              <Stack spacing={2}>
+                {previewDetail.description && (
+                  <Typography variant="body2" color="text.secondary">
+                    {previewDetail.description}
+                  </Typography>
+                )}
+                {previewDetail.objectives &&
+                  previewDetail.objectives.length > 0 && (
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontWeight: 600, textTransform: "uppercase" }}
+                      >
+                        Objectives
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 0.5,
+                          mt: 0.5,
+                        }}
+                      >
+                        {previewDetail.objectives.map((obj) => (
+                          <Chip
+                            key={obj}
+                            label={obj}
+                            size="small"
+                            sx={{
+                              ...vibrantTagColor(obj, isDark),
+                              fontSize: 10,
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                <Divider />
+                {previewDetail.questions.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    This assessment has no questions.
+                  </Typography>
+                ) : (
+                  [...previewDetail.questions]
+                    .sort((a, b) => a.orderIndex - b.orderIndex)
+                    .map((q, i) => (
+                      <Box key={q.id}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="baseline"
+                        >
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ fontFamily: "monospace" }}
+                          >
+                            {i + 1}
+                          </Typography>
+                          <Chip
+                            label={KIND_LABEL[q.kind] || q.kind}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 18, fontSize: 9, fontWeight: 600 }}
+                          />
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ ml: "auto", fontFamily: "monospace" }}
+                          >
+                            {q.points} pt{q.points !== 1 ? "s" : ""}
+                          </Typography>
+                        </Stack>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                          {q.prompt}
+                        </Typography>
+                        <QuestionAnswer kind={q.kind} payload={q.payload} />
+                        {i < previewDetail.questions.length - 1 && (
+                          <Divider sx={{ mt: 2 }} />
+                        )}
+                      </Box>
+                    ))
+                )}
+              </Stack>
+            ) : null}
+          </Box>
+
+          {/* Drawer footer — review → decide */}
+          <Box
+            sx={{
+              p: 2,
+              borderTop: "1px solid",
+              borderColor: "divider",
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 1,
+            }}
+          >
+            <Button onClick={() => setPreviewOpen(false)} color="inherit">
+              Close
+            </Button>
+            {previewRow?.deletedAt ? (
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<RestoreIcon />}
+                onClick={() => previewRow && handleOpenRestore(previewRow)}
+              >
+                Restore
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => previewRow && handleOpenDelete(previewRow)}
+                disabled={!previewRow}
+              >
+                Delete
+              </Button>
+            )}
+          </Box>
+        </Box>
+      </Drawer>
 
       {/* Delete Dialog */}
       <Dialog

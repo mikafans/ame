@@ -57,7 +57,7 @@ pub async fn create_study_plan(
          FROM tb_attempts a \
          JOIN tb_question_tags qt ON qt.question_id = a.question_id \
          JOIN tb_tags t ON t.id = qt.tag_id \
-         WHERE a.user_id = $1 \
+         WHERE a.owner_id = $1 \
            AND a.created_at >= now() - ($2::bigint * interval '1 day') \
          GROUP BY t.name \
          ORDER BY avg_score ASC \
@@ -252,11 +252,11 @@ pub async fn plan_assessment(
                     ) \
                 ))) \
            AND ($6::bigint IS NULL OR NOT EXISTS ( \
-                SELECT 1 FROM tb_attempts a \
-                WHERE a.user_id = $1 \
-                  AND a.question_id = q.id \
-                  AND a.created_at >= now() - ($6::bigint * interval '1 hour') \
-           ))",
+                 SELECT 1 FROM tb_attempts a \
+                 WHERE a.owner_id = $1 \
+                   AND a.question_id = q.id \
+                   AND a.created_at >= now() - ($6::bigint * interval '1 hour') \
+            ))",
     )
     .bind(user_id)
     .bind(request.difficulty_min)

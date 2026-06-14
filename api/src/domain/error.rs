@@ -38,6 +38,8 @@ pub enum ApiError {
     ScoringUnavailable,
     #[error("too many requests")]
     TooManyRequests,
+    #[error("unknown tool: {0}")]
+    UnknownTool(String),
     #[error("service in maintenance mode")]
     Maintenance,
     #[error("quota exceeded")]
@@ -75,6 +77,7 @@ impl ApiError {
             ApiError::TooManyRequests | ApiError::QuotaExceeded { .. } => {
                 StatusCode::TOO_MANY_REQUESTS
             }
+            ApiError::UnknownTool(_) => StatusCode::BAD_REQUEST,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -154,6 +157,12 @@ impl IntoResponse for ApiError {
                 "rate limit exceeded".to_string(),
                 None,
             ),
+            ApiError::UnknownTool(tool) => (
+                StatusCode::BAD_REQUEST,
+                "unknown_tool",
+                format!("unknown or non-runnable tool: {}", tool),
+                None,
+            ),
             ApiError::Maintenance => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "maintenance",
@@ -187,6 +196,15 @@ impl IntoResponse for ApiError {
             error_body["details"] = d;
         }
 
-        (status, Json(json!({ "error": error_body }))).into_response()
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            (
+                status,
+                [("retry-after", "1")],
+                Json(json!({ "error": error_body })),
+            )
+                .into_response()
+        } else {
+            (status, Json(json!({ "error": error_body }))).into_response()
+        }
     }
 }

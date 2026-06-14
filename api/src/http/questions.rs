@@ -44,7 +44,10 @@ pub struct ListQuestionsQuery {
     pub max_rating: Option<f64>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    #[serde(alias = "cursor")]
     pub after: Option<String>,
+    #[serde(alias = "assessmentId")]
+    pub assessment_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -109,6 +112,7 @@ pub async fn list_questions(
         limit: q.limit,
         offset: q.offset,
         created_by,
+        assessment_id: q.assessment_id,
     };
 
     let after = match q.after {
@@ -230,19 +234,8 @@ pub async fn create_questions(
         .await?;
     }
 
-    let agent_id = if auth.0.user.role == crate::domain::user::Role::Agent {
-        Some(auth.0.user.id)
-    } else {
-        None
-    };
-    let questions = repo::create_questions(
-        &mut db,
-        auth.0.owner_id,
-        auth.0.owner_id,
-        agent_id,
-        body.questions,
-    )
-    .await?;
+    let questions =
+        repo::create_questions(&mut db, auth.0.user.id, auth.0.owner_id, body.questions).await?;
     Ok((
         StatusCode::CREATED,
         Json(CreateQuestionsResponse { questions }),

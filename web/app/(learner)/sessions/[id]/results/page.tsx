@@ -356,18 +356,62 @@ export default function ResultsPage({
       </Typography>
       <Stack spacing={1.5} sx={{ mb: 4 }}>
         {answers.map((a, i) => (
-          <Card key={a.qid} variant="outlined">
+          <Card
+            key={a.qid}
+            variant="outlined"
+            sx={{
+              position: "relative",
+              overflow: "hidden",
+              borderRadius: 2,
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              ...(!a.correct && a.gradeStatus !== "pending_manual"
+                ? {
+                    borderColor: "error.light",
+                    borderLeft: "6px solid",
+                    borderLeftColor: "error.main",
+                    background: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "linear-gradient(135deg, rgba(211, 47, 47, 0.12) 0%, rgba(30, 30, 30, 0.95) 100%)"
+                        : "linear-gradient(135deg, rgba(211, 47, 47, 0.03) 0%, rgba(255, 255, 255, 1) 100%)",
+                    boxShadow: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "0 4px 20px rgba(211, 47, 47, 0.15)"
+                        : "0 4px 20px rgba(211, 47, 47, 0.06)",
+                    "&:hover": {
+                      transform: "translateY(-2px)",
+                      boxShadow: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "0 8px 28px rgba(211, 47, 47, 0.25)"
+                          : "0 8px 28px rgba(211, 47, 47, 0.12)",
+                    },
+                  }
+                : {
+                    "&:hover": {
+                      transform: "translateY(-1px)",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+                    },
+                  }),
+            }}
+          >
             <CardContent>
               <Box
-                sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  mb: 2,
+                }}
               >
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 600, color: "text.primary", pr: 2 }}
+                >
                   Q{i + 1}. {a.prompt}
                 </Typography>
                 <Stack
                   direction="row"
                   spacing={0.75}
-                  sx={{ alignItems: "center" }}
+                  sx={{ alignItems: "center", flexShrink: 0 }}
                 >
                   {a.gradeStatus === "pending_manual" ? (
                     <Chip
@@ -375,66 +419,178 @@ export default function ResultsPage({
                       size="small"
                       variant="outlined"
                     />
+                  ) : a.correct ? (
+                    <Chip
+                      label={`${a.points}/${a.max} PTS`}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      sx={{ fontWeight: 600 }}
+                    />
                   ) : (
                     <Chip
-                      label={`${a.points}/${a.max}`}
+                      label={`${a.points}/${a.max} PTS`}
                       size="small"
-                      color={a.correct ? "success" : "error"}
-                      variant="outlined"
+                      color="error"
+                      sx={{
+                        fontWeight: 700,
+                        backgroundColor: (theme) =>
+                          theme.palette.mode === "dark"
+                            ? "rgba(211, 47, 47, 0.25)"
+                            : "rgba(211, 47, 47, 0.08)",
+                        animation: "pulse 2.5s infinite ease-in-out",
+                        "@keyframes pulse": {
+                          "0%": { transform: "scale(1)" },
+                          "50%": { transform: "scale(1.04)" },
+                          "100%": { transform: "scale(1)" },
+                        },
+                      }}
                     />
                   )}
                 </Stack>
               </Box>
-              {a.type === "code" ? (
+
+              {/* Response detail block */}
+              {a.gradeStatus === "pending_manual" ? (
                 <Box>
                   <Typography
                     variant="caption"
                     color="text.secondary"
-                    sx={{ display: "block", mb: 0.5 }}
+                    sx={{ display: "block", mb: 0.5, fontWeight: 600 }}
                   >
                     Your submission
                   </Typography>
                   {a.given ? (
                     <Box sx={{ mt: 0.5 }}>
-                      <HighlightedCode code={a.given} language="python" />
+                      <HighlightedCode
+                        code={a.given}
+                        language={a.type === "code" ? "python" : "text"}
+                      />
                     </Box>
                   ) : (
                     <Typography variant="caption" color="text.secondary">
                       No answer submitted
                     </Typography>
                   )}
-                  {a.gradeStatus === "pending_manual" && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mt: 1, fontStyle: "italic" }}
+                  >
+                    Awaiting manual review — code/essay isn’t auto-graded.
+                  </Typography>
+                </Box>
+              ) : a.correct ? (
+                // Correct answer style: clean and tidy
+                <Box
+                  sx={{
+                    pl: 1,
+                    borderLeft: "3px solid",
+                    borderLeftColor: "success.light",
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="success.main"
+                    sx={{ fontWeight: 500 }}
+                  >
+                    Correct: {a.given || "—"}
+                  </Typography>
+                </Box>
+              ) : (
+                // Wrong answer style: astonishing side-by-side comparison block
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: 2,
+                    mt: 1.5,
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: (theme) =>
+                      theme.palette.mode === "dark"
+                        ? "rgba(211, 47, 47, 0.08)"
+                        : "rgba(211, 47, 47, 0.02)",
+                    border: "1px dashed",
+                    borderColor: "error.light",
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      sx={{ display: "block", mt: 0.5, fontStyle: "italic" }}
+                      sx={{ display: "block", fontWeight: 600, mb: 0.5 }}
                     >
-                      Awaiting manual review — code isn’t auto-graded.
+                      Your Answer
                     </Typography>
-                  )}
-                </Box>
-              ) : (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Your answer: {a.given || "—"}
-                  </Typography>
+                    {a.type === "code" && a.given ? (
+                      <HighlightedCode code={a.given} language="python" />
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        color="error.main"
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {a.given || "—"}
+                      </Typography>
+                    )}
+                  </Box>
                   {a.correctAnswer && (
-                    <Typography
-                      variant="caption"
-                      color="error.main"
-                      sx={{ display: "block", mt: 0.5, fontWeight: 500 }}
+                    <Box
+                      sx={{
+                        flex: 1,
+                        borderLeft: { sm: "1px solid" },
+                        borderColor: { sm: "divider" },
+                        pl: { sm: 2 },
+                      }}
                     >
-                      Correct answer: {a.correctAnswer}
-                    </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", fontWeight: 600, mb: 0.5 }}
+                      >
+                        Correct Solution
+                      </Typography>
+                      {a.type === "code" ? (
+                        <HighlightedCode
+                          code={a.correctAnswer}
+                          language="python"
+                        />
+                      ) : (
+                        <Typography
+                          variant="body2"
+                          color="success.main"
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {a.correctAnswer}
+                        </Typography>
+                      )}
+                    </Box>
                   )}
                 </Box>
               )}
+
               {a.explanation && (
                 <>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="caption" color="text.secondary">
-                    {a.explanation}
-                  </Typography>
+                  <Divider sx={{ my: 2 }} />
+                  <Box
+                    sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="primary.main"
+                      sx={{ fontWeight: 600, flexShrink: 0 }}
+                    >
+                      Explanation:
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ lineHeight: 1.4 }}
+                    >
+                      {a.explanation}
+                    </Typography>
+                  </Box>
                 </>
               )}
             </CardContent>

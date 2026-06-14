@@ -112,10 +112,10 @@ pub async fn activity(
 
     let rows = if let Some(cursor) = q.cursor {
         sqlx::query(
-            "SELECT a.id, a.ts, a.agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+            "SELECT a.id, a.ts, a.actor_id AS agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
-             LEFT JOIN tb_agents ag ON a.agent_id = ag.id
-             WHERE a.agent_id = ANY($1) AND a.id < $2
+             LEFT JOIN tb_agents ag ON a.actor_id = ag.id
+             WHERE a.actor_id = ANY($1) AND a.id < $2
              ORDER BY a.id DESC
              LIMIT $3",
         )
@@ -126,10 +126,10 @@ pub async fn activity(
         .await
     } else {
         sqlx::query(
-            "SELECT a.id, a.ts, a.agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+            "SELECT a.id, a.ts, a.actor_id AS agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
-             LEFT JOIN tb_agents ag ON a.agent_id = ag.id
-             WHERE a.agent_id = ANY($1)
+             LEFT JOIN tb_agents ag ON a.actor_id = ag.id
+             WHERE a.actor_id = ANY($1)
              ORDER BY a.id DESC
              LIMIT $2",
         )
@@ -209,18 +209,36 @@ fn build_skill_manifest(strict: bool) -> Value {
             "assessment.list",
             "List assessments accessible to the caller.",
             json!({"type":"object","properties":{"course":{"type":"string"},"status":{"type":"string"},"mode":{"type":"string","enum":["practice","graded"]}}}),
-            "POST",
-            "/v1/agents/run",
+            "GET",
+            "/v1/assessments",
             Some("assessment.read"),
             strict,
         ),
         tool(
             "assessment.get",
-            "Get a single assessment with its questions and sections.",
+            "Get assessment details.",
+            id_only(),
+            "GET",
+            "/v1/assessments/{id}",
+            Some("assessment.read"),
+            strict,
+        ),
+        tool(
+            "assessment.archive",
+            "Archive an assessment.",
             id_only(),
             "POST",
             "/v1/agents/run",
-            Some("assessment.read"),
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
+            "assessment.publish",
+            "Publish an assessment to make it active and promote draft questions to live.",
+            id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
             strict,
         ),
         tool(
@@ -300,10 +318,6 @@ fn build_skill_manifest(strict: bool) -> Value {
                 }
             }),
             "POST",
-            // Run-only composite — no REST route exists. Advertise the real
-            // endpoint (matches profile.get/memory.set/target.set), not a path
-            // that 404s. Callers invoke it via POST /v1/agents/run with
-            // {"tool":"assessment.batchCreate","params":{...}}. (Audit F-3.)
             "/v1/agents/run",
             Some("assessment.write"),
             strict,
@@ -341,9 +355,9 @@ fn build_skill_manifest(strict: bool) -> Value {
         tool(
             "question.list",
             "List questions in the bank.",
-            json!({"type":"object","properties":{"tag":{"type":"string"},"status":{"type":"string","enum":["draft","live","archived"]},"limit":{"type":"integer"},"offset":{"type":"integer"}}}),
-            "POST",
-            "/v1/agents/run",
+            json!({"type":"object","properties":{"tag":{"type":"string"},"status":{"type":"string","enum":["draft","live","archived"]},"limit":{"type":"integer"},"offset":{"type":"integer"},"after":{"type":"string"},"cursor":{"type":"string"},"assessmentId":{"type":"string","format":"uuid"}}}),
+            "GET",
+            "/v1/questions",
             Some("assessment.read"),
             strict,
         ),
@@ -366,11 +380,31 @@ fn build_skill_manifest(strict: bool) -> Value {
             strict,
         ),
         tool(
+            "question.update",
+            "Update a question in the bank.",
+            json!({
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "prompt": { "type": "string" },
+                    "explanation": { "type": "string" },
+                    "points": { "type": "integer" },
+                    "tags": { "type": "array", "items": { "type": "string" } },
+                    "payload": { "type": "object" }
+                }
+            }),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
             "assessment.stats",
             "Get per-assessment performance stats (avg, median, distribution, per-question metrics).",
             id_only(),
-            "POST",
-            "/v1/agents/run",
+            "GET",
+            "/v1/assessments/{id}/stats",
             Some("stats.read"),
             strict,
         ),
@@ -378,8 +412,8 @@ fn build_skill_manifest(strict: bool) -> Value {
             "activity.list",
             "List agent activity log.",
             json!({"type":"object","properties":{"cursor":{"type":"string","format":"uuid"},"limit":{"type":"integer"}}}),
-            "POST",
-            "/v1/agents/run",
+            "GET",
+            "/v1/agents/activity",
             Some("assessment.read"),
             strict,
         ),
@@ -387,8 +421,8 @@ fn build_skill_manifest(strict: bool) -> Value {
             "stats.user",
             "Read the caller's aggregate learning statistics.",
             json!({"type":"object","properties":{}}),
-            "POST",
-            "/v1/agents/run",
+            "GET",
+            "/v1/me/stats",
             Some("stats.read"),
             strict,
         ),
@@ -396,8 +430,8 @@ fn build_skill_manifest(strict: bool) -> Value {
             "attempt.list",
             "List the owner's per-attempt history, optionally filtered to one session.",
             json!({"type":"object","properties":{"limit":{"type":"integer"},"offset":{"type":"integer"},"sessionId":{"type":"string","format":"uuid"}}}),
-            "POST",
-            "/v1/agents/run",
+            "GET",
+            "/v1/me/attempts",
             Some("attempt.read"),
             strict,
         ),
@@ -417,6 +451,15 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("attempt.write"),
+            strict,
+        ),
+        tool(
+            "assessment.delete",
+            "Delete an assessment.",
+            id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
             strict,
         ),
         // Agent self — run-only tools (POST /v1/agents/run). These operate on the
@@ -481,8 +524,12 @@ fn build_skill_manifest(strict: bool) -> Value {
                 "assessment.batchCreate",
                 "assessment.update",
                 "assessment.addQuestion",
+                "assessment.delete",
+                "assessment.archive",
+                "assessment.publish",
                 "question.create",
                 "question.promote",
+                "question.update",
                 "attempt.grade",
                 "profile.get",
                 "memory.set",
@@ -583,6 +630,10 @@ async fn dispatch_run(
             require_scope(&auth, Scope::AssessmentWrite)?;
             run_question_promote(&state, &auth, body.params).await
         }
+        "question.update" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_question_update(&state, &auth, body.params).await
+        }
         "attempt.grade" => {
             require_scope(&auth, Scope::AttemptWrite)?;
             run_attempt_grade(&state, &auth, body.params).await
@@ -594,6 +645,18 @@ async fn dispatch_run(
         "assessment.get" => {
             require_scope(&auth, Scope::AssessmentRead)?;
             run_assessment_get(&state, &auth, body.params).await
+        }
+        "assessment.delete" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_delete(&state, &auth, body.params).await
+        }
+        "assessment.archive" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_archive(&state, &auth, body.params).await
+        }
+        "assessment.publish" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_assessment_publish(&state, &auth, body.params).await
         }
         "question.list" => {
             require_scope(&auth, Scope::AssessmentRead)?;
@@ -619,12 +682,7 @@ async fn dispatch_run(
         "memory.set" => run_memory_set(&state, &user_id, body.params).await,
         "memory.append" => run_memory_append(&state, &user_id, body.params).await,
         "target.set" => run_target_set(&state, &user_id, body.params).await,
-        other => Ok(Json(RunResponse {
-            ok: false,
-            tool: other.to_string(),
-            result: Value::Null,
-            error: Some(format!("unknown or non-runnable tool: {other}")),
-        })),
+        other => Err(ApiError::UnknownTool(other.to_string())),
     }
 }
 
@@ -646,6 +704,75 @@ async fn run_assessment_create(
         ok: true,
         tool: "assessment.create".into(),
         result: serde_json::to_value(res.1.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_delete(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    super::assessments::delete_assessment(auth.clone(), State(state.clone()), Path(id)).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.delete".into(),
+        result: Value::Null,
+        error: None,
+    }))
+}
+
+async fn run_assessment_archive(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let req = crate::domain::assessment::UpdateAssessmentRequest {
+        title: None,
+        description: None,
+        status: Some(crate::domain::assessment::AssessmentStatus::Archived),
+        objectives: None,
+    };
+    let res = super::assessments::patch_assessment(
+        auth.clone(),
+        State(state.clone()),
+        Path(id),
+        Json(req),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.archive".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_assessment_publish(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let req = crate::domain::assessment::UpdateAssessmentRequest {
+        title: None,
+        description: None,
+        status: Some(crate::domain::assessment::AssessmentStatus::Active),
+        objectives: None,
+    };
+    let res = super::assessments::patch_assessment(
+        auth.clone(),
+        State(state.clone()),
+        Path(id),
+        Json(req),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "assessment.publish".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
         error: None,
     }))
 }
@@ -810,12 +937,6 @@ async fn run_assessment_batch_create(
         });
     }
 
-    let agent_id = if auth.user.role == crate::domain::user::Role::Agent {
-        Some(auth.user.id)
-    } else {
-        None
-    };
-
     // Open transaction
     let mut tx = state
         .pool
@@ -826,13 +947,13 @@ async fn run_assessment_batch_create(
     let is_admin = auth.user.role == crate::domain::user::Role::Admin;
     crate::http::db::set_rls_guc(&mut tx, auth.owner_id, is_admin).await?;
 
-    // Bulk insert assessments (17 columns)
+    // Bulk insert assessments (16 columns)
     {
         let mut qb = QueryBuilder::new(
             "INSERT INTO tb_assessments \
              (id, title, description, mode, status, objectives, course, duration_min, \
               time_limit_seconds, passing_points, show_results_during, affects_rating, \
-              method, created_by, owner_id, total_points, agent_id) ",
+              method, created_by, owner_id, total_points) ",
         );
 
         qb.push_values(&validated, |mut b, item| {
@@ -849,10 +970,9 @@ async fn run_assessment_batch_create(
                 .push_bind(item.show_results_during)
                 .push_bind(item.affects_rating)
                 .push_bind(&item.method)
+                .push_bind(auth.user.id)
                 .push_bind(auth.owner_id)
-                .push_bind(auth.owner_id)
-                .push_bind(item.total_points)
-                .push_bind(agent_id);
+                .push_bind(item.total_points);
         });
 
         qb.build()
@@ -893,7 +1013,6 @@ async fn run_assessment_batch_create(
         explanation: Option<String>,
         points: i32,
         created_by: Uuid,
-        agent_id: Option<Uuid>,
     }
 
     #[derive(Debug)]
@@ -919,8 +1038,7 @@ async fn run_assessment_batch_create(
                 payload: q.payload.clone(),
                 explanation: q.explanation.clone(),
                 points: q.points.unwrap_or(1),
-                created_by: auth.owner_id,
-                agent_id,
+                created_by: auth.user.id,
             });
 
             all_assessment_items.push(AssessmentItemRecord {
@@ -939,10 +1057,10 @@ async fn run_assessment_batch_create(
         }
     }
 
-    // Bulk insert questions (10 columns: id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id)
+    // Bulk insert questions (9 columns: id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
     if !all_questions.is_empty() {
         let mut qb = QueryBuilder::new(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by, agent_id) ",
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by) ",
         );
 
         qb.push_values(&all_questions, |mut b, q| {
@@ -954,8 +1072,7 @@ async fn run_assessment_batch_create(
                 .push_bind(&q.explanation)
                 .push_bind("live")
                 .push_bind(q.points)
-                .push_bind(q.created_by)
-                .push_bind(q.agent_id);
+                .push_bind(q.created_by);
         });
 
         qb.build()
@@ -1161,11 +1278,10 @@ async fn run_question_create(
         .map_err(|e| ApiError::Internal(e.into()))?;
     let conn = &mut *acquired;
     let owner_id = auth.owner_id;
-    let agent_id = Some(auth.user.id);
 
     crate::http::db::set_rls_guc(conn, owner_id, false).await?;
 
-    let created = repo::create_questions(conn, owner_id, owner_id, agent_id, questions).await?;
+    let created = repo::create_questions(conn, auth.user.id, owner_id, questions).await?;
     Ok(Json(RunResponse {
         ok: true,
         tool: "question.create".into(),
@@ -1195,6 +1311,39 @@ async fn run_question_promote(
         ok: true,
         tool: "question.promote".into(),
         result: serde_json::to_value(question).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_question_update(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let patch: crate::bank::questions::QuestionPatch = serde_json::from_value(params.clone())
+        .map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid patch params: {e}"),
+            }])
+        })?;
+
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    let owner_id = auth.owner_id;
+
+    crate::http::db::set_rls_guc(conn, owner_id, false).await?;
+
+    let updated = crate::bank::questions::update_question(conn, id, patch).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.update".into(),
+        result: serde_json::to_value(updated).unwrap_or(Value::Null),
         error: None,
     }))
 }
@@ -1395,7 +1544,7 @@ async fn run_attempt_grade(
           JOIN tb_questions q ON q.id = a.question_id \
           WHERE a.id = $1 \
             AND (q.created_by = $2 \
-                 OR EXISTS (SELECT 1 FROM tb_users ow WHERE ow.id = q.created_by AND ow.owner_user_id = $2))",
+                 OR EXISTS (SELECT 1 FROM tb_agents ag WHERE ag.id = q.created_by AND ag.owner_user_id = $2))",
     )
     .bind(p.id)
     .bind(auth.owner_id)
