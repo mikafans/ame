@@ -127,18 +127,32 @@ test.describe("UI/UX spec alignment", () => {
       .locator(".MuiCardContent-root")
       .allTextContents();
     const hasNonBlankAnswer = cardContents.some((content) => {
-      if (content.includes("Correct:") && !content.includes("Correct: —") && !content.includes("Correct:  ")) {
+      if (
+        content.includes("Correct:") &&
+        !content.includes("Correct: —") &&
+        !content.includes("Correct:  ")
+      ) {
         return true;
       }
       if (content.includes("Your Answer")) {
         const matches = content.match(/Your Answer\s*(.+)/s);
-        if (matches && matches[1] && !matches[1].trim().startsWith("—") && matches[1].trim() !== "") {
+        if (
+          matches &&
+          matches[1] &&
+          !matches[1].trim().startsWith("—") &&
+          matches[1].trim() !== ""
+        ) {
           return true;
         }
       }
       if (content.includes("Your submission")) {
         const matches = content.match(/Your submission\s*(.+)/s);
-        if (matches && matches[1] && !matches[1].trim().startsWith("—") && matches[1].trim() !== "") {
+        if (
+          matches &&
+          matches[1] &&
+          !matches[1].trim().startsWith("—") &&
+          matches[1].trim() !== ""
+        ) {
           return true;
         }
       }
