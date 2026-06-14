@@ -105,8 +105,8 @@ async fn skill_manifest_contains_assessment_tools() {
         let name = t["name"].as_str().unwrap();
         let expected_method = match name {
             // Reads: direct GET
-            "assessment.list" | "assessment.get" | "question.list" | "assessment.stats"
-            | "activity.list" | "stats.user" | "attempt.list" => "GET",
+            "assessment.list" | "assessment.get" | "question.list" | "question.deepen"
+            | "assessment.stats" | "activity.list" | "stats.user" | "attempt.list" => "GET",
             // Writes: all via POST /v1/agents/run
             "assessment.create"
             | "assessment.batchCreate"
@@ -131,6 +131,7 @@ async fn skill_manifest_contains_assessment_tools() {
             "assessment.get" => "/v1/assessments/{id}",
             "assessment.stats" => "/v1/assessments/{id}/stats",
             "question.list" => "/v1/questions",
+            "question.deepen" => "/v1/questions/{id}/deepen",
             "activity.list" => "/v1/agents/activity",
             "stats.user" => "/v1/me/stats",
             "attempt.list" => "/v1/me/attempts",

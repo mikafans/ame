@@ -753,3 +753,202 @@ async fn patch_session_rejects_finished_target() {
         .unwrap();
     assert_eq!(finished.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[tokio::test]
+async fn test_question_deepen_flow() {
+    if skip_if_no_db() {
+        return;
+    }
+
+    let pool = setup_db().await;
+    let (bearer, user_id) = make_user_token(&pool, None, "user", &["assessment.read"]).await;
+    let (admin_bearer, _admin_id) = make_user_token(&pool, None, "admin", &["admin"]).await;
+
+    // 1. Create a target question with tags, deep_dive, and source
+    let target_id = make_live_mc_question_detailed(
+        &pool,
+        user_id,
+        &["rust", "async"],
+        Some("# Target Question Deep Dive\nSome detailed notes."),
+        Some("https://doc.rust-lang.org/book/"),
+    )
+    .await;
+
+    // 2. Create related live questions with tags
+    // Q_rel1 has 2 shared tags ("rust", "async") -> highest rank
+    let rel1_id =
+        make_live_mc_question_detailed(&pool, user_id, &["rust", "async", "tokio"], None, None)
+            .await;
+
+    // Q_rel2 has 1 shared tag ("rust") -> second rank
+    let rel2_id =
+        make_live_mc_question_detailed(&pool, user_id, &["rust", "lifetimes"], None, None).await;
+
+    // Q_unrelated has 0 shared tags
+    let unrelated_id =
+        make_live_mc_question_detailed(&pool, user_id, &["javascript"], None, None).await;
+
+    let base_url = serve(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    // 3. Request deepening details
+    let response = client
+        .get(format!("{base_url}/v1/questions/{target_id}/deepen"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap();
+    if response.status() != StatusCode::OK {
+        let status = response.status();
+        let text = response.text().await.unwrap();
+        panic!("Request failed with status: {status}, body: {text}");
+    }
+
+    let body: Value = response.json().await.unwrap();
+
+    // Check main question fields
+    assert_eq!(body["question"]["id"], target_id.to_string());
+    assert_eq!(
+        body["question"]["deepDive"],
+        "# Target Question Deep Dive\nSome detailed notes."
+    );
+    assert_eq!(
+        body["question"]["source"],
+        "https://doc.rust-lang.org/book/"
+    );
+
+    // Check related questions ordering
+    let related = body["related"]
+        .as_array()
+        .expect("related should be an array");
+    assert!(
+        !related.is_empty(),
+        "related questions list should not be empty"
+    );
+
+    // The first related question should be rel1_id (highest shared tags)
+    assert_eq!(related[0]["id"], rel1_id.to_string());
+    // The second should be rel2_id
+    assert_eq!(related[1]["id"], rel2_id.to_string());
+    // Unrelated question should not be present (0 shared tags)
+    let has_unrelated = related.iter().any(|q| q["id"] == unrelated_id.to_string());
+    assert!(
+        !has_unrelated,
+        "unrelated question should not be in related list"
+    );
+
+    // 4. Request with exclude query param
+    let response_ex = client
+        .get(format!(
+            "{base_url}/v1/questions/{target_id}/deepen?exclude={rel1_id}"
+        ))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response_ex.status(), StatusCode::OK);
+
+    let body_ex: Value = response_ex.json().await.unwrap();
+    let related_ex = body_ex["related"].as_array().unwrap();
+
+    // Verify rel1_id is excluded
+    let has_rel1 = related_ex.iter().any(|q| q["id"] == rel1_id.to_string());
+    assert!(!has_rel1, "rel1 should be excluded");
+
+    // 5. Create active session containing the target question for the user
+    let session_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO tb_sessions (id, owner_id, actor_id, status, question_plan) VALUES ($1, $2, $2, 'in_progress', $3)",
+    )
+    .bind(session_id)
+    .bind(user_id)
+    .bind(json!({
+        "items": [
+            { "question_id": target_id }
+        ]
+    }))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 6. Requesting deepen should now return 403 Forbidden
+    let response_forbidden = client
+        .get(format!("{base_url}/v1/questions/{target_id}/deepen"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response_forbidden.status(), StatusCode::FORBIDDEN);
+
+    // 7. Requesting as Admin should bypass the active session gate
+    let response_admin = client
+        .get(format!("{base_url}/v1/questions/{target_id}/deepen"))
+        .header(header::AUTHORIZATION, format!("Bearer {admin_bearer}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response_admin.status(), StatusCode::OK);
+
+    // 8. Cancel session by changing status to abandoned
+    sqlx::query("UPDATE tb_sessions SET status = 'abandoned' WHERE id = $1")
+        .bind(session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // 9. Now request is allowed again
+    let response_allowed = client
+        .get(format!("{base_url}/v1/questions/{target_id}/deepen"))
+        .header(header::AUTHORIZATION, format!("Bearer {bearer}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response_allowed.status(), StatusCode::OK);
+}
+
+async fn make_live_mc_question_detailed(
+    pool: &PgPool,
+    owner_id: Uuid,
+    tags: &[&str],
+    deep_dive: Option<&str>,
+    source: Option<&str>,
+) -> Uuid {
+    ensure_test_owner(pool).await;
+
+    let question_id: Uuid = sqlx::query(
+        "INSERT INTO tb_questions (owner_id, kind, prompt, payload, status, points, created_by, deep_dive, source) \
+         VALUES ($1, 'mc', 'What color?', $2, 'live', 2, $1, $3, $4) \
+          RETURNING id",
+    )
+    .bind(owner_id)
+    .bind(json!({ "options": ["red", "green", "blue"], "correct_index": 1 }))
+    .bind(deep_dive)
+    .bind(source)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+    .get("id");
+
+    for tag in tags {
+        let tag_id: Uuid = sqlx::query(
+            "INSERT INTO tb_tags (name) VALUES ($1) \
+             ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name \
+             RETURNING id",
+        )
+        .bind(tag)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .get("id");
+        sqlx::query(
+            "INSERT INTO tb_question_tags (question_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(question_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    question_id
+}

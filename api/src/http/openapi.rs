@@ -48,7 +48,10 @@ use crate::{
             UpdateAgentBody,
         },
         plans::CreatePlanBody,
-        questions::{CreateQuestionsBody, CreateQuestionsResponse, ListQuestionsResponse},
+        questions::{
+            CreateQuestionsBody, CreateQuestionsResponse, ListQuestionsResponse,
+            QuestionDeepenResponse,
+        },
         quota::Plan as QuotaPlan,
         sessions::{
             AnswerSessionBody, AnswerSessionResponse, CreateSessionBody, CreateSessionResponse,
@@ -90,6 +93,7 @@ use crate::{
         crate::http::explore::explore_facets,
         crate::http::questions::list_questions,
         crate::http::questions::get_question,
+        crate::http::questions::get_question_deepen,
         crate::http::questions::list_versions,
         crate::http::questions::create_questions,
         crate::http::questions::update_question,
@@ -131,6 +135,7 @@ use crate::{
         QuestionInsert,
         QuestionPatch,
         ListQuestionsResponse,
+        QuestionDeepenResponse,
         CreateQuestionsBody,
         CreateQuestionsResponse,
         Assessment,

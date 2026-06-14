@@ -553,3 +553,38 @@ pub async fn archive_question(
         resource: "question",
     })
 }
+
+pub async fn get_related_questions(
+    conn: &mut sqlx::PgConnection,
+    question_id: Uuid,
+    exclude: &[Uuid],
+) -> Result<Vec<Question>, ApiError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT q.id, q.kind, q.prompt, q.version, q.status, q.points, q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source, q.rating, q.attempts_count, q.created_by, q.created_at, q.updated_at,
+               COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags,
+               COUNT(qt_match.tag_id) AS shared_tag_count
+        FROM tb_questions q
+        JOIN tb_question_tags qt_self ON qt_self.question_id = q.id
+        JOIN tb_question_tags qt_match ON qt_match.tag_id = qt_self.tag_id
+        WHERE qt_match.question_id = $1
+          AND q.id != $1
+          AND q.status = 'live'
+          AND NOT (q.id = ANY($2))
+        GROUP BY q.id
+        ORDER BY shared_tag_count DESC, q.rating DESC, q.created_at DESC
+        LIMIT 5
+        "#
+    )
+    .bind(question_id)
+    .bind(exclude)
+    .fetch_all(conn)
+    .await
+    .map_err(internal)?;
+
+    let mut related = Vec::new();
+    for row in rows {
+        related.push(row_to_question(row)?);
+    }
+    Ok(related)
+}

@@ -400,6 +400,22 @@ fn build_skill_manifest(strict: bool) -> Value {
             strict,
         ),
         tool(
+            "question.deepen",
+            "Retrieve deepen/review details for a question (tags, related questions, references, study notes). Returns 403 Forbidden if there is an active session for this question.",
+            json!({
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                    "id": { "type": "string", "format": "uuid", "description": "Question ID" },
+                    "exclude": { "type": "string", "description": "Comma-separated list of question IDs to exclude" }
+                }
+            }),
+            "GET",
+            "/v1/questions/{id}/deepen",
+            Some("assessment.read"),
+            strict,
+        ),
+        tool(
             "assessment.stats",
             "Get per-assessment performance stats (avg, median, distribution, per-question metrics).",
             id_only(),
@@ -661,6 +677,10 @@ async fn dispatch_run(
         "question.list" => {
             require_scope(&auth, Scope::AssessmentRead)?;
             run_question_list(&state, &auth, body.params).await
+        }
+        "question.deepen" => {
+            require_scope(&auth, Scope::AssessmentRead)?;
+            run_question_deepen(&state, &auth, body.params).await
         }
         "assessment.stats" => {
             require_scope(&auth, Scope::StatsRead)?;
@@ -1344,6 +1364,86 @@ async fn run_question_update(
         ok: true,
         tool: "question.update".into(),
         result: serde_json::to_value(updated).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_question_deepen(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let id = parse_id(&params)?;
+    let exclude_str: Option<String> = params
+        .get("exclude")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    let owner_id = auth.owner_id;
+
+    crate::http::db::set_rls_guc(conn, owner_id, false).await?;
+
+    use crate::bank::questions as repo;
+    let question = repo::get_question(conn, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    // Check ownership if not admin
+    if auth.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(conn, id, owner_id).await?
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
+    // Reuse existing in-progress/pending session gate (no key reveal pre-submit)
+    if auth.user.role != crate::domain::user::Role::Admin {
+        let active: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1 FROM tb_sessions s
+                WHERE s.owner_id = $1
+                  AND s.status = 'in_progress'
+                  AND s.question_plan->'items' @> jsonb_build_array(jsonb_build_object('question_id', $2))
+            )
+            "#
+        )
+        .bind(auth.user.id)
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+        if active {
+            return Err(ApiError::Forbidden(std::borrow::Cow::Borrowed(
+                "cannot access deepening details while an active session is in progress",
+            )));
+        }
+    }
+
+    let exclude_ids: Vec<Uuid> = exclude_str
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|s| Uuid::parse_str(s.trim()).ok())
+        .collect();
+
+    let related = repo::get_related_questions(conn, id, &exclude_ids).await?;
+
+    let res = super::questions::QuestionDeepenResponse { question, related };
+
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "question.deepen".into(),
+        result: serde_json::to_value(res).unwrap_or(Value::Null),
         error: None,
     }))
 }
