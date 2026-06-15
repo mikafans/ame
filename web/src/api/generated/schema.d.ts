@@ -622,6 +622,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/questions/{id}/deepen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_question_deepen"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/questions/{id}/promote": {
         parameters: {
             query?: never;
@@ -963,6 +979,7 @@ export interface components {
         AssessmentMode: "practice" | "graded";
         AssessmentQuestion: {
             codeSnippet?: unknown;
+            deepDive?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;
@@ -973,6 +990,7 @@ export interface components {
             /** Format: int32 */
             points: number;
             prompt: string;
+            source?: string | null;
             status: string;
         };
         AssessmentSectionDetail: {
@@ -1385,6 +1403,7 @@ export interface components {
             createdAt: string;
             /** Format: uuid */
             createdBy: string;
+            deepDive?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;
@@ -1403,6 +1422,10 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        QuestionDeepenResponse: {
+            question: components["schemas"]["Question"];
+            related: components["schemas"]["Question"][];
+        };
         QuestionImport: {
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
@@ -1413,23 +1436,27 @@ export interface components {
             tags?: string[];
         };
         QuestionInsert: {
+            deepDive?: string | null;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
             payload: unknown;
             /** Format: int32 */
             points?: number | null;
             prompt: string;
+            source?: string | null;
             status?: null | components["schemas"]["QuestionStatus"];
             tags: string[];
         };
         /** @enum {string} */
         QuestionKind: "mc" | "tf" | "short" | "essay" | "code";
         QuestionPatch: {
+            deepDive?: string | null;
             explanation?: string | null;
             payload?: unknown;
             /** Format: int32 */
             points?: number | null;
             prompt?: string | null;
+            source?: string | null;
             tags?: string[] | null;
         };
         QuestionPlan: {
@@ -1449,6 +1476,7 @@ export interface components {
             codeSnippet?: unknown;
             /** Format: date-time */
             createdAt: string;
+            deepDive?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;
@@ -1456,6 +1484,7 @@ export interface components {
             prompt: string;
             /** Format: uuid */
             questionId: string;
+            source?: string | null;
             /** Format: int32 */
             version: number;
         };
@@ -3437,6 +3466,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Question"];
                 };
+            };
+            /** @description Question not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_question_deepen: {
+        parameters: {
+            query?: {
+                exclude?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Question id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question deepen bundle */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionDeepenResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Question not found */
             404: {

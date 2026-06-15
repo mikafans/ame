@@ -67,6 +67,7 @@ pub async fn agent_guard_middleware(
                 | ("GET", "/v1/assessments/{id}")
                 | ("GET", "/v1/assessments/{id}/stats")
                 | ("GET", "/v1/questions")
+                | ("GET", "/v1/questions/{id}/deepen")
                 | ("GET", "/v1/me/attempts")
                 | ("GET", "/v1/me/stats")
                 | ("GET", "/v1/agents/activity")

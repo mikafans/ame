@@ -1380,6 +1380,39 @@ paths:
           description: Question not found
       security:
       - bearer: []
+  /v1/questions/{id}/deepen:
+    get:
+      tags:
+      - questions
+      operationId: get_question_deepen
+      parameters:
+      - name: id
+        in: path
+        description: Question id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: exclude
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Question deepen bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionDeepenResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Question not found
+      security:
+      - bearer: []
   /v1/questions/{id}/promote:
     post:
       tags:
@@ -2205,6 +2238,10 @@ components:
       - orderIndex
       properties:
         codeSnippet: {}
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -2223,6 +2260,10 @@ components:
           format: int32
         prompt:
           type: string
+        source:
+          type:
+          - string
+          - 'null'
         status:
           type: string
     AssessmentSectionDetail:
@@ -3287,6 +3328,10 @@ components:
         createdBy:
           type: string
           format: uuid
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3321,6 +3366,18 @@ components:
         version:
           type: integer
           format: int32
+    QuestionDeepenResponse:
+      type: object
+      required:
+      - question
+      - related
+      properties:
+        question:
+          $ref: '#/components/schemas/Question'
+        related:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
     QuestionImport:
       type: object
       required:
@@ -3354,6 +3411,10 @@ components:
       - payload
       - tags
       properties:
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3368,6 +3429,10 @@ components:
           format: int32
         prompt:
           type: string
+        source:
+          type:
+          - string
+          - 'null'
         status:
           oneOf:
           - type: 'null'
@@ -3387,6 +3452,10 @@ components:
     QuestionPatch:
       type: object
       properties:
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3398,6 +3467,10 @@ components:
           - 'null'
           format: int32
         prompt:
+          type:
+          - string
+          - 'null'
+        source:
           type:
           - string
           - 'null'
@@ -3453,6 +3526,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -3466,6 +3543,10 @@ components:
         questionId:
           type: string
           format: uuid
+        source:
+          type:
+          - string
+          - 'null'
         version:
           type: integer
           format: int32

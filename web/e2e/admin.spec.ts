@@ -103,10 +103,12 @@ test.describe("admin portal", () => {
     await row.getByRole("button", { name: "Preview content" }).click();
 
     // Drawer shows the question list; the answer reveal (CORRECT chip) is admin-only.
-    const drawer = page.locator(".MuiDrawer-paper").first();
+    const drawer = page.getByRole("dialog").first();
     await expect(drawer).toBeVisible();
     await expect(drawer.getByText(/question/i).first()).toBeVisible();
-    await expect(drawer.getByText("CORRECT").first()).toBeVisible({
+    await expect(
+      drawer.locator(".MuiChip-root").filter({ hasText: "CORRECT" }).first(),
+    ).toBeVisible({
       timeout: 8000,
     });
   });

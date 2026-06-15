@@ -45,7 +45,7 @@ pub async fn list_questions(
     let kind_str = filter.kind.map(|k| k.as_str().to_string());
 
     let rows = sqlx::query(
-        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, deep_dive, source, rating, attempts_count, created_by, created_at, updated_at,
                 COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
          FROM tb_questions q
          WHERE ($1::text IS NULL OR q.status = $1)
@@ -97,7 +97,7 @@ pub async fn list_questions_paged(
     };
 
     let rows = sqlx::query(
-        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, deep_dive, source, rating, attempts_count, created_by, created_at, updated_at,
                 COUNT(*) OVER() as total,
                 COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
          FROM tb_questions q
@@ -168,7 +168,7 @@ pub async fn get_question(
     id: Uuid,
 ) -> Result<Option<Question>, ApiError> {
     let row = sqlx::query(
-        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at,
+        "SELECT id, kind, prompt, version, status, points, code_snippet, payload, explanation, deep_dive, source, rating, attempts_count, created_by, created_at, updated_at,
                 COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags
          FROM tb_questions q WHERE q.id = $1"
     )
@@ -207,6 +207,7 @@ fn row_to_question(row: sqlx::postgres::PgRow) -> Result<Question, ApiError> {
         code_snippet: row.get("code_snippet"),
         payload: row.get("payload"),
         explanation: row.get("explanation"),
+        deep_dive: row.get("deep_dive"),
         source: row.get("source"),
         rating: row.get("rating"),
         attempts_count: row.get("attempts_count"),
@@ -221,7 +222,7 @@ pub async fn get_question_versions(
     question_id: Uuid,
 ) -> Result<Vec<QuestionVersion>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, question_id, version, prompt, code_snippet, payload, explanation, archived_at, created_at
+        "SELECT id, question_id, version, prompt, code_snippet, payload, explanation, deep_dive, source, archived_at, created_at
          FROM tb_question_versions
          WHERE question_id = $1
          ORDER BY version DESC"
@@ -241,6 +242,8 @@ pub async fn get_question_versions(
                 code_snippet: row.get("code_snippet"),
                 payload: row.get("payload"),
                 explanation: row.get("explanation"),
+                deep_dive: row.get("deep_dive"),
+                source: row.get("source"),
                 archived_at: row.get("archived_at"),
                 created_at: row.get("created_at"),
             })
@@ -281,20 +284,26 @@ pub async fn question_in_owner_scope(
 pub const MAX_BATCH: usize = 250;
 
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionInsert {
     pub kind: QuestionKind,
     pub prompt: String,
     pub payload: serde_json::Value,
     pub explanation: Option<String>,
+    pub deep_dive: Option<String>,
+    pub source: Option<String>,
     pub tags: Vec<String>,
     pub points: Option<i32>,
     pub status: Option<QuestionStatus>,
 }
 
 #[derive(Debug, Default, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionPatch {
     pub prompt: Option<String>,
     pub explanation: Option<String>,
+    pub deep_dive: Option<String>,
+    pub source: Option<String>,
     pub points: Option<i32>,
     pub tags: Option<Vec<String>>,
     pub payload: Option<serde_json::Value>,
@@ -318,6 +327,18 @@ pub async fn create_questions(
     let mut tx = conn.begin().await.map_err(internal)?;
 
     for q in questions {
+        if q.source
+            .as_ref()
+            .is_some_and(|s| !s.starts_with("http://") && !s.starts_with("https://"))
+        {
+            return Err(ApiError::Validation(vec![
+                crate::domain::error::FieldError {
+                    field: "source".to_string(),
+                    message: "reference URL must use http or https scheme".to_string(),
+                },
+            ]));
+        }
+
         let id = Uuid::now_v7();
         let status = q.status.unwrap_or(QuestionStatus::Draft);
 
@@ -329,9 +350,9 @@ pub async fn create_questions(
             .collect();
 
         let q_row = sqlx::query(
-            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, status, points, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             RETURNING id, kind, prompt, version, status, points, code_snippet, payload, explanation, source, rating, attempts_count, created_by, created_at, updated_at, '{}'::text[] AS tags"
+            "INSERT INTO tb_questions (id, owner_id, kind, prompt, payload, explanation, deep_dive, source, status, points, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING id, kind, prompt, version, status, points, code_snippet, payload, explanation, deep_dive, source, rating, attempts_count, created_by, created_at, updated_at, '{}'::text[] AS tags"
         )
         .bind(id)
         .bind(owner_id)
@@ -339,6 +360,8 @@ pub async fn create_questions(
         .bind(&q.prompt)
         .bind(&q.payload)
         .bind(&q.explanation)
+        .bind(&q.deep_dive)
+        .bind(&q.source)
         .bind(status.as_str())
         .bind(q.points.unwrap_or(1))
         .bind(user_id)
@@ -384,9 +407,22 @@ pub async fn update_question(
 ) -> Result<Question, ApiError> {
     let mut tx = conn.begin().await.map_err(internal)?;
 
+    if patch
+        .source
+        .as_ref()
+        .is_some_and(|s| !s.starts_with("http://") && !s.starts_with("https://"))
+    {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "source".to_string(),
+                message: "reference URL must use http or https scheme".to_string(),
+            },
+        ]));
+    }
+
     // Fetch current state and check if editable.
     let current_row = sqlx::query(
-        "SELECT version, status, prompt, code_snippet, payload, explanation FROM tb_questions WHERE id = $1 FOR UPDATE"
+        "SELECT version, status, prompt, code_snippet, payload, explanation, deep_dive, source FROM tb_questions WHERE id = $1 FOR UPDATE"
     )
     .bind(id)
     .fetch_optional(&mut *tx)
@@ -411,10 +447,12 @@ pub async fn update_question(
         let current_code_snippet: Option<serde_json::Value> = current_row.get("code_snippet");
         let current_payload: serde_json::Value = current_row.get("payload");
         let current_explanation: Option<String> = current_row.get("explanation");
+        let current_deep_dive: Option<String> = current_row.get("deep_dive");
+        let current_source: Option<String> = current_row.get("source");
 
         sqlx::query(
-            "INSERT INTO tb_question_versions (question_id, version, prompt, code_snippet, payload, explanation) \
-             VALUES ($1, $2, $3, $4, $5, $6)"
+            "INSERT INTO tb_question_versions (question_id, version, prompt, code_snippet, payload, explanation, deep_dive, source) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
         )
         .bind(id)
         .bind(current_version)
@@ -422,6 +460,8 @@ pub async fn update_question(
         .bind(current_code_snippet)
         .bind(current_payload)
         .bind(current_explanation)
+        .bind(current_deep_dive)
+        .bind(current_source)
         .execute(&mut *tx)
         .await
         .map_err(internal)?;
@@ -440,15 +480,19 @@ pub async fn update_question(
         "UPDATE tb_questions \
          SET prompt = COALESCE($1, prompt), \
              explanation = COALESCE($2, explanation), \
-             points = COALESCE($3, points), \
-             payload = COALESCE($4, payload), \
+             deep_dive = COALESCE($3, deep_dive), \
+             points = COALESCE($4, points), \
+             payload = COALESCE($5, payload), \
+             source = COALESCE($6, source), \
              updated_at = now() \
-         WHERE id = $5",
+         WHERE id = $7",
     )
     .bind(patch.prompt.as_deref())
     .bind(patch.explanation.as_deref())
+    .bind(patch.deep_dive.as_deref())
     .bind(patch.points)
     .bind(patch.payload)
+    .bind(patch.source.as_deref())
     .bind(id)
     .execute(&mut *tx)
     .await
@@ -510,4 +554,39 @@ pub async fn archive_question(
     get_question(conn, id).await?.ok_or(ApiError::NotFound {
         resource: "question",
     })
+}
+
+pub async fn get_related_questions(
+    conn: &mut sqlx::PgConnection,
+    question_id: Uuid,
+    exclude: &[Uuid],
+) -> Result<Vec<Question>, ApiError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT q.id, q.kind, q.prompt, q.version, q.status, q.points, q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source, q.rating, q.attempts_count, q.created_by, q.created_at, q.updated_at,
+               COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags,
+               COUNT(qt_match.tag_id) AS shared_tag_count
+        FROM tb_questions q
+        JOIN tb_question_tags qt_self ON qt_self.question_id = q.id
+        JOIN tb_question_tags qt_match ON qt_match.tag_id = qt_self.tag_id
+        WHERE qt_match.question_id = $1
+          AND q.id != $1
+          AND q.status = 'live'
+          AND NOT (q.id = ANY($2))
+        GROUP BY q.id
+        ORDER BY shared_tag_count DESC, q.rating DESC, q.created_at DESC
+        LIMIT 5
+        "#
+    )
+    .bind(question_id)
+    .bind(exclude)
+    .fetch_all(conn)
+    .await
+    .map_err(internal)?;
+
+    let mut related = Vec::new();
+    for row in rows {
+        related.push(row_to_question(row)?);
+    }
+    Ok(related)
 }

@@ -345,6 +345,93 @@ pub async fn archive_question(
     Ok(Json(repo::archive_question(&mut db, id).await?))
 }
 
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct DeepenQuery {
+    pub exclude: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionDeepenResponse {
+    pub question: Question,
+    pub related: Vec<Question>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/questions/{id}/deepen",
+    params(
+        ("id" = Uuid, Path, description = "Question id"),
+        DeepenQuery
+    ),
+    responses(
+        (status = 200, description = "Question deepen bundle", body = QuestionDeepenResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Question not found"),
+    ),
+    security(("bearer" = [])),
+    tag = "questions"
+)]
+pub async fn get_question_deepen(
+    mut db: DbConn,
+    auth: RequireAnyScope<QuestionReadScopes>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<DeepenQuery>,
+) -> Result<Json<QuestionDeepenResponse>, ApiError> {
+    let question = repo::get_question(&mut db, id)
+        .await?
+        .ok_or(ApiError::NotFound {
+            resource: "question",
+        })?;
+
+    // Check ownership if not admin
+    if auth.0.user.role != crate::domain::user::Role::Admin
+        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
+    {
+        return Err(ApiError::NotFound {
+            resource: "question",
+        });
+    }
+
+    // Reuse existing in-progress/pending session gate (no key reveal pre-submit)
+    if auth.0.user.role != crate::domain::user::Role::Admin {
+        let active: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1 FROM tb_sessions s
+                WHERE s.owner_id = $1
+                  AND s.status = 'in_progress'
+                  AND s.question_plan->'items' @> jsonb_build_array(jsonb_build_object('question_id', $2))
+            )
+            "#
+        )
+        .bind(auth.0.user.id)
+        .bind(id)
+        .fetch_one(&mut *db)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
+
+        if active {
+            return Err(ApiError::Forbidden(std::borrow::Cow::Borrowed(
+                "cannot access deepening details while an active session is in progress",
+            )));
+        }
+    }
+
+    let exclude_ids: Vec<Uuid> = q
+        .exclude
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|s| Uuid::parse_str(s.trim()).ok())
+        .collect();
+
+    let related = repo::get_related_questions(&mut db, id, &exclude_ids).await?;
+
+    Ok(Json(QuestionDeepenResponse { question, related }))
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/questions", get(list_questions).post(create_questions))
@@ -352,6 +439,7 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/questions/{id}",
             get(get_question).patch(update_question),
         )
+        .route("/v1/questions/{id}/deepen", get(get_question_deepen))
         .route("/v1/questions/{id}/versions", get(list_versions))
         .route("/v1/questions/{id}/promote", post(promote_question))
         .route("/v1/questions/{id}/archive", post(archive_question))

@@ -79,6 +79,32 @@ fn mc_insert(prompt: &str, tags: &[&str]) -> QuestionInsert {
         prompt: prompt.to_string(),
         payload,
         explanation: None,
+        deep_dive: None,
+        source: None,
+        points: Some(1),
+        tags: tags.iter().map(|s| s.to_string()).collect(),
+        status: None,
+    }
+}
+
+fn mc_insert_with_deep_dive(
+    prompt: &str,
+    explanation: &str,
+    deep_dive: &str,
+    tags: &[&str],
+) -> QuestionInsert {
+    let payload = serde_json::to_value(McPayload {
+        options: vec!["a".into(), "b".into(), "c".into()],
+        correct_index: 1,
+    })
+    .unwrap();
+    QuestionInsert {
+        kind: QuestionKind::Mc,
+        prompt: prompt.to_string(),
+        payload,
+        explanation: Some(explanation.to_string()),
+        deep_dive: Some(deep_dive.to_string()),
+        source: None,
         points: Some(1),
         tags: tags.iter().map(|s| s.to_string()).collect(),
         status: None,
@@ -299,4 +325,181 @@ async fn cannot_edit_archived_question() {
         ApiError::Validation(fields) => assert_eq!(fields[0].field, "status"),
         other => panic!("expected Validation, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn deep_dive_round_trips_through_create_patch_and_publish() {
+    if skip_if_no_db() {
+        return;
+    }
+    let pool = setup_db().await;
+    let user_id = make_user(&pool).await;
+
+    let mut conn = pool.acquire().await.unwrap();
+
+    // Create a question with deep_dive
+    let q = q_repo::create_questions(
+        &mut conn,
+        user_id,
+        user_id,
+        vec![mc_insert_with_deep_dive(
+            "What is Rust?",
+            "Rust is a systems language.",
+            "# Rust Deep Dive\n\nRust combines safety and performance.",
+            &["programming", "rust"],
+        )],
+    )
+    .await
+    .unwrap()
+    .pop()
+    .unwrap();
+
+    // Verify deep_dive persisted on creation
+    assert_eq!(
+        q.deep_dive,
+        Some("# Rust Deep Dive\n\nRust combines safety and performance.".to_string())
+    );
+    assert_eq!(q.status, QuestionStatus::Draft);
+
+    // Patch the deep_dive on the draft question
+    let patch = QuestionPatch {
+        deep_dive: Some("# Updated Deep Dive\n\nMore detailed explanation.".to_string()),
+        ..Default::default()
+    };
+    let patched = q_repo::update_question(&mut conn, q.id, patch)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        patched.deep_dive,
+        Some("# Updated Deep Dive\n\nMore detailed explanation.".to_string())
+    );
+    assert_eq!(patched.version, 1, "draft patch should not bump version");
+
+    // Promote question to live (publish)
+    q_repo::promote_question(&mut conn, q.id).await.unwrap();
+
+    // Patch deep_dive on a live question (should snapshot the old version)
+    let patch2 = QuestionPatch {
+        deep_dive: Some("# Third Version Deep Dive\n\nEven more detail.".to_string()),
+        ..Default::default()
+    };
+    let patched_live = q_repo::update_question(&mut conn, q.id, patch2)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        patched_live.deep_dive,
+        Some("# Third Version Deep Dive\n\nEven more detail.".to_string())
+    );
+    assert_eq!(patched_live.version, 2, "live patch should bump version");
+
+    // Verify the snapshot captured the previous deep_dive
+    let versions = q_repo::get_question_versions(&mut conn, q.id)
+        .await
+        .unwrap();
+    assert_eq!(versions.len(), 1, "should have one version snapshot");
+    assert_eq!(versions[0].version, 1);
+    assert_eq!(
+        versions[0].deep_dive,
+        Some("# Updated Deep Dive\n\nMore detailed explanation.".to_string())
+    );
+
+    // Verify fetching the question returns the current deep_dive
+    let fetched = q_repo::get_question(&mut conn, q.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        fetched.deep_dive,
+        Some("# Third Version Deep Dive\n\nEven more detail.".to_string())
+    );
+}
+
+#[tokio::test]
+async fn source_round_trips_and_validates_scheme() {
+    if skip_if_no_db() {
+        return;
+    }
+    let pool = setup_db().await;
+    let user_id = make_user(&pool).await;
+
+    let mut conn = pool.acquire().await.unwrap();
+
+    // 1. Create a question with invalid source scheme (ftp://...) - should fail validation
+    let invalid_insert = QuestionInsert {
+        kind: QuestionKind::Mc,
+        prompt: "Invalid URL".to_string(),
+        payload: serde_json::to_value(McPayload {
+            options: vec!["a".into(), "b".into()],
+            correct_index: 0,
+        })
+        .unwrap(),
+        explanation: None,
+        deep_dive: None,
+        source: Some("ftp://example.com".to_string()),
+        points: Some(1),
+        tags: vec![],
+        status: None,
+    };
+    let err = q_repo::create_questions(&mut conn, user_id, user_id, vec![invalid_insert]).await;
+    assert!(err.is_err(), "expected validation error for ftp:// scheme");
+
+    // 2. Create a question with valid source scheme (https://...)
+    let valid_insert = QuestionInsert {
+        kind: QuestionKind::Mc,
+        prompt: "Valid URL".to_string(),
+        payload: serde_json::to_value(McPayload {
+            options: vec!["a".into(), "b".into()],
+            correct_index: 0,
+        })
+        .unwrap(),
+        explanation: None,
+        deep_dive: None,
+        source: Some("https://example.com/ref".to_string()),
+        points: Some(1),
+        tags: vec![],
+        status: None,
+    };
+    let q = q_repo::create_questions(&mut conn, user_id, user_id, vec![valid_insert])
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert_eq!(q.source, Some("https://example.com/ref".to_string()));
+
+    // 3. Patch valid source to another http scheme (http://...)
+    let patch = QuestionPatch {
+        source: Some("http://example.com/new".to_string()),
+        ..Default::default()
+    };
+    let patched = q_repo::update_question(&mut conn, q.id, patch)
+        .await
+        .unwrap();
+    assert_eq!(patched.source, Some("http://example.com/new".to_string()));
+
+    // 4. Promote and check version snapshot preserves source
+    q_repo::promote_question(&mut conn, q.id).await.unwrap();
+
+    let patch2 = QuestionPatch {
+        source: Some("https://example.com/third".to_string()),
+        ..Default::default()
+    };
+    let patched_live = q_repo::update_question(&mut conn, q.id, patch2)
+        .await
+        .unwrap();
+    assert_eq!(
+        patched_live.source,
+        Some("https://example.com/third".to_string())
+    );
+
+    let versions = q_repo::get_question_versions(&mut conn, q.id)
+        .await
+        .unwrap();
+    assert_eq!(versions.len(), 1);
+    assert_eq!(
+        versions[0].source,
+        Some("http://example.com/new".to_string())
+    );
 }

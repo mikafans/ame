@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
 import { useAuth } from "@/hooks/useAuth";
+import { MarkdownView } from "@/components/MarkdownView";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -23,6 +24,8 @@ interface AssessmentQuestion {
   prompt: string;
   payload: unknown;
   explanation?: string;
+  deepDive?: string;
+  source?: string;
   points: number;
   status: string;
   orderIndex: number;
@@ -84,6 +87,9 @@ export default function AuthorStudioPage({
 
   const [editPrompt, setEditPrompt] = useState("");
   const [editExplanation, setEditExplanation] = useState("");
+  const [editDeepDive, setEditDeepDive] = useState("");
+  const [editSource, setEditSource] = useState("");
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState(1);
   const [editTag, setEditTag] = useState("");
   const [editQuestionDifficulty, setEditQuestionDifficulty] =
@@ -114,6 +120,8 @@ export default function AuthorStudioPage({
               codeSnippet: q.codeSnippet ?? undefined,
               payload: q.payload,
               explanation: q.explanation ?? undefined,
+              deepDive: q.deepDive ?? undefined,
+              source: q.source ?? undefined,
               points: q.points,
               status: q.status,
               orderIndex: q.orderIndex,
@@ -143,6 +151,9 @@ export default function AuthorStudioPage({
     if (selectedQ) {
       setEditPrompt(selectedQ.prompt);
       setEditExplanation(selectedQ.explanation ?? "");
+      setEditDeepDive(selectedQ.deepDive ?? "");
+      setEditSource(selectedQ.source ?? "");
+      setSourceError(null);
       setEditPoints(selectedQ.points);
       setEditTag("");
       setEditQuestionDifficulty("intermediate");
@@ -169,6 +180,18 @@ export default function AuthorStudioPage({
 
   async function saveQuestion(payloadOverride?: Record<string, unknown>) {
     if (!selectedId) return;
+
+    // Validate URL scheme if present
+    if (editSource) {
+      const isSchemeValid =
+        editSource.startsWith("http://") || editSource.startsWith("https://");
+      if (!isSchemeValid) {
+        setSourceError("URL must start with http:// or https://");
+        return;
+      }
+    }
+    setSourceError(null);
+
     setSaving(true);
     const tags = editTag
       .split(",")
@@ -180,6 +203,8 @@ export default function AuthorStudioPage({
         body: {
           prompt: editPrompt,
           explanation: editExplanation || undefined,
+          deepDive: editDeepDive || undefined,
+          source: editSource || undefined,
           points: editPoints,
           tags: tags.length > 0 ? tags : undefined,
           payload: payloadOverride ?? editPayload,
@@ -993,6 +1018,145 @@ export default function AuthorStudioPage({
                     }}
                   />
                 </Box>
+
+                {/* External Source URL */}
+                <Box component="label" sx={{ display: "block", mt: 2.75 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={monoLabel as React.CSSProperties}
+                  >
+                    Reference URL (External Source)
+                  </Typography>
+                  <input
+                    value={editSource}
+                    placeholder="https://example.com/reference"
+                    onChange={(e) => {
+                      setEditSource(e.target.value);
+                      if (sourceError) setSourceError(null);
+                    }}
+                    onBlur={() => saveQuestion()}
+                    style={{
+                      ...inlineInput,
+                      borderColor: sourceError ? "#d32f2f" : undefined,
+                    }}
+                  />
+                  {sourceError && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ display: "block", mt: 0.5 }}
+                    >
+                      {sourceError}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Deep Dive Study Notes */}
+                <Box component="label" sx={{ display: "block", mt: 2.75 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={monoLabel as React.CSSProperties}
+                  >
+                    Deep Dive Study Notes (Markdown / Mermaid supported)
+                  </Typography>
+                  <textarea
+                    value={editDeepDive}
+                    placeholder="# Detailed Study Notes\n\nUse markdown here..."
+                    onChange={(e) => setEditDeepDive(e.target.value)}
+                    onBlur={() => saveQuestion()}
+                    rows={6}
+                    style={{
+                      ...inlineInput,
+                      width: "100%",
+                      padding: 12,
+                      resize: "vertical",
+                    }}
+                  />
+                </Box>
+
+                {/* Live Preview Area */}
+                {(editDeepDive ||
+                  (editSource &&
+                    (!editSource ||
+                      editSource.startsWith("http://") ||
+                      editSource.startsWith("https://")))) && (
+                  <Box
+                    sx={{
+                      mt: 3,
+                      p: 2,
+                      border: "1px dashed",
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      bgcolor: "background.default",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="primary"
+                      sx={{
+                        ...monoLabel,
+                        display: "block",
+                        mb: 1.5,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Live Preview
+                    </Typography>
+
+                    {editSource &&
+                      (!editSource ||
+                        editSource.startsWith("http://") ||
+                        editSource.startsWith("https://")) && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block", mb: 0.5 }}
+                          >
+                            Reference Link:
+                          </Typography>
+                          <a
+                            href={editSource}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: "#1976d2",
+                              textDecoration: "underline",
+                              fontSize: "0.875rem",
+                            }}
+                          >
+                            {editSource}
+                          </a>
+                        </Box>
+                      )}
+
+                    {editDeepDive && (
+                      <Box>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", mb: 1 }}
+                        >
+                          Study Notes:
+                        </Typography>
+                        <Box
+                          sx={{
+                            border: "1px solid",
+                            borderColor: "divider",
+                            borderRadius: 1,
+                            p: 2,
+                            bgcolor: "background.paper",
+                          }}
+                        >
+                          <MarkdownView content={editDeepDive} />
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                )}
               </Box>
             </>
           ) : (

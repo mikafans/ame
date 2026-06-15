@@ -95,6 +95,8 @@ platform.
   `GET /v1/assessments/{id}/stats`.
 - `question.list` — list bank questions. `GET /v1/questions` with
   `params: { tag?, status?, limit?, offset? }` (scope `assessment.read`).
+- `question.deepen` — retrieve deepening/review details for a question (scope `assessment.read`).
+  `GET /v1/questions/{id}/deepen` with `params: { exclude? }` (comma-separated list of question IDs to exclude). Returns 403 Forbidden if there is an active session containing the question.
 - `attempt.list` — list the owner's attempt history. `GET /v1/me/attempts` with
   `params: { limit?, offset?, sessionId? }` (scope `attempt.read`).
 - `activity.list` — the agent's own activity log. `GET /v1/agents/activity` with
