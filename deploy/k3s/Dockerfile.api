@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+# Cross-build the ame API for arm64 WITHOUT emulation:
+#   - builder runs natively on $BUILDPLATFORM (amd64) and cross-compiles to
+#     aarch64-unknown-linux-musl via cargo-zigbuild (zig as linker/CC).
+#   - runtime is a COPY-only distroless image, so no arm64 code is ever executed
+#     at build time and no qemu/binfmt is required.
+# AME has no OpenSSL dep (sqlx no-TLS, reqwest rustls-tls), so a fully static
+# musl binary links cleanly. Migrations + llms.txt are embedded in the binary.
+#
+# Build context MUST be the ame repo root:
+#   podman build --platform=linux/arm64 -f deploy/k3s/Dockerfile.api -t ame-api:arm64 .
+ARG RUST_VERSION=1.95
+
+FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-alpine AS builder
+RUN apk add --no-cache zig musl-dev \
+  && cargo install cargo-zigbuild --locked \
+  && rustup target add aarch64-unknown-linux-musl
+WORKDIR /build
+
+# Source needed to compile (matches the upstream api/Dockerfile inputs).
+COPY api/Cargo.toml api/Cargo.lock ./api/
+COPY api/src ./api/src
+# Cargo validates every manifest target path (incl. [[bench]] hot_paths) before
+# compiling, even for --bin ame-api — so the benches dir must be present.
+COPY api/benches ./api/benches
+# include_str! at compile time.
+COPY api/llms.txt ./api/llms.txt
+# sqlx::migrate! embeds these (resolved as ../db/migrations from the crate).
+COPY db/migrations ./db/migrations
+
+RUN cd api \
+  && cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ame-api \
+  && cp target/aarch64-unknown-linux-musl/release/ame-api /build/ame-api
+
+# ── runtime (arm64, COPY-only — assembled, never executed here) ───────────────
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+COPY --from=builder /build/ame-api /usr/local/bin/ame-api
+EXPOSE 8080
+ENV RUST_LOG=ame_api=info,tower_http=info,sqlx=warn
+ENTRYPOINT ["/usr/local/bin/ame-api"]
