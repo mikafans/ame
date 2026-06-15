@@ -18,7 +18,7 @@ dashboard depends on the metrics pipeline (Phase D) and so comes last.
 | v0.1 (now) | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
 | v0.2 | Operational control plane | **#1 Token Audit**, **#2 Settings & Feature Flags** | admin shell (done) |
 | v0.3 | Content integrity + data hygiene | **#3 Feedback / Flags / Support Queue**, **data retention & pruning**, **learner mobile (H5)** | learner session UI |
-| v0.4 | Learn Deeper *(parallel learner track)* | **Deepen panel** (related-by-tag, author deep-dive, reference URL), **async deepen notes** (agent-generated) | v0.3 learner session UI |
+| v0.4 | Learn Deeper *(parallel learner track)* | **Deepen panel** ✅ *shipped early in 0.2.0* (related-by-tag, author deep-dive, reference URL); **async deepen notes** (agent-generated) — pending | v0.3 learner session UI |
 | v1.0 | Insight + hardening | **#4 Analytics Dashboard** | Phase D metrics |
 | v1.1 | GA polish | (all four integrated) | v1.0 |
 
@@ -158,11 +158,11 @@ The first deliberately **learner-facing** track (the v0.2→v1.1 line is the
 operator console; this runs alongside it, not blocking it). When a learner
 finishes a question, let them *push further* on that question or topic.
 
-- **A1 — Deepen panel** *(ready to build)*: per-question review surface with
-  related-questions-by-tag, an author `deep_dive` field, an external reference
-  URL, and a dual-surface read contract (`GET /v1/questions/{id}/deepen`) so the
-  learner's **own agent** can consume it. Shared sanitized renderer
-  (`react-markdown` + existing Prism + `mermaid`).
+- **A1 — Deepen panel** ✅ *(shipped in 0.2.0, ahead of its v0.4 slot)*:
+  per-question review surface with related-questions-by-tag, an author
+  `deep_dive` field, an external reference URL, and a dual-surface read contract
+  (`GET /v1/questions/{id}/deepen`) so the learner's **own agent** can consume it.
+  Shared sanitized renderer (`react-markdown` + existing Prism + `mermaid`).
 - **A2 — Async deepen notes**: an in-session "flag for dive deeper" → the user's
   agent reads the attempt's flags, generates content, writes it back
   (`deepen.write` via `/v1/agents/run`) → learner reads later. AME hosts no LLM;

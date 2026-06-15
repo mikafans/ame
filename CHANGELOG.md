@@ -7,10 +7,19 @@ This project is pre-1.0; releases are not yet tagged.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-06-14
+## [0.2.0] - 2026-06-15
 
 ### Added
 
+- Learn Deeper: a per-question "Dive deeper" review surface on the session
+  results page — author-written `deep_dive` study notes (sanitized markdown via a
+  shared `MarkdownView` renderer with Prism + Mermaid), an external reference
+  `source` URL, and related-questions-by-tag navigation with back-history. Shows
+  an empty-state when a question has no extra material.
+- `GET /v1/questions/{id}/deepen` — dual-surface read endpoint (plus an agent
+  read tool) returning the question payload, deep-dive, source, and related
+  questions, so a learner's own agent can consume the same deepen content.
+- Authoring UI: `deep_dive` and `source` inputs with live markdown preview.
 - Exposed new agent tool: `question.update` to support remote question modifications.
 - Exposed new agent tools: `assessment.archive`, `assessment.publish`, and `assessment.delete` to the agent platform (run-door, scope `assessment.write`).
 - Added keyboard shortcuts (`1`-`9`, `Enter`, `F` to flag) and a desktop sidebar navigation panel to the quiz session page.
