@@ -1169,6 +1169,17 @@ export default function ResultsPage({
                     </Typography>
                   )}
                 </Box>
+
+                {/* Empty-state: nothing beyond the answer key to explore */}
+                {!deepenData.question.explanation &&
+                  !deepenData.question.source &&
+                  !deepenData.question.deepDive &&
+                  (!deepenData.related || deepenData.related.length === 0) && (
+                    <Alert severity="info" variant="outlined">
+                      No extra study material for this question yet — just the
+                      answer key above.
+                    </Alert>
+                  )}
               </Stack>
             ) : null}
           </Box>
