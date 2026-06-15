@@ -2238,6 +2238,10 @@ components:
       - orderIndex
       properties:
         codeSnippet: {}
+        deepDive:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -2256,6 +2260,10 @@ components:
           format: int32
         prompt:
           type: string
+        source:
+          type:
+          - string
+          - 'null'
         status:
           type: string
     AssessmentSectionDetail:
@@ -3403,7 +3411,7 @@ components:
       - payload
       - tags
       properties:
-        deep_dive:
+        deepDive:
           type:
           - string
           - 'null'
@@ -3444,7 +3452,7 @@ components:
     QuestionPatch:
       type: object
       properties:
-        deep_dive:
+        deepDive:
           type:
           - string
           - 'null'

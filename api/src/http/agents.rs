@@ -755,9 +755,19 @@ async fn run_assessment_archive(
         status: Some(crate::domain::assessment::AssessmentStatus::Archived),
         objectives: None,
     };
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    crate::http::db::set_rls_guc(conn, auth.owner_id, false).await?;
+    let db = crate::http::db::DbConn(acquired);
+
     let res = super::assessments::patch_assessment(
         auth.clone(),
         State(state.clone()),
+        db,
         Path(id),
         Json(req),
     )
@@ -782,9 +792,19 @@ async fn run_assessment_publish(
         status: Some(crate::domain::assessment::AssessmentStatus::Active),
         objectives: None,
     };
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    crate::http::db::set_rls_guc(conn, auth.owner_id, false).await?;
+    let db = crate::http::db::DbConn(acquired);
+
     let res = super::assessments::patch_assessment(
         auth.clone(),
         State(state.clone()),
+        db,
         Path(id),
         Json(req),
     )
@@ -1221,9 +1241,19 @@ async fn run_assessment_update(
                 message: format!("invalid update request: {e}"),
             }])
         })?;
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let conn = &mut *acquired;
+    crate::http::db::set_rls_guc(conn, auth.owner_id, false).await?;
+    let db = crate::http::db::DbConn(acquired);
+
     let res = super::assessments::patch_assessment(
         auth.clone(),
         State(state.clone()),
+        db,
         Path(id),
         Json(req),
     )

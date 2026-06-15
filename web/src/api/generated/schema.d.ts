@@ -979,6 +979,7 @@ export interface components {
         AssessmentMode: "practice" | "graded";
         AssessmentQuestion: {
             codeSnippet?: unknown;
+            deepDive?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;
@@ -989,6 +990,7 @@ export interface components {
             /** Format: int32 */
             points: number;
             prompt: string;
+            source?: string | null;
             status: string;
         };
         AssessmentSectionDetail: {
@@ -1434,7 +1436,7 @@ export interface components {
             tags?: string[];
         };
         QuestionInsert: {
-            deep_dive?: string | null;
+            deepDive?: string | null;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
             payload: unknown;
@@ -1448,7 +1450,7 @@ export interface components {
         /** @enum {string} */
         QuestionKind: "mc" | "tf" | "short" | "essay" | "code";
         QuestionPatch: {
-            deep_dive?: string | null;
+            deepDive?: string | null;
             explanation?: string | null;
             payload?: unknown;
             /** Format: int32 */

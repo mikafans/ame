@@ -97,6 +97,10 @@ pub struct AssessmentQuestion {
     pub payload: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub explanation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deep_dive: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
     pub points: i32,
     pub status: String,
     pub order_index: i32,
@@ -607,7 +611,7 @@ pub async fn get_assessment(
     // Fetch all items for all sections in a single JOIN query
     let item_rows = sqlx::query(
         "SELECT sec.id AS section_id, sec.order_index AS sec_order_index,
-                q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
+                q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source,
                 COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
          FROM tb_assessment_items ai
          JOIN tb_assessment_sections sec ON sec.id = ai.section_id
@@ -632,6 +636,8 @@ pub async fn get_assessment(
             code_snippet: row.get("code_snippet"),
             payload: row.get("payload"),
             explanation: row.get("explanation"),
+            deep_dive: row.get("deep_dive"),
+            source: row.get("source"),
             points: row.get("points"),
             status: row.get("status"),
             order_index: row.get("order_index"),
@@ -705,12 +711,14 @@ pub async fn get_assessment(
 )]
 pub async fn patch_assessment(
     user: AuthenticatedUser,
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
+    mut db: DbConn,
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateAssessmentRequest>,
 ) -> Result<Json<Assessment>, ApiError> {
     // Only the owner can patch
     let status = payload.status.as_ref().map(|s| s.to_string());
+    let conn = &mut *db;
 
     let row = sqlx::query(
         "UPDATE tb_assessments
@@ -728,7 +736,7 @@ pub async fn patch_assessment(
     .bind(payload.objectives)
     .bind(id)
     .bind(user.owner_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?
     .ok_or(ApiError::NotFound {
@@ -748,7 +756,7 @@ pub async fn patch_assessment(
                )",
         )
         .bind(id)
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
     }
@@ -1106,7 +1114,7 @@ pub async fn patch_assessment_section(
 
     // Fetch questions for this section
     let item_rows = sqlx::query(
-        "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation,
+        "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source,
                 COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
          FROM tb_assessment_items ai
          JOIN tb_questions q ON q.id = ai.question_id
@@ -1127,6 +1135,8 @@ pub async fn patch_assessment_section(
             code_snippet: r.get("code_snippet"),
             payload: r.get("payload"),
             explanation: r.get("explanation"),
+            deep_dive: r.get("deep_dive"),
+            source: r.get("source"),
             points: r.get("points"),
             status: r.get("status"),
             order_index: r.get("order_index"),

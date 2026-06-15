@@ -284,6 +284,7 @@ pub async fn question_in_owner_scope(
 pub const MAX_BATCH: usize = 250;
 
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionInsert {
     pub kind: QuestionKind,
     pub prompt: String,
@@ -297,6 +298,7 @@ pub struct QuestionInsert {
 }
 
 #[derive(Debug, Default, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionPatch {
     pub prompt: Option<String>,
     pub explanation: Option<String>,

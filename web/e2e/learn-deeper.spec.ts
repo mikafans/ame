@@ -116,7 +116,9 @@ test.describe("Learn Deeper flow", () => {
     await page.waitForTimeout(500);
 
     // Verify live preview shows
-    await expect(page.getByText("Paris Deep Dive")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Paris Deep Dive" }),
+    ).toBeVisible();
 
     // 4. Add Question 2: Rome T/F
     await page.getByRole("button", { name: "Add" }).first().click();
@@ -175,7 +177,9 @@ test.describe("Learn Deeper flow", () => {
     await page.waitForTimeout(500);
 
     // Verify live preview shows for Q2
-    await expect(page.getByText("Rome Deep Dive")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Rome Deep Dive" }),
+    ).toBeVisible();
 
     // 5. Publish the assessment
     await page.getByRole("button", { name: "Publish" }).click();
@@ -238,20 +242,24 @@ test.describe("Learn Deeper flow", () => {
     await parisCard.getByRole("button", { name: "Dive deeper" }).click();
 
     // Verify Drawer displays Q1 info
+    const resultsDrawer = page.getByRole("dialog").first();
+    await expect(resultsDrawer).toBeVisible({ timeout: 5000 });
     await expect(
-      page.getByRole("heading", { name: "Dive Deeper" }),
-    ).toBeVisible({ timeout: 5000 });
-    await expect(
-      page.getByText("Paris is the capital of France."),
+      resultsDrawer.getByRole("heading", { name: "Dive Deeper" }),
     ).toBeVisible();
-    await expect(page.getByText("Deep Dive Study Notes")).toBeVisible();
     await expect(
-      page.getByText("Paris has been a major settlement"),
+      resultsDrawer.getByText("Paris is the capital of France."),
     ).toBeVisible();
-    await expect(page.getByText("geography").first()).toBeVisible();
-    await expect(page.getByText("europe").first()).toBeVisible();
+    await expect(
+      resultsDrawer.getByText("Deep Dive Study Notes"),
+    ).toBeVisible();
+    await expect(
+      resultsDrawer.getByText("Paris has been a major settlement"),
+    ).toBeVisible();
+    await expect(resultsDrawer.getByText("geography").first()).toBeVisible();
+    await expect(resultsDrawer.getByText("europe").first()).toBeVisible();
 
-    const visitSourceBtn = page.getByRole("link", {
+    const visitSourceBtn = resultsDrawer.getByRole("link", {
       name: "Visit External Source",
     });
     await expect(visitSourceBtn).toBeVisible();
@@ -261,7 +269,7 @@ test.describe("Learn Deeper flow", () => {
     );
 
     // Verify related questions displays Rome
-    const relatedCard = page.locator(
+    const relatedCard = resultsDrawer.locator(
       'div.MuiCard-root:has-text("Rome is the capital of Italy.")',
     );
     await expect(relatedCard).toBeVisible();
@@ -270,19 +278,21 @@ test.describe("Learn Deeper flow", () => {
     await relatedCard.click();
 
     // Verify Rome details in drawer
-    await expect(page.getByText("Rome is the capital of Italy.")).toBeVisible();
     await expect(
-      page.getByText("Rome has a history spanning 28 centuries."),
+      resultsDrawer.getByText("Rome is the capital of Italy."),
+    ).toBeVisible();
+    await expect(
+      resultsDrawer.getByText("Rome has a history spanning 28 centuries."),
     ).toBeVisible();
 
     // Back button should be visible
-    const backBtn = page.getByRole("button", { name: "Back" });
+    const backBtn = resultsDrawer.getByRole("button", { name: "Back" });
     await expect(backBtn).toBeVisible();
     await backBtn.click();
 
     // Should return to Paris details
     await expect(
-      page.getByText("Paris is the capital of France."),
+      resultsDrawer.getByText("Paris is the capital of France."),
     ).toBeVisible();
 
     // Close the drawer
