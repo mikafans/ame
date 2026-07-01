@@ -7,6 +7,15 @@ This project is pre-1.0; releases are not yet tagged.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-23
+
+### Changed
+
+- k3s image build now defaults to `linux/amd64` (x64) and is platform-parameterized
+  (`PLATFORM=linux/arm64 deploy/k3s/build-images.sh` still builds the arm64 edge
+  image). `Dockerfile.api` derives its Rust musl target from `TARGETARCH`, so the
+  same Dockerfile cross-builds either arch.
+
 ## [0.2.0] - 2026-06-15
 
 ### Added

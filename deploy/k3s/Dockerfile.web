@@ -1,12 +1,13 @@
 # syntax=docker/dockerfile:1
-# Cross-build the ame web (Next.js standalone) for arm64 WITHOUT emulation:
+# Cross-build the ame web (Next.js standalone) for the target arch WITHOUT
+# emulation:
 #   - deps/builder run natively on $BUILDPLATFORM (amd64); `bun run build`
 #     produces portable standalone JS (SWC/native bits are build-time only).
-#   - runtime is COPY-only on the arm64 node base, which just runs server.js,
-#     so no arm64 code executes at build time → no qemu/binfmt.
+#   - runtime is COPY-only on the multi-arch node base, which just runs
+#     server.js, so no target-arch code executes at build time → no qemu/binfmt.
 #
 # Build context MUST be the ame repo root (needs web/ and api/openapi.yaml):
-#   podman build --platform=linux/arm64 -f deploy/k3s/Dockerfile.web \
+#   podman build --platform=linux/amd64 -f deploy/k3s/Dockerfile.web \
 #     --build-arg NEXT_PUBLIC_API_URL=http://ame-api.ame.svc.cluster.local \
 #     -t ame-web:arm64 .
 ARG BUN_VERSION=1.2
