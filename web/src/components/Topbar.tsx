@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
-import { useColorMode } from "@/components/ThemeRegistry";
+import { BrandMark } from "@/components/BrandMark";
 
 interface TopbarProps {
   title: string;
@@ -15,10 +15,6 @@ interface TopbarProps {
 }
 
 export function Topbar({ title, subtitle, breadcrumb, actions }: TopbarProps) {
-  const { mode } = useColorMode();
-  const mascotSrc =
-    mode === "dark" ? "/miku-icon-dark.svg" : "/miku-icon-light.svg";
-
   return (
     <Box
       component="header"
@@ -37,35 +33,8 @@ export function Topbar({ title, subtitle, breadcrumb, actions }: TopbarProps) {
       }}
     >
       <Box sx={{ minWidth: 0 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1 }}>
-          <Box
-            component="img"
-            src={mascotSrc}
-            alt=""
-            aria-hidden="true"
-            sx={{
-              width: 32,
-              height: 32,
-              display: "block",
-              flex: "0 0 auto",
-              borderRadius: 2,
-            }}
-          />
-          <Typography
-            component="span"
-            sx={{
-              fontSize: 24,
-              fontWeight: 800,
-              lineHeight: 1,
-              letterSpacing: "-0.02em",
-              background: "linear-gradient(120deg, #45C4B9, #FF8FB4)",
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            ame
-          </Typography>
+        <Box sx={{ mb: 1 }}>
+          <BrandMark />
         </Box>
         {breadcrumb && (
           <Typography

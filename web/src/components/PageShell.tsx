@@ -10,6 +10,7 @@
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import React from "react";
+import { BrandMark } from "@/components/BrandMark";
 
 interface PageShellProps {
   /** Small uppercase label above the title */
@@ -59,6 +60,9 @@ export function PageShell({
         }}
       >
         <Box>
+          <Box sx={{ mb: 1.25 }}>
+            <BrandMark />
+          </Box>
           {kicker && (
             <Typography
               variant="overline"
