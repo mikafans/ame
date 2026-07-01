@@ -12,6 +12,7 @@ import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
 import { api } from "@/api/client";
+import { PageShell } from "@/components/PageShell";
 import { FlashcardReview } from "@/components/flashcards/FlashcardReview";
 import { buildDeck, filterByTypes, type FlashQuestion } from "@/lib/flashcards";
 
@@ -186,12 +187,12 @@ export default function FlashcardsPage() {
   // ---- Setup phase ----
   if (phase === "setup") {
     return (
-      <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 640 }}>
-        <Kicker>Flashcards</Kicker>
-        <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
-          Review deck
-        </Typography>
-
+      <PageShell
+        kicker="Flashcards"
+        title="Review deck"
+        subtitle="Turn live questions into a quick recall deck."
+        maxWidth={640}
+      >
         <SetupBlock label="Topics" kicker="Filter by topics (optional)">
           {tags === null ? (
             <Typography variant="body2" color="text.secondary">
@@ -283,7 +284,7 @@ export default function FlashcardsPage() {
         >
           {loading ? "Loading…" : "Start deck →"}
         </Button>
-      </Box>
+      </PageShell>
     );
   }
 
@@ -310,8 +311,7 @@ export default function FlashcardsPage() {
 
   // ---- Summary phase ----
   return (
-    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 640 }}>
-      <Kicker>Deck complete</Kicker>
+    <PageShell kicker="Deck complete" title="Review summary" maxWidth={640}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
         You knew {knewCount} of {knewCount + missed.length}
       </Typography>
@@ -339,25 +339,7 @@ export default function FlashcardsPage() {
           New deck
         </Button>
       </Stack>
-    </Box>
-  );
-}
-
-function Kicker({ children }: { children: React.ReactNode }) {
-  return (
-    <Typography
-      variant="caption"
-      color="text.secondary"
-      sx={{
-        fontFamily: "monospace",
-        letterSpacing: 1.3,
-        textTransform: "uppercase",
-        display: "block",
-        mb: 0.75,
-      }}
-    >
-      {children}
-    </Typography>
+    </PageShell>
   );
 }
 

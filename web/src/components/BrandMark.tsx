@@ -3,6 +3,7 @@
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { useColorMode } from "@/components/ThemeRegistry";
+import { BRAND_GRADIENT } from "@/lib/brand";
 
 interface BrandMarkProps {
   size?: number;
@@ -40,7 +41,7 @@ export function BrandMark({ size = 32 }: BrandMarkProps) {
           fontWeight: 800,
           lineHeight: 1,
           letterSpacing: "-0.02em",
-          background: "linear-gradient(120deg, #45C4B9, #FF8FB4)",
+          background: BRAND_GRADIENT,
           backgroundClip: "text",
           WebkitBackgroundClip: "text",
           color: "transparent",

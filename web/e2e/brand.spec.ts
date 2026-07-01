@@ -16,6 +16,10 @@ test.describe("brand v0 smoke", () => {
     page,
   }) => {
     await page.goto("/explore");
+    await expect(page).toHaveURL(/\/explore$/);
+    const primaryButton = page.getByRole("button", { name: /^Start$/ }).first();
+    await expect(primaryButton).toBeVisible({ timeout: 10000 });
+
     await expect(page.getByTestId("brand-wordmark").first()).toHaveText("ame");
 
     await expect(
@@ -38,8 +42,6 @@ test.describe("brand v0 smoke", () => {
     expect(wordmarkGradient).toContain("rgb(69, 196, 185)");
     expect(wordmarkGradient).toContain("rgb(255, 143, 180)");
 
-    const primaryButton = page.getByRole("button", { name: /^Start$/ }).first();
-    await expect(primaryButton).toBeVisible({ timeout: 10000 });
     const primaryBackground = await primaryButton.evaluate(
       (node) => getComputedStyle(node).backgroundImage,
     );

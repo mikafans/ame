@@ -13,6 +13,7 @@ import {
 } from "react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
+import { BRAND } from "@/lib/brand";
 
 type ColorMode = "light" | "dark";
 
@@ -27,27 +28,28 @@ export function useColorMode() {
 
 function buildTheme(mode: ColorMode) {
   const isDark = mode === "dark";
+  const brand = isDark ? BRAND.dark : BRAND.light;
   return createTheme({
     palette: {
       mode,
       primary: {
-        main: isDark ? "#62D8CD" : "#45C4B9",
-        light: isDark ? "#84E2D9" : "#6FDACF",
-        dark: isDark ? "#2FA79E" : "#1F766F",
+        main: brand.primary,
+        light: brand.primaryLight,
+        dark: brand.primaryDark,
         contrastText: "#0C1817",
       },
       secondary: {
-        main: isDark ? "#FF9DC0" : "#FF8FB4",
-        light: isDark ? "#F7A9C4" : "#FBB2CB",
-        dark: isDark ? "#E978A2" : "#D95F8D",
+        main: brand.secondary,
+        light: brand.secondaryLight,
+        dark: brand.secondaryDark,
         contrastText: "#0C1817",
       },
       error: { main: isDark ? "#f87171" : "#dc2626" },
       warning: { main: isDark ? "#fbbf24" : "#d97706" },
-      success: { main: isDark ? "#62D8CD" : "#1F766F" },
+      success: { main: isDark ? brand.primary : brand.primaryDark },
       background: isDark
-        ? { default: "#101E1C", paper: "#1B2A28" }
-        : { default: "#F3FCFB", paper: "#ffffff" },
+        ? { default: brand.background, paper: brand.surface }
+        : { default: brand.background, paper: brand.surface },
       divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)",
       text: isDark
         ? { primary: "#e2e8f0", secondary: "#94a3b8", disabled: "#475569" }
@@ -202,7 +204,7 @@ function buildTheme(mode: ColorMode) {
             overflow: "auto",
             borderRadius: 12,
             border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
-            backgroundColor: isDark ? "#1B2A28" : "#ffffff",
+            backgroundColor: brand.surface,
           },
         },
       },
@@ -297,7 +299,7 @@ function buildTheme(mode: ColorMode) {
         styleOverrides: {
           paper: {
             borderRight: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`,
-            backgroundColor: isDark ? "#13161f" : "#ffffff",
+            backgroundColor: isDark ? "#1B2A28" : "#ffffff",
           },
         },
       },

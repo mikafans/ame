@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
+import { PageShell } from "@/components/PageShell";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -28,7 +28,6 @@ const QUESTION_TYPES = [
 ];
 
 export default function PracticePage() {
-  const { user } = useAuth();
   const router = useRouter();
   const [tags, setTags] = useState<TagItem[] | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -92,24 +91,12 @@ export default function PracticePage() {
   }
 
   return (
-    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 640 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          fontFamily: "monospace",
-          letterSpacing: 1.3,
-          textTransform: "uppercase",
-          display: "block",
-          mb: 0.75,
-        }}
-      >
-        Session setup
-      </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 600, mb: 4 }}>
-        Practice
-      </Typography>
-
+    <PageShell
+      kicker="Session setup"
+      title="Practice"
+      subtitle="Build a focused practice session from your live question bank."
+      maxWidth={640}
+    >
       <Box component="form" onSubmit={handleStart}>
         {/* Tags */}
         <SetupBlock label="Topics" kicker="Filter by topic">
@@ -265,7 +252,7 @@ export default function PracticePage() {
           {loading ? "Starting…" : "Start session →"}
         </Button>
       </Box>
-    </Box>
+    </PageShell>
   );
 }
 

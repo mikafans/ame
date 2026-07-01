@@ -1,10 +1,12 @@
+import { BRAND_TAG_HUES } from "@/lib/brand";
+
 // Deterministic hue from a string (same name → same hue, no persistence needed).
-function nameToHue(name: string): number {
+function nameToPaletteHue(name: string): number {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) | 0;
   }
-  return Math.abs(hash) % 360;
+  return BRAND_TAG_HUES[Math.abs(hash) % BRAND_TAG_HUES.length];
 }
 
 /**
@@ -20,19 +22,19 @@ export function tagColor(
   name: string,
   isDark: boolean = false,
 ): { color: string; borderColor: string; bgcolor: string } {
-  const h = nameToHue(name);
+  const h = nameToPaletteHue(name);
   if (isDark) {
     return {
-      color: `hsl(${h} 75% 72%)`,
-      borderColor: `hsl(${h} 60% 55% / 0.45)`,
-      bgcolor: `hsl(${h} 65% 50% / 0.12)`,
+      color: `hsl(${h} 72% 74%)`,
+      borderColor: `hsl(${h} 58% 58% / 0.42)`,
+      bgcolor: `hsl(${h} 62% 48% / 0.11)`,
     };
   }
   // Light: low saturation, dark text, very pale fill — no eye-scorching
   return {
-    color: `hsl(${h} 50% 28%)`,
-    borderColor: `hsl(${h} 40% 60% / 0.5)`,
-    bgcolor: `hsl(${h} 45% 93%)`,
+    color: `hsl(${h} 48% 27%)`,
+    borderColor: `hsl(${h} 36% 62% / 0.45)`,
+    bgcolor: `hsl(${h} 42% 94%)`,
   };
 }
 
