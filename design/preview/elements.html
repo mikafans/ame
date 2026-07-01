@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ame — Miku elements</title>
+<style>
+  :root { --teal:#39C5BB; --teal-dark:#158F86; --teal-deep:#0E6B64; --mint:#86CECB;
+          --mint-tint:#F4FBFA; --pink:#FF6699; --pink-soft:#FF85AD; --pink-deep:#E4405F;
+          --ink:#12262B; --ink-2:#4A6B70; --line:rgba(16,40,44,0.10); }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,"Segoe UI",Roboto,system-ui,sans-serif; background:var(--mint-tint); color:var(--ink); }
+  .wrap { max-width:1000px; margin:0 auto; padding:40px 24px 80px; }
+  a.back { color:var(--teal-dark); text-decoration:none; font-size:13px; font-weight:600; }
+  h1 { font-size:26px; margin:10px 0 2px; }
+  .sub { color:var(--ink-2); margin:0 0 28px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-2); margin:34px 0 12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px; box-shadow:0 2px 8px rgba(16,40,44,0.05); }
+  .card h3 { margin:0 0 4px; font-size:15px; }
+  .card p { margin:0; color:var(--ink-2); font-size:13px; line-height:1.5; }
+  .demo { min-height:96px; display:grid; place-items:center; margin:14px 0; border-radius:10px; background:var(--mint-tint); }
+  .risk { display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; margin-top:12px; }
+  .safe { background:rgba(39,174,139,0.14); color:#1E7A5E; }
+  .caution { background:rgba(242,153,74,0.16); color:#B3671A; }
+  .avoid { background:rgba(228,64,95,0.14); color:var(--pink-deep); }
+
+  /* spinning negi/leek loader */
+  .negi { font-size:34px; animation:spin 1.4s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  /* candy swirl loader */
+  .swirl { width:40px; height:40px; border-radius:50%;
+           background:conic-gradient(var(--teal),var(--pink),var(--teal)); animation:spin 1s linear infinite;
+           -webkit-mask:radial-gradient(circle 12px at center, transparent 98%, #000); mask:radial-gradient(circle 12px at center, transparent 98%, #000); }
+  /* ribbon / twin-tail wave divider */
+  .ribbon { width:100%; height:22px; background:
+     repeating-linear-gradient(90deg, var(--teal) 0 14px, var(--pink) 14px 28px); border-radius:999px; opacity:.85; }
+  .wave { width:100%; height:40px; }
+  /* mascot candy */
+  .mascot { width:70px; height:80px; }
+  /* 39 easter egg */
+  .badge39 { font-size:30px; font-weight:800; color:var(--pink-deep); }
+  .hairflow { height:96px; width:100%; border-radius:10px;
+     background:linear-gradient(120deg, var(--teal) 0%, var(--mint) 40%, var(--pink-soft) 100%); position:relative; overflow:hidden; }
+  .hairflow::after { content:""; position:absolute; inset:0;
+     background:radial-gradient(120px 80px at 20% 20%, rgba(255,255,255,.35), transparent 60%); }
+  .toggle { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--teal-dark);
+            border:1.5px solid var(--teal); background:#fff; border-radius:999px; padding:6px 14px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← back to gallery</a>
+  <h1>Miku elements — beyond the palette</h1>
+  <p class="sub">Candidate motifs to make the Miku/飴 identity felt across the app. Each tagged by licensing risk for a public repo.</p>
+
+  <div style="background:rgba(242,153,74,0.10); border:1px solid rgba(242,153,74,0.3); border-radius:12px; padding:14px 18px; font-size:13px; color:#8a5316; margin-bottom:8px;">
+    <b>Licensing reality:</b> Hatsune Miku's <i>character art / likeness / name-as-branding</i> is owned by Crypton Future Media (Piapro Character License — non-commercial, conditional). Safe forever: her <b>signature color</b>, abstract candy/ribbon motifs, and fan-culture <b>food memes</b> (leek/negi) & the <b>"39" pun</b>. Avoid: her actual face/twin-tail character render, or naming the mascot "Miku".
+  </div>
+
+  <h2>Motion & feedback</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Spinning-leek loader</h3>
+      <div class="demo"><span class="negi">🥬</span></div>
+      <p>The negi/leek is Miku's most iconic fan meme (the "Ievan Polkka" spin). Instantly recognizable, zero likeness risk.</p>
+      <span class="risk safe">safe · food meme</span>
+    </div>
+    <div class="card">
+      <h3>Candy-swirl spinner</h3>
+      <div class="demo"><span class="swirl"></span></div>
+      <p>Teal→pink conic swirl — reads as "candy" and stays on-palette. Generic default loader.</p>
+      <span class="risk safe">safe · abstract</span>
+    </div>
+    <div class="card">
+      <h3>Correct-answer chime</h3>
+      <div class="demo"><button class="toggle">🔊 sound on</button></div>
+      <p>A soft vocaloid-flavored chime on a correct review (opt-in, off by default). Nods to the "she sings" identity. Use original/CC audio — not Miku voicebank.</p>
+      <span class="risk caution">caution · use own audio</span>
+    </div>
+  </div>
+
+  <h2>Structure & decoration</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Ribbon / twin-tail divider</h3>
+      <div class="demo"><div class="ribbon"></div></div>
+      <p>Section dividers as a teal/pink dashed ribbon — abstracts her twin-tail ribbons without drawing the character.</p>
+      <span class="risk safe">safe · abstract</span>
+    </div>
+    <div class="card">
+      <h3>Hair-flow gradient header</h3>
+      <div class="demo" style="padding:0;"><div class="hairflow"></div></div>
+      <p>Page/hero headers wash teal→mint→pink like her hair gradient. Great for the dashboard & results banner.</p>
+      <span class="risk safe">safe · abstract</span>
+    </div>
+    <div class="card">
+      <h3>Candy mascot (original)</h3>
+      <div class="demo">
+        <svg class="mascot" viewBox="0 0 70 80">
+          <ellipse cx="35" cy="46" rx="22" ry="26" fill="#39C5BB"/>
+          <path d="M13 40 L2 30 L6 46 Z" fill="#FF6699"/>
+          <path d="M57 40 L68 30 L64 46 Z" fill="#FF6699"/>
+          <circle cx="27" cy="44" r="3.4" fill="#0E6B64"/><circle cx="43" cy="44" r="3.4" fill="#0E6B64"/>
+          <path d="M29 54 Q35 60 41 54" stroke="#0E6B64" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <circle cx="24" cy="52" r="3" fill="#FF85AD" opacity=".6"/><circle cx="46" cy="52" r="3" fill="#FF85AD" opacity=".6"/>
+        </svg>
+      </div>
+      <p>An <b>original</b> teal candy-drop mascot (wrapper "twin-tails") — the safe, ownable face of ame. Lives in empty states & the 404 page. Not Miku, Miku-<i>flavored</i>.</p>
+      <span class="risk safe">safe · original IP</span>
+    </div>
+  </div>
+
+  <h2>Delight & easter eggs</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>The "39" streak milestone</h3>
+      <div class="demo"><span class="badge39">39 🍬</span></div>
+      <p>39 = "Mi-ku" (3-9) & "thank you" (san-kyū). Make the <b>39-day streak</b> / <b>39 cards mastered</b> a special celebration with confetti. Fans will *get it*.</p>
+      <span class="risk safe">safe · number pun</span>
+    </div>
+    <div class="card">
+      <h3>March 9 — "Miku Day"</h3>
+      <div class="demo"><span style="font-size:22px;font-weight:700;color:var(--teal-dark)">3/9 🎉</span></div>
+      <p>A subtle seasonal theme on 3/9 (and 8/31 "Ha-tsu-ne"): extra sugar, festive banner. Cheap, high fan-delight, entirely date-driven.</p>
+      <span class="risk safe">safe · date pun</span>
+    </div>
+    <div class="card">
+      <h3>Character render / avatar</h3>
+      <div class="demo"><span style="font-size:28px;opacity:.5;">🚫👧</span></div>
+      <p>Drawing Miku herself (face, canonical outfit, twin-tails as a person) as app art. This is the line — needs a Crypton/Piapro license for anything public or commercial.</p>
+      <span class="risk avoid">avoid · likeness = license</span>
+    </div>
+  </div>
+
+  <p style="color:var(--ink-2); font-size:12.5px; margin-top:32px;">
+    Recommendation: adopt the <b>safe</b> tier freely (leek loader, candy swirl, ribbon divider, hair-flow headers, original candy mascot, 39/3-9 easter eggs). Treat sound as opt-in with original audio. Keep the actual Miku character out of shipped art unless you license it. The result reads unmistakably "Miku-inspired" while staying an ownable, publishable brand.
+  </p>
+</div>
+</body>
+</html>

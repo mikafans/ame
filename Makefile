@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -155,6 +155,10 @@ uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 			mise exec -- bunx playwright test e2e/uiux.spec.ts --project=chromium; \
 	fi
 
+preview: ## Serve design/preview/ mockups over LAN/Tailscale (0.0.0.0:$(PREVIEW_PORT))
+	@echo "design preview → http://$(shell hostname):$(PREVIEW_PORT)/  (Ctrl-C to stop)"
+	mise exec -- uv run --no-project python -m http.server $(PREVIEW_PORT) --bind 0.0.0.0 --directory design/preview
+
 check: fmt-check lint test ## Pre-commit gate (read-only)
 
 # db-reset between test-db and e2e: test-db writes users/sessions into the shared
@@ -242,6 +246,7 @@ stop: ## Stop API, frontend, and Postgres
 API_HOST ?= localhost
 API_PORT ?= 28080
 WEB_PORT ?= 23000
+PREVIEW_PORT ?= 28900
 
 BACKUP_FILE ?= backup.dump
 RESTORE_DB ?= ame_scratch

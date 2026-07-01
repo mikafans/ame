@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ame — sticker mascot</title>
+<style>
+  :root { --teal:#39C5BB; --teal-dark:#158F86; --pink:#FF6699; --pink-deep:#E4405F;
+          --mint-tint:#F4FBFA; --ink:#12262B; --ink-2:#4A6B70; --line:rgba(16,40,44,0.10); }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,"Segoe UI",Roboto,system-ui,sans-serif; background:var(--mint-tint); color:var(--ink); }
+  .wrap { max-width:1000px; margin:0 auto; padding:40px 24px 80px; }
+  a.back { color:var(--teal-dark); text-decoration:none; font-size:13px; font-weight:600; }
+  h1 { font-size:26px; margin:10px 0 2px; }
+  .sub { color:var(--ink-2); margin:0 0 26px; max-width:680px; line-height:1.55; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-2); margin:34px 0 14px; }
+  .row { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(16,40,44,0.05); }
+  .card.dark { background:#12181B; border-color:rgba(255,255,255,0.08); }
+  .cap { font-size:12px; color:var(--ink-2); margin-top:6px; text-align:center; }
+  .dark .cap { color:#7FA6A2; }
+  .pop { animation:pop 2.4s ease-in-out infinite; transform-origin:center bottom; }
+  @keyframes pop { 0%,100%{ transform:scale(1) rotate(0); } 50%{ transform:scale(1.04) rotate(-1.5deg); } }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .btn { border:1.5px solid var(--teal); background:#fff; color:var(--teal-dark); font:600 13px Inter;
+         padding:7px 14px; border-radius:999px; cursor:pointer; }
+  .btn.on { background:linear-gradient(135deg,var(--teal),var(--pink)); color:#fff; border-color:transparent; }
+  .fav { background:#fff; border:1px solid var(--line); border-radius:8px; padding:6px; line-height:0; }
+  .favrow { display:flex; align-items:center; gap:14px; }
+  .note { font-size:12.5px; color:var(--ink-2); margin-top:8px; line-height:1.55; }
+  code { background:rgba(57,197,187,0.12); padding:2px 6px; border-radius:5px; font-size:12px; }
+
+  .m { --hair:#63C4BB; --hair2:#3E9E96; --ol:#173F3C; --skin:#F3DCE6; --blush:#E88FA9;
+       --iris:#5EC6BD; --mouth:#B94A66; --tie:#3A9E96; --collar:#22323C; }
+  .m.pink { --hair:#F58AAE; --hair2:#D45E86; --iris:#63C4BB; --tie:#D45E86; }
+  .m.mono { --hair:#63C4BB; --hair2:#3E9E96; --iris:#8BD8D0; --tie:#3E9E96; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← back to gallery</a>
+  <h1>ame — sticker mascot 🍬</h1>
+  <p class="sub">Super-deformed <b>emote/sticker</b> style: giant round head, tiny body, huge sparkly
+  <b>star-eyes</b>, thick dark-teal outlines, pink blush, muted seafoam teal, manga speed-lines.
+  Kept <b>original</b> (candy accents, generic face, no canonical outfit) — reads as a teal twin-tail idol without being Miku.</p>
+
+  <div class="controls">
+    <button class="btn on" id="v-teal">Seafoam</button>
+    <button class="btn" id="v-pink">Candy pink</button>
+    <button class="btn" id="v-mono">Mono</button>
+    <button class="btn" id="t-lines" style="margin-left:auto;">toggle speed-lines</button>
+  </div>
+
+  <h2>The mascot</h2>
+  <div class="row">
+    <div class="card"><div class="pop" data-slot data-size="240"></div><div class="cap">hero · excited / celebration</div></div>
+    <div class="card"><div class="pop" data-slot data-size="96"></div><div class="cap">96px · badge</div></div>
+    <div class="card dark"><div class="pop" data-slot data-size="240" data-dark></div><div class="cap">on dark</div></div>
+  </div>
+
+  <h2>Small-size test</h2>
+  <div class="card">
+    <div class="favrow">
+      <span class="fav" data-slot data-size="64"></span>
+      <span class="fav" data-slot data-size="40"></span>
+      <span class="fav" data-slot data-size="28"></span>
+      <span class="note" style="margin:0 0 0 6px;">64 · 40 · 28px. Head + star-eyes carry the read; speed-lines auto-hide when tiny.</span>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:24px;">
+    One inline SVG, palette via CSS variables. Sticker sets live on <b>expressions</b> — this excited "star-eyes"
+    pose is the template; happy / sleepy / thinking variants are the same head with swapped eyes + mouth.
+    Tell me the palette/proportions to nudge and I adjust the numbers.
+  </p>
+</div>
+
+<script>
+function speedLines(cx, cy, R){
+  let s="";
+  for(let i=0;i<64;i++){
+    const a=(i/64)*Math.PI*2, w=0.008+ (i%3===0?0.006:0);
+    const r1=R*0.62, r2=R*1.5;
+    const x1=cx+Math.cos(a)*r1, y1=cy+Math.sin(a)*r1;
+    const x2=cx+Math.cos(a)*r2, y2=cy+Math.sin(a)*r2;
+    s+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#14403C" stroke-width="${(w*R).toFixed(2)}" stroke-linecap="round"/>`;
+  }
+  return s;
+}
+
+function eye(cx, cy){
+  return `
+    <ellipse cx="${cx}" cy="${cy}" rx="27" ry="30" fill="#fff" stroke="var(--ol)" stroke-width="5"/>
+    <ellipse cx="${cx}" cy="${cy+2}" rx="21" ry="24" fill="var(--iris)"/>
+    <ellipse cx="${cx}" cy="${cy+16}" rx="19" ry="9" fill="#cfeced" opacity=".8"/>
+    <path d="M${cx} ${cy-14} l4.7 9.5 10.5 1.5 -7.6 7.4 1.8 10.4 -9.4 -4.9 -9.4 4.9 1.8 -10.4 -7.6 -7.4 10.5 -1.5 z" fill="#fff"/>`;
+}
+
+// excited SD chibi. viewBox 0 0 240 260
+function mascotSVG(size, dark, lines){
+  return `
+  <div class="m" style="display:inline-block;line-height:0;">
+  <svg width="${size}" height="${(size*260/240).toFixed(0)}" viewBox="0 0 240 260" xmlns="http://www.w3.org/2000/svg">
+    ${lines ? `<g opacity="${dark?0.5:0.85}">${speedLines(120,120,120)}</g>` : ``}
+
+    <!-- hair back: big rounded mass -->
+    <path d="M120 26 C58 26 34 78 36 138 C38 196 62 236 120 236 C178 236 202 196 204 138 C206 78 182 26 120 26 Z"
+          fill="var(--hair)" stroke="var(--ol)" stroke-width="6"/>
+
+    <!-- twin-tail tufts + ties -->
+    <path d="M40 120 C10 130 8 176 26 196 C36 168 40 150 48 138 Z" fill="var(--hair)" stroke="var(--ol)" stroke-width="6"/>
+    <path d="M200 120 C230 130 232 176 214 196 C204 168 200 150 192 138 Z" fill="var(--hair)" stroke="var(--ol)" stroke-width="6"/>
+    <circle cx="46" cy="126" r="7" fill="var(--pink,#F58AAE)"/><circle cx="194" cy="126" r="7" fill="#F58AAE"/>
+
+    <!-- ahoge antennae -->
+    <path d="M112 30 C104 8 118 2 122 6 C118 12 120 22 122 30 Z" fill="var(--hair)" stroke="var(--ol)" stroke-width="5"/>
+    <path d="M132 30 C140 12 150 12 150 18 C142 20 138 26 134 32 Z" fill="var(--hair)" stroke="var(--ol)" stroke-width="5"/>
+
+    <!-- face -->
+    <path d="M120 96 C86 96 70 116 72 144 C74 172 96 190 120 190 C144 190 166 172 168 144 C170 116 154 96 120 96 Z"
+          fill="var(--skin)" stroke="var(--ol)" stroke-width="5.5"/>
+
+    <!-- bangs over forehead -->
+    <path d="M66 120 C68 92 92 78 120 78 C148 78 172 92 174 120
+             C166 104 150 100 138 104 C130 92 122 104 120 96
+             C118 104 110 92 102 104 C90 100 74 104 66 120 Z" fill="var(--hair)" stroke="var(--ol)" stroke-width="5.5"/>
+
+    <!-- eyebrows (raised, excited) -->
+    <path d="M78 108 q16 -10 30 0" fill="none" stroke="var(--ol)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M132 108 q16 -10 30 0" fill="none" stroke="var(--ol)" stroke-width="6" stroke-linecap="round"/>
+
+    <!-- eyes -->
+    ${eye(96,146)}
+    ${eye(146,146)}
+
+    <!-- blush -->
+    <ellipse cx="80" cy="168" rx="11" ry="6" fill="var(--blush)" opacity=".75"/>
+    <ellipse cx="160" cy="168" rx="11" ry="6" fill="var(--blush)" opacity=".75"/>
+
+    <!-- open excited mouth -->
+    <path d="M112 172 Q121 166 130 172 Q127 186 121 186 Q115 186 112 172 Z" fill="var(--mouth)" stroke="var(--ol)" stroke-width="3.5"/>
+
+    <!-- tiny body: collar + candy tie -->
+    <path d="M96 196 L120 206 L144 196 L150 236 L90 236 Z" fill="#EDEFF2" stroke="var(--ol)" stroke-width="5"/>
+    <path d="M108 200 L120 210 L132 200" fill="none" stroke="var(--collar)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M120 210 l7 8 -7 20 -7 -20 z" fill="var(--tie)" stroke="var(--ol)" stroke-width="3"/>
+  </svg>
+  </div>`;
+}
+
+let variant="teal", lines=true;
+function renderAll(){
+  document.querySelectorAll("[data-slot]").forEach(el=>{
+    const size=+el.dataset.size, dark=el.hasAttribute("data-dark");
+    el.innerHTML = mascotSVG(size, dark, lines && size>=90);
+    const m=el.querySelector(".m");
+    m.classList.toggle("pink", variant==="pink");
+    m.classList.toggle("mono", variant==="mono");
+  });
+}
+renderAll();
+function setV(v){ variant=v; renderAll(); ["teal","pink","mono"].forEach(k=>document.getElementById("v-"+k).classList.toggle("on",k===v)); }
+document.getElementById("v-teal").onclick=()=>setV("teal");
+document.getElementById("v-pink").onclick=()=>setV("pink");
+document.getElementById("v-mono").onclick=()=>setV("mono");
+document.getElementById("t-lines").onclick=()=>{ lines=!lines; renderAll(); };
+</script>
+</body>
+</html>
