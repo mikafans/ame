@@ -1,4 +1,4 @@
-# AME
+# ame — study, sweetened
 
 > An assessment learning platform with a first-class agent surface. An agent acts
 > on behalf of its owner: it authors question banks, assembles and publishes

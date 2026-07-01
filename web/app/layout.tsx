@@ -5,8 +5,9 @@ import ThemeRegistry from "@/components/ThemeRegistry";
 import { AuthProvider } from "@/hooks/useAuth";
 
 export const metadata: Metadata = {
-  title: "ame",
-  description: "Question collector + exam platform",
+  title: "ame — study, sweetened",
+  description:
+    "ame — study, sweetened. Assessment platform with a first-class agent surface.",
   icons: {
     icon: [
       {

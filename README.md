@@ -1,4 +1,4 @@
-# ame
+# ame — study, sweetened
 
 Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
 

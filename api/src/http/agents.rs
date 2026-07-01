@@ -521,7 +521,7 @@ fn build_skill_manifest(strict: bool) -> Value {
     json!({
         "schema_version": "v1",
         "name": "ame",
-        "description": "Read and write assessments, attempts, and study plans on AME.",
+        "description": "ame — study, sweetened. Read and write assessments, attempts, and study plans.",
         "auth": { "type": "bearer", "format": "<id>_<secret>" },
         "entrypoint": "/llms.txt",
         "run": {
