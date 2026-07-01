@@ -7,6 +7,25 @@ import { AuthProvider } from "@/hooks/useAuth";
 export const metadata: Metadata = {
   title: "ame",
   description: "Question collector + exam platform",
+  icons: {
+    icon: [
+      {
+        url: "/miku-icon-light.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/miku-icon-dark.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        url: "/miku-icon-16.svg",
+        type: "image/svg+xml",
+        sizes: "16x16",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
