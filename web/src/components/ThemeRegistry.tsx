@@ -31,23 +31,23 @@ function buildTheme(mode: ColorMode) {
     palette: {
       mode,
       primary: {
-        main: isDark ? "#818cf8" : "#4f46e5", // indigo-500 / indigo-400
-        light: isDark ? "#a5b4fc" : "#6366f1",
-        dark: isDark ? "#6366f1" : "#3730a3",
-        contrastText: "#ffffff",
+        main: isDark ? "#62D8CD" : "#45C4B9",
+        light: isDark ? "#84E2D9" : "#6FDACF",
+        dark: isDark ? "#2FA79E" : "#1F766F",
+        contrastText: "#0C1817",
       },
       secondary: {
-        main: isDark ? "#34d399" : "#0d9488", // emerald / teal
-        light: isDark ? "#6ee7b7" : "#14b8a6",
-        dark: isDark ? "#10b981" : "#0f766e",
-        contrastText: "#ffffff",
+        main: isDark ? "#FF9DC0" : "#FF8FB4",
+        light: isDark ? "#F7A9C4" : "#FBB2CB",
+        dark: isDark ? "#E978A2" : "#D95F8D",
+        contrastText: "#0C1817",
       },
       error: { main: isDark ? "#f87171" : "#dc2626" },
       warning: { main: isDark ? "#fbbf24" : "#d97706" },
-      success: { main: isDark ? "#34d399" : "#059669" },
+      success: { main: isDark ? "#62D8CD" : "#1F766F" },
       background: isDark
-        ? { default: "#0f1117", paper: "#1a1f2e" }
-        : { default: "#f8fafc", paper: "#ffffff" },
+        ? { default: "#101E1C", paper: "#1B2A28" }
+        : { default: "#F3FCFB", paper: "#ffffff" },
       divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)",
       text: isDark
         ? { primary: "#e2e8f0", secondary: "#94a3b8", disabled: "#475569" }
@@ -117,12 +117,12 @@ function buildTheme(mode: ColorMode) {
           sizeLarge: { padding: "10px 24px", minHeight: 46, fontSize: 15 },
           containedPrimary: {
             background: isDark
-              ? "linear-gradient(135deg, #6366f1 0%, #818cf8 100%)"
-              : "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+              ? "linear-gradient(135deg, #2FA79E 0%, #62D8CD 100%)"
+              : "linear-gradient(135deg, #2FA79E 0%, #45C4B9 100%)",
             "&:hover": {
               background: isDark
-                ? "linear-gradient(135deg, #818cf8 0%, #a5b4fc 100%)"
-                : "linear-gradient(135deg, #3730a3 0%, #4f46e5 100%)",
+                ? "linear-gradient(135deg, #45C4B9 0%, #84E2D9 100%)"
+                : "linear-gradient(135deg, #248E87 0%, #2FA79E 100%)",
             },
           },
         },
@@ -176,8 +176,8 @@ function buildTheme(mode: ColorMode) {
               transition: "box-shadow 0.15s ease",
               "&.Mui-focused": {
                 boxShadow: isDark
-                  ? "0 0 0 3px rgba(129,140,248,0.2)"
-                  : "0 0 0 3px rgba(79,70,229,0.12)",
+                  ? "0 0 0 3px rgba(98,216,205,0.2)"
+                  : "0 0 0 3px rgba(47,167,158,0.12)",
               },
             },
           },
@@ -202,7 +202,7 @@ function buildTheme(mode: ColorMode) {
             overflow: "auto",
             borderRadius: 12,
             border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
-            backgroundColor: isDark ? "#1a1f2e" : "#ffffff",
+            backgroundColor: isDark ? "#1B2A28" : "#ffffff",
           },
         },
       },
@@ -246,16 +246,16 @@ function buildTheme(mode: ColorMode) {
             transition: "background 0.12s ease",
             "&.Mui-selected": {
               backgroundColor: isDark
-                ? "rgba(129,140,248,0.15)"
-                : "rgba(79,70,229,0.08)",
-              color: isDark ? "#818cf8" : "#4f46e5",
+                ? "rgba(98,216,205,0.15)"
+                : "rgba(47,167,158,0.08)",
+              color: isDark ? "#62D8CD" : "#1F766F",
               "& .MuiListItemIcon-root": {
-                color: isDark ? "#818cf8" : "#4f46e5",
+                color: isDark ? "#62D8CD" : "#1F766F",
               },
               "&:hover": {
                 backgroundColor: isDark
-                  ? "rgba(129,140,248,0.22)"
-                  : "rgba(79,70,229,0.13)",
+                  ? "rgba(98,216,205,0.22)"
+                  : "rgba(47,167,158,0.13)",
               },
             },
           },
@@ -269,10 +269,10 @@ function buildTheme(mode: ColorMode) {
             fontWeight: 500,
             fontSize: 13,
             "&.Mui-selected": {
-              color: isDark ? "#818cf8" : "#4f46e5",
+              color: isDark ? "#62D8CD" : "#1F766F",
               backgroundColor: isDark
-                ? "rgba(129,140,248,0.15)"
-                : "rgba(79,70,229,0.08)",
+                ? "rgba(98,216,205,0.15)"
+                : "rgba(47,167,158,0.08)",
             },
           },
         },
