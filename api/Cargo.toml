@@ -46,6 +46,7 @@ base64 = "0.22.1"
 toml = "0.8"
 deadpool-redis = "0.18"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
+zip = { version = "2.2.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 proptest = "1"

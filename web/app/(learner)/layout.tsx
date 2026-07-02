@@ -33,6 +33,7 @@ export default function LearnerLayout({
     if (pathname.startsWith("/practice")) return "assessment";
     if (pathname.startsWith("/flashcards")) return "flashcards";
     if (pathname.startsWith("/questions")) return "questions";
+    if (pathname.startsWith("/deep-dives")) return "deep-dives";
     if (pathname.startsWith("/results")) return "results";
     if (pathname.startsWith("/progress")) return "dashboard";
     if (pathname.startsWith("/author")) return "author";
@@ -54,6 +55,7 @@ export default function LearnerLayout({
       assessment: "/practice",
       flashcards: "/flashcards",
       questions: "/questions",
+      "deep-dives": "/deep-dives",
       results: "/results",
       dashboard: "/progress",
       author: "/author",

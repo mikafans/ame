@@ -42,6 +42,10 @@ use crate::{
             ListAssessmentsResponse, UpdateSectionBody,
         },
         auth::{AuthResponse, LoginBody, RegisterBody, UserInfo},
+        deep_dives::{
+            CreateDeepDiveBody, DeepDive, DeepDiveRevision, DeepDiveRevisionsResponse,
+            ListDeepDivesQuery, ListDeepDivesResponse, PatchDeepDiveBody, PublishDeepDiveBody,
+        },
         me::{
             AgentSummary, AgentTokenSummary, CohortStatsResponse, CreateAgentBody,
             CreateAgentTokenBody, CreateKeyResponse, ListAttemptsResponse, MeResponse,
@@ -122,6 +126,13 @@ use crate::{
         crate::http::admin::delete_token_admin,
         crate::http::admin::get_settings,
         crate::http::admin::put_settings,
+        crate::http::deep_dives::create_deep_dive,
+        crate::http::deep_dives::list_deep_dives,
+        crate::http::deep_dives::get_deep_dive,
+        crate::http::deep_dives::patch_deep_dive,
+        crate::http::deep_dives::publish_deep_dive,
+        crate::http::deep_dives::export_deep_dives,
+        crate::http::deep_dives::get_deep_dive_revisions,
     ),
     components(schemas(
         User,
@@ -219,7 +230,15 @@ use crate::{
         crate::settings::TierQuota,
         crate::http::explore::ExploreResponse,
         crate::http::explore::ExploreFacetsResponse,
-        crate::http::explore::ExploreCounts
+        crate::http::explore::ExploreCounts,
+        DeepDive,
+        CreateDeepDiveBody,
+        ListDeepDivesQuery,
+        ListDeepDivesResponse,
+        PatchDeepDiveBody,
+        PublishDeepDiveBody,
+        DeepDiveRevision,
+        DeepDiveRevisionsResponse
     )),
     info(
         title = "ame API",

@@ -133,6 +133,7 @@ pub mod agents;
 pub mod assessments;
 pub mod auth;
 pub mod db;
+pub mod deep_dives;
 pub mod explore;
 pub mod export;
 pub mod health;
@@ -203,6 +204,7 @@ pub fn router(pool: PgPool) -> Router {
     let logged_router = Router::new()
         .merge(assessments::router(state.clone()))
         .merge(sessions::router(state.clone()))
+        .merge(deep_dives::router(state.clone()))
         .merge(me::router(state.clone()))
         .merge(plans::router(state.clone()))
         .merge(agents::logged_router(state.clone()))

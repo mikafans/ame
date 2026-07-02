@@ -394,6 +394,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deep-dives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_deep_dives"];
+        put?: never;
+        post: operations["create_deep_dive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deep-dives/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_deep_dives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deep-dives/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_deep_dive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patch_deep_dive"];
+        trace?: never;
+    };
+    "/v1/deep-dives/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["publish_deep_dive"];
+        trace?: never;
+    };
+    "/v1/deep-dives/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_deep_dive_revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/explore": {
         parameters: {
             query?: never;
@@ -1170,6 +1250,15 @@ export interface components {
             timeLimitSeconds?: number | null;
             title: string;
         };
+        CreateDeepDiveBody: {
+            /** Format: uuid */
+            questionId: string;
+            reason?: string | null;
+            /** Format: uuid */
+            sourceAttemptId?: string | null;
+            /** Format: uuid */
+            sourceSessionId?: string | null;
+        };
         CreateKeyResponse: {
             /** Format: uuid */
             id: string;
@@ -1208,6 +1297,58 @@ export interface components {
             questions: components["schemas"]["SessionQuestion"][];
             /** Format: uuid */
             sessionId: string;
+        };
+        DeepDive: {
+            /** Format: date-time */
+            archivedAt?: string | null;
+            assessmentTitle?: string | null;
+            bodyMarkdown?: string | null;
+            category?: string | null;
+            course?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            noteUpdatedAt?: string | null;
+            /** Format: uuid */
+            ownerId: string;
+            /** Format: date-time */
+            publishedAt?: string | null;
+            /** Format: uuid */
+            questionId: string;
+            questionKind: string;
+            questionPrompt: string;
+            questionTags: string[];
+            reason?: string | null;
+            /** Format: uuid */
+            sourceAttemptId?: string | null;
+            /** Format: uuid */
+            sourceSessionId?: string | null;
+            status: string;
+            /** Format: date-time */
+            updatedAt: string;
+            userNote?: string | null;
+        };
+        DeepDiveRevision: {
+            bodyMarkdown?: string | null;
+            category?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            createdBy?: string | null;
+            /** Format: uuid */
+            deepDiveId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            revision: number;
+            userNote?: string | null;
+        };
+        DeepDiveRevisionsResponse: {
+            revisions: components["schemas"]["DeepDiveRevision"][];
         };
         DistributionBucket: {
             /** Format: int32 */
@@ -1321,6 +1462,14 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListDeepDivesQuery: {
+            category?: string | null;
+            search?: string | null;
+            status?: string | null;
+        };
+        ListDeepDivesResponse: {
+            deepDives: components["schemas"]["DeepDive"][];
+        };
         ListMySessionsResponse: {
             sessions: components["schemas"]["SessionSummary"][];
             /** Format: int64 */
@@ -1359,6 +1508,10 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        PatchDeepDiveBody: {
+            status?: string | null;
+            userNote?: string | null;
+        };
         PatchSessionBody: {
             status: components["schemas"]["SessionStatus"];
         };
@@ -1394,6 +1547,11 @@ export interface components {
             section?: string | null;
             /** Format: int32 */
             version: number;
+        };
+        PublishDeepDiveBody: {
+            bodyMarkdown: string;
+            category?: string | null;
+            status?: string | null;
         };
         Question: {
             /** Format: int32 */
@@ -2834,6 +2992,279 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_deep_dives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                status: string | null;
+                category: string | null;
+                search: string | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of deep dives */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDeepDivesResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_deep_dive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeepDiveBody"];
+            };
+        };
+        responses: {
+            /** @description Deep dive created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDive"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Question, session, or attempt not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    export_deep_dives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP archive of deep dives */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": number[];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_deep_dive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Deep dive ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deep dive details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDive"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Deep dive not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_deep_dive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Deep dive ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchDeepDiveBody"];
+            };
+        };
+        responses: {
+            /** @description Deep dive updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDive"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Deep dive not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    publish_deep_dive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Deep dive ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishDeepDiveBody"];
+            };
+        };
+        responses: {
+            /** @description Deep dive published */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDive"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Deep dive not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_deep_dive_revisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Deep dive ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of revisions for the deep dive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDiveRevisionsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Deep dive not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

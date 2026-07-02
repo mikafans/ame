@@ -8,6 +8,7 @@ import { useColorMode } from "@/components/ThemeRegistry";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
@@ -94,6 +95,9 @@ export default function QuestionsPage() {
     null,
   );
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [deepDiveRequests, setDeepDiveRequests] = useState<
+    Record<string, "saving" | "requested">
+  >({});
 
   // Debounce search input
   useEffect(() => {
@@ -205,6 +209,27 @@ export default function QuestionsPage() {
     setPreviewRow(null);
     setPreviewDetail(null);
   }, []);
+
+  const requestDeepDive = async (questionId: string) => {
+    if (deepDiveRequests[questionId] === "saving") return;
+    setDeepDiveRequests((prev) => ({ ...prev, [questionId]: "saving" }));
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (api as any).POST("/v1/deep-dives", {
+        body: {
+          questionId,
+          reason: "Marked from question bank",
+        },
+      });
+      setDeepDiveRequests((prev) => ({ ...prev, [questionId]: "requested" }));
+    } catch {
+      setDeepDiveRequests((prev) => {
+        const next = { ...prev };
+        delete next[questionId];
+        return next;
+      });
+    }
+  };
 
   const handlePageSizeChange = (newSize: unknown) => {
     setPageSize(newSize as number);
@@ -507,6 +532,24 @@ export default function QuestionsPage() {
                       ))}
                     </Box>
                   )}
+                  <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Button
+                      size="small"
+                      variant={
+                        deepDiveRequests[previewRow.id] === "requested"
+                          ? "outlined"
+                          : "contained"
+                      }
+                      disabled={deepDiveRequests[previewRow.id] === "saving"}
+                      onClick={() => requestDeepDive(previewRow.id)}
+                    >
+                      {deepDiveRequests[previewRow.id] === "saving"
+                        ? "Requesting"
+                        : deepDiveRequests[previewRow.id] === "requested"
+                          ? "Deep dive requested"
+                          : "Request deep dive"}
+                    </Button>
+                  </Box>
                 </Stack>
               )}
             </DialogContent>
