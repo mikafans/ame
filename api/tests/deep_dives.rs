@@ -368,7 +368,9 @@ async fn test_deep_dives_kb_operations() {
     // Check first file contents
     let mut content1 = String::new();
     {
-        let mut file1 = archive.by_name("What is the speed of light_.md").unwrap();
+        let mut file1 = archive
+            .by_name("Physics/What is the speed of light_.md")
+            .unwrap();
         file1.read_to_string(&mut content1).unwrap();
     }
     assert!(content1.contains("category: Physics"));
@@ -380,7 +382,9 @@ async fn test_deep_dives_kb_operations() {
     // Check second file contents
     let mut content2 = String::new();
     {
-        let mut file2 = archive.by_name("What is Photosynthesis_.md").unwrap();
+        let mut file2 = archive
+            .by_name("Biology/What is Photosynthesis_.md")
+            .unwrap();
         file2.read_to_string(&mut content2).unwrap();
     }
     assert!(content2.contains("category: Biology"));

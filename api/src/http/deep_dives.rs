@@ -806,14 +806,16 @@ pub async fn export_deep_dives(
         let mut used_names = std::collections::HashSet::new();
 
         for dive in &dives {
+            let category_dir =
+                sanitize_filename(dive.category.as_deref().unwrap_or("Uncategorized"));
             let base_name = sanitize_filename(&dive.question_prompt);
-            let mut filename = format!("{}.md", base_name);
+            let mut relative_path = format!("{}/{}.md", category_dir, base_name);
             let mut counter = 1;
-            while used_names.contains(&filename) {
-                filename = format!("{}_{}.md", base_name, counter);
+            while used_names.contains(&relative_path) {
+                relative_path = format!("{}/{}_{}.md", category_dir, base_name, counter);
                 counter += 1;
             }
-            used_names.insert(filename.clone());
+            used_names.insert(relative_path.clone());
 
             let tags_str = if dive.question_tags.is_empty() {
                 "[]".to_string()
@@ -861,7 +863,7 @@ published_at: {}
                 content.push('\n');
             }
 
-            zip.start_file(&filename, options)
+            zip.start_file(&relative_path, options)
                 .map_err(|e| ApiError::Internal(anyhow::anyhow!("Zip error: {e}")))?;
             zip.write_all(content.as_bytes())
                 .map_err(|e| ApiError::Internal(anyhow::anyhow!("Zip error: {e}")))?;
