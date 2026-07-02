@@ -345,11 +345,7 @@ export default function DeepDivesPage() {
         {/* Right pane: Main Area */}
         <Grid size={{ xs: 12, md: 8.5 }}>
           <Stack spacing={2.5}>
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={2}
-              sx={{ alignItems: "center", width: "100%" }}
-            >
+            <Stack spacing={2} sx={{ width: "100%" }}>
               <TextField
                 placeholder="Search prompt, content, notes..."
                 value={searchVal}
@@ -377,34 +373,44 @@ export default function DeepDivesPage() {
                 }}
               />
 
-              <ToggleButtonGroup
-                value={status}
-                exclusive
-                size="small"
-                onChange={(_, next) => next && setStatus(next)}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
                 sx={{
-                  flexShrink: 0,
-                  "& .MuiToggleButton-root": {
-                    borderRadius: 2,
-                    px: 1.75,
-                    textTransform: "none",
-                    fontWeight: 500,
-                  },
+                  justifyContent: "space-between",
+                  alignItems: { xs: "flex-start", sm: "center" },
+                  width: "100%",
                 }}
               >
-                {STATUSES.map((item) => (
-                  <ToggleButton key={item.value} value={item.value}>
-                    {item.label}
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
+                <ToggleButtonGroup
+                  value={status}
+                  exclusive
+                  size="small"
+                  onChange={(_, next) => next && setStatus(next)}
+                  sx={{
+                    flexWrap: "wrap",
+                    "& .MuiToggleButton-root": {
+                      borderRadius: 2,
+                      px: 1.75,
+                      textTransform: "none",
+                      fontWeight: 500,
+                    },
+                  }}
+                >
+                  {STATUSES.map((item) => (
+                    <ToggleButton key={item.value} value={item.value}>
+                      {item.label}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
 
-              <Chip
-                label={countLabel}
-                size="small"
-                variant="outlined"
-                sx={{ flexShrink: 0, height: 32, borderRadius: 2 }}
-              />
+                <Chip
+                  label={countLabel}
+                  size="small"
+                  variant="outlined"
+                  sx={{ flexShrink: 0, height: 32, borderRadius: 2 }}
+                />
+              </Stack>
             </Stack>
 
             {error && <Alert severity="error">{error}</Alert>}
