@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION fn_prune_stale_data(dry_run boolean)
-RETURNS TABLE(table_name text, would_delete bigint, deleted bigint) AS $$
+RETURNS TABLE (table_name text, would_delete bigint, deleted bigint) AS $$
 DECLARE
     v_deleted bigint;
     v_would_delete bigint;

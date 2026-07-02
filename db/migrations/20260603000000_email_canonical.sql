@@ -25,4 +25,4 @@ UPDATE tb_users SET email = email
 WHERE email IS NOT NULL;
 
 -- Create partial unique index to enforce uniqueness for non-agent users
-CREATE UNIQUE INDEX idx_tb_users_email_canonical ON tb_users(email_canonical) WHERE email_canonical IS NOT NULL;
+CREATE UNIQUE INDEX idx_tb_users_email_canonical ON tb_users (email_canonical) WHERE email_canonical IS NOT NULL;

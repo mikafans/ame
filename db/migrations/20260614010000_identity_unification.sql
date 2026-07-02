@@ -1,37 +1,45 @@
 -- ─── 1. Create tb_identities ──────────────────────────────────────────────────
 CREATE TABLE tb_identities (
-  id         uuid        PRIMARY KEY DEFAULT uuid_generate_v7(),
-  type       text        NOT NULL CHECK (type IN ('human', 'agent')),
-  created_at timestamptz NOT NULL DEFAULT now()
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v7(),
+    type text NOT NULL CHECK (type IN ('human', 'agent')),
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ─── 2. Populate tb_identities with existing users and agents ────────────────
 INSERT INTO tb_identities (id, type, created_at)
 SELECT
-id,
-'human',
-created_at
+    id,
+    'human' AS type,
+    created_at
 FROM tb_users;
 
 INSERT INTO tb_identities (id, type, created_at)
 SELECT
-id,
-'agent',
-created_at
+    id,
+    'agent' AS type,
+    created_at
 FROM tb_agents;
 
 -- ─── 3. Add foreign key constraints on tb_users and tb_agents ────────────────
-ALTER TABLE tb_users ADD CONSTRAINT tb_users_id_identities_fk FOREIGN KEY (id) REFERENCES tb_identities(id) ON DELETE CASCADE;
+ALTER TABLE tb_users ADD CONSTRAINT tb_users_id_identities_fk FOREIGN KEY (id) REFERENCES tb_identities (
+    id
+) ON DELETE CASCADE;
 ALTER TABLE tb_users DROP COLUMN IF EXISTS owner_user_id CASCADE;
 
-ALTER TABLE tb_agents ADD CONSTRAINT tb_agents_id_identities_fk FOREIGN KEY (id) REFERENCES tb_identities(id) ON DELETE CASCADE;
+ALTER TABLE tb_agents ADD CONSTRAINT tb_agents_id_identities_fk FOREIGN KEY (id) REFERENCES tb_identities (
+    id
+) ON DELETE CASCADE;
 
 -- ─── 4. Refactor tb_sessions ─────────────────────────────────────────────────
 ALTER TABLE tb_sessions ADD COLUMN actor_id uuid;
 ALTER TABLE tb_sessions ADD COLUMN owner_id uuid;
 
-ALTER TABLE tb_sessions ADD CONSTRAINT tb_sessions_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities(id) ON DELETE CASCADE;
-ALTER TABLE tb_sessions ADD CONSTRAINT tb_sessions_owner_id_fk FOREIGN KEY (owner_id) REFERENCES tb_users(id) ON DELETE CASCADE;
+ALTER TABLE tb_sessions ADD CONSTRAINT tb_sessions_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities (
+    id
+) ON DELETE CASCADE;
+ALTER TABLE tb_sessions ADD CONSTRAINT tb_sessions_owner_id_fk FOREIGN KEY (owner_id) REFERENCES tb_users (
+    id
+) ON DELETE CASCADE;
 
 -- Backfill tb_sessions:
 -- Human sessions: actor_id = user_id, owner_id = user_id
@@ -51,8 +59,12 @@ ALTER TABLE tb_sessions DROP COLUMN agent_id CASCADE;
 ALTER TABLE tb_attempts ADD COLUMN actor_id uuid;
 ALTER TABLE tb_attempts ADD COLUMN owner_id uuid;
 
-ALTER TABLE tb_attempts ADD CONSTRAINT tb_attempts_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities(id) ON DELETE CASCADE;
-ALTER TABLE tb_attempts ADD CONSTRAINT tb_attempts_owner_id_fk FOREIGN KEY (owner_id) REFERENCES tb_users(id) ON DELETE CASCADE;
+ALTER TABLE tb_attempts ADD CONSTRAINT tb_attempts_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities (
+    id
+) ON DELETE CASCADE;
+ALTER TABLE tb_attempts ADD CONSTRAINT tb_attempts_owner_id_fk FOREIGN KEY (owner_id) REFERENCES tb_users (
+    id
+) ON DELETE CASCADE;
 
 -- Backfill attempts (human-only actors)
 UPDATE tb_attempts SET actor_id = user_id, owner_id = user_id;
@@ -65,7 +77,7 @@ ALTER TABLE tb_attempts DROP COLUMN user_id CASCADE;
 -- ─── 6. Refactor tb_questions ────────────────────────────────────────────────
 ALTER TABLE tb_questions ADD COLUMN actor_id uuid;
 
-ALTER TABLE tb_questions ADD CONSTRAINT tb_questions_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities(id);
+ALTER TABLE tb_questions ADD CONSTRAINT tb_questions_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities (id);
 
 -- Backfill: if agent_id set, created by agent, else human
 UPDATE tb_questions SET actor_id = agent_id
@@ -83,7 +95,9 @@ ALTER TABLE tb_questions RENAME COLUMN actor_id TO created_by;
 -- ─── 7. Refactor tb_assessments ──────────────────────────────────────────────
 ALTER TABLE tb_assessments ADD COLUMN actor_id uuid;
 
-ALTER TABLE tb_assessments ADD CONSTRAINT tb_assessments_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities(id);
+ALTER TABLE tb_assessments ADD CONSTRAINT tb_assessments_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities (
+    id
+);
 
 -- Backfill: if agent_id set, created by agent, else human
 UPDATE tb_assessments SET actor_id = agent_id
@@ -102,7 +116,9 @@ ALTER TABLE tb_assessments RENAME COLUMN actor_id TO created_by;
 ALTER TABLE tb_activity_log RENAME COLUMN agent_id TO actor_id;
 
 ALTER TABLE tb_activity_log DROP CONSTRAINT IF EXISTS tb_activity_log_agent_id_fkey;
-ALTER TABLE tb_activity_log ADD CONSTRAINT tb_activity_log_actor_id_fk FOREIGN KEY (actor_id) REFERENCES tb_identities(id) ON DELETE CASCADE;
+ALTER TABLE tb_activity_log ADD CONSTRAINT tb_activity_log_actor_id_fk FOREIGN KEY (
+    actor_id
+) REFERENCES tb_identities (id) ON DELETE CASCADE;
 
 -- ─── 9. Add automatic triggers to populate tb_identities on INSERT ───────────
 CREATE OR REPLACE FUNCTION trigger_insert_identity_users()
