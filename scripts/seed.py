@@ -889,6 +889,7 @@ def seed_deep_dives(client: httpx.Client, result: SeedResult) -> None:
                 {
                     "id": dive["id"],
                     "status": "published",
+                    "category": "Algorithms" if label == "Ada" else "Chemistry",
                     "bodyMarkdown": (
                         f"# {label} Deep Dive\n\n"
                         f"## Why this question matters\n\n"

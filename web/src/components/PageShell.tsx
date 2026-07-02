@@ -40,6 +40,7 @@ export function PageShell({
         pt: 5,
         pb: 8,
         maxWidth,
+        mx: "auto", // Center the container horizontally
         "@keyframes fadeUp": {
           from: { opacity: 0, transform: "translateY(10px)" },
           to: { opacity: 1, transform: "translateY(0)" },

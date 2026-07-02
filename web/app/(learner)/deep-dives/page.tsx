@@ -13,6 +13,7 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import CardActionArea from "@mui/material/CardActionArea";
 import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -432,110 +433,132 @@ export default function DeepDivesPage() {
                     variant="outlined"
                     sx={{
                       borderRadius: 2,
-                      transition: "transform 0.15s, box-shadow 0.15s",
+                      transition:
+                        "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
                       "&:hover": {
                         transform: "translateY(-2px)",
                         boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                        borderColor: "primary.main",
                       },
                     }}
                   >
-                    <CardContent>
-                      <Stack spacing={1.5}>
-                        <Stack
-                          direction={{ xs: "column", sm: "row" }}
-                          sx={{
-                            justifyContent: "space-between",
-                            alignItems: { xs: "flex-start", sm: "center" },
-                            gap: 1,
-                          }}
-                        >
+                    <CardActionArea
+                      onClick={() => router.push(`/deep-dives/${item.id}`)}
+                      sx={{ width: "100%", textAlign: "left" }}
+                    >
+                      <CardContent>
+                        <Stack spacing={1.5}>
                           <Stack
-                            direction="row"
-                            spacing={1}
-                            sx={{ flexWrap: "wrap", alignItems: "center" }}
+                            direction={{ xs: "column", sm: "row" }}
+                            sx={{
+                              justifyContent: "space-between",
+                              alignItems: { xs: "flex-start", sm: "center" },
+                              gap: 1,
+                            }}
                           >
-                            <Chip
-                              label={STATUS_LABELS[item.status] ?? item.status}
-                              size="small"
-                              color={
-                                item.status === "published"
-                                  ? "success"
-                                  : "default"
-                              }
-                              variant={
-                                item.status === "published"
-                                  ? "filled"
-                                  : "outlined"
-                              }
-                            />
-                            <Chip
-                              label={item.questionKind.toUpperCase()}
-                              size="small"
-                              variant="outlined"
-                            />
-                            {item.category && (
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{ flexWrap: "wrap", alignItems: "center" }}
+                            >
                               <Chip
-                                label={item.category}
+                                label={
+                                  STATUS_LABELS[item.status] ?? item.status
+                                }
                                 size="small"
-                                color="primary"
+                                color={
+                                  item.status === "published"
+                                    ? "success"
+                                    : "default"
+                                }
+                                variant={
+                                  item.status === "published"
+                                    ? "filled"
+                                    : "outlined"
+                                }
+                              />
+                              <Chip
+                                label={item.questionKind.toUpperCase()}
+                                size="small"
                                 variant="outlined"
                               />
-                            )}
+                              {item.category && (
+                                <Chip
+                                  label={item.category}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Stack>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Updated {formatDate(item.updatedAt)}
+                            </Typography>
                           </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            Updated {formatDate(item.updatedAt)}
+
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {item.questionPrompt}
                           </Typography>
+
+                          {(item.assessmentTitle || item.course) && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {[item.course, item.assessmentTitle]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </Typography>
+                          )}
+
+                          {item.questionTags.length > 0 && (
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              sx={{ flexWrap: "wrap" }}
+                            >
+                              {item.questionTags.map((tag) => (
+                                <Chip
+                                  key={tag}
+                                  label={tag}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={tagColor(tag, isDark)}
+                                />
+                              ))}
+                            </Stack>
+                          )}
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "flex-end",
+                              pt: 0.5,
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              color="primary"
+                              sx={{
+                                fontWeight: 600,
+                                fontSize: "0.85rem",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              Open <ArrowForwardIcon sx={{ fontSize: 16 }} />
+                            </Typography>
+                          </Box>
                         </Stack>
-
-                        <Typography
-                          variant="subtitle1"
-                          sx={{ fontWeight: 600 }}
-                        >
-                          {item.questionPrompt}
-                        </Typography>
-
-                        {(item.assessmentTitle || item.course) && (
-                          <Typography variant="caption" color="text.secondary">
-                            {[item.course, item.assessmentTitle]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </Typography>
-                        )}
-
-                        {item.questionTags.length > 0 && (
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            sx={{ flexWrap: "wrap" }}
-                          >
-                            {item.questionTags.map((tag) => (
-                              <Chip
-                                key={tag}
-                                label={tag}
-                                size="small"
-                                variant="outlined"
-                                sx={tagColor(tag, isDark)}
-                              />
-                            ))}
-                          </Stack>
-                        )}
-
-                        <Box
-                          sx={{ display: "flex", justifyContent: "flex-end" }}
-                        >
-                          <Button
-                            size="small"
-                            endIcon={<ArrowForwardIcon />}
-                            onClick={() =>
-                              router.push(`/deep-dives/${item.id}`)
-                            }
-                            sx={{ textTransform: "none", borderRadius: 1.5 }}
-                          >
-                            Open Space
-                          </Button>
-                        </Box>
-                      </Stack>
-                    </CardContent>
+                      </CardContent>
+                    </CardActionArea>
                   </Card>
                 ))}
               </Stack>
