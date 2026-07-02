@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project is pre-1.0; releases are not yet tagged.
 
-## [Unreleased]
+## [0.3.0] - 2026-07-02
 
 ### Added
 
