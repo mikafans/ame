@@ -23,17 +23,17 @@ test.describe("brand v0 smoke", () => {
     await expect(page.getByTestId("brand-wordmark").first()).toHaveText("ame");
 
     await expect(
-      page.locator('link[rel="icon"][href="/miku-icon-light.svg"]'),
+      page.locator('link[rel="icon"][href="/ame-icon-light.svg"]'),
     ).toHaveAttribute("media", "(prefers-color-scheme: light)");
     await expect(
-      page.locator('link[rel="icon"][href="/miku-icon-dark.svg"]'),
+      page.locator('link[rel="icon"][href="/ame-icon-dark.svg"]'),
     ).toHaveAttribute("media", "(prefers-color-scheme: dark)");
     await expect(
-      page.locator('link[rel="icon"][href="/miku-icon-16.svg"]'),
+      page.locator('link[rel="icon"][href="/ame-icon-16.svg"]'),
     ).toHaveAttribute("sizes", "16x16");
 
     const mascot = page.getByTestId("brand-mascot").first();
-    await expect(mascot).toHaveAttribute("src", /miku-icon-light\.svg$/);
+    await expect(mascot).toHaveAttribute("src", /ame-icon-light\.svg$/);
 
     const wordmarkGradient = await page
       .getByTestId("brand-wordmark")
@@ -49,14 +49,14 @@ test.describe("brand v0 smoke", () => {
     expect(primaryBackground).toContain("rgb(69, 196, 185)");
 
     await page.getByRole("button", { name: "Dark mode" }).click();
-    await expect(mascot).toHaveAttribute("src", /miku-icon-dark\.svg$/);
+    await expect(mascot).toHaveAttribute("src", /ame-icon-dark\.svg$/);
   });
 
   test("freezes mascot animation when reduced motion is requested", async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/miku-icon-light.svg");
+    await page.goto("/ame-icon-light.svg");
     const animatedElementIds = await page.evaluate(() =>
       ["tailL", "tailR", "fig", "eyes"].filter((id) => {
         const el = document.getElementById(id);

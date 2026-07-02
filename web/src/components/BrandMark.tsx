@@ -12,7 +12,7 @@ interface BrandMarkProps {
 export function BrandMark({ size = 32 }: BrandMarkProps) {
   const { mode } = useColorMode();
   const mascotSrc =
-    mode === "dark" ? "/miku-icon-dark.svg" : "/miku-icon-light.svg";
+    mode === "dark" ? "/ame-icon-dark.svg" : "/ame-icon-light.svg";
 
   return (
     <Box

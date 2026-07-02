@@ -11,17 +11,17 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/miku-icon-light.svg",
+        url: "/ame-icon-light.svg",
         type: "image/svg+xml",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/miku-icon-dark.svg",
+        url: "/ame-icon-dark.svg",
         type: "image/svg+xml",
         media: "(prefers-color-scheme: dark)",
       },
       {
-        url: "/miku-icon-16.svg",
+        url: "/ame-icon-16.svg",
         type: "image/svg+xml",
         sizes: "16x16",
       },
