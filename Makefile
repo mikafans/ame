@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -70,6 +70,7 @@ test-db: ## DB-backed backend integration tests (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test export -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test admin -- --nocapture
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test admin_settings -- --nocapture --test-threads=1
+	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test retention -- --nocapture --test-threads=1
 
 test-bank: ## Bank integration tests only (requires `make db-up`)
 	cd api && AME_RUN_DB_TESTS=1 AME_CONFIG_PATH=../ame.dev.toml mise exec -- cargo test --test bank -- --nocapture
@@ -153,6 +154,10 @@ uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 			E2E_API_URL=http://$(API_HOST):$(API_PORT) E2E_BASE_URL=http://$(API_HOST):$(WEB_PORT) \
 			mise exec -- bunx playwright test e2e/uiux.spec.ts --project=chromium; \
 	fi
+
+preview: ## Serve design/preview/ mockups over LAN/Tailscale (0.0.0.0:$(PREVIEW_PORT))
+	@echo "design preview → http://$(shell hostname):$(PREVIEW_PORT)/  (Ctrl-C to stop)"
+	mise exec -- uv run --no-project python -m http.server $(PREVIEW_PORT) --bind 0.0.0.0 --directory design/preview
 
 check: fmt-check lint test ## Pre-commit gate (read-only)
 
@@ -241,6 +246,7 @@ stop: ## Stop API, frontend, and Postgres
 API_HOST ?= localhost
 API_PORT ?= 28080
 WEB_PORT ?= 23000
+PREVIEW_PORT ?= 28900
 
 BACKUP_FILE ?= backup.dump
 RESTORE_DB ?= ame_scratch

@@ -625,6 +625,137 @@ async fn test_agent_full_authoring_loop_via_run() {
     );
 }
 
+/// Deep Dive revision path: the same agent-owned request can be published again,
+/// replacing the Markdown body and returning to `published`.
+#[tokio::test]
+async fn test_agent_deep_dive_publish_can_replace_body() {
+    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping DB integration test; set AME_RUN_DB_TESTS=1 and run make db-up");
+        return;
+    }
+
+    let pool = setup_db().await;
+    let base_url = spawn_app(pool.clone()).await;
+    let client = reqwest::Client::new();
+
+    let (_owner_id, _agent_id, agent_auth) = seed_agent(
+        &pool,
+        &["assessment.read", "assessment.write", "attempt.write"],
+    )
+    .await;
+
+    let created = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "question.create",
+        json!({
+            "questions": [{
+                "kind": "mc",
+                "prompt": "What does a Deep Dive revision replace?",
+                "payload": { "options": ["status only", "markdown body"], "correct_index": 1 },
+                "tags": ["deep-dive"],
+                "status": "live",
+            }]
+        }),
+    )
+    .await;
+    assert!(
+        created["ok"].as_bool().unwrap_or(false),
+        "question.create should succeed: {created}"
+    );
+    let question_id = created["result"]["questions"][0]["id"]
+        .as_str()
+        .expect("created question id");
+
+    let requested = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "deepDive.request",
+        json!({
+            "questionId": question_id,
+            "reason": "Needs a detailed explanation"
+        }),
+    )
+    .await;
+    assert!(
+        requested["ok"].as_bool().unwrap_or(false),
+        "deepDive.request should succeed: {requested}"
+    );
+    let deep_dive_id = requested["result"]["id"]
+        .as_str()
+        .expect("deep dive id")
+        .to_string();
+    assert_eq!(requested["result"]["status"], "requested");
+
+    let first_publish = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "deepDive.publish",
+        json!({
+            "id": deep_dive_id,
+            "bodyMarkdown": "# First version\n\nInitial explanation.",
+            "status": "published"
+        }),
+    )
+    .await;
+    assert!(
+        first_publish["ok"].as_bool().unwrap_or(false),
+        "first publish should succeed: {first_publish}"
+    );
+    assert_eq!(first_publish["result"]["status"], "published");
+    assert_eq!(
+        first_publish["result"]["bodyMarkdown"],
+        "# First version\n\nInitial explanation."
+    );
+
+    let revision = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "deepDive.publish",
+        json!({
+            "id": deep_dive_id,
+            "bodyMarkdown": "# Revised version\n\nCorrected explanation with more detail.",
+            "status": "published"
+        }),
+    )
+    .await;
+    assert!(
+        revision["ok"].as_bool().unwrap_or(false),
+        "revision publish should succeed: {revision}"
+    );
+    assert_eq!(revision["result"]["status"], "published");
+    assert_eq!(
+        revision["result"]["bodyMarkdown"],
+        "# Revised version\n\nCorrected explanation with more detail."
+    );
+
+    let listed = run_tool(
+        &client,
+        &base_url,
+        &agent_auth,
+        "deepDive.list",
+        json!({ "status": "published" }),
+    )
+    .await;
+    assert!(
+        listed["ok"].as_bool().unwrap_or(false),
+        "deepDive.list should succeed: {listed}"
+    );
+    let items = listed["result"]["deepDives"].as_array().unwrap();
+    let listed_item = items
+        .iter()
+        .find(|item| item["id"] == deep_dive_id)
+        .expect("published deep dive should be listed");
+    assert_eq!(
+        listed_item["bodyMarkdown"],
+        "# Revised version\n\nCorrected explanation with more detail."
+    );
+}
+
 /// Regression: activity.list works after agents were moved from tb_users to tb_agents.
 /// The agent performs a tool call that writes an activity log entry, then calls
 /// activity.list to verify the entry appears with the agent's label.

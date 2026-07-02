@@ -11,4 +11,4 @@ ALTER TABLE tb_api_tokens ALTER COLUMN agent_id SET NOT NULL;
 
 ALTER TABLE tb_api_tokens DROP COLUMN user_id;
 
-CREATE INDEX tb_api_tokens_agent_active ON tb_api_tokens(agent_id) WHERE revoked_at IS NULL;
+CREATE INDEX tb_api_tokens_agent_active ON tb_api_tokens (agent_id) WHERE revoked_at IS NULL;

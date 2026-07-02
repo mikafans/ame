@@ -1,20 +1,30 @@
 # syntax=docker/dockerfile:1
-# Cross-build the ame API for arm64 WITHOUT emulation:
-#   - builder runs natively on $BUILDPLATFORM (amd64) and cross-compiles to
-#     aarch64-unknown-linux-musl via cargo-zigbuild (zig as linker/CC).
-#   - runtime is a COPY-only distroless image, so no arm64 code is ever executed
-#     at build time and no qemu/binfmt is required.
+# Cross-build the ame API for the target arch WITHOUT emulation:
+#   - builder runs natively on $BUILDPLATFORM (amd64) and cross-compiles to the
+#     target's musl triple via cargo-zigbuild (zig as linker/CC). The triple is
+#     derived from the Docker-provided TARGETARCH, so the same Dockerfile builds
+#     amd64 (default) or arm64.
+#   - runtime is a COPY-only distroless image, so no target-arch code is ever
+#     executed at build time and no qemu/binfmt is required.
 # AME has no OpenSSL dep (sqlx no-TLS, reqwest rustls-tls), so a fully static
 # musl binary links cleanly. Migrations + llms.txt are embedded in the binary.
 #
 # Build context MUST be the ame repo root:
-#   podman build --platform=linux/arm64 -f deploy/k3s/Dockerfile.api -t ame-api:arm64 .
+#   podman build --platform=linux/amd64 -f deploy/k3s/Dockerfile.api -t ame-api:amd64 .
 ARG RUST_VERSION=1.95
 
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-alpine AS builder
+ARG TARGETARCH
+# Map the Docker TARGETARCH to the Rust musl triple (one place, used by both the
+# `rustup target add` and the `cargo zigbuild --target` below).
+RUN case "$TARGETARCH" in \
+      amd64) echo x86_64-unknown-linux-musl  > /tmp/rust-target ;; \
+      arm64) echo aarch64-unknown-linux-musl > /tmp/rust-target ;; \
+      *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;; \
+    esac
 RUN apk add --no-cache zig musl-dev \
   && cargo install cargo-zigbuild --locked \
-  && rustup target add aarch64-unknown-linux-musl
+  && rustup target add "$(cat /tmp/rust-target)"
 WORKDIR /build
 
 # Source needed to compile (matches the upstream api/Dockerfile inputs).
@@ -29,10 +39,11 @@ COPY api/llms.txt ./api/llms.txt
 COPY db/migrations ./db/migrations
 
 RUN cd api \
-  && cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ame-api \
-  && cp target/aarch64-unknown-linux-musl/release/ame-api /build/ame-api
+  && TARGET="$(cat /tmp/rust-target)" \
+  && cargo zigbuild --release --target "$TARGET" --bin ame-api \
+  && cp "target/$TARGET/release/ame-api" /build/ame-api
 
-# ── runtime (arm64, COPY-only — assembled, never executed here) ───────────────
+# ── runtime (target arch, COPY-only — assembled, never executed here) ─────────
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 COPY --from=builder /build/ame-api /usr/local/bin/ame-api
 EXPOSE 8080

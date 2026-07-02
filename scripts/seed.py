@@ -293,6 +293,92 @@ EXAM_BLUEPRINT = {
     "passing_points": 10,
 }
 
+ADMIN_QUESTIONS = [
+    {
+        "kind": "mc",
+        "prompt": "Which PostgreSQL feature prevents readers from seeing rows owned by another tenant when policies are enabled?",
+        "payload": {
+            "options": ["Materialized views", "Row Level Security", "Foreign data wrappers", "Advisory locks"],
+            "correct_index": 1,
+        },
+        "explanation": "Row Level Security applies per-row visibility rules inside PostgreSQL, which is useful for tenant isolation.",
+        "tags": ["data-structures", "python"],
+        "points": 1,
+    },
+    {
+        "kind": "tf",
+        "prompt": "A published Markdown explanation should be sanitized before rendering in a learner's browser.",
+        "payload": {"correct": True},
+        "explanation": "Sanitization keeps rich Markdown useful while blocking scripts and unsafe attributes.",
+        "tags": ["python"],
+        "points": 1,
+    },
+    {
+        "kind": "short",
+        "prompt": "What HTTP status code is commonly used when an authenticated token lacks the required scope?",
+        "payload": {
+            "accepted": ["403", "forbidden", "403 forbidden"],
+            "normalize": "case_insensitive_strip_accents",
+            "judge": "exact",
+        },
+        "explanation": "A valid identity without the necessary permission receives 403 Forbidden.",
+        "tags": ["algorithms"],
+        "points": 1,
+    },
+    {
+        "kind": "essay",
+        "prompt": "Explain why a learner-facing Deep Dive request should store the source question and session reference, but not duplicate the correct answer.",
+        "payload": {
+            "min_words": 60,
+            "rubric": "Award marks for: clear ownership boundary (2), avoiding answer leakage (2), useful context for authoring (2), operational traceability (2).",
+            "judge": "manual",
+        },
+        "explanation": "The request needs enough context to author a useful explanation, while answer visibility should remain governed by the session/results rules.",
+        "tags": ["algorithms", "data-structures"],
+        "points": 8,
+    },
+    {
+        "kind": "code",
+        "prompt": "Write a Python function `clamp_score(score)` that returns 0 when score is below 0, 1 when score is above 1, and the original score otherwise.",
+        "payload": {
+            "language": "python",
+            "starter": "def clamp_score(score):\n    pass",
+            "tests": [
+                {"name": "low values clamp to 0", "body": "assert clamp_score(-0.25) == 0"},
+                {"name": "high values clamp to 1", "body": "assert clamp_score(1.25) == 1"},
+                {"name": "middle values pass through", "body": "assert clamp_score(0.7) == 0.7"},
+            ],
+            "exemplar": "def clamp_score(score):\n    return max(0, min(1, score))",
+        },
+        "explanation": "A nested min/max expression clamps a numeric value to the inclusive [0, 1] interval.",
+        "tags": ["python", "math"],
+        "points": 3,
+    },
+]
+
+ADMIN_QUIZ = {
+    "title": "Admin Verification — Platform Workflows",
+    "description": "Admin-owned practice assessment for verifying learner and authoring surfaces.",
+    "course": "AME Operations",
+    "objectives": [
+        "Verify scoped content ownership as an admin",
+        "Exercise Markdown explanation and Deep Dive workflows",
+        "Review common API permission boundaries",
+    ],
+}
+
+ADMIN_EXAM_BLUEPRINT = {
+    "title": "Admin Verification — Release Gate",
+    "description": "Admin-owned graded exam for smoke-testing exam and result flows.",
+    "objectives": [
+        "Check answer submission for admin-owned content",
+        "Confirm result review and Deep Dive request entry points",
+    ],
+    "course": "AME Operations",
+    "duration": 30,
+    "passing_points": 6,
+}
+
 # Answers to submit when seeding learner attempts.
 # Each entry maps to the corresponding QUESTIONS item by index.
 # MC: selected_position that maps to the correct option (position == correct_index
@@ -351,12 +437,18 @@ class SeedResult:
     users: list[dict] = field(default_factory=list)
     tags: list[dict] = field(default_factory=list)
     questions: list[dict] = field(default_factory=list)
+    admin_questions: list[dict] = field(default_factory=list)
     assessment_id: str | None = None
     assessment_python_id: str | None = None
     exam_id: str | None = None
+    admin_assessment_id: str | None = None
+    admin_exam_id: str | None = None
     cohort_id: str | None = None
     attempts_seeded: int = 0
+    deep_dives_seeded: int = 0
+    ada_agent_key: str | None = None
     mira_agent_key: str | None = None
+    admin_agent_key: str | None = None
 
 
 def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None, label: str = "") -> dict:
@@ -367,6 +459,21 @@ def post(client: httpx.Client, path: str, body: dict, auth: dict | None = None, 
         if label:
             console.print(f"  ({label})")
     return resp.json() if resp.is_success else {}
+
+
+def run_agent_tool(client: httpx.Client, agent_key: str, tool: str, params: dict) -> dict:
+    resp = client.post(
+        "/v1/agents/run",
+        json={"tool": tool, "params": params},
+        headers={"Authorization": f"Bearer {agent_key}"},
+    )
+    if not resp.is_success:
+        console.print(f"  [yellow]{tool} failed:[/yellow] {resp.status_code} {resp.text[:200]}")
+        return {}
+    body = resp.json()
+    if not body.get("ok"):
+        console.print(f"  [yellow]{tool} returned error:[/yellow] {body.get('error')}")
+    return body
 
 
 def register_or_login(client: httpx.Client, user: dict) -> dict | None:
@@ -583,6 +690,58 @@ def seed_exam(client: httpx.Client, auth: dict, result: SeedResult) -> None:
         console.print(f"  [yellow]Could not create exam (non-fatal):[/yellow] {resp.status_code} {resp.text[:200]}")
 
 
+def seed_admin_content(client: httpx.Client, result: SeedResult) -> None:
+    console.rule("[bold]Admin Verification Content")
+    agent_key = result.admin_agent_key
+    if not agent_key:
+        console.print("  [yellow]No admin agent — skipping admin verification content[/yellow]")
+        return
+
+    created = run_agent_tool(
+        client,
+        agent_key,
+        "question.create",
+        {"questions": [{**q, "status": "live"} for q in ADMIN_QUESTIONS]},
+    )
+    if not created.get("ok"):
+        return
+
+    result.admin_questions = created["result"].get("questions", [])
+    console.print(f"  [green]✓[/green] Minted {len(result.admin_questions)} admin questions via agent")
+
+    assessment = run_agent_tool(
+        client,
+        agent_key,
+        "assessment.create",
+        {
+            **ADMIN_QUIZ,
+            "mode": "practice",
+            "method": "agent",
+            "status": "active",
+            "questions": ADMIN_QUESTIONS,
+        },
+    )
+    if assessment.get("ok"):
+        result.admin_assessment_id = assessment["result"]["id"]
+        console.print(f"  [green]✓[/green] Minted admin practice via agent {result.admin_assessment_id[:8]}…")
+
+    exam = run_agent_tool(
+        client,
+        agent_key,
+        "assessment.create",
+        {
+            **ADMIN_EXAM_BLUEPRINT,
+            "mode": "graded",
+            "method": "agent",
+            "status": "active",
+            "questions": [q for q in ADMIN_QUESTIONS if q["kind"] in ("mc", "tf", "short", "essay")],
+        },
+    )
+    if exam.get("ok"):
+        result.admin_exam_id = exam["result"]["id"]
+        console.print(f"  [green]✓[/green] Minted admin exam via agent {result.admin_exam_id[:8]}…")
+
+
 def seed_cohort(client: httpx.Client, auth: dict, result: SeedResult) -> None:
     console.rule("[bold]Cohort")
     resp = client.post(
@@ -701,14 +860,81 @@ def seed_attempts(client: httpx.Client, result: SeedResult) -> None:
         console.print(f"  [yellow]Failed to finish session {session_id[:8]}:[/yellow] {finish_resp.status_code}")
 
 
+def seed_deep_dives(client: httpx.Client, result: SeedResult) -> None:
+    console.rule("[bold]Deep Dives")
+
+    def create_sample(agent_key: str | None, questions: list[dict], label: str) -> None:
+        if not agent_key or not questions:
+            console.print(f"  [yellow]No {label} questions — skipping[/yellow]")
+            return
+
+        published_question = questions[0]
+        request_question = questions[1] if len(questions) > 1 else None
+
+        created = run_agent_tool(
+            client,
+            agent_key,
+            "deepDive.request",
+            {
+                "questionId": published_question["id"],
+                "reason": f"Seeded published Deep Dive for {label} verification",
+            },
+        )
+        if created.get("ok"):
+            dive = created["result"]
+            published = run_agent_tool(
+                client,
+                agent_key,
+                "deepDive.publish",
+                {
+                    "id": dive["id"],
+                    "status": "published",
+                    "category": "Algorithms" if label == "Ada" else "Chemistry",
+                    "bodyMarkdown": (
+                        f"# {label} Deep Dive\n\n"
+                        f"## Why this question matters\n\n"
+                        f"{published_question['prompt']}\n\n"
+                        "```mermaid\n"
+                        "flowchart TD\n"
+                        "  A[Read the prompt] --> B[Identify the core concept]\n"
+                        "  B --> C[Check the constraint]\n"
+                        "  C --> D[Choose or write the answer]\n"
+                        "```\n\n"
+                        "### Study move\n\n"
+                        "- Restate the rule in your own words.\n"
+                        "- Work one similar example without looking at the answer.\n"
+                        "- Compare your reasoning with the explanation.\n"
+                    ),
+                },
+            )
+            if published.get("ok"):
+                result.deep_dives_seeded += 1
+                console.print(f"  [green]✓[/green] Published {label} Deep Dive {dive['id'][:8]}…")
+
+        if request_question:
+            requested = run_agent_tool(
+                client,
+                agent_key,
+                "deepDive.request",
+                {
+                    "questionId": request_question["id"],
+                    "reason": f"Seeded requested Deep Dive for {label} queue verification",
+                },
+            )
+            if requested.get("ok"):
+                result.deep_dives_seeded += 1
+                console.print(f"  [green]✓[/green] Requested {label} Deep Dive {requested['result']['id'][:8]}…")
+
+    create_sample(result.ada_agent_key, result.questions, "Ada")
+    create_sample(result.admin_agent_key, result.admin_questions, "Admin")
+
+
 def seed_agents(client: httpx.Client, result: SeedResult) -> None:
     console.rule("[bold]Agents")
     admin = next((u for u in result.users if u["email"] == "admin@example.com"), None)
     if not admin:
         console.print("  [yellow]No admin user — skipping agents[/yellow]")
         return
-    admin_auth = {"Authorization": f"Bearer {admin['token']}"}
-
     # Helper to create an agent, deleting existing ones if we hit a quota limit
     def create_agent_for_user(user_dict, body):
         auth = {"Authorization": f"Bearer {user_dict['token']}"}
@@ -758,6 +984,21 @@ def seed_agents(client: httpx.Client, result: SeedResult) -> None:
             console.print(f"    Key: {result.mira_agent_key}")
         else:
             console.print(f"  [yellow]Failed to create second user agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
+
+    # 3. Create agent for admin verification content
+    body = {
+        "label": "Carol's Verification Agent",
+        "scopes": ["assessment.read", "assessment.write", "attempt.read", "attempt.write", "stats.read"],
+        "focusTags": ["algorithms", "python", "data-structures"],
+    }
+    agent_resp = create_agent_for_user(admin, body)
+    if agent_resp.is_success:
+        agent_data = agent_resp.json()
+        result.admin_agent_key = agent_data.get("apiKey")
+        console.print(f"  [green]✓[/green] Created agent for Admin: [cyan]{agent_data.get('id')}[/cyan]")
+        console.print(f"    Key: {result.admin_agent_key}")
+    else:
+        console.print(f"  [yellow]Failed to create admin agent:[/yellow] {agent_resp.status_code} {agent_resp.text}")
 
 
 def seed_second_user_content(client: httpx.Client, result: SeedResult) -> None:
@@ -859,11 +1100,15 @@ def print_summary(result: SeedResult) -> None:
     table.add_row("Users", str(len(result.users)))
     table.add_row("Tags", str(len(result.tags)))
     table.add_row("Questions (live)", str(len(result.questions)))
+    table.add_row("Admin questions", str(len(result.admin_questions)))
     table.add_row("Assessment (main)", result.assessment_id or "—")
     table.add_row("Assessment (python)", result.assessment_python_id or "—")
     table.add_row("Exam", result.exam_id or "—")
+    table.add_row("Admin assessment", result.admin_assessment_id or "—")
+    table.add_row("Admin exam", result.admin_exam_id or "—")
     table.add_row("Cohort", result.cohort_id or "—")
     table.add_row("Attempts seeded", str(result.attempts_seeded))
+    table.add_row("Deep dives seeded", str(result.deep_dives_seeded))
     console.print(table)
 
     console.rule("[bold]Credentials")
@@ -908,7 +1153,9 @@ def main() -> None:
         seed_assessments(client, auth, result)
         seed_exam(client, auth, result)
         seed_agents(client, result)
+        seed_admin_content(client, result)
         seed_second_user_content(client, result)
+        seed_deep_dives(client, result)
         seed_cohort(client, admin_auth, result)
         seed_attempts(client, result)
 

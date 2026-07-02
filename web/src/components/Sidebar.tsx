@@ -20,6 +20,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GradingOutlinedIcon from "@mui/icons-material/GradingOutlined";
 import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
+import TipsAndUpdatesOutlinedIcon from "@mui/icons-material/TipsAndUpdatesOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
@@ -60,6 +61,7 @@ const ICON_MAP: Record<string, React.ReactElement> = {
   grade: <GradingOutlinedIcon fontSize="small" />,
   questions: <FormatListBulletedOutlinedIcon fontSize="small" />,
   flashcards: <StyleOutlinedIcon fontSize="small" />,
+  "deep-dives": <TipsAndUpdatesOutlinedIcon fontSize="small" />,
   agent: <SmartToyOutlinedIcon fontSize="small" />,
   "admin-dashboard": <ShieldOutlinedIcon fontSize="small" />,
   "admin-users": <PeopleOutlinedIcon fontSize="small" />,
@@ -156,6 +158,12 @@ export function Sidebar({
       id: "questions",
       label: "Question bank",
       icon: "questions",
+      section: "Learn",
+    },
+    {
+      id: "deep-dives",
+      label: "Deep dives",
+      icon: "deep-dives",
       section: "Learn",
     },
     { id: "results", label: "Last results", icon: "results", section: "Learn" },

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ame — 飴 × Miku style board</title>
+<style>
+  :root {
+    --teal: #39C5BB;        /* canonical Hatsune Miku color */
+    --teal-dark: #158F86;
+    --teal-deep: #0E6B64;
+    --mint: #86CECB;
+    --mint-tint: #F4FBFA;
+    --pink: #FF6699;        /* Miku necktie / nail accent = "candy" */
+    --pink-soft: #FF85AD;
+    --pink-deep: #E4405F;
+    --ink: #12262B;
+    --ink-2: #4A6B70;
+    --line: rgba(16,40,44,0.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: Inter, "Segoe UI", Roboto, system-ui, sans-serif;
+    background: var(--mint-tint); color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.hero { display:flex; align-items:center; gap:16px; margin-bottom: 8px; }
+  .logo {
+    font-size: 40px; font-weight: 800; letter-spacing:-0.02em;
+    background: linear-gradient(120deg, var(--teal) 0%, var(--pink) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .candy { font-size: 34px; filter: saturate(1.2); }
+  .tagline { color: var(--ink-2); font-size: 15px; margin: 0 0 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing:0.08em;
+       color: var(--ink-2); margin: 40px 0 14px; font-weight: 700; }
+  .row { display:flex; flex-wrap:wrap; gap:16px; }
+  .card {
+    background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:20px; box-shadow: 0 2px 8px rgba(16,40,44,0.05);
+  }
+  /* swatches */
+  .swatches { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .sw { border-radius:12px; overflow:hidden; border:1px solid var(--line); }
+  .sw .chip { height:64px; }
+  .sw .meta { padding:8px 10px; font-size:12px; background:#fff; }
+  .sw .meta b { display:block; font-size:12.5px; }
+  .sw .meta span { color: var(--ink-2); font-family: ui-monospace, monospace; font-size:11px; }
+  /* buttons */
+  .btn {
+    border:0; cursor:pointer; font: 500 14px Inter, sans-serif; color:#fff;
+    padding:9px 20px; border-radius:9px;
+    background: linear-gradient(135deg, var(--teal) 0%, var(--pink) 100%);
+    box-shadow: 0 4px 12px rgba(255,102,153,0.28);
+  }
+  .btn.ghost { background:#fff; color: var(--teal-dark); border:1.5px solid var(--teal); box-shadow:none; }
+  .btn.pink { background: linear-gradient(135deg, var(--pink) 0%, var(--pink-soft) 100%); box-shadow:0 4px 12px rgba(228,64,95,0.25); }
+  .pill {
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+    padding:5px 12px; border-radius:999px; background: rgba(57,197,187,0.12); color: var(--teal-deep);
+  }
+  .pill.pink { background: rgba(255,102,153,0.14); color: var(--pink-deep); }
+  /* candy-jar streak */
+  .jar { width:120px; height:150px; position:relative; }
+  .jar .glass {
+    position:absolute; inset:0; border:3px solid var(--mint); border-radius:14px 14px 26px 26px;
+    background: rgba(134,206,203,0.10); overflow:hidden;
+  }
+  .jar .lid { position:absolute; top:-10px; left:14px; right:14px; height:14px; border-radius:6px; background: var(--teal); }
+  .jar .fill {
+    position:absolute; left:0; right:0; bottom:0; height:68%;
+    background: linear-gradient(180deg, var(--pink-soft), var(--pink));
+  }
+  .jar .fill::before { content:"🍬🍬🍬🍬🍬🍬🍬🍬🍬"; position:absolute; inset:0; font-size:20px; line-height:26px; opacity:.9; letter-spacing:2px; padding:6px; }
+  .streakbig { font-size:34px; font-weight:800; color:var(--pink-deep); }
+  /* due-today review card */
+  .review { max-width:520px; }
+  .qtext { font-size:17px; font-weight:600; margin:4px 0 16px; line-height:1.4; }
+  .opt { display:block; width:100%; text-align:left; padding:12px 16px; margin-bottom:8px;
+         border:1.5px solid var(--line); border-radius:10px; background:#fff; font:500 14px Inter; cursor:pointer; }
+  .opt:hover { border-color: var(--teal); background: rgba(57,197,187,0.05); }
+  .grades { display:flex; gap:8px; margin-top:14px; }
+  .grade { flex:1; padding:8px; border-radius:9px; border:0; color:#fff; font:600 13px Inter; cursor:pointer; }
+  .g-again { background:#E4405F; } .g-hard { background:#F2994A; }
+  .g-good { background: var(--teal); } .g-easy { background:#27AE8B; }
+  /* dark strip */
+  .dark { background: #12181B; color:#DDECEA; border-radius:16px; padding:28px; margin-top:14px; }
+  .dark .card { background:#1A2226; border-color: rgba(255,255,255,0.08); box-shadow:none; }
+  .dark .opt { background:#1A2226; color:#DDECEA; border-color: rgba(255,255,255,0.10); }
+  .dark .logo { background: linear-gradient(120deg, #57D9CE, #FF85AD); -webkit-background-clip:text; background-clip:text; }
+  .note { font-size:12.5px; color:var(--ink-2); margin-top:6px; }
+  .appbar { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid var(--line);
+            border-radius:12px; padding:10px 18px; box-shadow:0 2px 8px rgba(16,40,44,0.05); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="candy">🍬</span>
+    <span class="logo">ame</span>
+  </header>
+  <p class="tagline">飴 — "candy" · study, sweetened · Hatsune Miku palette (teal #39C5BB × candy pink #FF6699)</p>
+
+  <!-- App bar with streak -->
+  <h2>App bar (with streak + daily goal)</h2>
+  <div class="appbar">
+    <span class="logo" style="font-size:24px;">ame</span>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <span class="pill pink">🔥 7-day streak</span>
+      <span class="pill">🍬 12 / 20 due today</span>
+      <span class="btn" style="padding:7px 16px;">Review now</span>
+    </div>
+  </div>
+
+  <!-- Palette -->
+  <h2>Palette</h2>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#39C5BB"></div><div class="meta"><b>Primary · Miku teal</b><span>#39C5BB</span></div></div>
+    <div class="sw"><div class="chip" style="background:#158F86"></div><div class="meta"><b>Teal dark</b><span>#158F86</span></div></div>
+    <div class="sw"><div class="chip" style="background:#86CECB"></div><div class="meta"><b>Mint accent</b><span>#86CECB</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FF6699"></div><div class="meta"><b>Secondary · candy pink</b><span>#FF6699</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FF85AD"></div><div class="meta"><b>Pink soft</b><span>#FF85AD</span></div></div>
+    <div class="sw"><div class="chip" style="background:#E4405F"></div><div class="meta"><b>Error · raspberry</b><span>#E4405F</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F4FBFA;border-bottom:1px solid #eee"></div><div class="meta"><b>BG tint (candy mint)</b><span>#F4FBFA</span></div></div>
+    <div class="sw"><div class="chip" style="background:#12181B"></div><div class="meta"><b>Dark BG</b><span>#12181B</span></div></div>
+  </div>
+
+  <!-- Components -->
+  <h2>Buttons, chips, gradient</h2>
+  <div class="row" style="align-items:center;">
+    <button class="btn">Start assessment</button>
+    <button class="btn pink">Rate this card</button>
+    <button class="btn ghost">Secondary</button>
+    <span class="pill">practice</span>
+    <span class="pill pink">graded</span>
+  </div>
+  <p class="note">Gradient buttons reuse your existing <code>containedPrimary</code> gradient — teal→pink instead of indigo→violet. One file, one token swap.</p>
+
+  <!-- Two feature mockups -->
+  <h2>The retention loop (v0.5)</h2>
+  <div class="row">
+    <!-- Due today review -->
+    <div class="card review">
+      <span class="pill">🍬 Due today · card 12 of 20</span>
+      <p class="qtext">What is the time complexity of binary search on a sorted array?</p>
+      <button class="opt">A · O(n)</button>
+      <button class="opt">B · O(log n)</button>
+      <button class="opt">C · O(n log n)</button>
+      <button class="opt">D · O(1)</button>
+      <div class="grades">
+        <button class="grade g-again">Again</button>
+        <button class="grade g-hard">Hard</button>
+        <button class="grade g-good">Good</button>
+        <button class="grade g-easy">Easy</button>
+      </div>
+      <p class="note">FSRS grades → next due date. "Good" here → due again in ~4 days.</p>
+    </div>
+
+    <!-- Candy jar streak -->
+    <div class="card" style="text-align:center;">
+      <div style="display:flex; gap:24px; align-items:center; justify-content:center;">
+        <div class="jar"><div class="glass"><div class="fill"></div></div><div class="lid"></div></div>
+        <div style="text-align:left;">
+          <div class="streakbig">7 🔥</div>
+          <div style="font-weight:600;">day streak</div>
+          <p class="note" style="max-width:150px;">The candy jar fills as you clear today's queue. Keep the streak, keep the jar sweet.</p>
+          <span class="pill pink">+40 🍬 sugar today</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dark mode -->
+  <h2>Dark mode (first-class)</h2>
+  <div class="dark">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <span class="candy">🍬</span><span class="logo" style="font-size:28px;">ame</span>
+      <span class="pill" style="background:rgba(87,217,206,0.15); color:#57D9CE; margin-left:auto;">🔥 7-day</span>
+    </div>
+    <div class="card">
+      <p style="font-weight:600; margin:0 0 12px;">What is the time complexity of binary search?</p>
+      <button class="opt">A · O(n)</button>
+      <button class="opt" style="border-color:#57D9CE; background:rgba(87,217,206,0.10);">B · O(log n) ✓</button>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:32px;">
+    This is a static mockup, not the real app. It shows the <b>palette + candy/streak motif</b> only.
+    Applying it for real = swapping the tokens in <code>web/src/components/ThemeRegistry.tsx</code> (~1 file for ~90% of the surface) + a wordmark + the streak widget.
+    Accessibility caveat: bright teal/pink are <b>fill</b> colors; text uses the darker variants to pass WCAG AA.
+  </p>
+
+</div>
+</body>
+</html>

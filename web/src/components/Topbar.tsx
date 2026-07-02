@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import { BrandMark } from "@/components/BrandMark";
 
 interface TopbarProps {
   title: string;
@@ -31,7 +32,10 @@ export function Topbar({ title, subtitle, breadcrumb, actions }: TopbarProps) {
         zIndex: 5,
       }}
     >
-      <Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ mb: 1 }}>
+          <BrandMark />
+        </Box>
         {breadcrumb && (
           <Typography
             variant="caption"

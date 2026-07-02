@@ -112,12 +112,38 @@ export default function ResultsPage({
   } | null>(null);
   const [deepenLoading, setDeepenLoading] = useState(false);
   const [deepenError, setDeepenError] = useState<string | null>(null);
+  const [deepDiveRequests, setDeepDiveRequests] = useState<
+    Record<string, "saving" | "requested">
+  >({});
 
   function handleOpenDeepen(qid: string, isFromHistory = false) {
     setDeepenOpen(true);
     setDeepenQid(qid);
     if (!isFromHistory) {
       setDeepenHistory([]);
+    }
+  }
+
+  async function handleRequestDeepDive(questionId: string) {
+    if (deepDiveRequests[questionId] === "saving") return;
+    setDeepDiveRequests((prev) => ({ ...prev, [questionId]: "saving" }));
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (api as any).POST("/v1/deep-dives", {
+        body: {
+          questionId,
+          sourceSessionId: data?.id,
+          reason: "Marked from results review",
+        },
+      });
+      setDeepDiveRequests((prev) => ({ ...prev, [questionId]: "requested" }));
+    } catch (err) {
+      console.error(err);
+      setDeepDiveRequests((prev) => {
+        const next = { ...prev };
+        delete next[questionId];
+        return next;
+      });
     }
   }
 
@@ -509,6 +535,27 @@ export default function ResultsPage({
                     }}
                   >
                     Dive deeper
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={
+                      deepDiveRequests[a.qid] === "requested"
+                        ? "outlined"
+                        : "text"
+                    }
+                    disabled={deepDiveRequests[a.qid] === "saving"}
+                    onClick={() => handleRequestDeepDive(a.qid)}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {deepDiveRequests[a.qid] === "saving"
+                      ? "Requesting"
+                      : deepDiveRequests[a.qid] === "requested"
+                        ? "Requested"
+                        : "Request deep dive"}
                   </Button>
                   {a.gradeStatus === "pending_manual" ? (
                     <Chip

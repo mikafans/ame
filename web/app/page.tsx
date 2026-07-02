@@ -14,7 +14,6 @@ import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import LinkIcon from "@mui/icons-material/Link";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
@@ -22,6 +21,8 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { copyToClipboard } from "@/utils/clipboard";
+import { Logo } from "@/components/Logo";
+import { BRAND } from "@/lib/brand";
 
 export default function LandingPage() {
   const [copied, setCopied] = useState(false);
@@ -68,15 +69,20 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
   // value has a light + dark variant so text never goes invisible-on-invisible.
   const c = isDark
     ? {
-        pageBg: "#0A0915",
-        pageGradient: `radial-gradient(circle at 10% 20%, rgba(98, 0, 234, 0.15) 0%, transparent 40%),
-                       radial-gradient(circle at 90% 80%, rgba(0, 229, 255, 0.1) 0%, transparent 40%)`,
-        textPrimary: "#F8F9FA",
+        pageBg: BRAND.dark.background,
+        pageGradient: `radial-gradient(circle at 10% 20%, rgba(98, 216, 205, 0.12) 0%, transparent 40%),
+                       radial-gradient(circle at 90% 80%, rgba(255, 157, 192, 0.12) 0%, transparent 42%)`,
+        textPrimary: BRAND.dark.text,
         textSecondary: "#90A4AE",
-        headingGradient: "linear-gradient(135deg, #FFFFFF 0%, #90A4AE 100%)",
-        logoGradient: "linear-gradient(90deg, #FFFFFF 0%, #B0BEC5 100%)",
-        agentChipColor: "#B388FF",
-        cardBg: "rgba(18, 16, 35, 0.65)",
+        headingGradient: "linear-gradient(135deg, #E2E8F0 0%, #62D8CD 100%)",
+        agentChipColor: BRAND.dark.secondary,
+        brandStart: BRAND.dark.primary,
+        brandEnd: BRAND.dark.secondary,
+        brandStartSoft: "rgba(98, 216, 205, 0.15)",
+        brandEndSoft: "rgba(255, 157, 192, 0.16)",
+        brandBorder: "rgba(98, 216, 205, 0.35)",
+        brandShadow: "rgba(98, 216, 205, 0.28)",
+        cardBg: "rgba(27, 42, 40, 0.78)",
         cardBorder: "1px solid rgba(255, 255, 255, 0.08)",
         cardShadow: "0 20px 40px rgba(0,0,0,0.4)",
         rowBg: "rgba(255, 255, 255, 0.03)",
@@ -90,22 +96,27 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
         divider: "rgba(255, 255, 255, 0.08)",
       }
     : {
-        pageBg: "#F5F7FB",
-        pageGradient: `radial-gradient(circle at 10% 20%, rgba(98, 0, 234, 0.08) 0%, transparent 40%),
-                       radial-gradient(circle at 90% 80%, rgba(0, 229, 255, 0.08) 0%, transparent 40%)`,
-        textPrimary: "#1A1A2E",
+        pageBg: BRAND.light.background,
+        pageGradient: `radial-gradient(circle at 10% 20%, rgba(69, 196, 185, 0.14) 0%, transparent 42%),
+                       radial-gradient(circle at 90% 80%, rgba(255, 143, 180, 0.16) 0%, transparent 42%)`,
+        textPrimary: BRAND.light.text,
         textSecondary: "#5A6473",
-        headingGradient: "linear-gradient(135deg, #1A1A2E 0%, #4A5568 100%)",
-        logoGradient: "linear-gradient(90deg, #1A1A2E 0%, #4A5568 100%)",
-        agentChipColor: "#6200EA",
+        headingGradient: "linear-gradient(135deg, #0F172A 0%, #1F766F 100%)",
+        agentChipColor: BRAND.light.secondaryDark,
+        brandStart: BRAND.light.primary,
+        brandEnd: BRAND.light.secondary,
+        brandStartSoft: "rgba(69, 196, 185, 0.14)",
+        brandEndSoft: "rgba(255, 143, 180, 0.16)",
+        brandBorder: "rgba(47, 167, 158, 0.26)",
+        brandShadow: "rgba(47, 167, 158, 0.16)",
         cardBg: "rgba(255, 255, 255, 0.85)",
         cardBorder: "1px solid rgba(0, 0, 0, 0.08)",
-        cardShadow: "0 20px 40px rgba(98, 0, 234, 0.08)",
-        rowBg: "rgba(98, 0, 234, 0.04)",
+        cardShadow: "0 20px 40px rgba(47, 167, 158, 0.12)",
+        rowBg: "rgba(69, 196, 185, 0.07)",
         rowBorder: "1px solid rgba(0, 0, 0, 0.06)",
-        rowHoverBg: "rgba(98, 0, 234, 0.08)",
+        rowHoverBg: "rgba(69, 196, 185, 0.12)",
         outlineBorder: "rgba(0, 0, 0, 0.15)",
-        outlineColor: "#1A1A2E",
+        outlineColor: "#0F172A",
         ghostBorder: "rgba(0, 0, 0, 0.15)",
         ghostColor: "#4A5568",
         promptBg: "rgba(0, 0, 0, 0.04)",
@@ -137,34 +148,7 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
             mb: 8,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: "8px",
-                background: "linear-gradient(135deg, #6200EA 0%, #00E5FF 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 14px rgba(98, 0, 234, 0.4)",
-              }}
-            >
-              <SmartToyOutlinedIcon sx={{ color: "#FFF", fontSize: 20 }} />
-            </Box>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 700,
-                letterSpacing: -0.5,
-                background: c.logoGradient,
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              ame
-            </Typography>
-          </Box>
+          <Logo size={36} />
 
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Tooltip title={isDark ? "Light mode" : "Dark mode"}>
@@ -194,9 +178,9 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                 fontWeight: 500,
                 transition: "all 0.3s",
                 "&:hover": {
-                  borderColor: "#6200EA",
-                  bgcolor: "rgba(98, 0, 234, 0.08)",
-                  boxShadow: "0 0 15px rgba(98, 0, 234, 0.3)",
+                  borderColor: c.brandStart,
+                  bgcolor: c.brandStartSoft,
+                  boxShadow: `0 0 15px ${c.brandShadow}`,
                 },
               }}
             >
@@ -212,8 +196,8 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
               <Chip
                 label="First-Class Agent Support"
                 sx={{
-                  background: "rgba(98, 0, 234, 0.12)",
-                  border: "1px solid rgba(98, 0, 234, 0.3)",
+                  background: c.brandEndSoft,
+                  border: `1px solid ${c.brandBorder}`,
                   color: c.agentChipColor,
                   fontWeight: 600,
                   fontSize: 12,
@@ -257,22 +241,20 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                   onClick={() => (window.location.href = ctaHref)}
                   endIcon={<ArrowForwardIcon />}
                   sx={{
-                    background:
-                      "linear-gradient(135deg, #6200EA 0%, #651FFF 100%)",
-                    color: "#FFF",
+                    background: `linear-gradient(135deg, ${c.brandStart} 0%, ${c.brandEnd} 100%)`,
+                    color: "#0C1817",
                     textTransform: "none",
                     borderRadius: "10px",
                     px: 4,
                     py: 1.5,
                     fontSize: 16,
                     fontWeight: 600,
-                    boxShadow: "0 6px 20px rgba(98, 0, 234, 0.3)",
+                    boxShadow: `0 6px 20px ${c.brandShadow}`,
                     transition: "all 0.3s",
                     "&:hover": {
-                      background:
-                        "linear-gradient(135deg, #7C4DFF 0%, #651FFF 100%)",
+                      background: `linear-gradient(135deg, ${c.brandEnd} 0%, ${c.brandStart} 100%)`,
                       transform: "translateY(-2px)",
-                      boxShadow: "0 8px 25px rgba(98, 0, 234, 0.5)",
+                      boxShadow: `0 8px 25px ${c.brandShadow}`,
                     },
                   }}
                 >
@@ -292,9 +274,9 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                     fontWeight: 500,
                     transition: "all 0.3s",
                     "&:hover": {
-                      borderColor: "#6200EA",
+                      borderColor: c.brandStart,
                       color: c.textPrimary,
-                      bgcolor: "rgba(98, 0, 234, 0.06)",
+                      bgcolor: c.brandStartSoft,
                     },
                   }}
                 >
@@ -323,8 +305,7 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                   left: 0,
                   right: 0,
                   height: "3px",
-                  background:
-                    "linear-gradient(90deg, #6200EA 0%, #00E5FF 100%)",
+                  background: `linear-gradient(90deg, ${c.brandStart} 0%, ${c.brandEnd} 100%)`,
                   borderTopLeftRadius: "16px",
                   borderTopRightRadius: "16px",
                 },
@@ -398,7 +379,7 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                       transition: "all 0.2s",
                       "&:hover": {
                         bgcolor: c.rowHoverBg,
-                        borderColor: "#6200EA",
+                        borderColor: c.brandStart,
                         transform: "translateX(4px)",
                       },
                     }}
@@ -450,7 +431,7 @@ Your first task is to read my learning stats at /v1/me/stats, identify my weakes
                     onClick={handleCopyPrompt}
                     startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
                     sx={{
-                      color: copied ? "#00B8D4" : "#7C4DFF",
+                      color: copied ? c.brandStart : c.brandEnd,
                       textTransform: "none",
                       fontSize: 12,
                     }}

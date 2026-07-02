@@ -857,6 +857,208 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '422':
           description: Validation failed
+  /v1/deep-dives:
+    get:
+      tags:
+      - deep-dives
+      operationId: list_deep_dives
+      parameters:
+      - name: status
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: category
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: search
+        in: path
+        required: true
+        schema:
+          type:
+          - string
+          - 'null'
+      responses:
+        '200':
+          description: List of deep dives
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDeepDivesResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+    post:
+      tags:
+      - deep-dives
+      operationId: create_deep_dive
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeepDiveBody'
+        required: true
+      responses:
+        '201':
+          description: Deep dive created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDive'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Question, session, or attempt not found
+      security:
+      - bearer: []
+  /v1/deep-dives/export:
+    get:
+      tags:
+      - deep-dives
+      operationId: export_deep_dives
+      responses:
+        '200':
+          description: ZIP archive of deep dives
+          content:
+            application/octet-stream:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: int32
+                  minimum: 0
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /v1/deep-dives/{id}:
+    get:
+      tags:
+      - deep-dives
+      operationId: get_deep_dive
+      parameters:
+      - name: id
+        in: path
+        description: Deep dive ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Deep dive details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDive'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Deep dive not found
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - deep-dives
+      operationId: patch_deep_dive
+      parameters:
+      - name: id
+        in: path
+        description: Deep dive ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchDeepDiveBody'
+        required: true
+      responses:
+        '200':
+          description: Deep dive updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDive'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Deep dive not found
+      security:
+      - bearer: []
+  /v1/deep-dives/{id}/publish:
+    patch:
+      tags:
+      - deep-dives
+      operationId: publish_deep_dive
+      parameters:
+      - name: id
+        in: path
+        description: Deep dive ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishDeepDiveBody'
+        required: true
+      responses:
+        '200':
+          description: Deep dive published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDive'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Deep dive not found
+      security:
+      - bearer: []
+  /v1/deep-dives/{id}/revisions:
+    get:
+      tags:
+      - deep-dives
+      operationId: get_deep_dive_revisions
+      parameters:
+      - name: id
+        in: path
+        description: Deep dive ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: List of revisions for the deep dive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveRevisionsResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Deep dive not found
+      security:
+      - bearer: []
   /v1/explore:
     get:
       tags:
@@ -2718,6 +2920,28 @@ components:
           format: int32
         title:
           type: string
+    CreateDeepDiveBody:
+      type: object
+      required:
+      - questionId
+      properties:
+        questionId:
+          type: string
+          format: uuid
+        reason:
+          type:
+          - string
+          - 'null'
+        sourceAttemptId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        sourceSessionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
     CreateKeyResponse:
       type: object
       required:
@@ -2823,6 +3047,144 @@ components:
         sessionId:
           type: string
           format: uuid
+    DeepDive:
+      type: object
+      required:
+      - id
+      - ownerId
+      - questionId
+      - status
+      - createdAt
+      - updatedAt
+      - questionPrompt
+      - questionKind
+      - questionTags
+      properties:
+        archivedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        assessmentTitle:
+          type:
+          - string
+          - 'null'
+        bodyMarkdown:
+          type:
+          - string
+          - 'null'
+        category:
+          type:
+          - string
+          - 'null'
+        course:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        noteUpdatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        ownerId:
+          type: string
+          format: uuid
+        publishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        questionId:
+          type: string
+          format: uuid
+        questionKind:
+          type: string
+        questionPrompt:
+          type: string
+        questionTags:
+          type: array
+          items:
+            type: string
+        reason:
+          type:
+          - string
+          - 'null'
+        sourceAttemptId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        sourceSessionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        status:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        userNote:
+          type:
+          - string
+          - 'null'
+    DeepDiveRevision:
+      type: object
+      required:
+      - id
+      - deepDiveId
+      - revision
+      - createdAt
+      properties:
+        bodyMarkdown:
+          type:
+          - string
+          - 'null'
+        category:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        deepDiveId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          format: int32
+        userNote:
+          type:
+          - string
+          - 'null'
+    DeepDiveRevisionsResponse:
+      type: object
+      required:
+      - revisions
+      properties:
+        revisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeepDiveRevision'
     DistributionBucket:
       type: object
       required:
@@ -3115,6 +3477,30 @@ components:
         total:
           type: integer
           format: int64
+    ListDeepDivesQuery:
+      type: object
+      properties:
+        category:
+          type:
+          - string
+          - 'null'
+        search:
+          type:
+          - string
+          - 'null'
+        status:
+          type:
+          - string
+          - 'null'
+    ListDeepDivesResponse:
+      type: object
+      required:
+      - deepDives
+      properties:
+        deepDives:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeepDive'
     ListMySessionsResponse:
       type: object
       required:
@@ -3211,6 +3597,17 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
+    PatchDeepDiveBody:
+      type: object
+      properties:
+        status:
+          type:
+          - string
+          - 'null'
+        userNote:
+          type:
+          - string
+          - 'null'
     PatchSessionBody:
       type: object
       required:
@@ -3302,6 +3699,21 @@ components:
         version:
           type: integer
           format: int32
+    PublishDeepDiveBody:
+      type: object
+      required:
+      - bodyMarkdown
+      properties:
+        bodyMarkdown:
+          type: string
+        category:
+          type:
+          - string
+          - 'null'
+        status:
+          type:
+          - string
+          - 'null'
     Question:
       type: object
       required:

@@ -416,6 +416,56 @@ fn build_skill_manifest(strict: bool) -> Value {
             strict,
         ),
         tool(
+            "deepDive.request",
+            "Request a durable Deep Dive explanation for an owned question.",
+            json!({
+                "type": "object",
+                "required": ["questionId"],
+                "properties": {
+                    "questionId": { "type": "string", "format": "uuid" },
+                    "sourceSessionId": { "type": "string", "format": "uuid" },
+                    "sourceAttemptId": { "type": "string", "format": "uuid" },
+                    "reason": { "type": "string" }
+                }
+            }),
+            "POST",
+            "/v1/agents/run",
+            Some("attempt.write"),
+            strict,
+        ),
+        tool(
+            "deepDive.list",
+            "List the owner's Deep Dive requests.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "status": { "type": "string", "enum": ["requested", "drafting", "published", "needs_revision", "archived"] }
+                }
+            }),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.read"),
+            strict,
+        ),
+        tool(
+            "deepDive.publish",
+            "Publish authored Markdown for an owned Deep Dive request.",
+            json!({
+                "type": "object",
+                "required": ["id", "bodyMarkdown"],
+                "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "bodyMarkdown": { "type": "string" },
+                    "status": { "type": "string", "enum": ["published", "drafting", "needs_revision", "requested"] },
+                    "category": { "type": "string" }
+                }
+            }),
+            "POST",
+            "/v1/agents/run",
+            Some("assessment.write"),
+            strict,
+        ),
+        tool(
             "assessment.stats",
             "Get per-assessment performance stats (avg, median, distribution, per-question metrics).",
             id_only(),
@@ -521,7 +571,7 @@ fn build_skill_manifest(strict: bool) -> Value {
     json!({
         "schema_version": "v1",
         "name": "ame",
-        "description": "Read and write assessments, attempts, and study plans on AME.",
+        "description": "ame — study, sweetened. Read and write assessments, attempts, and study plans.",
         "auth": { "type": "bearer", "format": "<id>_<secret>" },
         "entrypoint": "/llms.txt",
         "run": {
@@ -546,6 +596,9 @@ fn build_skill_manifest(strict: bool) -> Value {
                 "question.create",
                 "question.promote",
                 "question.update",
+                "deepDive.request",
+                "deepDive.list",
+                "deepDive.publish",
                 "attempt.grade",
                 "profile.get",
                 "memory.set",
@@ -681,6 +734,18 @@ async fn dispatch_run(
         "question.deepen" => {
             require_scope(&auth, Scope::AssessmentRead)?;
             run_question_deepen(&state, &auth, body.params).await
+        }
+        "deepDive.request" => {
+            require_scope(&auth, Scope::AttemptWrite)?;
+            run_deep_dive_request(&state, &auth, body.params).await
+        }
+        "deepDive.list" => {
+            require_scope(&auth, Scope::AssessmentRead)?;
+            run_deep_dive_list(&state, &auth, body.params).await
+        }
+        "deepDive.publish" => {
+            require_scope(&auth, Scope::AssessmentWrite)?;
+            run_deep_dive_publish(&state, &auth, body.params).await
         }
         "assessment.stats" => {
             require_scope(&auth, Scope::StatsRead)?;
@@ -1474,6 +1539,122 @@ async fn run_question_deepen(
         ok: true,
         tool: "question.deepen".into(),
         result: serde_json::to_value(res).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_deep_dive_request(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let body: super::deep_dives::CreateDeepDiveBody =
+        serde_json::from_value(params).map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid deep dive request params: {e}"),
+            }])
+        })?;
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    crate::http::db::set_rls_guc(&mut acquired, auth.owner_id, false).await?;
+    let db = crate::http::db::DbConn(acquired);
+    let res = super::deep_dives::create_deep_dive(
+        State(state.clone()),
+        db,
+        RequireAnyScope::new(auth.clone()),
+        Json(body),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "deepDive.request".into(),
+        result: serde_json::to_value(res.1.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+async fn run_deep_dive_list(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let query: super::deep_dives::ListDeepDivesQuery =
+        serde_json::from_value(params).map_err(|e| {
+            ApiError::Validation(vec![FieldError {
+                field: "params".into(),
+                message: format!("invalid deep dive list params: {e}"),
+            }])
+        })?;
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    crate::http::db::set_rls_guc(&mut acquired, auth.owner_id, false).await?;
+    let db = crate::http::db::DbConn(acquired);
+    let res = super::deep_dives::list_deep_dives(
+        State(state.clone()),
+        db,
+        RequireAnyScope::new(auth.clone()),
+        Query(query),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "deepDive.list".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
+        error: None,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunDeepDivePublishParams {
+    id: Uuid,
+    body_markdown: String,
+    status: Option<String>,
+    category: Option<String>,
+}
+
+async fn run_deep_dive_publish(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let params: RunDeepDivePublishParams = serde_json::from_value(params).map_err(|e| {
+        ApiError::Validation(vec![FieldError {
+            field: "params".into(),
+            message: format!("invalid deep dive publish params: {e}"),
+        }])
+    })?;
+    let mut acquired = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    crate::http::db::set_rls_guc(&mut acquired, auth.owner_id, false).await?;
+    let db = crate::http::db::DbConn(acquired);
+    let body = super::deep_dives::PublishDeepDiveBody {
+        body_markdown: params.body_markdown,
+        status: params.status,
+        category: params.category,
+    };
+    let res = super::deep_dives::publish_deep_dive(
+        State(state.clone()),
+        db,
+        RequireAnyScope::new(auth.clone()),
+        Path(params.id),
+        Json(body),
+    )
+    .await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "deepDive.publish".into(),
+        result: serde_json::to_value(res.0).unwrap_or(Value::Null),
         error: None,
     }))
 }

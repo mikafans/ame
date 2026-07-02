@@ -5,7 +5,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project is pre-1.0; releases are not yet tagged.
 
-## [Unreleased]
+## [0.3.0] - 2026-07-02
+
+### Added
+
+- Deep Dives Personal KB Workspace: Transforms flat explanation requests into a personal, organized study knowledge base.
+  - Evolved `/deep-dives` dashboard into a premium two-pane layout with category and tag filters, full-text query search, and Markdown-based ZIP export.
+  - Refactored `/deep-dives/[id]` workspace into a split 70/30 layout with read-only agent content, a sticky study notes editor (with debounced autosaving), and a side-drawer showing revision timeline logs.
+  - Implemented backend API routes for creating, updating, listing, and exporting deep dives:
+    - `GET /v1/deep-dives` supporting `?category` and `?search` queries.
+    - `PATCH /v1/deep-dives/{id}` supporting `userNote` and `status` updates.
+    - `GET /v1/deep-dives/{id}/revisions` to retrieve explanation and notes revision snapshots.
+    - `GET /v1/deep-dives/export` generating an Obsidian, Logseq, and Notion-compatible Markdown ZIP archive.
+  - Created database migrations adding `category`, `user_note`, and `note_updated_at` to `tb_deep_dives`, alongside the snapshotting `tb_deep_dive_revisions` table.
+  - Integrated agent tools `deepDive.request`, `deepDive.list`, and `deepDive.publish` with auto-categorization capabilities.
+
+## [0.2.1] - 2026-06-23
+
+### Changed
+
+- k3s image build now defaults to `linux/amd64` (x64) and is platform-parameterized
+  (`PLATFORM=linux/arm64 deploy/k3s/build-images.sh` still builds the arm64 edge
+  image). `Dockerfile.api` derives its Rust musl target from `TARGETARCH`, so the
+  same Dockerfile cross-builds either arch.
 
 ## [0.2.0] - 2026-06-15
 

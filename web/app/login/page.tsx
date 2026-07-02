@@ -18,6 +18,8 @@ import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "@/hooks/useAuth";
+import { Logo } from "@/components/Logo";
+import { BRAND } from "@/lib/brand";
 
 type TabId = "signup" | "login";
 
@@ -101,20 +103,17 @@ export default function LoginPage() {
     }
   }
 
-  const leftBg = isDark ? "#0d1117" : "#f5f7ff";
+  const brand = isDark ? BRAND.dark : BRAND.light;
+  const leftBg = isDark ? brand.background : brand.background;
   const leftBorder = isDark ? "none" : `1px solid ${theme.palette.divider}`;
-  const cardBg = isDark ? "rgba(255,255,255,0.04)" : "#ffffff";
-  const cardBorder = isDark
-    ? "1px solid rgba(255,255,255,0.1)"
-    : `1px solid ${theme.palette.divider}`;
   const subColor = isDark
     ? "rgba(255,255,255,0.45)"
     : theme.palette.text.secondary;
-  const agentBg = isDark ? "rgba(37,99,235,0.1)" : "#eff6ff";
+  const agentBg = isDark ? "rgba(98,216,205,0.1)" : "rgba(69,196,185,0.1)";
   const agentBorder = isDark
-    ? "1px solid rgba(96,165,250,0.25)"
-    : "1px dashed #93c5fd";
-  const agentCodeColor = isDark ? "#93c5fd" : "#1d4ed8";
+    ? "1px solid rgba(98,216,205,0.28)"
+    : "1px dashed rgba(47,167,158,0.35)";
+  const agentCodeColor = isDark ? brand.primaryLight : brand.primaryDark;
   const agentTextColor = isDark ? "rgba(255,255,255,0.4)" : "#64748b";
 
   return (
@@ -139,31 +138,7 @@ export default function LoginPage() {
             mb: 5,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-            <Box
-              sx={{
-                width: 30,
-                height: 30,
-                background: "#1976d2",
-                borderRadius: "7px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                fontWeight: 700,
-                color: "white",
-                fontFamily: "monospace",
-                letterSpacing: -0.5,
-              }}
-            >
-              ame
-            </Box>
-            <Typography
-              sx={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2 }}
-            >
-              ame-platform
-            </Typography>
-          </Box>
+          <Logo size={30} />
           <Tooltip title={isDark ? "Light mode" : "Dark mode"}>
             <IconButton size="small" onClick={toggle}>
               {isDark ? (
@@ -207,7 +182,7 @@ export default function LoginPage() {
               fontWeight: 700,
               letterSpacing: 1.5,
               textTransform: "uppercase",
-              color: "#1976d2",
+              color: brand.primary,
               mb: 0.75,
             }}
           >

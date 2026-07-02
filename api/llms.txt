@@ -1,4 +1,4 @@
-# AME
+# ame — study, sweetened
 
 > An assessment learning platform with a first-class agent surface. An agent acts
 > on behalf of its owner: it authors question banks, assembles and publishes
@@ -85,6 +85,12 @@ platform.
 - `attempt.grade` — grade one pending essay or code attempt.
   `params: { id, score (0.0–1.0), notes? }`. Grades a learner's attempt, never the
   agent's own.
+- `deepDive.request` — request a durable Deep Dive explanation for a question.
+  `params: { questionId, sourceSessionId?, sourceAttemptId?, reason? }`.
+
+**Deep Dive writes (scope `assessment.write`, via POST /v1/agents/run)**
+- `deepDive.publish` — publish agent-authored Markdown explanation and category.
+  `params: { id, bodyMarkdown, category?, status? }`.
 
 **Reading (direct GET endpoints)**
 - `assessment.list` — list the owner's assessments. `GET /v1/assessments` with
@@ -96,9 +102,17 @@ platform.
 - `question.list` — list bank questions. `GET /v1/questions` with
   `params: { tag?, status?, limit?, offset? }` (scope `assessment.read`).
 - `question.deepen` — retrieve deepening/review details for a question (scope `assessment.read`).
-  `GET /v1/questions/{id}/deepen` with `params: { exclude? }` (comma-separated list of question IDs to exclude). Returns 403 Forbidden if there is an active session containing the question.
+  `GET /v1/questions/{id}/deepen` with `params: { exclude? }`.
 - `attempt.list` — list the owner's attempt history. `GET /v1/me/attempts` with
   `params: { limit?, offset?, sessionId? }` (scope `attempt.read`).
+- `deepDive.list` — list Deep Dive requests (scope `assessment.read`, also via run-door).
+  `GET /v1/deep-dives` or `POST /v1/agents/run` with `params: { status?, category?, search? }`.
+- `deepDive.get` — get a single Deep Dive details with notes and revisions.
+  `GET /v1/deep-dives/{id}` (scope `assessment.read`).
+- `deepDive.revisions` — list of explanation and note revision snapshots.
+  `GET /v1/deep-dives/{id}/revisions` (scope `assessment.read`).
+- `deepDive.export` — download a ZIP of all published deep dives as Obsidian-compatible Markdowns.
+  `GET /v1/deep-dives/export` (scope `assessment.read`).
 - `activity.list` — the agent's own activity log. `GET /v1/agents/activity` with
   `params: { cursor?, limit? }` (scope `assessment.read`).
 - `stats.user` — the owner's aggregate learning statistics.
@@ -190,3 +204,18 @@ The full loop: read struggle points, author targeted questions, publish.
 3. `assessment.create` (or an existing draft) collects them via
    `assessment.addQuestion`.
 4. `assessment.update` `{ id, status: "active" }` activates and publishes.
+
+### Playbook 4: Authoring and updating a Deep Dive KB (`author-deep-dive`)
+
+Evolve requested questions into categorized, study-ready deep dive entries.
+
+1. `deepDive.list` `{ status: "requested" }` returns the owner's outstanding requests (each containing the `questionPrompt`, `questionTags`, and user's requested `reason`).
+2. Generate a high-quality Markdown explanation (`bodyMarkdown`) featuring:
+   - A descriptive title
+   - Conceptual breakdowns and code exemplars
+   - Mermaid visualization diagrams showing dataflow/logic
+   - Recommended study moves for the learner
+3. Determine a high-level `category` (e.g. "Database Systems", "Algorithms", "Network Protocols").
+4. `deepDive.publish` `{ id, bodyMarkdown, category, status: "published" }` publishes the explanation. This creates the first revision snapshot.
+5. If the user updates their notes or requests revisions, re-publish via `deepDive.publish` to update the explanation body, generating sequential revision snapshots.
+

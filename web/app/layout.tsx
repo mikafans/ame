@@ -5,8 +5,28 @@ import ThemeRegistry from "@/components/ThemeRegistry";
 import { AuthProvider } from "@/hooks/useAuth";
 
 export const metadata: Metadata = {
-  title: "ame",
-  description: "Question collector + exam platform",
+  title: "ame — study, sweetened",
+  description:
+    "ame — study, sweetened. Assessment platform with a first-class agent surface.",
+  icons: {
+    icon: [
+      {
+        url: "/ame-icon-light.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/ame-icon-dark.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        url: "/ame-icon-16.svg",
+        type: "image/svg+xml",
+        sizes: "16x16",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
