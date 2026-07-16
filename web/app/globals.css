@@ -156,15 +156,56 @@
   line-height: 1.5;
   tab-size: 4;
 }
-.dark .prism-code { background: #282c34; color: #abb2bf; }
-.prism-code code { background: transparent; color: inherit; font-family: inherit; white-space: pre; }
-.prism-code .token.comment, .prism-code .token.prolog, .prism-code .token.doctype, .prism-code .token.cdata { color: #a0a1a7; font-style: italic; }
-.dark .prism-code .token.comment, .dark .prism-code .token.prolog, .dark .prism-code .token.doctype, .dark .prism-code .token.cdata { color: #5c6370; }
-.prism-code .token.keyword { color: #a626a4; }
-.dark .prism-code .token.keyword { color: #c678dd; }
-.prism-code .token.string, .prism-code .token.char { color: #50a14f; }
-.dark .prism-code .token.string, .dark .prism-code .token.char { color: #98c379; }
-.prism-code .token.function, .prism-code .token.class-name { color: #4078f2; }
-.dark .prism-code .token.function, .dark .prism-code .token.class-name { color: #61afef; }
-.prism-code .token.number, .prism-code .token.boolean { color: #986801; }
-.dark .prism-code .token.number, .dark .prism-code .token.boolean { color: #d19a66; }
+.dark .prism-code {
+  background: #282c34;
+  color: #abb2bf;
+}
+.prism-code code {
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  white-space: pre;
+}
+.prism-code .token.comment,
+.prism-code .token.prolog,
+.prism-code .token.doctype,
+.prism-code .token.cdata {
+  color: #a0a1a7;
+  font-style: italic;
+}
+.dark .prism-code .token.comment,
+.dark .prism-code .token.prolog,
+.dark .prism-code .token.doctype,
+.dark .prism-code .token.cdata {
+  color: #5c6370;
+}
+.prism-code .token.keyword {
+  color: #a626a4;
+}
+.dark .prism-code .token.keyword {
+  color: #c678dd;
+}
+.prism-code .token.string,
+.prism-code .token.char {
+  color: #50a14f;
+}
+.dark .prism-code .token.string,
+.dark .prism-code .token.char {
+  color: #98c379;
+}
+.prism-code .token.function,
+.prism-code .token.class-name {
+  color: #4078f2;
+}
+.dark .prism-code .token.function,
+.dark .prism-code .token.class-name {
+  color: #61afef;
+}
+.prism-code .token.number,
+.prism-code .token.boolean {
+  color: #986801;
+}
+.dark .prism-code .token.number,
+.dark .prism-code .token.boolean {
+  color: #d19a66;
+}
