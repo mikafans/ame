@@ -157,7 +157,15 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          <form
+            id="auth-form"
+            name="login"
+            method="post"
+            action="/login"
+            autoComplete="on"
+            className="flex flex-col gap-4"
+            onSubmit={handleSubmit}
+          >
             {tab === "signup" && (
               <label
                 className="grid gap-1.5 text-sm font-medium"
@@ -182,6 +190,8 @@ export default function LoginPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete={tab === "signup" ? "email" : "username"}
+                placeholder="name@example.com"
+                spellCheck={false}
                 required
                 className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20"
               />
@@ -199,6 +209,9 @@ export default function LoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete={
                   tab === "signup" ? "new-password" : "current-password"
+                }
+                placeholder={
+                  tab === "signup" ? "Create a password" : "Enter your password"
                 }
                 required
                 className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20"
