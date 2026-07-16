@@ -1,6 +1,6 @@
 # AME Roadmap — toward v1.1 "Admin Console GA"
 
-**Current version:** `v0.2.0` (`api/Cargo.toml`)
+**Current version:** `v0.3.0` (`api/Cargo.toml`, `web/package.json`)
 **Target:** `v1.1` — a complete, operable admin console. The four operator
 features below are the v1.1 epic; they ship incrementally across v0.2 → v1.0 and
 are integrated + hardened at v1.1.
@@ -15,9 +15,9 @@ dashboard depends on the metrics pipeline (Phase D) and so comes last.
 | Version | Theme | Operator features delivered | Hard dependency |
 |---------|-------|------------------------------|-----------------|
 | pre-v0.1 | Foundation build | Schema/auth, question bank, assessments, engine, stats, agent surface, MUI frontend, RLS, owner isolation, security hardening | — |
-| v0.1 (now) | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
+| v0.1 | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
 | v0.2 | Operational control plane | **#1 Token Audit**, **#2 Settings & Feature Flags** | admin shell (done) |
-| v0.3 | Content integrity + data hygiene | **#3 Feedback / Flags / Support Queue**, **data retention & pruning**, **learner mobile (H5)** | learner session UI |
+| v0.3 (now) | Learner experience + self-hosting foundation | Landing refresh, Tailwind migration, containerized local stack, self-hosting docs | learner session UI |
 | v0.4 | Learn Deeper *(parallel learner track)* | **Deepen panel** ✅ *shipped early in 0.2.0* (related-by-tag, author deep-dive, reference URL); **async deepen notes** (agent-generated) — pending | v0.3 learner session UI |
 | v1.0 | Insight + hardening | **#4 Analytics Dashboard** | Phase D metrics |
 | v1.1 | GA polish | (all four integrated) | v1.0 |
@@ -40,7 +40,7 @@ is in code. Compressed history:
   stats + feedback.
 - **Agent surface:** `role=agent` + agent profiles, scoped agent API, served
   OpenAPI snapshot.
-- **Frontend:** learner + author/agent UIs, full MUI migration (no Tailwind).
+- **Frontend:** learner + author/agent UIs, Tailwind/shadcn migration in progress.
 - **Isolation + security:** row-level security on `tb_questions`, owner-scoped
   sub-accounts, tiered per-owner rate limiting, per-plan quotas, and the security
   hardening pass (token-scope validation, hashed webhook secrets, security
@@ -53,7 +53,7 @@ security-hardened.
 
 ---
 
-## v0.1 — Platform + Admin foundation *(current)*
+## v0.1 — Platform + Admin foundation *(shipped)*
 
 Already shipped or in flight on `feat/admin-api`:
 
@@ -69,6 +69,20 @@ Already shipped or in flight on `feat/admin-api`:
 
 **Exit criteria:** admin can run day-to-day moderation and the service has
 restart/backup safety.
+
+## v0.3 — Learner experience + self-hosting foundation *(current)*
+
+The 0.3.0 release establishes the public product entry point and a practical
+deployment path:
+
+- Landing page with honest signed-out CTAs and responsive product preview.
+- Tailwind CSS and local shadcn-style primitives replacing the MUI runtime.
+- Containerized debug stack with Postgres, Valkey, API, web, and Caddy routing.
+- Single-host self-hosting guide, production compose healthchecks, and agent
+  discovery routes documented separately from `api/llms.txt`.
+
+The next incremental work in this release line is content integrity, data
+retention, support queues, and learner mobile polish.
 
 ---
 

@@ -94,7 +94,8 @@ export default function LandingPage() {
   const signedIn = !!user;
   const entryHref = signedIn ? "/explore" : "/login";
   const entryLabel = signedIn ? "Open Explore" : "Sign up free";
-  const sampleLabel = signedIn ? "Open Explore" : "Try a sample quiz";
+  const sampleHref = signedIn ? "/explore" : "#benefits";
+  const sampleLabel = signedIn ? "Open Explore" : "See how it works";
 
   return (
     <div className="min-h-screen bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
@@ -171,9 +172,9 @@ export default function LandingPage() {
                   <Button
                     asChild
                     variant="outline"
-                    className="rounded-full border-neutral-600 px-6 py-3 text-white hover:border-white hover:bg-transparent hover:text-white"
+                    className="rounded-full border-neutral-600 bg-transparent px-6 py-3 text-white hover:border-white hover:bg-white/10 hover:text-white"
                   >
-                    <Link href={entryHref}>{sampleLabel}</Link>
+                    <Link href={sampleHref}>{sampleLabel}</Link>
                   </Button>
                 </div>
               </div>
@@ -185,9 +186,13 @@ export default function LandingPage() {
             <p className="mb-2 font-mono text-xs tracking-[0.14em] text-blue-600">
               WHY AME
             </p>
-            <h2 className="mb-8 max-w-2xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
-              Everything between &quot;I should study&quot; and &quot;I
-              passed.&quot;
+            <h2 className="mb-8 max-w-3xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
+              Everything between{" "}
+              <span className="whitespace-nowrap">
+                &quot;I should study&quot;
+              </span>{" "}
+              and{" "}
+              <span className="whitespace-nowrap">&quot;I passed.&quot;</span>
             </h2>
             <div className="grid gap-4 md:grid-cols-3">
               {benefits.map((benefit) => (

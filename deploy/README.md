@@ -4,12 +4,14 @@ This directory documents the supported deploy shapes. The repo ships container
 artifacts but **not** opinionated infra-as-code — bring your own k8s manifests,
 Terraform, Helm chart, etc.
 
+For a complete single-host installation, see [`SELF-HOSTING.md`](SELF-HOSTING.md).
+
 ## Artifacts
 
 - `api/Dockerfile` — multi-stage Rust build, ~50 MB Debian-slim runtime.
 - `web/Dockerfile` — multi-stage Next.js standalone build, runs on Node 22.
-- `docker-compose.prod.yml` (repo root) — db + migrate job + api + web composed
-  together with healthchecks.
+- `docker-compose.prod.yml` (repo root) — Postgres + Valkey + API + web with
+  healthchecks and embedded API migrations.
 
 ## Smoke deploy (single host)
 
@@ -53,9 +55,9 @@ See [`../SECURITY.md`](../SECURITY.md) for the current threat model.
 
 ## Kubernetes
 
-There are no manifests in this repo yet. The compose file is the closest
-reference — port mappings, env vars, and the migrate-then-api dependency
-ordering translate directly to a Job + Deployment pair.
+The [`k3s/`](k3s/) and [`k8s/`](k8s/) directories contain the reference image
+build and Kustomize manifests. They are intentionally environment-specific;
+review the overlays and secrets before applying them to another cluster.
 
 ## CI image publishing
 
