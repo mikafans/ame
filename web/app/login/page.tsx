@@ -174,6 +174,7 @@ export default function LoginPage() {
                 Full name
                 <input
                   id="full-name"
+                  placeholder="Ada Lovelace"
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
                   autoComplete="name"

@@ -54,6 +54,13 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:28800
       API_URL: http://api:8080
       NEXT_ALLOWED_ORIGINS: localhost
+      # Podman Desktop bind mounts on macOS do not always emit native fs
+      # events. Polling keeps Next.js hot reload reliable across Docker and
+      # Podman without changing the production image.
+      WATCHPACK_POLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "1000"
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
     volumes:
       - ./web:/workspace/web
       - web-node-modules:/workspace/web/node_modules

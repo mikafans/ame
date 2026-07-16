@@ -1,34 +1,23 @@
-// @ts-nocheck
 "use client";
 
-import { useState, useEffect, useCallback, useRef, use, useMemo } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/api/client";
 import {
-  Box,
-  Stack,
-  Typography,
-  Button,
-  LinearProgress,
-  CircularProgress,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  ArrowBackOutlinedIcon,
-  ArrowForwardOutlinedIcon,
-  ExitToAppOutlinedIcon,
-  FlagOutlinedIcon,
-  FlagIcon,
-} from "@/components/ui/legacy-primitives";
+  ArrowLeft,
+  ArrowRight,
+  Flag,
+  LoaderCircle,
+  LogOut,
+  X,
+} from "lucide-react";
+import { api } from "@/api/client";
 import { McqRenderer } from "@/components/question/McqRenderer";
 import { ShortRenderer } from "@/components/question/ShortRenderer";
 import { EssayRenderer } from "@/components/question/EssayRenderer";
 import { ClozeRenderer } from "@/components/question/ClozeRenderer";
 import { TfRenderer } from "@/components/question/TfRenderer";
 import { CodeRenderer } from "@/components/question/CodeRenderer";
+import { Button } from "@/components/ui/button";
 
 interface SessionQuestion {
   questionId: string;
@@ -40,30 +29,25 @@ interface SessionQuestion {
   options?: Array<{ text: string }>;
   optionOrder?: number[];
 }
-
 interface SessionData {
   session: {
     id: string;
     status: string;
     deadline_at?: string;
-    duration?: number;
-    allowed_materials?: string[];
-    course_title?: string;
     assessment_title?: string;
   };
   questions: SessionQuestion[];
 }
-
 type Answer = string | number | boolean | null;
 
 const QUESTION_TYPES: Record<string, string> = {
   mc: "Multiple choice",
+  mcq: "Multiple choice",
   tf: "True / false",
   short: "Short answer",
+  free_text: "Short answer",
   essay: "Essay",
   code: "Code",
-  mcq: "Multiple choice",
-  free_text: "Free text",
   cloze: "Fill in the blank",
 };
 
@@ -80,56 +64,52 @@ export default function ActiveQuizPage({
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [finishing, setFinishing] = useState(false);
-  const [quitDialogOpen, setQuitDialogOpen] = useState(false);
-  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
-
+  const [dialog, setDialog] = useState<"quit" | "submit" | null>(null);
   const [timesSpent, setTimesSpent] = useState<Record<string, number>>({});
-  const [questionStartTime, setQuestionStartTime] = useState<number>(
-    Date.now(),
-  );
+  const [questionStart, setQuestionStart] = useState(Date.now());
   const [lastIdx, setLastIdx] = useState(0);
-
-  const questions = useMemo(
-    () => session?.questions ?? [],
-    [session?.questions],
-  );
-  const answered = Object.keys(answers).length;
 
   useEffect(() => {
     api
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
       .then(({ data }: { data?: SessionData }) => {
-        if (data) {
-          setSession(data);
-          if (data.session.deadline_at) {
-            const remaining = Math.max(
+        if (!data) return;
+        setSession(data);
+        if (data.session.deadline_at) {
+          setTimeLeft(
+            Math.max(
               0,
               Math.floor(
                 (new Date(data.session.deadline_at).getTime() - Date.now()) /
                   1000,
               ),
-            );
-            setTimeLeft(remaining);
-          } else if (data.questions.length > 0) {
-            setTimeLeft(Math.max(20, data.questions.length * 2) * 60);
-          }
+            ),
+          );
+        } else if (data.questions.length) {
+          setTimeLeft(Math.max(20, data.questions.length * 2) * 60);
         }
       })
       .catch(console.error);
   }, [id]);
 
+  const questions = useMemo(() => session?.questions ?? [], [session]);
+  const answered = Object.keys(answers).filter(
+    (key) => answers[key] !== null && answers[key] !== "",
+  ).length;
+  const current = questions[idx];
+
   useEffect(() => {
-    const prevQuestion = questions[lastIdx];
-    if (prevQuestion) {
-      const elapsed = Date.now() - questionStartTime;
-      setTimesSpent((prev) => ({
-        ...prev,
-        [prevQuestion.questionId]:
-          (prev[prevQuestion.questionId] ?? 0) + elapsed,
+    const previous = questions[lastIdx];
+    if (previous) {
+      setTimesSpent((value) => ({
+        ...value,
+        [previous.questionId]:
+          (value[previous.questionId] ?? 0) + Date.now() - questionStart,
       }));
     }
-    setQuestionStartTime(Date.now());
+    setQuestionStart(Date.now());
     setLastIdx(idx);
+    // The timer intentionally starts when the question index changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, questions.length]);
 
@@ -137,85 +117,71 @@ export default function ActiveQuizPage({
     if (finishing) return;
     setFinishing(true);
     try {
-      const client = api;
-      const currentQ = questions[idx];
       const finalTimes = { ...timesSpent };
-      if (currentQ) {
-        const elapsed = Date.now() - questionStartTime;
-        finalTimes[currentQ.questionId] =
-          (finalTimes[currentQ.questionId] ?? 0) + elapsed;
+      if (current) {
+        finalTimes[current.questionId] =
+          (finalTimes[current.questionId] ?? 0) + Date.now() - questionStart;
       }
-      for (const [qid, val] of Object.entries(answers)) {
-        const q = session?.questions.find((x) => x.questionId === qid);
-        if (!q) continue;
+      for (const [questionId, value] of Object.entries(answers)) {
+        const question = session?.questions.find(
+          (item) => item.questionId === questionId,
+        );
+        if (!question) continue;
         let response: Record<string, unknown>;
-        if (q.kind === "mc") {
-          const displayPos = q.optionOrder
-            ? q.optionOrder.indexOf(val as number)
-            : (val as number);
+        if (question.kind === "mc" || question.kind === "mcq") {
+          const order =
+            question.optionOrder ?? question.options?.map((_, i) => i) ?? [];
           response = {
-            selected_position: displayPos >= 0 ? displayPos : (val as number),
+            selected_position:
+              order.indexOf(value as number) >= 0
+                ? order.indexOf(value as number)
+                : value,
           };
-        } else if (q.kind === "tf") {
-          response = { answer: val as boolean };
-        } else if (q.kind === "essay") {
-          const body = String(val ?? "");
+        } else if (question.kind === "tf") {
+          response = { answer: value as boolean };
+        } else if (question.kind === "essay") {
+          const body = String(value ?? "");
           response = {
             body,
             word_count: body.trim().split(/\s+/).filter(Boolean).length,
           };
-        } else if (q.kind === "code") {
-          // Must match the grader's Code { source, language } shape, and the
-          // language must equal the question's grading language or the answer
-          // is rejected (and not saved).
+        } else if (question.kind === "code") {
           response = {
-            source: String(val ?? ""),
-            language: q.language ?? q.codeSnippet?.language ?? "python",
+            source: String(value ?? ""),
+            language:
+              question.language ?? question.codeSnippet?.language ?? "python",
           };
         } else {
-          response = { answer: String(val ?? "") };
+          response = { answer: String(value ?? "") };
         }
-        await (
-          client as never as {
-            POST: (p: string, o: unknown) => Promise<unknown>;
-          }
-        ).POST("/v1/sessions/{id}/answer", {
+        await (api as any).POST("/v1/sessions/{id}/answer", {
           params: { path: { id } },
           body: {
-            questionId: qid,
+            questionId,
             response,
-            time_to_answer_ms: Math.round(finalTimes[qid] ?? 0),
+            time_to_answer_ms: Math.round(finalTimes[questionId] ?? 0),
           },
         });
       }
-      await (
-        client as never as { POST: (p: string, o: unknown) => Promise<unknown> }
-      ).POST("/v1/sessions/{id}/finish", { params: { path: { id } } });
-      try {
-        localStorage.setItem("ame.lastSessionId", id);
-      } catch {
-        /* ignore */
-      }
+      await (api as any).POST("/v1/sessions/{id}/finish", {
+        params: { path: { id } },
+      });
       router.push(`/sessions/${id}/results`);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       setFinishing(false);
     }
   }, [
-    id,
-    router,
-    finishing,
     answers,
+    current,
+    finishing,
+    id,
+    questionStart,
+    router,
     session,
-    idx,
-    questionStartTime,
-    questions,
     timesSpent,
   ]);
 
-  // Keep the latest handleFinish reachable from the once-created interval below
-  // without rebuilding the interval — the interval closes over a stale closure
-  // otherwise and would auto-submit an empty answer set on timeout.
   const finishRef = useRef(handleFinish);
   useEffect(() => {
     finishRef.current = handleFinish;
@@ -223,489 +189,284 @@ export default function ActiveQuizPage({
 
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
-    const t = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(t);
+    const timer = setInterval(() => {
+      setTimeLeft((value) => {
+        if (value === null || value <= 1) {
+          clearInterval(timer);
           finishRef.current();
           return 0;
         }
-        return prev - 1;
+        return value - 1;
       });
     }, 1000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => clearInterval(timer);
   }, [timeLeft !== null && timeLeft > 0]);
 
-  const handleSaveExit = useCallback(async () => {
-    try {
-      await api.PATCH(
-        "/v1/sessions/{id}" as never,
-        {
-          params: { path: { id } },
-          body: { status: "abandoned" },
-        } as never,
-      );
-      router.push("/explore");
-    } catch (err) {
-      console.error(err);
-    }
-  }, [id, router]);
-
-  const handleQuitClick = useCallback(() => {
-    setQuitDialogOpen(true);
-  }, []);
-
-  const handleSubmitClick = useCallback(() => {
-    setSubmitDialogOpen(true);
-  }, []);
-
-  // Keyboard shortcuts and Enter navigation. On the last question, Enter opens
-  // the submit confirmation dialog. Keyboard shortcuts (1-9) select options in
-  // MCQ/TF questions when not focused in an input. 'F' toggles the flag.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    function onKey(event: KeyboardEvent) {
       if (!session) return;
-
-      const target = e.target as HTMLElement | null;
-      const isInput =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
+      const target = event.target as HTMLElement | null;
+      const typing =
+        ["INPUT", "TEXTAREA"].includes(target?.tagName ?? "") ||
         target?.isContentEditable;
-
-      // Enter advances
-      if (e.key === "Enter" && !e.shiftKey) {
-        const isTextarea = target?.tagName === "TEXTAREA";
-        if (isTextarea && !(e.ctrlKey || e.metaKey)) return;
-        e.preventDefault();
-        const last = session.questions.length - 1;
-        if (idx < last) setIdx((i) => Math.min(last, i + 1));
-        else setSubmitDialogOpen(true);
-        return;
-      }
-
-      // If typing in an input/textarea, ignore shortcuts
-      if (isInput) return;
-
-      // 'f' or 'F' toggles flag
-      if (e.key === "f" || e.key === "F") {
-        const cur = session.questions[idx];
-        if (cur) {
-          e.preventDefault();
-          setFlagged((prev) => ({
-            ...prev,
-            [cur.questionId]: !prev[cur.questionId],
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !(target?.tagName === "TEXTAREA" && !event.ctrlKey && !event.metaKey)
+      ) {
+        event.preventDefault();
+        if (idx < questions.length - 1) setIdx((value) => value + 1);
+        else setDialog("submit");
+      } else if (!typing && event.key.toLowerCase() === "f" && current) {
+        setFlagged((value) => ({
+          ...value,
+          [current.questionId]: !value[current.questionId],
+        }));
+      } else if (!typing && /^[1-9]$/.test(event.key) && current) {
+        const option = Number(event.key) - 1;
+        if (current.kind === "tf" && option < 2) {
+          setAnswers((value) => ({
+            ...value,
+            [current.questionId]: option === 0,
           }));
-        }
-        return;
-      }
-
-      // Keys 1-9 select option for MCQ/TF
-      if (e.key >= "1" && e.key <= "9") {
-        const cur = session.questions[idx];
-        if (cur) {
-          const num = parseInt(e.key) - 1;
-          if (cur.kind === "tf" && num < 2) {
-            e.preventDefault();
-            const val = num === 0; // 1 = True, 2 = False
-            setAnswers((prev) => ({ ...prev, [cur.questionId]: val }));
-          } else if (cur.options && num < cur.options.length) {
-            e.preventDefault();
-            const order = cur.optionOrder ?? cur.options.map((_, i) => i);
-            const actualIndex = order[num];
-            setAnswers((prev) => ({ ...prev, [cur.questionId]: actualIndex }));
-          }
+        } else if (current.options && option < current.options.length) {
+          const order = current.optionOrder ?? current.options.map((_, i) => i);
+          setAnswers((value) => ({
+            ...value,
+            [current.questionId]: order[option],
+          }));
         }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idx, session]);
+  }, [current, idx, questions.length, session]);
 
   if (!session) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100dvh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <div className="grid min-h-screen place-items-center">
+        <LoaderCircle className="size-7 animate-spin text-primary" />
+      </div>
     );
   }
 
-  const cur = questions[idx];
-  const curAnswer = cur ? (answers[cur.questionId] ?? null) : null;
-
-  const mm = timeLeft !== null ? Math.floor(timeLeft / 60) : null;
-  const ss = timeLeft !== null ? String(timeLeft % 60).padStart(2, "0") : null;
+  const minutes = timeLeft === null ? null : Math.floor(timeLeft / 60);
+  const seconds =
+    timeLeft === null ? null : String(timeLeft % 60).padStart(2, "0");
+  const setAnswer = (value: Answer) => {
+    if (current)
+      setAnswers((previous) => ({ ...previous, [current.questionId]: value }));
+  };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
-      {/* Sticky header */}
-      <Paper
-        elevation={0}
-        sx={{
-          borderBottom: 1,
-          borderColor: "divider",
-          px: { xs: 1.5, sm: 3 },
-          py: 1.5,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 1,
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          bgcolor: "background.default",
-        }}
-      >
-        <Typography
-          variant="subtitle2"
-          sx={{ fontWeight: 500, minWidth: 0, flexShrink: 1 }}
-          noWrap
-        >
-          {session.session.assessment_title || "Quiz"}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {answered}/{questions.length} answered
-          {mm !== null && ss !== null && ` · ${mm}:${ss}`}
-        </Typography>
-        <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-          <Button
-            size="small"
-            variant="contained"
-            color="success"
-            disabled={finishing}
-            onClick={handleSubmitClick}
-          >
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:px-8">
+        <div className="min-w-0">
+          <p className="truncate font-medium">
+            {session.session.assessment_title || "Quiz"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {answered}/{questions.length} answered
+            {minutes !== null && ` · ${minutes}:${seconds}`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setDialog("submit")} disabled={finishing}>
             {finishing ? "Submitting…" : "Submit"}
           </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            startIcon={<ExitToAppOutlinedIcon />}
-            onClick={handleQuitClick}
-          >
-            Quit
+          <Button variant="outline" onClick={() => setDialog("quit")}>
+            <LogOut /> Quit
           </Button>
-        </Stack>
-      </Paper>
-
-      {/* Progress bar */}
-      <LinearProgress
-        variant="determinate"
-        value={questions.length ? (answered / questions.length) * 100 : 0}
-      />
-
-      {/* Main container splits left (question) and right (sidebar) */}
-      <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Left: Question area */}
-        <Box
-          sx={{
-            flex: 1,
-            overflowY: "auto",
-            p: { xs: 2, sm: 4 },
-            display: "flex",
-            flexDirection: "column",
+        </div>
+      </header>
+      <div className="h-1 bg-muted">
+        <div
+          className="h-full bg-primary transition-all"
+          style={{
+            width: `${questions.length ? (answered / questions.length) * 100 : 0}%`,
           }}
-        >
-          <Box sx={{ maxWidth: 800, mx: "auto", width: "100%" }}>
-            {cur && (
+        />
+      </div>
+
+      <main className="flex min-h-0 flex-1">
+        <section className="min-w-0 flex-1 overflow-y-auto p-5 sm:p-10">
+          <div className="mx-auto max-w-3xl">
+            {current && (
               <>
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 1.5,
-                  }}
-                >
-                  <Typography variant="caption" color="text.secondary">
+                <div className="mb-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>
                     Question {idx + 1} of {questions.length} ·{" "}
-                    {QUESTION_TYPES[cur.kind] ?? cur.kind} · {cur.points}{" "}
-                    {cur.points === 1 ? "pt" : "pts"}
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="text"
-                    color={flagged[cur.questionId] ? "warning" : "inherit"}
-                    startIcon={
-                      flagged[cur.questionId] ? (
-                        <FlagIcon sx={{ color: "warning.main" }} />
-                      ) : (
-                        <FlagOutlinedIcon />
-                      )
-                    }
+                    {QUESTION_TYPES[current.kind] ?? current.kind} ·{" "}
+                    {current.points} pt{current.points === 1 ? "" : "s"}
+                  </span>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 transition hover:bg-muted ${flagged[current.questionId] ? "text-amber-600 dark:text-amber-300" : ""}`}
                     onClick={() =>
-                      setFlagged((prev) => ({
-                        ...prev,
-                        [cur.questionId]: !prev[cur.questionId],
+                      setFlagged((value) => ({
+                        ...value,
+                        [current.questionId]: !value[current.questionId],
                       }))
                     }
-                    sx={{ textTransform: "none", fontSize: 12 }}
                   >
-                    {flagged[cur.questionId] ? "Flagged" : "Flag for review"}
-                  </Button>
-                </Stack>
-                <Typography variant="h6" sx={{ mb: 3 }}>
-                  {cur.prompt}
-                </Typography>
-
-                <Box data-testid="question-input">
+                    <Flag className="size-3.5" />{" "}
+                    {flagged[current.questionId]
+                      ? "Flagged"
+                      : "Flag for review"}
+                  </button>
+                </div>
+                <h1 className="mb-8 text-2xl font-semibold tracking-tight">
+                  {current.prompt}
+                </h1>
+                <div data-testid="question-input">
                   <QuestionInput
-                    question={cur}
-                    value={curAnswer}
-                    onChange={(v) =>
-                      setAnswers((prev) => ({ ...prev, [cur.questionId]: v }))
-                    }
+                    question={current}
+                    value={answers[current.questionId] ?? null}
+                    onChange={setAnswer}
                     disabled={false}
                   />
-                </Box>
+                </div>
               </>
             )}
-          </Box>
-        </Box>
+          </div>
+        </section>
 
-        {/* Right: Question Navigation Sidebar (Desktop only) */}
-        <Box
-          sx={{
-            width: 280,
-            borderLeft: 1,
-            borderColor: "divider",
-            bgcolor: "background.paper",
-            display: { xs: "none", md: "flex" },
-            flexDirection: "column",
-            p: 3,
-            overflowY: "auto",
-          }}
-        >
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 600, mb: 2, letterSpacing: 0.5 }}
-          >
-            Questions
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 1.25,
-            }}
-          >
-            {questions.map((q, qIdx) => {
-              const isCurrent = qIdx === idx;
+        <aside className="hidden w-72 shrink-0 border-l border-border bg-card/30 p-6 md:block">
+          <h2 className="mb-4 text-sm font-semibold">Questions</h2>
+          <div className="grid grid-cols-5 gap-2">
+            {questions.map((question, questionIndex) => {
               const isAnswered =
-                answers[q.questionId] !== undefined &&
-                answers[q.questionId] !== null &&
-                answers[q.questionId] !== "";
-              const isFlagged = flagged[q.questionId] === true;
-
-              let btnBg = "transparent";
-              let btnBorderColor = "divider";
-              let btnColor = "text.primary";
-              let hoverBg = "action.hover";
-
-              if (isCurrent) {
-                btnBorderColor = "primary.main";
-                btnBg = "action.selected";
-                btnColor = "primary.main";
-              } else if (isAnswered) {
-                btnBg = "rgba(46, 125, 50, 0.08)";
-                btnBorderColor = "success.light";
-                btnColor = "success.main";
-                hoverBg = "rgba(46, 125, 50, 0.16)";
-              }
-
+                answers[question.questionId] !== undefined &&
+                answers[question.questionId] !== null &&
+                answers[question.questionId] !== "";
               return (
-                <Box
-                  key={q.questionId}
-                  component="button"
-                  onClick={() => setIdx(qIdx)}
-                  sx={{
-                    position: "relative",
-                    aspectRatio: "1/1",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 1.5,
-                    border: "2px solid",
-                    borderColor: btnBorderColor,
-                    bgcolor: btnBg,
-                    color: btnColor,
-                    fontSize: 14,
-                    fontWeight: isCurrent ? 700 : 500,
-                    cursor: "pointer",
-                    transition: "all 0.12s",
-                    outline: "none",
-                    "&:hover": {
-                      bgcolor: hoverBg,
-                    },
-                    "&:focus-visible": {
-                      borderColor: "primary.main",
-                      boxShadow: "0 0 0 2px rgba(25, 118, 210, 0.2)",
-                    },
-                  }}
+                <button
+                  key={question.questionId}
+                  type="button"
+                  onClick={() => setIdx(questionIndex)}
+                  className={`relative aspect-square rounded-lg border-2 text-sm font-medium transition hover:bg-muted ${questionIndex === idx ? "border-primary bg-primary/10 text-primary" : isAnswered ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border"}`}
                 >
-                  {qIdx + 1}
-                  {isFlagged && (
-                    <FlagIcon
-                      sx={{
-                        position: "absolute",
-                        top: -4,
-                        right: -4,
-                        fontSize: 14,
-                        color: "warning.main",
-                        bgcolor: "background.paper",
-                        borderRadius: "50%",
-                        boxShadow: 1,
-                      }}
-                    />
+                  {questionIndex + 1}
+                  {flagged[question.questionId] && (
+                    <Flag className="absolute -right-1 -top-1 size-3.5 rounded-full bg-background text-amber-500" />
                   )}
-                </Box>
+                </button>
               );
             })}
-          </Box>
-        </Box>
-      </Box>
+          </div>
+        </aside>
+      </main>
 
-      {/* Footer nav */}
-      <Paper
-        elevation={0}
-        sx={{
-          borderTop: 1,
-          borderColor: "divider",
-          px: 3,
-          py: 1.5,
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
+      <footer className="flex items-center justify-between border-t border-border bg-background px-4 py-3 sm:px-8">
         <Button
-          startIcon={<ArrowBackOutlinedIcon />}
+          variant="outline"
           disabled={idx === 0}
-          onClick={() => setIdx((i) => Math.max(0, i - 1))}
+          onClick={() => setIdx((value) => Math.max(0, value - 1))}
         >
-          Previous
+          <ArrowLeft /> Previous
         </Button>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ alignSelf: "center", display: { xs: "none", sm: "block" } }}
-        >
+        <span className="hidden text-xs text-muted-foreground sm:block">
           Press Enter to continue
-        </Typography>
+        </span>
         {idx < questions.length - 1 ? (
           <Button
-            endIcon={<ArrowForwardOutlinedIcon />}
-            variant="contained"
-            onClick={() => setIdx((i) => Math.min(questions.length - 1, i + 1))}
+            onClick={() =>
+              setIdx((value) => Math.min(questions.length - 1, value + 1))
+            }
           >
-            Next
+            Next <ArrowRight />
           </Button>
         ) : (
-          <Button
-            variant="contained"
-            color="success"
-            disabled={finishing}
-            onClick={handleSubmitClick}
-          >
-            {finishing ? "Submitting…" : "Submit"}
-          </Button>
-        )}
-      </Paper>
-
-      {/* Quit Confirmation Dialog */}
-      <Dialog
-        open={quitDialogOpen}
-        onClose={() => setQuitDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Quit Assessment?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to quit? Your progress will not be saved and
-            you cannot resume this assessment later.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQuitDialogOpen(false)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => {
-              setQuitDialogOpen(false);
-              handleSaveExit();
-            }}
-          >
-            Quit
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Submit Confirmation Dialog */}
-      <Dialog
-        open={submitDialogOpen}
-        onClose={() => setSubmitDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Submit Assessment?</DialogTitle>
-        <DialogContent>
-          <DialogContentText component="div">
-            {questions.length - answered > 0 ||
-            Object.values(flagged).filter(Boolean).length > 0 ? (
-              <>
-                {questions.length - answered > 0 && (
-                  <Box component="span" sx={{ display: "block", mb: 1 }}>
-                    You have {questions.length - answered} unanswered question
-                    {questions.length - answered !== 1 ? "s" : ""}.
-                  </Box>
-                )}
-                {Object.values(flagged).filter(Boolean).length > 0 && (
-                  <Box
-                    component="span"
-                    sx={{ display: "block", color: "warning.main", mb: 1 }}
-                  >
-                    You have {Object.values(flagged).filter(Boolean).length}{" "}
-                    question
-                    {Object.values(flagged).filter(Boolean).length !== 1
-                      ? "s"
-                      : ""}{" "}
-                    flagged for review.
-                  </Box>
-                )}
-                <Box component="span" sx={{ display: "block" }}>
-                  Are you sure you want to submit and finish this assessment?
-                </Box>
-              </>
-            ) : (
-              "Are you sure you want to submit and finish this assessment?"
-            )}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSubmitDialogOpen(false)}>Cancel</Button>
-          <Button
-            color="success"
-            variant="contained"
-            onClick={() => {
-              setSubmitDialogOpen(false);
-              handleFinish();
-            }}
-          >
+          <Button onClick={() => setDialog("submit")} disabled={finishing}>
             Submit
           </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        )}
+      </footer>
+
+      {dialog && (
+        <ConfirmDialog
+          kind={dialog}
+          unanswered={questions.length - answered}
+          flagged={Object.values(flagged).filter(Boolean).length}
+          onClose={() => setDialog(null)}
+          onConfirm={
+            dialog === "quit"
+              ? async () => {
+                  await (api as any).PATCH("/v1/sessions/{id}", {
+                    params: { path: { id } },
+                    body: { status: "abandoned" },
+                  });
+                  router.push("/explore");
+                }
+              : handleFinish
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  kind,
+  unanswered,
+  flagged,
+  onClose,
+  onConfirm,
+}: {
+  kind: "quit" | "submit";
+  unanswered: number;
+  flagged: number;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+    >
+      <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <h2 id="confirm-title" className="text-lg font-semibold">
+            {kind === "quit" ? "Quit Assessment?" : "Submit Assessment?"}
+          </h2>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          {kind === "quit" ? (
+            "Are you sure you want to quit? Your progress will not be saved and you cannot resume this assessment later."
+          ) : unanswered || flagged ? (
+            <>
+              You have {unanswered} unanswered question
+              {unanswered === 1 ? "" : "s"}
+              {flagged ? ` and ${flagged} flagged for review` : ""}. Are you
+              sure you want to submit?
+            </>
+          ) : (
+            "Are you sure you want to submit and finish this assessment?"
+          )}
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant={kind === "quit" ? "destructive" : "default"}
+            onClick={onConfirm}
+          >
+            {kind === "quit" ? "Quit" : "Submit"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -717,25 +478,25 @@ function QuestionInput({
 }: {
   question: SessionQuestion;
   value: Answer;
-  onChange: (v: Answer) => void;
+  onChange: (value: Answer) => void;
   disabled: boolean;
 }) {
   if ((question.kind === "mc" || question.kind === "mcq") && question.options) {
-    const order = question.optionOrder ?? question.options.map((_, i) => i);
-    const opts = order.map((pos) => ({
-      text: question.options![pos].text,
-      index: pos,
-    }));
+    const order =
+      question.optionOrder ?? question.options.map((_, index) => index);
     return (
       <McqRenderer
-        options={opts}
+        options={order.map((index) => ({
+          text: question.options![index].text,
+          index,
+        }))}
         value={typeof value === "number" ? value : null}
         onChange={onChange}
         disabled={disabled}
       />
     );
   }
-  if (question.kind === "tf") {
+  if (question.kind === "tf")
     return (
       <TfRenderer
         value={typeof value === "boolean" ? value : null}
@@ -743,8 +504,7 @@ function QuestionInput({
         disabled={disabled}
       />
     );
-  }
-  if (question.kind === "cloze") {
+  if (question.kind === "cloze")
     return (
       <ClozeRenderer
         prompt={question.prompt}
@@ -753,8 +513,7 @@ function QuestionInput({
         disabled={disabled}
       />
     );
-  }
-  if (question.kind === "code") {
+  if (question.kind === "code")
     return (
       <CodeRenderer
         value={String(value ?? "")}
@@ -764,13 +523,7 @@ function QuestionInput({
         starter={question.codeSnippet?.body}
       />
     );
-  }
-  const isEssay =
-    question.kind === "free_text" &&
-    String(value ?? "")
-      .trim()
-      .split(/\s+/).length > 30;
-  if (isEssay || question.kind === "essay") {
+  if (question.kind === "essay")
     return (
       <EssayRenderer
         value={String(value ?? "")}
@@ -778,7 +531,6 @@ function QuestionInput({
         disabled={disabled}
       />
     );
-  }
   return (
     <ShortRenderer
       value={String(value ?? "")}

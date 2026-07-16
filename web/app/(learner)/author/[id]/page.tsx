@@ -1,73 +1,42 @@
-// @ts-nocheck
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { api } from "@/api/client";
 import { MarkdownView } from "@/components/MarkdownView";
-import {
-  Box,
-  Stack,
-  Typography,
-  Button,
-  Card,
-  CardContent,
-  Alert,
-  AddOutlinedIcon,
-  AutoAwesomeOutlinedIcon,
-  ArrowForwardOutlinedIcon,
-  CheckOutlinedIcon,
-  DeleteOutlineIcon,
-} from "@/components/ui/legacy-primitives";
+import { Button } from "@/components/ui/button";
 
-interface AssessmentQuestion {
+type Question = {
   id: string;
   kind: string;
   prompt: string;
-  payload: unknown;
+  tags: string[];
+  payload: any;
   explanation?: string;
   deepDive?: string;
   source?: string;
   points: number;
   status: string;
   orderIndex: number;
-}
-
-interface Assessment {
+};
+type Assessment = {
   id: string;
   title: string;
   status: string;
   course?: string;
   description?: string;
-  duration?: number;
-  difficulty?: string;
-  attempts?: number;
-  questions: AssessmentQuestion[];
+  questions: Question[];
   updated_at?: string;
-}
-
-function kindLabel(kind: string): string {
-  const map: Record<string, string> = {
-    mc: "MC",
-    tf: "T/F",
-    short: "Short",
-    essay: "Essay",
-    code: "Code",
-  };
-  return map[kind] ?? kind;
-}
-
-function getMinutesAgo(iso: string): string {
-  if (!iso) return "unknown";
-  const now = new Date();
-  const then = new Date(iso);
-  const mins = Math.floor((now.getTime() - then.getTime()) / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
+};
+const kinds = ["mc", "tf", "short", "essay", "code"];
+const kindLabels: Record<string, string> = {
+  mc: "Multiple choice",
+  tf: "True / false",
+  short: "Short answer",
+  essay: "Essay",
+  code: "Code",
+};
 
 export default function AuthorStudioPage({
   params,
@@ -77,1434 +46,513 @@ export default function AuthorStudioPage({
   const { id } = use(params);
   const router = useRouter();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const [editTitle, setEditTitle] = useState("");
-  const [editCourse, setEditCourse] = useState("");
-  const [editDuration, setEditDuration] = useState(30);
-  const [editDifficulty, setEditDifficulty] = useState("intermediate");
-  const [editAttempts, setEditAttempts] = useState(2);
-
-  const [editPrompt, setEditPrompt] = useState("");
-  const [editExplanation, setEditExplanation] = useState("");
-  const [editDeepDive, setEditDeepDive] = useState("");
-  const [editSource, setEditSource] = useState("");
-  const [sourceError, setSourceError] = useState<string | null>(null);
-  const [editPoints, setEditPoints] = useState(1);
-  const [editTag, setEditTag] = useState("");
-  const [editQuestionDifficulty, setEditQuestionDifficulty] =
-    useState("intermediate");
-  const [editPayload, setEditPayload] = useState<Record<string, unknown>>({});
-
-  const [, setSaving] = useState(false);
+  const [title, setTitle] = useState("");
+  const [course, setCourse] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [explanation, setExplanation] = useState("");
+  const [deepDive, setDeepDive] = useState("");
+  const [source, setSource] = useState("");
+  const [points, setPoints] = useState(1);
+  const [tag, setTag] = useState("");
+  const [payload, setPayload] = useState<any>({});
+  const [picker, setPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [showKindPicker, setShowKindPicker] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function load(showSpinner = false) {
-    if (showSpinner) setLoading(true);
-    api
-      .GET("/v1/assessments/{id}", { params: { path: { id } } })
-      .then(({ data }) => {
-        if (data) {
-          const mappedAssessment: Assessment = {
-            id: (data as any).id,
-            title: (data as any).title,
-            description: (data as any).description ?? undefined,
-            status: (data as any).status,
-            course: (data as any).course ?? undefined,
-            questions: (data as any).questions.map((q: any) => ({
-              id: q.id,
-              kind: q.kind,
-              prompt: q.prompt,
-              codeSnippet: q.codeSnippet ?? undefined,
-              payload: q.payload,
-              explanation: q.explanation ?? undefined,
-              deepDive: q.deepDive ?? undefined,
-              source: q.source ?? undefined,
-              points: q.points,
-              status: q.status,
-              orderIndex: q.orderIndex,
-            })),
-          };
-          setAssessment(mappedAssessment);
-          setEditTitle(mappedAssessment.title || "");
-          setEditCourse(mappedAssessment.course || "");
-          if (mappedAssessment.questions.length && !selectedId) {
-            setSelectedId(mappedAssessment.questions[0].id);
-          }
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }
-
+  const load = async () => {
+    const { data } = await api.GET("/v1/assessments/{id}", {
+      params: { path: { id } },
+    });
+    if (!data) return;
+    const next = data as any as Assessment;
+    setAssessment(next);
+    setTitle(next.title ?? "");
+    setCourse(next.course ?? "");
+    setSelectedId((current) => current ?? next.questions[0]?.id ?? null);
+  };
   useEffect(() => {
-    load(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load().catch(console.error);
   }, [id]);
-
-  const selectedQ =
+  const selected =
     assessment?.questions.find((q) => q.id === selectedId) ?? null;
-
   useEffect(() => {
-    if (selectedQ) {
-      setEditPrompt(selectedQ.prompt);
-      setEditExplanation(selectedQ.explanation ?? "");
-      setEditDeepDive(selectedQ.deepDive ?? "");
-      setEditSource(selectedQ.source ?? "");
-      setSourceError(null);
-      setEditPoints(selectedQ.points);
-      setEditTag("");
-      setEditQuestionDifficulty("intermediate");
-      setEditPayload((selectedQ.payload as Record<string, unknown>) ?? {});
-    }
-  }, [selectedQ]);
+    if (!selected) return;
+    setPrompt(selected.prompt ?? "");
+    setExplanation(selected.explanation ?? "");
+    setDeepDive(selected.deepDive ?? "");
+    setSource(selected.source ?? "");
+    setPoints(selected.points ?? 1);
+    setTag(selected.tags?.join(", ") ?? "");
+    setPayload(selected.payload ?? {});
+  }, [selected]);
 
-  async function saveMetadata() {
-    setSaving(true);
-    try {
-      await api.PATCH("/v1/assessments/{id}", {
-        params: { path: { id } },
-        body: {
-          title: editTitle,
-        },
-      });
-      load();
-    } catch {
-      // noop
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveQuestion(payloadOverride?: Record<string, unknown>) {
+  const saveMetadata = async () => {
+    await api.PATCH("/v1/assessments/{id}", {
+      params: { path: { id } },
+      body: { title, course: course || undefined },
+    });
+    await load();
+  };
+  const saveQuestion = async (nextPayload = payload) => {
     if (!selectedId) return;
-
-    // Validate URL scheme if present
-    if (editSource) {
-      const isSchemeValid =
-        editSource.startsWith("http://") || editSource.startsWith("https://");
-      if (!isSchemeValid) {
-        setSourceError("URL must start with http:// or https://");
-        return;
-      }
+    if (source && !/^https?:\/\//.test(source)) {
+      setError("Reference URL must start with http:// or https://");
+      return;
     }
-    setSourceError(null);
-
+    setError(null);
     setSaving(true);
-    const tags = editTag
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
     try {
       await api.PATCH("/v1/questions/{id}", {
         params: { path: { id: selectedId } },
         body: {
-          prompt: editPrompt,
-          explanation: editExplanation || undefined,
-          deepDive: editDeepDive || undefined,
-          source: editSource || undefined,
-          points: editPoints,
-          tags: tags.length > 0 ? tags : undefined,
-          payload: payloadOverride ?? editPayload,
+          prompt,
+          explanation: explanation || undefined,
+          deepDive: deepDive || undefined,
+          source: source || undefined,
+          points,
+          tags: tag
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean),
+          payload: nextPayload,
         },
       });
-      load();
-    } catch {
-      // noop
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save question");
     } finally {
       setSaving(false);
     }
-  }
-
-  async function addQuestion(kind: string) {
-    setShowKindPicker(false);
+  };
+  const addQuestion = async (kind: string) => {
+    setPicker(false);
     setSaving(true);
     try {
       const { data } = await api.POST("/v1/assessments/{id}/questions", {
         params: { path: { id } },
         body: { kind: kind as any, prompt: "" },
       });
-      load();
-      if (data?.questionId) setSelectedId(data.questionId);
-    } catch {
-      // noop
+      await load();
+      if ((data as any)?.questionId) setSelectedId((data as any).questionId);
     } finally {
       setSaving(false);
     }
-  }
-
-  async function deleteQuestion(idToDelete: string) {
-    const remaining =
-      assessment?.questions.filter((q) => q.id !== idToDelete) ?? [];
-    if (selectedId === idToDelete)
-      setSelectedId(remaining.length > 0 ? remaining[0].id : null);
-    setAssessment((q) =>
-      q
-        ? { ...q, questions: q.questions.filter((qq) => qq.id !== idToDelete) }
-        : q,
-    );
-    try {
-      await api.DELETE("/v1/assessments/{id}/questions/{question_id}", {
-        params: { path: { id, question_id: idToDelete } },
-      });
-      load();
-    } catch (err) {
-      console.error("delete failed", err);
-      load();
-    }
-  }
-
-  async function changeKind(newKind: string) {
-    if (!selectedId || !selectedQ) return;
-    if (newKind === selectedQ.kind) return;
-    setSaving(true);
-    try {
-      const { data } = await api.POST("/v1/assessments/{id}/questions", {
-        params: { path: { id } },
-        body: {
-          kind: newKind as any,
-          prompt: editPrompt,
-        },
-      });
-      await api.POST("/v1/questions/{id}/archive", {
-        params: { path: { id: selectedId } },
-      });
-      load();
-      if (data?.questionId) setSelectedId(data.questionId);
-    } catch {
-      // noop
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function publish() {
+  };
+  const deleteQuestion = async (questionId: string) => {
+    await api.DELETE("/v1/assessments/{id}/questions/{question_id}", {
+      params: { path: { id, question_id: questionId } },
+    });
+    setSelectedId(null);
+    await load();
+  };
+  const publish = async () => {
     setPublishing(true);
-    setPublishError(null);
-    const { error } = await api.PATCH("/v1/assessments/{id}", {
+    setError(null);
+    const { error: publishError } = await api.PATCH("/v1/assessments/{id}", {
       params: { path: { id } },
       body: { status: "active" },
     });
     setPublishing(false);
-    if (error) {
-      const msg =
-        typeof error === "object" && error && "message" in error
-          ? String((error as { message: string }).message)
-          : "Failed to publish";
-      setPublishError(msg);
-      return;
-    }
-    router.push(`/assessments/${id}/preview`);
-  }
+    if (publishError)
+      setError(
+        typeof publishError === "object" && "message" in publishError
+          ? String((publishError as any).message)
+          : "Could not publish assessment",
+      );
+    else router.push(`/assessments/${id}/preview`);
+  };
 
-  const outlineComplete =
-    editTitle.trim().length > 0 && (assessment?.questions.length ?? 0) > 0;
-  const incompleteQuestions =
-    assessment?.questions
-      .map((q, idx) => {
-        const issues: string[] = [];
-        if (!q.prompt?.trim()) issues.push("no prompt");
-        if (!q.points) issues.push("0 pts");
-        return issues.length > 0 ? { idx: idx + 1, id: q.id, issues } : null;
-      })
-      .filter(Boolean) ?? [];
-  const questionsNeedingReview = incompleteQuestions.length;
+  const incomplete =
+    assessment?.questions.filter((q) => !q.prompt?.trim() || !q.points)
+      .length ?? 0;
   const totalPoints =
     assessment?.questions.reduce((sum, q) => sum + (q.points || 0), 0) ?? 0;
-  const minutesAgo = getMinutesAgo(assessment?.updated_at ?? "");
+  const mcOptions = Array.isArray(payload.options) ? payload.options : [];
+  const setMcOption = (index: number, value: string) =>
+    setPayload({
+      ...payload,
+      options: mcOptions.map((option: string, i: number) =>
+        i === index ? value : option,
+      ),
+    });
 
-  if (loading) {
+  if (!assessment)
     return (
-      <Box sx={{ p: "48px 36px", color: "text.secondary", fontSize: 13 }}>
-        Loading…
-      </Box>
+      <div className="grid min-h-[60vh] place-items-center text-sm text-muted-foreground">
+        Loading assessment…
+      </div>
     );
-  }
-
-  if (!assessment) {
-    return (
-      <Box sx={{ p: "48px 36px", color: "text.secondary", fontSize: 14 }}>
-        Assessment not found.
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8 }}>
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          mb: 2.25,
-        }}
-      >
-        <Box>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              fontFamily: "monospace",
-              letterSpacing: 1.3,
-              textTransform: "uppercase",
-              display: "block",
-              mb: 0.5,
-            }}
-          >
-            Editing draft · {editCourse} · autosaved
-          </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 400 }}>
+    <main className="mx-auto max-w-[1500px] px-5 py-8 sm:px-10">
+      <header className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+        <div>
+          <p className="mb-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            Editing draft · {course || "untitled course"}
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">
             Author studio
-          </Typography>
-        </Box>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ alignItems: "center", flexWrap: "wrap" }}
-        >
-          <Button
-            variant="outlined"
-            size="small"
-            disabled
-            title="Not yet available"
-          >
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled>
             Import
           </Button>
           <Button
-            variant="outlined"
-            size="small"
+            variant="outline"
             onClick={() => router.push(`/assessments/${id}/preview`)}
           >
             Preview
           </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={async () => {
-              await saveMetadata();
-              router.push("/author");
-            }}
-          >
+          <Button variant="outline" onClick={() => saveMetadata()}>
             Save draft
           </Button>
           <Button
-            variant="contained"
-            size="small"
             onClick={publish}
-            disabled={assessment.status === "active" || publishing}
-            endIcon={<ArrowForwardOutlinedIcon sx={{ fontSize: 14 }} />}
+            disabled={publishing || assessment.status === "active"}
           >
             {publishing ? "Publishing…" : "Publish"}
+            <ArrowRight />
           </Button>
-        </Stack>
-      </Box>
-
-      {publishError && (
-        <Alert severity="error" sx={{ mb: 1.75 }}>
-          {publishError}
-        </Alert>
+        </div>
+      </header>
+      {error && (
+        <div
+          role="alert"
+          className="mb-5 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {error}
+        </div>
       )}
 
-      {/* Metadata row */}
-      <Card variant="outlined" sx={{ mb: 2.25 }}>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "2fr 1fr 1fr",
-              md: "2fr 1fr 1fr 1fr 1fr",
-            },
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-        >
-          {[
-            {
-              label: "Title",
-              el: (
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onBlur={saveMetadata}
-                  style={inlineInput}
-                />
-              ),
-            },
-            {
-              label: "Course",
-              el: (
-                <input
-                  value={editCourse}
-                  onChange={(e) => setEditCourse(e.target.value)}
-                  onBlur={saveMetadata}
-                  style={inlineInput}
-                />
-              ),
-            },
-            {
-              label: "Duration",
-              el: (
-                <input
-                  type="number"
-                  value={editDuration}
-                  onChange={(e) =>
-                    setEditDuration(parseInt(e.target.value) || 30)
-                  }
-                  onBlur={saveMetadata}
-                  style={inlineInput}
-                />
-              ),
-            },
-            {
-              label: "Difficulty",
-              el: (
-                <select
-                  value={editDifficulty}
-                  onChange={(e) => setEditDifficulty(e.target.value)}
-                  onBlur={saveMetadata}
-                  style={inlineInput}
-                >
-                  <option value="intro">Intro</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              ),
-            },
-            {
-              label: "Attempts",
-              el: (
-                <input
-                  type="number"
-                  value={editAttempts}
-                  onChange={(e) =>
-                    setEditAttempts(parseInt(e.target.value) || 1)
-                  }
-                  onBlur={saveMetadata}
-                  style={inlineInput}
-                />
-              ),
-            },
-          ].map((field, i, arr) => (
-            <Box
-              key={field.label}
-              component="label"
-              sx={{
-                p: "14px 22px",
-                borderRight: i < arr.length - 1 ? 1 : 0,
-                borderColor: "divider",
-                display: "block",
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={monoLabel as React.CSSProperties}
-              >
-                {field.label}
-              </Typography>
-              {field.el}
-            </Box>
-          ))}
-        </Box>
+      <section className="mb-5 rounded-xl border border-border bg-card">
+        <div className="grid gap-4 border-b border-border p-5 sm:grid-cols-3">
+          <Field label="Title">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={saveMetadata}
+            />
+          </Field>
+          <Field label="Course">
+            <input
+              value={course}
+              onChange={(e) => setCourse(e.target.value)}
+              onBlur={saveMetadata}
+              placeholder="Optional course or track"
+            />
+          </Field>
+          <div className="flex items-end text-sm text-muted-foreground">
+            {assessment.questions.length} questions · {totalPoints} pts
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-4 px-5 py-3 text-xs text-muted-foreground">
+          <span
+            className={
+              title.trim() && assessment.questions.length
+                ? "text-emerald-600 dark:text-emerald-300"
+                : ""
+            }
+          >
+            {title.trim() && assessment.questions.length ? "✓" : "✗"} Outline
+            complete
+          </span>
+          <span
+            className={
+              incomplete === 0
+                ? "text-emerald-600 dark:text-emerald-300"
+                : "text-amber-600 dark:text-amber-300"
+            }
+          >
+            {incomplete === 0
+              ? "✓ All questions ready"
+              : `${incomplete} question${incomplete === 1 ? "" : "s"} need review`}
+          </span>
+        </div>
+      </section>
 
-        {/* Validation bar */}
-        <Box
-          sx={{
-            px: "22px",
-            py: 1.75,
-            display: "flex",
-            gap: 3.5,
-            alignItems: "center",
-            fontSize: 12.5,
-            color: "text.secondary",
-          }}
-        >
-          <Box
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 0.75,
-              color: outlineComplete ? "success.main" : "text.disabled",
-            }}
-          >
-            <span>{outlineComplete ? "✓" : "✗"}</span>
-            <span>Outline complete</span>
-          </Box>
-          <Box
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 0.75,
-              color:
-                questionsNeedingReview === 0 ? "success.main" : "text.disabled",
-            }}
-          >
-            {questionsNeedingReview === 0 ? (
-              <>
-                <span>✓</span>
-                <span>All questions ready</span>
-              </>
-            ) : (
-              <>
-                <span>✗</span>
-                <span>
-                  {incompleteQuestions
-                    .map((q) => `Q${q!.idx} (${q!.issues.join(", ")})`)
-                    .join(" · ")}
-                </span>
-              </>
-            )}
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            ≈ {assessment.questions.length} questions · {totalPoints} pts
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ ml: "auto", fontFamily: "monospace", letterSpacing: 0.5 }}
-          >
-            Last edit · {minutesAgo} ago · by you
-          </Typography>
-        </Box>
-      </Card>
-
-      {/* Three-pane layout */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "320px 1fr 280px" },
-          gap: 2.25,
-          minHeight: 600,
-        }}
-      >
-        {/* LEFT - Questions list */}
-        <Card
-          variant="outlined"
-          sx={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
-        >
-          <Box
-            sx={{
-              px: 2,
-              py: 1.75,
-              borderBottom: 1,
-              borderColor: "divider",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={monoLabel as React.CSSProperties}
-            >
+      <div className="grid min-h-[600px] gap-5 lg:grid-cols-[280px_minmax(0,1fr)_240px]">
+        <section className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
               Questions
-            </Typography>
+            </p>
             <Button
-              size="small"
-              variant="outlined"
-              startIcon={<AddOutlinedIcon sx={{ fontSize: 12 }} />}
-              onClick={() => setShowKindPicker((v) => !v)}
-              sx={{ minWidth: 0 }}
+              size="sm"
+              variant="outline"
+              onClick={() => setPicker(!picker)}
             >
-              Add
+              <Plus /> Add
             </Button>
-          </Box>
-
-          {showKindPicker && (
-            <Box
-              sx={{
-                px: 2,
-                py: 1.5,
-                borderBottom: 1,
-                borderColor: "divider",
-                bgcolor: "action.hover",
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontFamily: "monospace",
-                  display: "block",
-                  mb: 1,
-                  fontSize: 10,
-                  letterSpacing: 1,
-                }}
-              >
-                Choose type
-              </Typography>
-              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                {(["mc", "tf", "short", "essay", "code"] as const).map((k) => (
+          </div>
+          {picker && (
+            <div className="border-b border-border bg-muted/30 p-3">
+              <p className="mb-2 text-xs text-muted-foreground">Choose type</p>
+              <div className="flex flex-wrap gap-2">
+                {kinds.map((kind) => (
                   <Button
-                    key={k}
-                    size="small"
-                    variant="outlined"
-                    onClick={() => addQuestion(k)}
-                    sx={{ minWidth: 0, fontSize: 11, px: 1.25, py: 0.5 }}
+                    key={kind}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => addQuestion(kind)}
                   >
-                    {kindLabel(k)}
+                    {kind === "tf" ? "T/F" : kindLabels[kind]}
                   </Button>
                 ))}
-              </Stack>
-            </Box>
+              </div>
+            </div>
           )}
-
-          <Box sx={{ flex: 1, overflow: "auto" }}>
+          <div>
             {assessment.questions.length === 0 ? (
-              <Box
-                sx={{
-                  p: "24px 16px",
-                  color: "text.secondary",
-                  fontSize: 13,
-                  textAlign: "center",
-                }}
-              >
+              <p className="p-8 text-center text-sm text-muted-foreground">
                 No questions yet.
-              </Box>
+              </p>
             ) : (
-              assessment.questions.map((q, idx) => {
-                const sel = selectedId === q.id;
-                const incomplete = !q.prompt?.trim() || !q.points;
-                return (
-                  <Box
-                    key={q.id}
-                    onClick={() => setSelectedId(q.id)}
-                    sx={{
-                      width: "100%",
-                      px: 2,
-                      py: 1.5,
-                      bgcolor: sel
-                        ? (theme) =>
-                            theme.palette.mode === "dark"
-                              ? "rgba(25, 118, 210, 0.16)"
-                              : "rgba(25, 118, 210, 0.08)"
-                        : "transparent",
-                      borderLeft: `2px solid`,
-                      borderLeftColor: sel ? "primary.main" : "transparent",
-                      borderBottom: 1,
-                      borderColor: "divider",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      display: "grid",
-                      gridTemplateColumns: "28px 1fr 40px 28px",
-                      gap: 1,
-                      alignItems: "start",
-                      "&:hover .delete-btn": { opacity: 1 },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 0.5,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontFamily: "monospace", pt: 0.25 }}
-                      >
-                        Q{idx + 1}
-                      </Typography>
-                      {incomplete && (
-                        <Box
-                          sx={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: "50%",
-                            bgcolor: "warning.main",
-                          }}
-                          title={[
-                            !q.prompt?.trim() ? "no prompt" : null,
-                            !q.points ? "0 pts" : null,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
-                        />
-                      )}
-                    </Box>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: sel ? "text.primary" : "text.secondary",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          fontWeight: sel ? 500 : 400,
-                          mb: 0.5,
-                        }}
-                      >
-                        {q.prompt.slice(0, 40)}
-                        {q.prompt.length > 40 ? "…" : ""}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          fontFamily: "monospace",
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                          fontSize: 10,
-                        }}
-                      >
-                        {kindLabel(q.kind)}
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        fontFamily: "monospace",
-                        textAlign: "right",
-                        pt: 0.25,
-                      }}
-                    >
-                      {q.points}pt
-                    </Typography>
-                    <Box
-                      component="button"
-                      type="button"
-                      className="delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteQuestion(q.id);
-                      }}
-                      sx={{
-                        opacity: 0,
-                        transition: "opacity 0.15s",
-                        border: "none",
-                        bgcolor: "transparent",
-                        cursor: "pointer",
-                        color: "error.main",
-                        p: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        pt: 0.25,
-                      }}
-                    >
-                      <DeleteOutlineIcon sx={{ fontSize: 15 }} />
-                    </Box>
-                  </Box>
-                );
-              })
-            )}
-          </Box>
-
-          {/* Generate footer */}
-          <Box
-            sx={{
-              p: 1.75,
-              bgcolor: "action.hover",
-              borderTop: 1,
-              borderColor: "divider",
-            }}
-          >
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", lineHeight: 1.5, mb: 1 }}
-            >
-              Generate from source — paste notes or a reading.
-            </Typography>
-            <Button
-              variant="outlined"
-              size="small"
-              disabled
-              title="Not yet available"
-              startIcon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 12 }} />}
-            >
-              Generate questions
-            </Button>
-          </Box>
-        </Card>
-
-        {/* MIDDLE - Question editor */}
-        <Card
-          variant="outlined"
-          sx={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
-        >
-          {selectedQ ? (
-            <>
-              <Box
-                sx={{
-                  px: "22px",
-                  py: 2,
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                      fontFamily: "monospace",
-                      letterSpacing: 1.3,
-                      textTransform: "uppercase",
-                      display: "block",
-                      mb: 0.5,
-                    }}
-                  >
-                    Editing Q
-                    {assessment.questions.findIndex(
-                      (q) => q.id === selectedId,
-                    ) + 1}
-                  </Typography>
-                  <select
-                    value={selectedQ.kind}
-                    onChange={(e) => changeKind(e.target.value)}
-                    style={{
-                      ...inlineInput,
-                      width: "auto",
-                      fontSize: 14,
-                      fontWeight: 500,
-                    }}
-                    title="Change question type (creates a new question)"
-                  >
-                    <option value="mc">MC</option>
-                    <option value="tf">T/F</option>
-                    <option value="short">Short</option>
-                    <option value="essay">Essay</option>
-                    <option value="code">Code</option>
-                  </select>
-                </Box>
-              </Box>
-
-              <Box sx={{ flex: 1, overflow: "auto", p: "22px" }}>
-                <Box component="label" sx={{ display: "block", mb: 2.25 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={monoLabel as React.CSSProperties}
-                  >
-                    Question prompt
-                  </Typography>
-                  <textarea
-                    value={editPrompt}
-                    onChange={(e) => setEditPrompt(e.target.value)}
-                    onBlur={() => saveQuestion()}
-                    rows={3}
-                    style={{
-                      ...inlineInput,
-                      width: "100%",
-                      padding: 12,
-                      fontSize: 16,
-                      resize: "vertical",
-                    }}
-                  />
-                </Box>
-
-                {selectedQ.kind === "mc" && (
-                  <McOptionsEditor
-                    payload={editPayload}
-                    onChange={(p) => {
-                      setEditPayload(p);
-                      saveQuestion(p);
-                    }}
-                    onTextChange={(p) => setEditPayload(p)}
-                    onTextBlur={(p) => saveQuestion(p)}
-                  />
-                )}
-                {selectedQ.kind === "tf" && (
-                  <TfOptionsEditor
-                    payload={editPayload}
-                    onChange={(p) => {
-                      setEditPayload(p);
-                      saveQuestion(p);
-                    }}
-                  />
-                )}
-
-                <Box
-                  sx={{
-                    mt: 2.25,
-                    pt: 2.25,
-                    borderTop: 1,
-                    borderColor: "divider",
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
-                    gap: 2.25,
-                  }}
+              assessment.questions.map((question, index) => (
+                <button
+                  key={question.id}
+                  type="button"
+                  aria-label={`Question ${index + 1}: ${question.prompt || "Untitled question"}`}
+                  onClick={() => setSelectedId(question.id)}
+                  className={`flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left transition hover:bg-muted/40 ${question.id === selectedId ? "bg-primary/10" : ""}`}
                 >
-                  <Box component="label" sx={{ display: "block" }}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={monoLabel as React.CSSProperties}
-                    >
-                      Points
-                    </Typography>
-                    <input
-                      type="number"
-                      min={0}
-                      value={editPoints}
-                      onChange={(e) =>
-                        setEditPoints(
-                          Math.max(0, parseInt(e.target.value) || 0),
-                        )
-                      }
-                      onBlur={() => saveQuestion()}
-                      style={inlineInput}
-                    />
-                  </Box>
-                  <Box component="label" sx={{ display: "block" }}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={monoLabel as React.CSSProperties}
-                    >
-                      Tag
-                    </Typography>
-                    <input
-                      value={editTag}
-                      placeholder="tag1, tag2"
-                      onChange={(e) => setEditTag(e.target.value)}
-                      onBlur={() => saveQuestion()}
-                      style={inlineInput}
-                    />
-                  </Box>
-                  <Box component="label" sx={{ display: "block" }}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={monoLabel as React.CSSProperties}
-                    >
-                      Difficulty
-                    </Typography>
-                    <select
-                      value={editQuestionDifficulty}
-                      onChange={(e) =>
-                        setEditQuestionDifficulty(e.target.value)
-                      }
-                      onBlur={() => saveQuestion()}
-                      style={inlineInput}
-                    >
-                      <option value="intro">Intro</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
-                  </Box>
-                </Box>
-
-                <Box component="label" sx={{ display: "block", mt: 2.75 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={monoLabel as React.CSSProperties}
-                  >
-                    Explanation shown after answering
-                  </Typography>
-                  <textarea
-                    value={editExplanation}
-                    onChange={(e) => setEditExplanation(e.target.value)}
-                    onBlur={() => saveQuestion()}
-                    rows={2}
-                    style={{
-                      ...inlineInput,
-                      width: "100%",
-                      padding: 12,
-                      resize: "vertical",
-                    }}
-                  />
-                </Box>
-
-                {/* External Source URL */}
-                <Box component="label" sx={{ display: "block", mt: 2.75 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={monoLabel as React.CSSProperties}
-                  >
-                    Reference URL (External Source)
-                  </Typography>
-                  <input
-                    value={editSource}
-                    placeholder="https://example.com/reference"
-                    onChange={(e) => {
-                      setEditSource(e.target.value);
-                      if (sourceError) setSourceError(null);
-                    }}
-                    onBlur={() => saveQuestion()}
-                    style={{
-                      ...inlineInput,
-                      borderColor: sourceError ? "#d32f2f" : undefined,
-                    }}
-                  />
-                  {sourceError && (
-                    <Typography
-                      variant="caption"
-                      color="error"
-                      sx={{ display: "block", mt: 0.5 }}
-                    >
-                      {sourceError}
-                    </Typography>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {question.prompt || "Untitled question"}
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {kindLabels[question.kind] ?? question.kind} ·{" "}
+                      {question.points} pt
+                    </span>
+                  </span>
+                  {!question.prompt && (
+                    <span className="text-amber-500">!</span>
                   )}
-                </Box>
-
-                {/* Deep Dive Study Notes */}
-                <Box component="label" sx={{ display: "block", mt: 2.75 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={monoLabel as React.CSSProperties}
-                  >
-                    Deep Dive Study Notes (Markdown / Mermaid supported)
-                  </Typography>
-                  <textarea
-                    value={editDeepDive}
-                    placeholder="# Detailed Study Notes\n\nUse markdown here..."
-                    onChange={(e) => setEditDeepDive(e.target.value)}
-                    onBlur={() => saveQuestion()}
-                    rows={6}
-                    style={{
-                      ...inlineInput,
-                      width: "100%",
-                      padding: 12,
-                      resize: "vertical",
-                    }}
-                  />
-                </Box>
-
-                {/* Live Preview Area */}
-                {(editDeepDive ||
-                  (editSource &&
-                    (!editSource ||
-                      editSource.startsWith("http://") ||
-                      editSource.startsWith("https://")))) && (
-                  <Box
-                    sx={{
-                      mt: 3,
-                      p: 2,
-                      border: "1px dashed",
-                      borderColor: "divider",
-                      borderRadius: 1,
-                      bgcolor: "background.default",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      color="primary"
-                      sx={{
-                        ...monoLabel,
-                        display: "block",
-                        mb: 1.5,
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Live Preview
-                    </Typography>
-
-                    {editSource &&
-                      (!editSource ||
-                        editSource.startsWith("http://") ||
-                        editSource.startsWith("https://")) && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 0.5 }}
-                          >
-                            Reference Link:
-                          </Typography>
-                          <a
-                            href={editSource}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              color: "#1976d2",
-                              textDecoration: "underline",
-                              fontSize: "0.875rem",
-                            }}
-                          >
-                            {editSource}
-                          </a>
-                        </Box>
-                      )}
-
-                    {editDeepDive && (
-                      <Box>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block", mb: 1 }}
-                        >
-                          Study Notes:
-                        </Typography>
-                        <Box
-                          sx={{
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            p: 2,
-                            bgcolor: "background.paper",
-                          }}
-                        >
-                          <MarkdownView content={editDeepDive} />
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            </>
-          ) : (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                p: "48px 22px",
-                textAlign: "center",
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Select a question to edit.
-              </Typography>
-            </Box>
-          )}
-        </Card>
-
-        {/* RIGHT - Rail */}
-        <Stack spacing={2.25}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontFamily: "monospace",
-                  letterSpacing: 1.3,
-                  textTransform: "uppercase",
-                  display: "block",
-                  mb: 1.5,
-                }}
-              >
-                Distribution
-              </Typography>
-              <KV label="Most correct" value="#1" />
-              <KV label="Hardest item" value="#2" />
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined">
-            <CardContent>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontFamily: "monospace",
-                  letterSpacing: 1.3,
-                  textTransform: "uppercase",
-                  display: "block",
-                  mb: 1.5,
-                }}
-              >
-                Rubric
-              </Typography>
-              <Box
-                component="pre"
-                sx={{
-                  m: 0,
-                  p: "10px 12px",
-                  bgcolor: "action.hover",
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: 0.5,
-                  fontFamily: "monospace",
-                  fontSize: 12,
-                  color: "text.secondary",
-                  lineHeight: 1.5,
-                }}
-              >
-                {`criteria:\n  clarity: 0–2\n  evidence: 0–2\n  mechanism: 0–1\n  link: 0–1`}
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined">
-            <CardContent>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontFamily: "monospace",
-                  letterSpacing: 1.3,
-                  textTransform: "uppercase",
-                  display: "block",
-                  mb: 1.5,
-                }}
-              >
-                Recent activity
-              </Typography>
-              <Stack spacing={1.25}>
-                <ActivityItem name="You" action="edited Q1" time="4m" />
-                <ActivityItem name="You" action="added 2 questions" time="2h" />
-                <ActivityItem
-                  name="System"
-                  action="auto-saved draft"
-                  time="5m"
-                />
-              </Stack>
-            </CardContent>
-          </Card>
-        </Stack>
-      </Box>
-    </Box>
-  );
-}
-
-function McOptionsEditor({
-  payload,
-  onChange,
-  onTextChange,
-  onTextBlur,
-}: {
-  payload: unknown;
-  onChange: (p: Record<string, unknown>) => void;
-  onTextChange: (p: Record<string, unknown>) => void;
-  onTextBlur: (p: Record<string, unknown>) => void;
-}) {
-  const p = payload as {
-    options?: string[];
-    correct_index?: number;
-  } | null;
-  if (!p?.options) return null;
-
-  function updateText(i: number, text: string) {
-    const options = p!.options!.map((o, j) => (j === i ? text : o));
-    return { ...p, options };
-  }
-
-  return (
-    <Box sx={{ mb: 2.25 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={monoLabel as React.CSSProperties}
-      >
-        Options · click row to mark correct
-      </Typography>
-      <Stack spacing={1}>
-        {p.options.map((o, i) => (
-          <Box
-            key={i}
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "30px 1fr",
-              gap: 1.25,
-              alignItems: "center",
-              p: "6px 12px 6px 10px",
-              bgcolor:
-                i === p.correct_index
-                  ? (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(25, 118, 210, 0.16)"
-                        : "rgba(25, 118, 210, 0.08)"
-                  : "action.hover",
-              border: 1,
-              borderColor: i === p.correct_index ? "primary.main" : "divider",
-              borderRadius: 0.5,
-              cursor: "pointer",
-              "&:hover": { borderColor: "primary.light" },
-            }}
-            onClick={() => onChange({ ...p, correct_index: i })}
-          >
-            <Box
-              sx={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                bgcolor: i === p.correct_index ? "primary.main" : "transparent",
-                border: 1,
-                borderColor:
-                  i === p.correct_index ? "primary.main" : "action.disabled",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {i === p.correct_index && (
-                <CheckOutlinedIcon sx={{ fontSize: 12, color: "#fff" }} />
-              )}
-            </Box>
-            <input
-              value={o}
-              placeholder={`Option ${i + 1}`}
-              onChange={(e) => onTextChange(updateText(i, e.target.value))}
-              onBlur={(e) => onTextBlur(updateText(i, e.target.value))}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                fontSize: 13.5,
-                color: "inherit",
-                fontFamily: "inherit",
-                width: "100%",
-                cursor: "text",
-              }}
-            />
-          </Box>
-        ))}
-      </Stack>
-    </Box>
-  );
-}
-
-function TfOptionsEditor({
-  payload,
-  onChange,
-}: {
-  payload: unknown;
-  onChange: (p: Record<string, unknown>) => void;
-}) {
-  const p = payload as { correct?: boolean } | null;
-  const correct = p?.correct ?? true;
-  return (
-    <Box sx={{ mb: 2.25 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={monoLabel as React.CSSProperties}
-      >
-        Correct answer
-      </Typography>
-      <Stack direction="row" spacing={1}>
-        {([true, false] as const).map((val) => (
-          <Box
-            key={String(val)}
-            component="button"
-            type="button"
-            onClick={() => onChange({ correct: val })}
-            sx={{
-              flex: 1,
-              py: 1.5,
-              border: 1,
-              borderColor: correct === val ? "primary.main" : "divider",
-              borderRadius: 0.5,
-              bgcolor:
-                correct === val
-                  ? (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(25, 118, 210, 0.16)"
-                        : "rgba(25, 118, 210, 0.08)"
-                  : "action.hover",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1,
-              "&:hover": { borderColor: "primary.light" },
-            }}
-          >
-            {correct === val && (
-              <CheckOutlinedIcon sx={{ fontSize: 14, color: "primary.main" }} />
+                </button>
+              ))
             )}
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: correct === val ? 600 : 400 }}
-            >
-              {val ? "True" : "False"}
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-    </Box>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-6">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                Question editor
+              </p>
+              <h2 className="mt-1 text-lg font-semibold">
+                {selected
+                  ? `${kindLabels[selected.kind] ?? selected.kind} question`
+                  : "Select a question"}
+              </h2>
+            </div>
+            {selected && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => deleteQuestion(selected.id)}
+              >
+                <Trash2 /> Delete
+              </Button>
+            )}
+          </div>
+          {selected ? (
+            <div className="space-y-5">
+              <Field label="Question prompt">
+                <textarea
+                  rows={4}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onBlur={() => saveQuestion()}
+                />
+              </Field>
+              {selected.kind === "mc" && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Options · click to mark correct
+                  </p>
+                  <div className="space-y-2">
+                    {mcOptions.map((option: string, index: number) => (
+                      <div
+                        key={index}
+                        className={`flex items-center gap-2 rounded-lg border p-2 ${payload.correct_index === index ? "border-primary bg-primary/10" : "border-border"}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            saveQuestion({ ...payload, correct_index: index })
+                          }
+                          className="grid size-6 shrink-0 place-items-center rounded-full border border-border"
+                        >
+                          {payload.correct_index === index && (
+                            <Check className="size-3 text-primary" />
+                          )}
+                        </button>
+                        <input
+                          value={option}
+                          onChange={(e) => setMcOption(index, e.target.value)}
+                          onBlur={() => saveQuestion()}
+                          className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                          placeholder={`Option ${index + 1}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selected.kind === "tf" && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Correct answer
+                  </p>
+                  <div className="flex gap-2">
+                    {[true, false].map((value) => (
+                      <button
+                        type="button"
+                        key={String(value)}
+                        onClick={() =>
+                          saveQuestion({ ...payload, correct: value })
+                        }
+                        className={`flex-1 rounded-lg border p-3 text-sm ${payload.correct === value ? "border-primary bg-primary/10" : "border-border"}`}
+                      >
+                        {value ? "True" : "False"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Points">
+                  <input
+                    type="number"
+                    min="0"
+                    value={points}
+                    onChange={(e) => setPoints(Number(e.target.value))}
+                    onBlur={() => saveQuestion()}
+                  />
+                </Field>
+                <Field label="Tag">
+                  <input
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    onBlur={() => saveQuestion()}
+                    placeholder="rust, ownership"
+                  />
+                </Field>
+                <Field label="Reference URL">
+                  <input
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                    onBlur={() => saveQuestion()}
+                    placeholder="https://…"
+                  />
+                </Field>
+              </div>
+              <Field label="Explanation shown after answering">
+                <textarea
+                  rows={3}
+                  value={explanation}
+                  onChange={(e) => setExplanation(e.target.value)}
+                  onBlur={() => saveQuestion()}
+                />
+              </Field>
+              <Field label="Deep Dive Study Notes">
+                <textarea
+                  rows={7}
+                  value={deepDive}
+                  onChange={(e) => setDeepDive(e.target.value)}
+                  onBlur={() => saveQuestion()}
+                  placeholder="# Study notes"
+                />
+              </Field>
+              {(source || deepDive) && (
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Live preview
+                  </p>
+                  {source && /^https?:\/\//.test(source) && (
+                    <a
+                      className="mb-3 block text-sm text-primary underline"
+                      href={source}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {source}
+                    </a>
+                  )}
+                  {deepDive && <MarkdownView content={deepDive} />}
+                </div>
+              )}
+              {saving && (
+                <p className="text-xs text-muted-foreground">Saving…</p>
+              )}
+            </div>
+          ) : (
+            <div className="grid min-h-96 place-items-center text-sm text-muted-foreground">
+              Select a question to edit.
+            </div>
+          )}
+        </section>
+
+        <aside className="space-y-5">
+          <InfoCard title="Distribution">
+            <Stat
+              label="Questions"
+              value={String(assessment.questions.length)}
+            />
+            <Stat label="Total points" value={String(totalPoints)} />
+            <Stat label="Status" value={assessment.status} />
+          </InfoCard>
+          <InfoCard title="Rubric">
+            <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">{`criteria:\n  clarity: 0–2\n  evidence: 0–2\n  mechanism: 0–1`}</pre>
+          </InfoCard>
+        </aside>
+      </div>
+    </main>
   );
 }
 
-function KV({ label, value }: { label: string; value: string }) {
-  return (
-    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography variant="caption">{value}</Typography>
-    </Box>
-  );
-}
-
-function ActivityItem({
-  name,
-  action,
-  time,
+function Field({
+  label,
+  children,
 }: {
-  name: string;
-  action: string;
-  time: string;
+  label: string;
+  children: React.ReactNode;
 }) {
-  const isYou = name === "You";
   return (
-    <Box sx={{ display: "flex", gap: 1 }}>
-      <Box
-        sx={{
-          width: 4,
-          alignSelf: "stretch",
-          bgcolor: isYou ? "primary.main" : "action.disabled",
-          borderRadius: 0.25,
-        }}
-      />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography variant="caption" sx={{ color: "text.primary" }}>
-          <Box
-            component="span"
-            sx={{ color: isYou ? "primary.main" : "text.secondary" }}
-          >
-            {name}
-          </Box>{" "}
-          {action}
-        </Typography>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            fontFamily: "monospace",
-            fontSize: 10.5,
-            display: "block",
-            mt: 0.25,
-            letterSpacing: 0.5,
-          }}
-        >
-          {time} ago
-        </Typography>
-      </Box>
-    </Box>
+    <label className="grid gap-1.5 text-sm font-medium">
+      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
-
-const monoLabel = {
-  fontFamily: "monospace",
-  fontSize: 10,
-  letterSpacing: 1.3,
-  textTransform: "uppercase",
-  color: "rgba(0,0,0,0.5)",
-  marginBottom: 6,
-  display: "block",
-} as const;
-
-const inlineInput: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid rgba(0,0,0,0.23)",
-  borderRadius: 6,
-  padding: "9px 12px",
-  color: "inherit",
-  fontFamily: "inherit",
-  fontSize: 13.5,
-  outline: "none",
-  boxSizing: "border-box",
-  width: "100%",
-};
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between border-b border-border py-2 text-sm last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+function InfoCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+        {title}
+      </p>
+      {children}
+    </section>
+  );
+}

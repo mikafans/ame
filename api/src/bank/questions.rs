@@ -85,7 +85,7 @@ pub async fn list_questions_paged(
     filter: &QuestionFilter,
     after: Option<(OffsetDateTime, Uuid)>,
 ) -> Result<PagedQuestions, ApiError> {
-    let limit = filter.limit.unwrap_or(50);
+    let limit = filter.limit.unwrap_or(10);
     let query_limit = limit + 1;
     let offset = filter.offset.unwrap_or(0);
     let status_str = filter.status.map(|s| s.as_str().to_string());

@@ -14,10 +14,10 @@ dashboard depends on the metrics pipeline (Phase D) and so comes last.
 
 | Version | Theme | Operator features delivered | Hard dependency |
 |---------|-------|------------------------------|-----------------|
-| pre-v0.1 | Foundation build | Schema/auth, question bank, assessments, engine, stats, agent surface, MUI frontend, RLS, owner isolation, security hardening | — |
+| pre-v0.1 | Foundation build | Schema/auth, question bank, assessments, engine, stats, agent surface, web frontend, RLS, owner isolation, security hardening | — |
 | v0.1 | Platform + Admin foundation | Users, audit, health, assessment moderation (soft-delete) | — |
 | v0.2 | Operational control plane | **#1 Token Audit**, **#2 Settings & Feature Flags** | admin shell (done) |
-| v0.3 (now) | Learner experience + self-hosting foundation | Landing refresh, Tailwind migration, containerized local stack, self-hosting docs | learner session UI |
+| v0.3 (now) | Learner experience + self-hosting foundation | Landing refresh, Tailwind design system, containerized local stack, self-hosting docs | learner session UI |
 | v0.4 | Learn Deeper *(parallel learner track)* | **Deepen panel** ✅ *shipped early in 0.2.0* (related-by-tag, author deep-dive, reference URL); **async deepen notes** (agent-generated) — pending | v0.3 learner session UI |
 | v1.0 | Insight + hardening | **#4 Analytics Dashboard** | Phase D metrics |
 | v1.1 | GA polish | (all four integrated) | v1.0 |
@@ -35,12 +35,12 @@ is in code. Compressed history:
   login-fixed scopes.
 - **Question bank:** MC (bare-string options) / TF / essay / code questions,
   full-text search, pagination (verified at 1M rows).
-- **Assessments + engine:** unified assessment model (draft→active; legacy
+- **Assessments + engine:** unified assessment model (draft→active; old
   quiz/exam dropped), session engine with server-enforced deadlines, grading,
   stats + feedback.
 - **Agent surface:** `role=agent` + agent profiles, scoped agent API, served
   OpenAPI snapshot.
-- **Frontend:** learner + author/agent UIs, Tailwind/shadcn migration in progress.
+- **Frontend:** learner + author/agent UIs, built on Tailwind and local shadcn-style primitives.
 - **Isolation + security:** row-level security on `tb_questions`, owner-scoped
   sub-accounts, tiered per-owner rate limiting, per-plan quotas, and the security
   hardening pass (token-scope validation, hashed webhook secrets, security
@@ -76,7 +76,7 @@ The 0.3.0 release establishes the public product entry point and a practical
 deployment path:
 
 - Landing page with honest signed-out CTAs and responsive product preview.
-- Tailwind CSS and local shadcn-style primitives replacing the MUI runtime.
+- Tailwind CSS and local shadcn-style primitives are the web UI foundation.
 - Containerized debug stack with Postgres, Valkey, API, web, and Caddy routing.
 - Single-host self-hosting guide, production compose healthchecks, and agent
   discovery routes documented separately from `api/llms.txt`.
@@ -96,7 +96,7 @@ Plan: [`docs/plans/2026-06-03-admin-token-audit.md`](plans/2026-06-03-admin-toke
   `token_hash` never exposed) and `DELETE /v1/admin/tokens/{id}` (idempotent
   global revoke, audited).
 - `/admin/tokens` page (human + agent tokens in one view).
-- No migration — reuses `tb_api_tokens`.
+- No schema change — reuses `tb_api_tokens`.
 
 ### #2 — Global Platform Settings & Feature Flags
 - New `tb_settings` (key/value/jsonb + `updated_by` + `updated_at`) read through a
@@ -147,13 +147,11 @@ PG size is bounded by usage, not by uptime.
   navigation, MC tap targets (options stay bare strings), sticky timer/submit
   bar, and the review screen. Authoring, question bank, and admin pages stay
   desktop-first and only need to degrade gracefully.
-- **Known root cause:** `web/src/components/Sidebar.tsx` renders a
-  `variant="permanent"` Drawer at a fixed `DRAWER_WIDTH = 232` with no
-  breakpoint or toggle, so it covers the whole screen on mobile. Fix is the
-  standard MUI responsive-drawer pattern — `temporary` Drawer + hamburger
-  (AppBar) below `md`, `permanent` at `md+`.
+- **Shell behavior:** `web/src/components/Sidebar.tsx` uses a responsive sheet
+  below `md`; the desktop sidebar stays out of the mobile layout and the
+  hamburger remains available.
 - **Scope guard:** no separate H5 app, no PWA, no native — pure responsive work
-  on the existing Next.js + MUI frontend.
+  on the existing Next.js + Tailwind frontend.
 - **Open decision:** focus/tab-switch anti-cheat detection is weaker on mobile
   browsers — a product call to make before exposing high-stakes exams on phones.
 - Rides on the same **learner session UI** that #3's "flag this question" entry
@@ -202,7 +200,7 @@ related practice, author deep-dives, and (with an agent) generated study notes.
 - Built on the **Phase D metrics** from v0.1. Charts: DAU, attempts/day,
   registration growth, most-failed tags.
 - `GET /v1/admin/analytics?range=...` (server-side aggregation, cached) +
-  `/admin/analytics` page (MUI charts).
+  `/admin/analytics` page using the current web primitives.
 - Read-only; no new write paths.
 
 ### Hardening pass (gates the 1.x line)

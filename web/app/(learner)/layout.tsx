@@ -1,6 +1,5 @@
 "use client";
 
-// NOTE: The `(learner)` directory name is a legacy label. It hosts both learner and authoring features now.
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";

@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Edit3, Eye, ExternalLink, LoaderCircle, Play } from "lucide-react";
+import {
+  Check,
+  Edit3,
+  Eye,
+  ExternalLink,
+  LoaderCircle,
+  Play,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/PageShell";
 import { api } from "@/api/client";
@@ -13,9 +20,29 @@ import { formatDate } from "@/utils/format";
 
 type AssessmentMode = "all" | "practice" | "graded";
 
-function Tag({ children }: { children: React.ReactNode }) {
+function StatusTag({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    active:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    published:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    draft:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    archived:
+      "border-slate-400/40 bg-slate-500/10 text-slate-600 dark:text-slate-300",
+  };
   return (
-    <span className="inline-flex rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+    <span
+      className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${styles[status] ?? "border-border bg-muted text-muted-foreground"}`}
+    >
+      {status.replaceAll("_", " ")}
+    </span>
+  );
+}
+
+function TopicTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs text-sky-700 dark:text-sky-300">
       {children}
     </span>
   );
@@ -163,7 +190,7 @@ export default function ExplorePage() {
               ))}
             </div>
 
-            <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div className="grid gap-3 md:grid-cols-[1fr_1.35fr_auto] md:items-end">
               <label
                 className="grid gap-1.5 text-sm font-medium"
                 htmlFor="explore-search"
@@ -183,27 +210,41 @@ export default function ExplorePage() {
                 className="grid gap-1.5 text-sm font-medium"
                 htmlFor="explore-tags"
               >
-                Learning objectives
-                <select
+                Topics
+                <div
                   id="explore-tags"
-                  multiple
-                  value={selectedTags}
-                  onChange={(event) =>
-                    setSelectedTags(
-                      Array.from(
-                        event.target.selectedOptions,
-                        (option) => option.value,
-                      ),
-                    )
-                  }
-                  className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"
+                  aria-label="Filter by topics"
+                  className="flex min-h-20 flex-wrap content-start gap-2 rounded-lg border border-input bg-background p-2 outline-none focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20"
                 >
-                  {(facets?.tags ?? []).map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
-                    </option>
-                  ))}
-                </select>
+                  {(facets?.tags ?? []).length === 0 ? (
+                    <span className="px-1 py-1 text-xs font-normal text-muted-foreground">
+                      No topics available yet
+                    </span>
+                  ) : (
+                    (facets?.tags ?? []).map((tag) => {
+                      const selected = selectedTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          aria-label={`Topic ${tag}`}
+                          aria-pressed={selected}
+                          onClick={() =>
+                            setSelectedTags((current) =>
+                              selected
+                                ? current.filter((item) => item !== tag)
+                                : [...current, tag],
+                            )
+                          }
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-normal transition focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-sky-500/50 bg-sky-500/15 text-sky-700 dark:text-sky-200" : "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                        >
+                          {selected && <Check className="size-3" />}
+                          {tag}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </label>
               <Button
                 type="button"
@@ -256,19 +297,21 @@ export default function ExplorePage() {
                     <tr key={item.id} className="transition hover:bg-muted/30">
                       <td className="px-4 py-3 font-medium">{item.title}</td>
                       <td className="px-4 py-3">
-                        <Tag>{isGraded ? "Exam" : "Practice"}</Tag>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${isGraded ? "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300" : "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"}`}
+                        >
+                          {isGraded ? "Exam" : "Practice"}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {(item.tags as string[]).map((tag) => (
-                            <Tag key={tag}>{tag}</Tag>
+                            <TopicTag key={tag}>{tag}</TopicTag>
                           ))}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Tag>
-                          {item.status ? item.status.toUpperCase() : "UNKNOWN"}
-                        </Tag>
+                        <StatusTag status={item.status ?? "unknown"} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {formatDate(item.createdAt)}

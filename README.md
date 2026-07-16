@@ -36,6 +36,20 @@ out and back in — token scopes are fixed at login.
 
 Copy `.env.example` to `.env` if you need to override defaults.
 
+### Containerized local stack
+
+Use the debug stack when you want the complete local topology behind Caddy:
+
+```bash
+make local-up       # Caddy + web + API + Postgres + Valkey at :28800
+make local-uiux     # run the focused browser smoke test through Caddy
+make local-down     # stop services; keep the named Postgres volume
+```
+
+The web service bind-mounts `web/` and runs Next.js in development mode with
+polling enabled, so edits on macOS/Podman trigger hot reload without rebuilding
+the image. API source changes use the same bind-mounted development workflow.
+
 ## Common tasks
 
 ```bash

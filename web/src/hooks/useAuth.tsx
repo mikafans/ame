@@ -91,7 +91,7 @@ export function useAuth() {
 
 /**
  * @deprecated Use the logout function from useAuth() hook where possible.
- * This remains for non-component usage or legacy compatibility.
+ * This remains available for non-component callers.
  */
 export async function logout() {
   try {

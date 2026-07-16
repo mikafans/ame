@@ -2434,6 +2434,7 @@ components:
       - id
       - kind
       - prompt
+      - tags
       - payload
       - points
       - status
@@ -2468,6 +2469,10 @@ components:
           - 'null'
         status:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
     AssessmentSectionDetail:
       type: object
       required:

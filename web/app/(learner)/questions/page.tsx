@@ -36,7 +36,7 @@ export default function QuestionsPage() {
   const [tagId, setTagId] = useState<string | null>(null);
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [total, setTotal] = useState(0);
@@ -69,7 +69,10 @@ export default function QuestionsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const query: Record<string, unknown> = { page, pageSize };
+      const query: Record<string, unknown> = {
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      };
       if (debouncedSearch) query.search = debouncedSearch;
       if (kind !== "all") query.kind = kind;
       if (tagId) query.tag = tags.find((t) => t.id === tagId)?.name;
@@ -263,6 +266,7 @@ export default function QuestionsPage() {
               setPage(1);
             }}
           >
+            <option value={10}>10 / page</option>
             <option value={25}>25 / page</option>
             <option value={50}>50 / page</option>
             <option value={100}>100 / page</option>
