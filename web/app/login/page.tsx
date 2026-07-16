@@ -25,6 +25,12 @@ export default function LoginPage() {
     if (user) router.push("/explore");
   }, [user, router]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "signup") {
+      setTab("signup");
+    }
+  }, []);
+
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ??
     (typeof window !== "undefined"

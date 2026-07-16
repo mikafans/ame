@@ -92,7 +92,7 @@ export default function LandingPage() {
   const { user } = useAuth();
   const { mode, toggle } = useColorMode();
   const signedIn = !!user;
-  const entryHref = signedIn ? "/explore" : "/login";
+  const entryHref = signedIn ? "/explore" : "/login?tab=signup";
   const entryLabel = signedIn ? "Open Explore" : "Sign up free";
   const sampleHref = signedIn ? "/explore" : "#benefits";
   const sampleLabel = signedIn ? "Open Explore" : "See how it works";

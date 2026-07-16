@@ -104,6 +104,17 @@ def run_uiux() -> None:
         env=env,
         check=True,
     )
+
+
+def seed_stack() -> None:
+    promote_admin()
+    subprocess.run(
+        ["uv", "run", "scripts/seed.py", "--api", "http://localhost:28800"],
+        cwd=ROOT,
+        check=True,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("up", "down", "logs", "seed", "uiux"))
@@ -112,6 +123,7 @@ def main() -> int:
     if args.command == "up":
         compose("up", "-d", "--build")
         wait_for_api()
+        seed_stack()
         print("local stack ready → http://localhost:28800")
     elif args.command == "down":
         compose("down")
@@ -119,12 +131,7 @@ def main() -> int:
         compose("logs", "-f")
     elif args.command == "seed":
         wait_for_api()
-        promote_admin()
-        subprocess.run(
-            ["uv", "run", "scripts/seed.py", "--api", "http://localhost:28800"],
-            cwd=ROOT,
-            check=True,
-        )
+        seed_stack()
     else:
         wait_for_api()
         run_uiux()
