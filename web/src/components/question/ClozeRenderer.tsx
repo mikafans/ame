@@ -1,59 +1,45 @@
 "use client";
-
-import Box from "@mui/material/Box";
-import TextField from "@mui/material/TextField";
-
 interface Props {
   prompt: string;
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
 }
-
+const inputClass =
+  "h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 export function ClozeRenderer({
   prompt,
   value,
   onChange,
   disabled = false,
 }: Props) {
-  // Split prompt on ___ to render inline blanks
   const parts = prompt.split("___");
-
-  if (parts.length <= 1) {
+  if (parts.length <= 1)
     return (
-      <TextField
-        fullWidth
-        size="small"
+      <input
+        className={`${inputClass} w-full`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         placeholder="Fill in the blank…"
       />
     );
-  }
-
   return (
-    <Box sx={{ fontSize: 15, lineHeight: 2.4 }}>
+    <div className="text-[15px] leading-[2.4]">
       {parts.map((part, i) => (
         <span key={i}>
           {part}
           {i < parts.length - 1 && (
-            <TextField
-              variant="standard"
+            <input
+              className={`${inputClass} mx-2 w-40 text-center align-baseline`}
               value={value}
               onChange={(e) => onChange(e.target.value)}
               disabled={disabled}
               placeholder="___"
-              sx={{
-                width: 160,
-                mx: 0.75,
-                verticalAlign: "baseline",
-              }}
-              slotProps={{ htmlInput: { style: { textAlign: "center" } } }}
             />
           )}
         </span>
       ))}
-    </Box>
+    </div>
   );
 }
