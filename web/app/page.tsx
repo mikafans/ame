@@ -58,6 +58,8 @@ const faqs = [
 function QuizPreview() {
   return (
     <Card
+      role="img"
+      aria-label="Preview of an adaptive multiple-choice question"
       sx={{
         borderRadius: 2,
         p: { xs: 2, sm: 2.5 },
@@ -149,18 +151,21 @@ function QuizPreview() {
           <Typography variant="caption" sx={{ color: "#929292" }}>
             Hash maps · your weakest topic
           </Typography>
-          <Button
-            variant="contained"
-            size="small"
+          <Box
+            component="span"
             sx={{
               borderRadius: 5,
               bgcolor: "#050505",
               color: "#fff",
               minWidth: 72,
+              px: 1.5,
+              py: 0.75,
+              textAlign: "center",
+              fontSize: 14,
             }}
           >
             Next
-          </Button>
+          </Box>
         </Stack>
       </Stack>
     </Card>
