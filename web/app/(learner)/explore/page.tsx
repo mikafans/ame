@@ -1,53 +1,37 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { formatDate } from "@/utils/format";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import TextField from "@mui/material/TextField";
-import Stack from "@mui/material/Stack";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Chip from "@mui/material/Chip";
-import Button from "@mui/material/Button";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
-import Autocomplete from "@mui/material/Autocomplete";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Edit3, Eye, ExternalLink, LoaderCircle, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/PageShell";
 import { api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { useAuth } from "@/hooks/useAuth";
-import { vibrantTagColor } from "@/lib/tagColor";
-import { useColorMode } from "@/components/ThemeRegistry";
-import { PageShell } from "@/components/PageShell";
+import { formatDate } from "@/utils/format";
 
-import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import LaunchOutlinedIcon from "@mui/icons-material/LaunchOutlined";
+type AssessmentMode = "all" | "practice" | "graded";
+
+function Tag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+      {children}
+    </span>
+  );
+}
 
 export default function ExplorePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { mode: colorMode } = useColorMode();
-  const isDark = colorMode === "dark";
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [mode, setMode] = useState<string>("all"); // "all" | "practice" | "graded"
+  const [mode, setMode] = useState<AssessmentMode>("all");
   const [facets, setFacets] = useState<{
     tags: string[];
     counts: { practice: number; graded: number };
   } | null>(null);
-
   const [items, setItems] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,29 +42,22 @@ export default function ExplorePage() {
     if (authLoading || !user) return;
     try {
       const { data } = await api.GET("/v1/explore/facets");
-      if (data) {
-        setFacets(data as any);
-      }
-    } catch (err) {
-      console.error("Failed to fetch facets:", err);
+      if (data) setFacets(data as any);
+    } catch (error) {
+      console.error("Failed to fetch facets:", error);
     }
   }, [authLoading, user]);
-
-  useEffect(() => {
-    fetchFacets();
-  }, [fetchFacets]);
 
   const fetchItems = useCallback(
     async (cursor: string | null = null) => {
       if (authLoading || !user) return;
       setLoading(true);
-      const tagsParam = selectedTags.join(",");
       try {
         const { data } = await api.GET("/v1/explore", {
           params: {
             query: {
               search: search || undefined,
-              tags: tagsParam || undefined,
+              tags: selectedTags.join(",") || undefined,
               mode: mode === "all" ? undefined : mode,
               kind: "active",
               limit: 50,
@@ -88,22 +65,24 @@ export default function ExplorePage() {
             } as any,
           },
         });
-        setLoading(false);
         if (data) {
-          setItems((prev) => (cursor ? [...prev, ...data.items] : data.items));
+          setItems((previous) =>
+            cursor ? [...previous, ...data.items] : data.items,
+          );
           setNextCursor(data.nextCursor ?? null);
         }
-      } catch (err) {
-        console.error("Failed to fetch items:", err);
+      } catch (error) {
+        console.error("Failed to fetch items:", error);
+      } finally {
         setLoading(false);
       }
     },
     [search, selectedTags, mode, authLoading, user],
   );
 
-  const applyFilters = () => {
-    setSearch(searchText);
-  };
+  useEffect(() => {
+    fetchFacets();
+  }, [fetchFacets]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -123,25 +102,14 @@ export default function ExplorePage() {
         setStartError(errorMessage(error, "Failed to start assessment"));
         return;
       }
-      if (data?.sessionId) {
-        router.push(`/sessions/${data.sessionId}`);
-      }
-    } catch (err) {
-      console.error(err);
+      if (data?.sessionId) router.push(`/sessions/${data.sessionId}`);
+    } catch (error) {
+      console.error(error);
       setStartError("Unexpected error — check the console");
     } finally {
       setStarting(null);
     }
   }
-
-  const handleModeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newMode: string | null,
-  ) => {
-    if (newMode !== null) {
-      setMode(newMode);
-    }
-  };
 
   const practiceCount = facets?.counts?.practice ?? 0;
   const gradedCount = facets?.counts?.graded ?? 0;
@@ -152,304 +120,220 @@ export default function ExplorePage() {
       title="Explore"
       subtitle="Browse and search practice assessments and graded exams"
     >
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div className="flex flex-col gap-6">
         {startError && (
-          <Alert severity="error" onClose={() => setStartError(null)}>
-            {startError}
-          </Alert>
+          <div
+            role="alert"
+            className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            <span>{startError}</span>
+            <button
+              type="button"
+              aria-label="Dismiss error"
+              onClick={() => setStartError(null)}
+              className="font-medium underline"
+            >
+              Dismiss
+            </button>
+          </div>
         )}
 
-        {/* Filter Panel */}
-        <Paper sx={{ p: 3, borderRadius: 2 }} variant="outlined">
-          <Stack spacing={2.5}>
-            {/* Mode Selector */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 2,
-                flexWrap: "wrap",
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 600, color: "text.secondary" }}
-              >
-                Filter by Type:
-              </Typography>
-              <ToggleButtonGroup
-                value={mode}
-                exclusive
-                onChange={handleModeChange}
-                size="small"
-                color="primary"
-              >
-                <ToggleButton value="all" sx={{ textTransform: "none", px: 2 }}>
-                  All
-                </ToggleButton>
-                <ToggleButton
-                  value="practice"
-                  sx={{ textTransform: "none", px: 2 }}
+        <section className="rounded-xl border border-border bg-card p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-semibold text-muted-foreground">
+                Filter by type:
+              </span>
+              {(
+                [
+                  ["all", "All"],
+                  ["practice", `Practice (${practiceCount})`],
+                  ["graded", `Exam (${gradedCount})`],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={mode === value}
+                  onClick={() => setMode(value)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${mode === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted"}`}
                 >
-                  Practice ({practiceCount})
-                </ToggleButton>
-                <ToggleButton
-                  value="graded"
-                  sx={{ textTransform: "none", px: 2 }}
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+              <label
+                className="grid gap-1.5 text-sm font-medium"
+                htmlFor="explore-search"
+              >
+                Search title
+                <input
+                  id="explore-search"
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") setSearch(searchText);
+                  }}
+                  className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"
+                />
+              </label>
+              <label
+                className="grid gap-1.5 text-sm font-medium"
+                htmlFor="explore-tags"
+              >
+                Learning objectives
+                <select
+                  id="explore-tags"
+                  multiple
+                  value={selectedTags}
+                  onChange={(event) =>
+                    setSelectedTags(
+                      Array.from(
+                        event.target.selectedOptions,
+                        (option) => option.value,
+                      ),
+                    )
+                  }
+                  className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"
                 >
-                  Exam ({gradedCount})
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={2}
-              alignItems="center"
-            >
-              <TextField
-                fullWidth
-                label="Search Title"
-                size="small"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") applyFilters();
-                }}
-              />
-
-              <Autocomplete
-                multiple
-                freeSolo
-                fullWidth
-                size="small"
-                options={facets?.tags ?? []}
-                value={selectedTags}
-                onChange={(_event, newValue) => {
-                  setSelectedTags(newValue as string[]);
-                }}
-                renderTags={(value: readonly string[], getTagProps) =>
-                  value.map((option: string, index: number) => {
-                    const { key, ...tagProps } = getTagProps({ index });
-                    return (
-                      <Chip
-                        key={key}
-                        label={option}
-                        size="small"
-                        sx={vibrantTagColor(option, isDark)}
-                        {...tagProps}
-                      />
-                    );
-                  })
-                }
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Filter by Learning Objectives"
-                    placeholder="Select tags"
-                  />
-                )}
-              />
-
+                  {(facets?.tags ?? []).map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <Button
-                variant="contained"
-                onClick={applyFilters}
-                sx={{ minWidth: 140, height: 40, textTransform: "none" }}
+                type="button"
+                onClick={() => setSearch(searchText)}
+                className="h-10"
               >
-                Apply Filters
+                Apply filters
               </Button>
-            </Stack>
-          </Stack>
-        </Paper>
+            </div>
+          </div>
+        </section>
 
-        {/* Main Table */}
-        <TableContainer
-          component={Paper}
-          variant="outlined"
-          sx={{ borderRadius: 2 }}
-        >
-          <Table sx={{ minWidth: 720 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>
-                  Learning Objectives
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Created At</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Learning objectives</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Created at</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
               {loading && items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                    <CircularProgress size={32} />
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1.5 }}
-                    >
-                      Loading assessments...
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-muted-foreground"
+                  >
+                    <LoaderCircle className="mx-auto mb-2 size-7 animate-spin" />
+                    Loading assessments...
+                  </td>
+                </tr>
               ) : items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No assessments or exams found matching your criteria.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-muted-foreground"
+                  >
+                    No assessments or exams found matching your criteria.
+                  </td>
+                </tr>
               ) : (
                 items.map((item) => {
                   const isDraft = item.status === "draft";
                   const isGraded = item.mode === "graded";
-
                   return (
-                    <TableRow key={item.id} hover>
-                      <TableCell sx={{ fontWeight: 500 }}>
-                        {item.title}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={isGraded ? "Exam" : "Practice"}
-                          size="small"
-                          color={isGraded ? "secondary" : "primary"}
-                          variant="outlined"
-                          sx={{ fontWeight: 500 }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Stack
-                          direction="row"
-                          spacing={0.5}
-                          sx={{ flexWrap: "wrap", gap: 0.5 }}
-                        >
-                          {(item.tags as string[]).map((t) => (
-                            <Chip
-                              key={t}
-                              label={t}
-                              size="small"
-                              sx={vibrantTagColor(t, isDark)}
-                            />
+                    <tr key={item.id} className="transition hover:bg-muted/30">
+                      <td className="px-4 py-3 font-medium">{item.title}</td>
+                      <td className="px-4 py-3">
+                        <Tag>{isGraded ? "Exam" : "Practice"}</Tag>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(item.tags as string[]).map((tag) => (
+                            <Tag key={tag}>{tag}</Tag>
                           ))}
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={
-                            item.status ? item.status.toUpperCase() : "UNKNOWN"
-                          }
-                          size="small"
-                          variant="outlined"
-                          color={
-                            item.status === "active" || item.status === "live"
-                              ? "success"
-                              : isDraft
-                                ? "warning"
-                                : "default"
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>{formatDate(item.createdAt)}</TableCell>
-                      <TableCell align="right">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="flex-end"
-                        >
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Tag>
+                          {item.status ? item.status.toUpperCase() : "UNKNOWN"}
+                        </Tag>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {formatDate(item.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
                           {isDraft ? (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<EditOutlinedIcon />}
-                              component={Link}
-                              href={`/author/${item.id}`}
-                              sx={{ textTransform: "none" }}
-                            >
-                              Edit
+                            <Button asChild size="sm" variant="outline">
+                              <Link href={`/author/${item.id}`}>
+                                <Edit3 className="size-3.5" />
+                                Edit
+                              </Link>
+                            </Button>
+                          ) : isGraded ? (
+                            <Button asChild size="sm">
+                              <Link href={`/assessments/${item.id}/preview`}>
+                                <ExternalLink className="size-3.5" />
+                                Open
+                              </Link>
                             </Button>
                           ) : (
                             <>
-                              {isGraded ? (
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  color="secondary"
-                                  startIcon={<LaunchOutlinedIcon />}
-                                  component={Link}
-                                  href={`/assessments/${item.id}/preview`}
-                                  sx={{ textTransform: "none" }}
-                                >
-                                  Open
-                                </Button>
-                              ) : (
-                                <>
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<VisibilityOutlinedIcon />}
-                                    component={Link}
-                                    href={`/assessments/${item.id}/preview`}
-                                    sx={{ textTransform: "none" }}
-                                  >
-                                    Preview
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    color="primary"
-                                    startIcon={<PlayArrowOutlinedIcon />}
-                                    disabled={starting === item.id}
-                                    onClick={() => startAssessment(item.id)}
-                                    sx={{ textTransform: "none" }}
-                                  >
-                                    {starting === item.id
-                                      ? "Starting…"
-                                      : item.completed
-                                        ? "Re-take"
-                                        : "Start"}
-                                  </Button>
-                                </>
-                              )}
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={`/assessments/${item.id}/preview`}>
+                                  <Eye className="size-3.5" />
+                                  Preview
+                                </Link>
+                              </Button>
+                              <Button
+                                size="sm"
+                                disabled={starting === item.id}
+                                onClick={() => startAssessment(item.id)}
+                              >
+                                <Play className="size-3.5" />
+                                {starting === item.id
+                                  ? "Starting…"
+                                  : item.completed
+                                    ? "Re-take"
+                                    : "Start"}
+                              </Button>
                             </>
                           )}
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
           {nextCursor && (
-            <Box
-              sx={{
-                p: 2.5,
-                textAlign: "center",
-                borderTop: "1px solid",
-                borderColor: "divider",
-              }}
-            >
+            <div className="border-t border-border p-4 text-center">
               <Button
-                variant="outlined"
+                variant="outline"
+                size="sm"
                 onClick={() => fetchItems(nextCursor)}
                 disabled={loading}
-                size="small"
-                sx={{ textTransform: "none", px: 4 }}
               >
-                {loading ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                {loading ? "Loading more..." : "Load More"}
+                {loading && <LoaderCircle className="size-4 animate-spin" />}
+                {loading ? "Loading more..." : "Load more"}
               </Button>
-            </Box>
+            </div>
           )}
-        </TableContainer>
-      </Box>
+        </div>
+      </div>
     </PageShell>
   );
 }
