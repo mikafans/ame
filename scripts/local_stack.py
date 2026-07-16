@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-from container_runtime import compose as run_compose
+from container_runtime import compose as run_compose, engine
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = ROOT / "docker-compose.local.yml"
@@ -106,7 +106,36 @@ def run_uiux() -> None:
     )
 
 
-def seed_stack() -> None:
+def database_has_users() -> bool:
+    result = subprocess.run(
+        [
+            *engine(),
+            "-f",
+            str(COMPOSE_FILE),
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "ame",
+            "-At",
+            "-c",
+            "SELECT count(*) FROM tb_users",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout.strip() not in {"", "0"}
+
+
+def seed_stack(*, force: bool = False) -> None:
+    if not force and database_has_users():
+        print("local database already contains users; skipping automatic seed")
+        return
     promote_admin()
     subprocess.run(
         ["uv", "run", "scripts/seed.py", "--api", "http://localhost:28800"],
@@ -131,7 +160,7 @@ def main() -> int:
         compose("logs", "-f")
     elif args.command == "seed":
         wait_for_api()
-        seed_stack()
+        seed_stack(force=True)
     else:
         wait_for_api()
         run_uiux()
