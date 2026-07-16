@@ -49,7 +49,11 @@ test.describe("UI/UX spec alignment", () => {
     // --- Explore ---
     await page.goto("/explore");
     // Wait for the auth loading to finish and user to be visible in sidebar
-    console.log(await page.locator(".MuiDrawer-paper").innerText());
+    console.log(
+      await page
+        .getByRole("navigation", { name: "Main navigation" })
+        .innerText(),
+    );
     await expect(page.getByText(/Ada Lovelace/i).first()).toBeVisible({
       timeout: 10000,
     });
@@ -118,13 +122,13 @@ test.describe("UI/UX spec alignment", () => {
       page.getByRole("button", { name: "Back to Explore" }),
     ).toBeVisible();
     // Wait for the first answer card to render before reading captions
-    await expect(page.locator(".MuiCardContent-root").first()).toBeVisible({
+    await expect(page.getByTestId("answer-card").first()).toBeVisible({
       timeout: 5000,
     });
     await page.waitForLoadState("networkidle");
     // At least one answer should show a non-blank value
     const cardContents = await page
-      .locator(".MuiCardContent-root")
+      .getByTestId("answer-card")
       .allTextContents();
     const hasNonBlankAnswer = cardContents.some((content) => {
       if (
@@ -164,15 +168,17 @@ test.describe("UI/UX spec alignment", () => {
     // --- Progress: toggle works, hours not raw float ---
     await page.goto("/progress");
     await expect(
-      page.getByRole("heading", { name: "Progress dashboard" }),
+      page.getByRole("heading", { name: "Your learning progress" }),
     ).toBeVisible();
     await page.waitForTimeout(1500);
     const bodyText = await page.locator("body").textContent();
     expect(bodyText).not.toMatch(/0\.\d{3,}h/);
-    await page.getByRole("button", { name: "4w" }).click();
+    await page.getByRole("button", { name: "Last 4 weeks" }).click();
     await page.waitForTimeout(600);
-    await expect(page.getByRole("button", { name: "4w" })).toBeVisible();
-    await page.getByRole("button", { name: "All" }).click();
+    await expect(
+      page.getByRole("button", { name: "Last 4 weeks" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "All time" }).click();
     await page.waitForTimeout(400);
     await screenshot(page, "progress");
 
@@ -185,7 +191,12 @@ test.describe("UI/UX spec alignment", () => {
       timeout: 5000,
     });
     await expect(page.locator("text=/of \\d+/").first()).toBeVisible();
-    await expect(page.locator("tbody .MuiChip-root").first()).toBeVisible();
+    await expect(
+      page
+        .locator("tbody tr")
+        .first()
+        .getByText(/^(MC|T\/F|Short|Essay|Code)$/),
+    ).toBeVisible();
     await page.fill('input[placeholder="Search questions..."]', "sort");
     await page.waitForTimeout(800);
     await expect(page.locator("text=/of \\d+/").first()).toBeVisible();
@@ -200,7 +211,7 @@ test.describe("UI/UX spec alignment", () => {
     // --- Exams ---
     await page.goto("/exams");
     await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "All" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "All" })).toBeVisible();
     await expect(
       page.getByText(/CS Fundamentals Midterm|Exam/i).first(),
     ).toBeVisible();

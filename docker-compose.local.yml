@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ame
+    volumes:
+      - ame-local-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ame"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile.dev
+    environment:
+      AME_DATABASE_URL: postgres://postgres:postgres@postgres:5432/ame
+      AME_VALKEY_URL: redis://valkey:6379/0
+      AME_CORS_ORIGINS: http://localhost:28800
+    volumes:
+      - ./api:/workspace/api
+      - ./db/migrations:/workspace/db/migrations:ro
+      - ./ame.dev.toml:/workspace/ame.dev.toml:ro
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/workspace/api/target
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    command: ["sh", "-c", "touch /workspace/api/src/main.rs /workspace/api/src/lib.rs && cargo run --manifest-path api/Cargo.toml --bin ame-api"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  web:
+    image: node:22-bookworm-slim
+    working_dir: /workspace/web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:28800
+      API_URL: http://api:8080
+      NEXT_ALLOWED_ORIGINS: localhost
+    volumes:
+      - ./web:/workspace/web
+      - web-node-modules:/workspace/web/node_modules
+      - web-next:/workspace/web/.next
+    command: ["sh", "-c", "npm install --include=optional --no-package-lock --ignore-scripts && ./node_modules/.bin/next dev --webpack -H 0.0.0.0 --port 3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - "28800:80"
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+volumes:
+  ame-local-postgres:
+  cargo-registry:
+  cargo-target:
+  web-node-modules:
+  web-next:

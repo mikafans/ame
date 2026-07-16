@@ -2,7 +2,7 @@ import React from "react";
 
 type Props = any;
 const node = (tag: keyof React.JSX.IntrinsicElements, props: Props) => {
-  const { children, component, ...rest } = props;
+  const { children, component, endIcon, noWrap, startIcon, ...rest } = props;
   delete rest.sx;
   return React.createElement(component || tag, rest, children);
 };

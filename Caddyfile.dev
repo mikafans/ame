@@ -1,0 +1,25 @@
+:80 {
+    handle /v1/* {
+        reverse_proxy api:8080
+    }
+
+    handle /healthz {
+        reverse_proxy api:8080
+    }
+
+    handle /llms.txt {
+        reverse_proxy api:8080
+    }
+
+    handle /skill.json {
+        reverse_proxy api:8080
+    }
+
+    handle /openapi.yaml {
+        reverse_proxy api:8080
+    }
+
+    handle {
+        reverse_proxy web:3000
+    }
+}

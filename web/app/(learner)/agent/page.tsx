@@ -1902,7 +1902,6 @@ function ToolsTab() {
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
-     
     (api as any)
       .GET("/skill.json")
       .then(({ data }: { data?: { tools: McpTool[] } }) => {
@@ -2086,9 +2085,9 @@ function ImportTab() {
         });
         return;
       }
-       
+
       const client = api as any;
-       
+
       const {
         data,
         error,
@@ -2256,7 +2255,6 @@ function ActivityTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-     
     (api as any)
       .GET("/v1/agents/activity", { params: { query: { limit: 50 } } })
       .then(({ data }: { data?: { items: ActivityEntry[] } }) => {

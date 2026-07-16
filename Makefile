@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs
 
 COMPOSE ?= $(shell command -v podman >/dev/null 2>&1 && echo "podman compose" || echo "docker compose")
 
@@ -93,60 +93,7 @@ openapi: ## Regenerate api/openapi.yaml, web TypeScript schema, and embedded cli
 	fi
 
 e2e: ## Playwright (requires `make db-up`; auto-starts API + seeds if not running)
-	@if [ -x web/node_modules/.bin/next ]; then \
-		_api_owned=0; \
-		mkdir -p .tmp; \
-		if ! DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame sqlx migrate info --source db/migrations > /dev/null 2>&1; then \
-			echo "[e2e] FAILED: Postgres is not reachable on :5432. Run 'make db-up' first."; \
-			exit 1; \
-		fi; 		if ! curl -sf http://$(API_HOST):$(API_PORT)/healthz > /dev/null 2>&1; then \
-			echo "[e2e] API not running — starting..."; \
-			DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame RUST_LOG=warn \
-			AME_PORT=$(API_PORT) AME_CORS_ORIGINS=http://$(API_HOST):$(WEB_PORT) \
-			AME_AGENT_ACCESS_CODE=e2e-access-code AME_CONFIG_PATH=ame.dev.toml \
-				mise exec -- cargo run --manifest-path api/Cargo.toml --bin ame-api >> .tmp/ame-api-e2e.log 2>&1 & \
-			echo $$! > .tmp/ame-api-e2e.pid; \
-			_api_owned=1; \
-			echo "[e2e] Waiting for API on :$(API_PORT)..."; \
-			until curl -sf http://$(API_HOST):$(API_PORT)/healthz > /dev/null 2>&1; do sleep 1; done; \
-		fi; \
-		echo "[e2e] Promoting admin (db-admin)..."; \
-		if ! $(MAKE) --no-print-directory db-admin >> .tmp/ame-seed-e2e.log 2>&1; then \
-			echo "[e2e] FAILED: db-admin errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
-			tail -20 .tmp/ame-seed-e2e.log; \
-			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
-				kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; rm -f .tmp/ame-api-e2e.pid; \
-			fi; \
-			exit 1; \
-		fi; \
-		echo "[e2e] Seeding..."; \
-		if ! uv run scripts/seed.py --api http://$(API_HOST):$(API_PORT) >> .tmp/ame-seed-e2e.log 2>&1; then \
-			echo "[e2e] FAILED: seeding errored — last 20 lines of .tmp/ame-seed-e2e.log:"; \
-			tail -20 .tmp/ame-seed-e2e.log; \
-			if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
-				kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; rm -f .tmp/ame-api-e2e.pid; \
-			fi; \
-			exit 1; \
-		fi; \
-		echo "[e2e] Running playwright tests..."; \
-		cd web && PORT=$(WEB_PORT) NEXT_PUBLIC_API_URL=http://$(API_HOST):$(API_PORT) \
-			E2E_API_URL=http://$(API_HOST):$(API_PORT) E2E_BASE_URL=http://$(API_HOST):$(WEB_PORT) \
-			mise exec -- bun run e2e > ../.tmp/playwright-e2e.log 2>&1; _exit=$$?; cd ..; \
-		if [ "$$_api_owned" = "1" ] && [ -f .tmp/ame-api-e2e.pid ]; then \
-			kill $$(cat .tmp/ame-api-e2e.pid) 2>/dev/null || true; \
-			rm -f .tmp/ame-api-e2e.pid; \
-		fi; \
-		if [ $$_exit -ne 0 ]; then \
-			echo "[e2e] Tests failed — last 40 lines of .tmp/playwright-e2e.log:"; \
-			tail -40 .tmp/playwright-e2e.log; \
-			echo "[e2e] (full logs: .tmp/{ame-api-e2e.log,ame-seed-e2e.log,playwright-e2e.log})"; \
-		else \
-			echo "[e2e] Tests passed."; \
-		fi; \
-		exit $$_exit; \
-	else \
-		echo "[web] skipping e2e (web deps missing - run 'cd web && bun install' to enable)"; \
-	fi
+	uv run scripts/e2e.py
  
 uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 	@if [ -x web/node_modules/.bin/next ]; then \
@@ -154,6 +101,9 @@ uiux: ## Focused Playwright UI/UX contract spec (requires API + seed data)
 			E2E_API_URL=http://$(API_HOST):$(API_PORT) E2E_BASE_URL=http://$(API_HOST):$(WEB_PORT) \
 			mise exec -- bunx playwright test e2e/uiux.spec.ts --project=chromium; \
 	fi
+
+local-uiux: ## Run the focused UI/UX contract through the containerized Caddy stack
+	uv run scripts/local_stack.py uiux
 
 preview: ## Serve design/preview/ mockups over LAN/Tailscale (0.0.0.0:$(PREVIEW_PORT))
 	@echo "design preview → http://$(shell hostname):$(PREVIEW_PORT)/  (Ctrl-C to stop)"
@@ -291,3 +241,17 @@ docker-down: ## Stop the prod-shaped stack
 
 docker-logs: ## Tail logs from the prod-shaped stack
 	$(COMPOSE) -f docker-compose.prod.yml logs -f
+
+# ── Containerized local development ───────────────────────────────────────
+
+local-up: ## Start the debug local stack behind Caddy at :28800
+	uv run scripts/local_stack.py up
+
+local-down: ## Stop the debug local stack (keeps named volumes)
+	uv run scripts/local_stack.py down
+
+local-seed: ## Seed the containerized local stack through Caddy
+	uv run scripts/local_stack.py seed
+
+local-logs: ## Tail logs from the containerized local stack
+	uv run scripts/local_stack.py logs

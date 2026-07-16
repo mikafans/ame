@@ -469,6 +469,7 @@ export default function ResultsPage({
         {answers.map((a, i) => (
           <Card
             key={a.qid}
+            data-testid="answer-card"
             variant="outlined"
             sx={{
               position: "relative",
