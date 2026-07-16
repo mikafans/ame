@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import Box from "@mui/material/Box";
-import AppBar from "@mui/material/AppBar";
-import Toolbar from "@mui/material/Toolbar";
-import IconButton from "@mui/material/IconButton";
-import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { Logo } from "@/components/Logo";
 
@@ -28,39 +24,27 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar
         route={route}
         setRoute={handleRouteChange}
         mobileOpen={mobileOpen}
         onClose={handleMobileClose}
       />
-      <Box component="main" sx={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
-        <AppBar
-          position="sticky"
-          color="default"
-          elevation={0}
-          sx={{
-            display: { md: "none" },
-            bgcolor: "background.default",
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-        >
-          <Toolbar variant="dense">
-            <IconButton
-              edge="start"
-              aria-label="Open navigation"
-              onClick={() => setMobileOpen(true)}
-              sx={{ mr: 2 }}
-            >
-              <MenuOutlinedIcon />
-            </IconButton>
-            <Logo size={20} />
-          </Toolbar>
-        </AppBar>
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <header className="sticky top-0 z-10 flex min-h-12 items-center border-b border-border bg-background px-4 md:hidden">
+          <button
+            type="button"
+            aria-label="Open navigation"
+            onClick={() => setMobileOpen(true)}
+            className="mr-3 inline-flex size-8 items-center justify-center rounded-lg outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Menu className="size-5" />
+          </button>
+          <Logo size={20} />
+        </header>
         {children}
-      </Box>
-    </Box>
+      </main>
+    </div>
   );
 }

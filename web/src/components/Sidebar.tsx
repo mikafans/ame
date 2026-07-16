@@ -1,38 +1,29 @@
 "use client";
 
-import React from "react";
-import Box from "@mui/material/Box";
-import Drawer from "@mui/material/Drawer";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import Typography from "@mui/material/Typography";
-import Avatar from "@mui/material/Avatar";
-import Divider from "@mui/material/Divider";
-import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
-import ExploreOutlinedIcon from "@mui/icons-material/ExploreOutlined";
-import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
-import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
-import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import GradingOutlinedIcon from "@mui/icons-material/GradingOutlined";
-import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
-import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
-import TipsAndUpdatesOutlinedIcon from "@mui/icons-material/TipsAndUpdatesOutlined";
-import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
-import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
+import type { LucideIcon } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  ClipboardCheck,
+  Compass,
+  FileQuestion,
+  GraduationCap,
+  History,
+  KeyRound,
+  Layers3,
+  LayoutDashboard,
+  Lightbulb,
+  ListChecks,
+  LogOut,
+  Moon,
+  Pencil,
+  Play,
+  Settings,
+  Shield,
+  Sun,
+  Users,
+} from "lucide-react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
@@ -40,36 +31,24 @@ import { APP_VERSION } from "@/version";
 
 export const DRAWER_WIDTH = 232;
 
-// Deterministic avatar color: same name always maps to the same hue, so the
-// default (initials) avatar is distinguishable per-user instead of one flat
-// theme color. Fixed saturation/lightness keep white initials legible.
-function stringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return `hsl(${Math.abs(hash) % 360}, 55%, 45%)`;
-}
-
-const ICON_MAP: Record<string, React.ReactElement> = {
-  explore: <ExploreOutlinedIcon fontSize="small" />,
-  stack: <LayersOutlinedIcon fontSize="small" />,
-  take: <PlayArrowOutlinedIcon fontSize="small" />,
-  results: <AssessmentOutlinedIcon fontSize="small" />,
-  dashboard: <DashboardOutlinedIcon fontSize="small" />,
-  author: <EditOutlinedIcon fontSize="small" />,
-  grade: <GradingOutlinedIcon fontSize="small" />,
-  questions: <FormatListBulletedOutlinedIcon fontSize="small" />,
-  flashcards: <StyleOutlinedIcon fontSize="small" />,
-  "deep-dives": <TipsAndUpdatesOutlinedIcon fontSize="small" />,
-  agent: <SmartToyOutlinedIcon fontSize="small" />,
-  "admin-dashboard": <ShieldOutlinedIcon fontSize="small" />,
-  "admin-users": <PeopleOutlinedIcon fontSize="small" />,
-  "admin-assessments": <AssessmentOutlinedIcon fontSize="small" />,
-  "admin-tokens": <VpnKeyOutlinedIcon fontSize="small" />,
-  "admin-audit": <HistoryOutlinedIcon fontSize="small" />,
-  "admin-health": <MonitorHeartOutlinedIcon fontSize="small" />,
-  "admin-settings": <SettingsOutlinedIcon fontSize="small" />,
+const ICON_MAP: Record<string, LucideIcon> = {
+  explore: Compass,
+  take: Play,
+  results: ClipboardCheck,
+  dashboard: LayoutDashboard,
+  author: Pencil,
+  grade: GraduationCap,
+  questions: ListChecks,
+  flashcards: Layers3,
+  "deep-dives": Lightbulb,
+  agent: Bot,
+  "admin-dashboard": Shield,
+  "admin-users": Users,
+  "admin-assessments": ClipboardCheck,
+  "admin-tokens": KeyRound,
+  "admin-audit": History,
+  "admin-health": Activity,
+  "admin-settings": Settings,
 };
 
 interface SidebarProps {
@@ -77,6 +56,21 @@ interface SidebarProps {
   setRoute: (route: string) => void;
   mobileOpen?: boolean;
   onClose?: () => void;
+}
+
+interface NavigationItem {
+  id: string;
+  label: string;
+  icon: string;
+  section: string;
+}
+
+function stringToColor(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = value.charCodeAt(index) + ((hash << 5) - hash);
+  }
+  return `hsl(${Math.abs(hash) % 360}, 55%, 45%)`;
 }
 
 export function Sidebar({
@@ -88,11 +82,7 @@ export function Sidebar({
   const { user, logout: logoutContext } = useAuth();
   const { mode, toggle } = useColorMode();
 
-  async function handleLogout() {
-    await logoutContext();
-  }
-
-  const adminItems =
+  const adminItems: NavigationItem[] =
     user?.role === "admin"
       ? [
           {
@@ -140,7 +130,7 @@ export function Sidebar({
         ]
       : [];
 
-  const items = [
+  const items: NavigationItem[] = [
     { id: "explore", label: "Explore", icon: "explore", section: "Browse" },
     {
       id: "assessment",
@@ -168,21 +158,10 @@ export function Sidebar({
     },
     { id: "results", label: "Last results", icon: "results", section: "Learn" },
     { id: "dashboard", label: "Progress", icon: "dashboard", section: "Learn" },
-    {
-      id: "author",
-      label: "Author studio",
-      icon: "author",
-      section: "Manage",
-    },
-    {
-      id: "agent",
-      label: "Agent API",
-      icon: "agent",
-      section: "Integrate",
-    },
+    { id: "author", label: "Author studio", icon: "author", section: "Manage" },
+    { id: "agent", label: "Agent API", icon: "agent", section: "Integrate" },
     ...adminItems,
   ];
-
   const sections = [
     "Browse",
     "Learn",
@@ -193,154 +172,113 @@ export function Sidebar({
   const initials =
     user?.displayName
       ?.split(" ")
-      .map((n) => n[0])
+      .map((name) => name[0])
       .join("")
       .toUpperCase()
       .slice(0, 2) ?? "?";
   const displayName = user?.displayName ?? "";
 
-  const drawerContent = (
-    <>
-      <Box sx={{ p: 2.5, pb: 2, borderBottom: 1, borderColor: "divider" }}>
-        <Logo />
-        <Box
-          sx={{ display: "flex", alignItems: "baseline", gap: 0.75, mt: 0.5 }}
-        >
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              letterSpacing: 1.2,
-              textTransform: "none",
-            }}
-          >
-            AME
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.disabled"
-            sx={{ fontFamily: "monospace", fontSize: 11 }}
-          >
-            v{APP_VERSION}
-          </Typography>
-        </Box>
-      </Box>
+  async function handleLogout() {
+    await logoutContext();
+  }
 
-      <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>
-        {sections.map((sec) => {
-          const inSec = items.filter((i) => i.section === sec);
-          if (!inSec.length) return null;
+  const navigation = (
+    <div className="flex h-full flex-col bg-background">
+      <div className="border-b border-border px-5 pb-4 pt-5">
+        <Logo />
+        <div className="mt-1 flex items-baseline gap-2">
+          <span className="text-xs tracking-[0.12em] text-muted-foreground">
+            AME
+          </span>
+          <span className="font-mono text-[11px] text-muted-foreground/70">
+            v{APP_VERSION}
+          </span>
+        </div>
+      </div>
+
+      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-3">
+        {sections.map((section) => {
+          const sectionItems = items.filter((item) => item.section === section);
+          if (!sectionItems.length) return null;
           return (
-            <Box key={sec} sx={{ mb: 2 }}>
-              <Typography
-                variant="caption"
-                sx={{
-                  px: 1.5,
-                  py: 0.75,
-                  display: "block",
-                  letterSpacing: 1.4,
-                  textTransform: "uppercase",
-                  color: "text.secondary",
-                }}
-              >
-                {sec}
-              </Typography>
-              <List dense disablePadding>
-                {inSec.map((it) => (
-                  <ListItem key={it.id} disablePadding>
-                    <ListItemButton
-                      selected={route === it.id}
-                      onClick={() => setRoute(it.id)}
-                      sx={{ borderRadius: 1, mx: 0.5 }}
+            <div key={section} className="mb-5">
+              <p className="px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {section}
+              </p>
+              <div className="space-y-0.5 px-2">
+                {sectionItems.map((item) => {
+                  const Icon = ICON_MAP[item.icon] ?? FileQuestion;
+                  const selected = route === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-current={selected ? "page" : undefined}
+                      onClick={() => setRoute(item.id)}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                     >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        {ICON_MAP[it.icon]}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={it.label}
-                        slotProps={{ primary: { sx: { fontSize: 13 } } }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
+                      <Icon className="size-4 shrink-0" />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
-      </Box>
+      </nav>
 
-      <Divider />
-      <Box sx={{ p: 1.75, display: "flex", alignItems: "center", gap: 1.25 }}>
-        <Avatar
-          sx={{
-            width: 32,
-            height: 32,
-            fontSize: 14,
-            bgcolor: stringToColor(displayName || user?.email || "?"),
-          }}
-        >
-          {initials}
-        </Avatar>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Tooltip title={displayName} disableHoverListener={!displayName}>
-            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-              {displayName}
-            </Typography>
-          </Tooltip>
-        </Box>
-        <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
-          <IconButton size="small" onClick={toggle}>
+      <div className="border-t border-border p-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-sm text-white"
+            style={{
+              backgroundColor: stringToColor(displayName || user?.email || "?"),
+            }}
+          >
+            {initials}
+          </div>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {displayName}
+          </span>
+          <button
+            type="button"
+            title={mode === "dark" ? "Use light mode" : "Use dark mode"}
+            aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
+            onClick={toggle}
+            className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
             {mode === "dark" ? (
-              <LightModeOutlinedIcon sx={{ fontSize: 16 }} />
+              <Sun className="size-4" />
             ) : (
-              <DarkModeOutlinedIcon sx={{ fontSize: 16 }} />
+              <Moon className="size-4" />
             )}
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Sign out">
-          <IconButton size="small" onClick={handleLogout}>
-            <LogoutOutlinedIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        </Tooltip>
-      </Box>
-    </>
+          </button>
+          <button
+            type="button"
+            title="Sign out"
+            aria-label="Sign out"
+            onClick={handleLogout}
+            className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 
   return (
     <>
-      <Drawer
-        variant="permanent"
-        sx={{
-          display: { xs: "none", md: "block" },
-          width: DRAWER_WIDTH,
-          flexShrink: 0,
-          "& .MuiDrawer-paper": {
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-            display: "flex",
-            flexDirection: "column",
-          },
-        }}
-      >
-        {drawerContent}
-      </Drawer>
-      <Drawer
-        variant="temporary"
-        open={!!mobileOpen}
-        onClose={onClose}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: "block", md: "none" },
-          "& .MuiDrawer-paper": {
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-            display: "flex",
-            flexDirection: "column",
-          },
-        }}
-      >
-        {drawerContent}
-      </Drawer>
+      <aside className="hidden w-[232px] shrink-0 border-r border-border md:flex">
+        {navigation}
+      </aside>
+      <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose?.()}>
+        <SheetContent side="left" showCloseButton className="w-[232px] p-0">
+          <SheetTitle className="sr-only">AME navigation</SheetTitle>
+          {navigation}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

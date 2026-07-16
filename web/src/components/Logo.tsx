@@ -10,15 +10,7 @@ interface LogoProps {
 
 export function Logo({ size = 24 }: LogoProps) {
   return (
-    <Link
-      href="/"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 9,
-        textDecoration: "none",
-      }}
-    >
+    <Link href="/" className="inline-flex items-center gap-2 no-underline">
       <BrandMark size={size} />
     </Link>
   );

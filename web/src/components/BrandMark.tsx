@@ -1,7 +1,5 @@
 "use client";
 
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { BRAND_GRADIENT } from "@/lib/brand";
 
@@ -15,40 +13,27 @@ export function BrandMark({ size = 32 }: BrandMarkProps) {
     mode === "dark" ? "/ame-icon-dark.svg" : "/ame-icon-light.svg";
 
   return (
-    <Box
-      data-testid="brand-mark"
-      sx={{ display: "flex", alignItems: "center", gap: 1.25 }}
-    >
-      <Box
-        component="img"
+    <div data-testid="brand-mark" className="flex items-center gap-3">
+      <img
         src={mascotSrc}
         alt=""
         aria-hidden="true"
         data-testid="brand-mascot"
-        sx={{
-          width: size,
-          height: size,
-          display: "block",
-          flex: "0 0 auto",
-          borderRadius: 2,
-        }}
+        className="block shrink-0 rounded-lg"
+        style={{ width: size, height: size }}
       />
-      <Typography
-        component="span"
+      <span
         data-testid="brand-wordmark"
-        sx={{
+        className="font-extrabold leading-none tracking-[-0.02em] text-transparent"
+        style={{
           fontSize: Math.round(size * 0.75),
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
           background: BRAND_GRADIENT,
           backgroundClip: "text",
           WebkitBackgroundClip: "text",
-          color: "transparent",
         }}
       >
         ame
-      </Typography>
-    </Box>
+      </span>
+    </div>
   );
 }

@@ -7,8 +7,6 @@
  *  - Optional right-hand action slot (e.g. a button)
  *  - Subtle fade-in-up entrance animation
  */
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
 import React from "react";
 
 interface PageShellProps {
@@ -34,72 +32,29 @@ export function PageShell({
   children,
 }: PageShellProps) {
   return (
-    <Box
-      sx={{
-        px: { xs: 3, sm: 5 },
-        pt: 5,
-        pb: 8,
-        maxWidth,
-        mx: "auto", // Center the container horizontally
-        "@keyframes fadeUp": {
-          from: { opacity: 0, transform: "translateY(10px)" },
-          to: { opacity: 1, transform: "translateY(0)" },
-        },
-        animation: "fadeUp 0.22s ease-out both",
-      }}
+    <div
+      className="animate-[fadeUp_0.22s_ease-out_both] px-6 pb-16 pt-10 sm:px-10"
+      style={{ maxWidth, marginInline: "auto" }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          gap: { xs: 2, sm: 0 },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", sm: "flex-start" },
-          mb: 4,
-        }}
-      >
-        <Box>
+      <div className="mb-8 flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+        <div>
           {kicker && (
-            <Typography
-              variant="overline"
-              color="text.disabled"
-              sx={{ letterSpacing: 1.5, display: "block", mb: 0.25 }}
-            >
+            <p className="mb-1 block text-xs uppercase tracking-[0.15em] text-muted-foreground">
               {kicker}
-            </Typography>
+            </p>
           )}
-          <Typography
-            variant="h5"
-            component="h1"
-            sx={{ fontWeight: 600, lineHeight: 1.25 }}
-          >
-            {title}
-          </Typography>
+          <h1 className="text-xl font-semibold leading-tight">{title}</h1>
           {subtitle && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mt: 0.5, maxWidth: 540 }}
-            >
+            <p className="mt-1 max-w-[540px] text-sm text-muted-foreground">
               {subtitle}
-            </Typography>
+            </p>
           )}
-        </Box>
-        {action && (
-          <Box
-            sx={{
-              flexShrink: 0,
-              ml: { xs: 0, sm: 2 },
-              mt: { xs: 0.5, sm: 0 },
-            }}
-          >
-            {action}
-          </Box>
-        )}
-      </Box>
+        </div>
+        {action && <div className="mt-0.5 shrink-0 sm:ml-2">{action}</div>}
+      </div>
 
       {children}
-    </Box>
+    </div>
   );
 }
