@@ -9,11 +9,9 @@ import {
   CheckCircle2,
   Database,
   FileClock,
-  HeartPulse,
   List,
   Play,
   RefreshCw,
-  Server,
   Shield,
   Users,
 } from "lucide-react";
@@ -113,14 +111,12 @@ export default function SystemHealthPage() {
         <Service
           title="Database Service (PostgreSQL)"
           subtitle="Primary Database"
-          icon={Server}
         >
           {loading ? "Checking…" : status(health?.database ?? "unknown")}
         </Service>
         <Service
           title="Limiter Cache Service (Valkey)"
           subtitle="Rate Limiting"
-          icon={HeartPulse}
         >
           {loading ? "Checking…" : status(health?.valkey ?? "unknown")}
         </Service>
@@ -161,12 +157,10 @@ export default function SystemHealthPage() {
 function Service({
   title,
   subtitle,
-  icon: Icon,
   children,
 }: {
   title: string;
   subtitle: string;
-  icon: typeof Server;
   children: React.ReactNode;
 }) {
   return (

@@ -1,10 +1,9 @@
 // @ts-nocheck
 "use client";
 
-import { useState, useEffect, useCallback, useRef, use } from "react";
+import { useState, useEffect, useCallback, useRef, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Box,
   Stack,
@@ -68,19 +67,12 @@ const QUESTION_TYPES: Record<string, string> = {
   cloze: "Fill in the blank",
 };
 
-const DEFAULT_ALLOWED_MATERIALS = [
-  "One sheet of notes (any)",
-  "Class textbook (printed)",
-  "Standard calculator",
-];
-
 export default function ActiveQuizPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user } = useAuth();
   const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [idx, setIdx] = useState(0);
@@ -97,7 +89,10 @@ export default function ActiveQuizPage({
   );
   const [lastIdx, setLastIdx] = useState(0);
 
-  const questions = session?.questions ?? [];
+  const questions = useMemo(
+    () => session?.questions ?? [],
+    [session?.questions],
+  );
   const answered = Object.keys(answers).length;
 
   useEffect(() => {
@@ -206,7 +201,17 @@ export default function ActiveQuizPage({
       console.error(err);
       setFinishing(false);
     }
-  }, [id, router, finishing, answers, session]);
+  }, [
+    id,
+    router,
+    finishing,
+    answers,
+    session,
+    idx,
+    questionStartTime,
+    questions,
+    timesSpent,
+  ]);
 
   // Keep the latest handleFinish reachable from the once-created interval below
   // without rebuilding the interval — the interval closes over a stale closure
@@ -337,12 +342,6 @@ export default function ActiveQuizPage({
 
   const mm = timeLeft !== null ? Math.floor(timeLeft / 60) : null;
   const ss = timeLeft !== null ? String(timeLeft % 60).padStart(2, "0") : null;
-
-  const allowedMaterials =
-    session.session.allowed_materials &&
-    session.session.allowed_materials.length > 0
-      ? session.session.allowed_materials
-      : DEFAULT_ALLOWED_MATERIALS;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>

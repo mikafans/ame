@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
-import { useColorMode } from "@/components/ThemeRegistry";
 import { PageShell } from "@/components/PageShell";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ const KIND_LABELS: Record<string, string> = {
   code: "Code",
 };
 export default function QuestionsPage() {
-  const { mode } = useColorMode();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [kind, setKind] = useState("all");

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- sanitized external images are intentionally rendered verbatim. */
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";

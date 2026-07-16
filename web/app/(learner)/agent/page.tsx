@@ -1902,7 +1902,7 @@ function ToolsTab() {
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (api as any)
       .GET("/skill.json")
       .then(({ data }: { data?: { tools: McpTool[] } }) => {
@@ -2086,9 +2086,9 @@ function ImportTab() {
         });
         return;
       }
-      /* eslint-disable @typescript-eslint/no-explicit-any */
+       
       const client = api as any;
-      /* eslint-enable @typescript-eslint/no-explicit-any */
+       
       const {
         data,
         error,
@@ -2256,7 +2256,7 @@ function ActivityTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (api as any)
       .GET("/v1/agents/activity", { params: { query: { limit: 50 } } })
       .then(({ data }: { data?: { items: ActivityEntry[] } }) => {

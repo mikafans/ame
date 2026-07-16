@@ -2,7 +2,6 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { tagColor } from "@/lib/tagColor";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,6 @@ export default function AssessmentPreviewPage({
 }) {
   const { id } = use(params);
   const { mode } = useColorMode();
-  const { user } = useAuth();
   const router = useRouter();
   const [assessment, setAssessment] = useState<AssessmentDetail | null>(null);
   const [starting, setStarting] = useState(false);

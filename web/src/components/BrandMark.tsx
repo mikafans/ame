@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- brand SVG variants are selected by color mode. */
 
 import { useColorMode } from "@/components/ThemeRegistry";
 import { BRAND_GRADIENT } from "@/lib/brand";

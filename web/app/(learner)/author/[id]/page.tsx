@@ -4,7 +4,6 @@
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import { MarkdownView } from "@/components/MarkdownView";
 import {
   Box,
@@ -76,7 +75,6 @@ export default function AuthorStudioPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user } = useAuth();
   const router = useRouter();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [loading, setLoading] = useState(true);

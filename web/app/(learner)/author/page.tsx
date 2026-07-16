@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
@@ -14,7 +13,6 @@ interface Assessment {
   questionCount?: number;
 }
 export default function AuthorIndexPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const [drafts, setDrafts] = useState<Assessment[] | null>(null);
   const [creating, setCreating] = useState(false);

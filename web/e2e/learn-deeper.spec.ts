@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_URL, loginAs, setAuthCookie } from "./helpers";
+import { API_URL, setAuthCookie } from "./helpers";
 
 test.describe("Learn Deeper flow", () => {
   test.describe.configure({ mode: "serial" });

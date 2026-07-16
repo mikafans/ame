@@ -2,7 +2,8 @@ import React from "react";
 
 type Props = any;
 const node = (tag: keyof React.JSX.IntrinsicElements, props: Props) => {
-  const { children, component, sx, ...rest } = props;
+  const { children, component, ...rest } = props;
+  delete rest.sx;
   return React.createElement(component || tag, rest, children);
 };
 export const Box = (p: Props) => node("div", p);

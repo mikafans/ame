@@ -5,7 +5,6 @@ import { useState, useEffect, use } from "react";
 import { formatDate } from "@/utils/format";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
 import { MarkdownView } from "@/components/MarkdownView";
 import {
   Box,
@@ -81,7 +80,6 @@ export default function ResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<ResultData | null>(null);
   const [cohortStats, setCohortStats] = useState<CohortStats | null>(null);
@@ -131,7 +129,6 @@ export default function ResultsPage({
     if (deepDiveRequests[questionId] === "saving") return;
     setDeepDiveRequests((prev) => ({ ...prev, [questionId]: "saving" }));
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (api as any).POST("/v1/deep-dives", {
         body: {
           questionId,
@@ -202,7 +199,7 @@ export default function ResultsPage({
     setLoading(true);
     api
       .GET("/v1/sessions/{id}" as never, { params: { path: { id } } } as never)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       .then(({ data: d }: { data?: any }) => {
         if (!d?.session) return;
         const session = d.session;
