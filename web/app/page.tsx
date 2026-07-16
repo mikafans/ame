@@ -1,467 +1,575 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
-import Stack from "@mui/material/Stack";
 import Card from "@mui/material/Card";
 import Chip from "@mui/material/Chip";
-import Grid from "@mui/material/Grid";
-import Paper from "@mui/material/Paper";
+import Container from "@mui/material/Container";
 import Divider from "@mui/material/Divider";
+import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import LinkIcon from "@mui/icons-material/Link";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorMode } from "@/components/ThemeRegistry";
-import { copyToClipboard } from "@/utils/clipboard";
 import { Logo } from "@/components/Logo";
-import { BRAND } from "@/lib/brand";
+
+const benefits = [
+  {
+    number: "01",
+    title: "Study plans that adapt",
+    body: "Plans start from your performance and change as you answer. Spend your next session where it matters most.",
+  },
+  {
+    number: "02",
+    title: "Questions, organized",
+    body: "Collect questions from anywhere into tagged banks. Turn a bank into a timed assessment when you are ready.",
+  },
+  {
+    number: "03",
+    title: "Progress you can see",
+    body: "Track movement by topic so you can replace 'I should study' with a clear next step.",
+  },
+];
+
+const faqs = [
+  {
+    question: "Can I use AME without an AI assistant?",
+    answer:
+      "Yes. The web app works on its own. Agent support is an optional way to read your stats and build focused practice.",
+  },
+  {
+    question: "Can I self-host AME?",
+    answer:
+      "AME is designed to be self-hostable. Follow the repository deployment documentation to run the platform on your own infrastructure.",
+  },
+  {
+    question: "What should I do first?",
+    answer:
+      "Create an account, open Explore, and start an assessment from the question bank. Your first session gives you a useful baseline.",
+  },
+];
+
+function QuizPreview() {
+  return (
+    <Card
+      sx={{
+        borderRadius: 2,
+        p: { xs: 2, sm: 2.5 },
+        bgcolor: "#fff",
+        color: "#171717",
+        boxShadow: "0 24px 60px rgba(0, 0, 0, 0.28)",
+      }}
+    >
+      <Stack spacing={1.5}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+        >
+          <Typography
+            variant="caption"
+            sx={{ color: "#8a8a8a", fontFamily: "monospace" }}
+          >
+            Q 7 / 20
+          </Typography>
+          <Chip
+            label="Adaptive · ELO 1480"
+            size="small"
+            sx={{
+              bgcolor: "#e8f0ff",
+              color: "#1261e9",
+              fontSize: 11,
+              height: 24,
+            }}
+          />
+        </Stack>
+        <Box
+          sx={{
+            height: 4,
+            borderRadius: 2,
+            bgcolor: "#e8e8e8",
+            overflow: "hidden",
+          }}
+        >
+          <Box sx={{ width: "35%", height: "100%", bgcolor: "#1261e9" }} />
+        </Box>
+        <Typography
+          sx={{ fontSize: { xs: 16, sm: 17 }, fontWeight: 700, pt: 0.5 }}
+        >
+          Which data structure gives O(1) average lookup?
+        </Typography>
+        <Stack spacing={1}>
+          <Box
+            sx={{
+              border: "1px solid #d9d9d9",
+              borderRadius: 1.5,
+              px: 1.5,
+              py: 1.1,
+            }}
+          >
+            Binary search tree
+          </Box>
+          <Box
+            sx={{
+              border: "2px solid #1261e9",
+              borderRadius: 1.5,
+              px: 1.5,
+              py: 1.05,
+              bgcolor: "#e8f0ff",
+              display: "flex",
+              justifyContent: "space-between",
+            }}
+          >
+            <span>Hash table</span>
+            <CheckIcon sx={{ color: "#5b9700", fontSize: 19 }} />
+          </Box>
+          <Box
+            sx={{
+              border: "1px solid #d9d9d9",
+              borderRadius: 1.5,
+              px: 1.5,
+              py: 1.1,
+            }}
+          >
+            Linked list
+          </Box>
+        </Stack>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ pt: 0.5 }}
+        >
+          <Typography variant="caption" sx={{ color: "#929292" }}>
+            Hash maps · your weakest topic
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            sx={{
+              borderRadius: 5,
+              bgcolor: "#050505",
+              color: "#fff",
+              minWidth: 72,
+            }}
+          >
+            Next
+          </Button>
+        </Stack>
+      </Stack>
+    </Card>
+  );
+}
 
 export default function LandingPage() {
-  const [copied, setCopied] = useState(false);
   const { user } = useAuth();
   const { mode, toggle } = useColorMode();
-  const isDark = mode === "dark";
-
-  // The landing stays public (it's also the agent/discovery surface), but the
-  // human CTA adapts: signed-in visitors get a one-click way back into the app,
-  // signed-out visitors are sent to login. While useAuth is still resolving,
-  // `user` is null so we default to the logged-out label.
   const signedIn = !!user;
-  const ctaLabel = signedIn ? "Open Explore" : "Use Now";
-  const ctaHref = signedIn ? "/explore" : "/login";
-
-  // Resolve the origin only after mount. Computing it during render would
-  // diverge between server (no window) and client and break hydration, so we
-  // start empty (URLs render relative) and fill in the absolute origin once
-  // the client has mounted.
-  const [baseUrl, setBaseUrl] = useState("");
-  useEffect(() => {
-    setBaseUrl(window.location.origin);
-  }, []);
-
-  const starterPrompt = `You are an AI assistant helping me with my study on AME. AME has a first-class agent surface. To learn how to use it, please fetch and read the platform capabilities at:
-${baseUrl}/llms.txt
-
-The machine-readable tool schemas are available at:
-${baseUrl}/skill.json
-
-Authenticate all your requests using your Agent API Bearer Key.
-
-Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`;
-
-  const handleCopyPrompt = () => {
-    copyToClipboard(starterPrompt).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  // Mode-dependent palette. The page hardcodes its own colors (rather than
-  // leaning on the MUI theme) so the hero gradients stay intentional, but each
-  // value has a light + dark variant so text never goes invisible-on-invisible.
-  const c = isDark
-    ? {
-        pageBg: BRAND.dark.background,
-        pageGradient: `radial-gradient(circle at 10% 20%, rgba(98, 216, 205, 0.12) 0%, transparent 40%),
-                       radial-gradient(circle at 90% 80%, rgba(255, 157, 192, 0.12) 0%, transparent 42%)`,
-        textPrimary: BRAND.dark.text,
-        textSecondary: "#90A4AE",
-        headingGradient: "linear-gradient(135deg, #E2E8F0 0%, #62D8CD 100%)",
-        agentChipColor: BRAND.dark.secondary,
-        brandStart: BRAND.dark.primary,
-        brandEnd: BRAND.dark.secondary,
-        brandStartSoft: "rgba(98, 216, 205, 0.15)",
-        brandEndSoft: "rgba(255, 157, 192, 0.16)",
-        brandBorder: "rgba(98, 216, 205, 0.35)",
-        brandShadow: "rgba(98, 216, 205, 0.28)",
-        cardBg: "rgba(27, 42, 40, 0.78)",
-        cardBorder: "1px solid rgba(255, 255, 255, 0.08)",
-        cardShadow: "0 20px 40px rgba(0,0,0,0.4)",
-        rowBg: "rgba(255, 255, 255, 0.03)",
-        rowBorder: "1px solid rgba(255, 255, 255, 0.05)",
-        rowHoverBg: "rgba(255, 255, 255, 0.06)",
-        outlineBorder: "rgba(255, 255, 255, 0.15)",
-        outlineColor: "#FFF",
-        ghostBorder: "rgba(255, 255, 255, 0.1)",
-        ghostColor: "#B0BEC5",
-        promptBg: "rgba(0, 0, 0, 0.25)",
-        divider: "rgba(255, 255, 255, 0.08)",
-      }
-    : {
-        pageBg: BRAND.light.background,
-        pageGradient: `radial-gradient(circle at 10% 20%, rgba(69, 196, 185, 0.14) 0%, transparent 42%),
-                       radial-gradient(circle at 90% 80%, rgba(255, 143, 180, 0.16) 0%, transparent 42%)`,
-        textPrimary: BRAND.light.text,
-        textSecondary: "#5A6473",
-        headingGradient: "linear-gradient(135deg, #0F172A 0%, #1F766F 100%)",
-        agentChipColor: BRAND.light.secondaryDark,
-        brandStart: BRAND.light.primary,
-        brandEnd: BRAND.light.secondary,
-        brandStartSoft: "rgba(69, 196, 185, 0.14)",
-        brandEndSoft: "rgba(255, 143, 180, 0.16)",
-        brandBorder: "rgba(47, 167, 158, 0.26)",
-        brandShadow: "rgba(47, 167, 158, 0.16)",
-        cardBg: "rgba(255, 255, 255, 0.85)",
-        cardBorder: "1px solid rgba(0, 0, 0, 0.08)",
-        cardShadow: "0 20px 40px rgba(47, 167, 158, 0.12)",
-        rowBg: "rgba(69, 196, 185, 0.07)",
-        rowBorder: "1px solid rgba(0, 0, 0, 0.06)",
-        rowHoverBg: "rgba(69, 196, 185, 0.12)",
-        outlineBorder: "rgba(0, 0, 0, 0.15)",
-        outlineColor: "#0F172A",
-        ghostBorder: "rgba(0, 0, 0, 0.15)",
-        ghostColor: "#4A5568",
-        promptBg: "rgba(0, 0, 0, 0.04)",
-        divider: "rgba(0, 0, 0, 0.08)",
-      };
+  const entryHref = signedIn ? "/explore" : "/login";
 
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        bgcolor: c.pageBg,
-        backgroundImage: c.pageGradient,
-        color: c.textPrimary,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        fontFamily: "'Outfit', 'Inter', sans-serif",
-        py: 8,
-        overflow: "hidden",
+        bgcolor: "#fff",
+        color: "#171717",
+        fontFamily: "Inter, sans-serif",
       }}
     >
-      <Container maxWidth="lg">
-        {/* Top Header */}
+      <Container maxWidth="lg" sx={{ py: { xs: 1.5, sm: 2 } }}>
         <Box
+          component="header"
           sx={{
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            mb: 8,
+            justifyContent: "space-between",
+            minHeight: 48,
           }}
         >
-          <Logo size={36} />
-
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Tooltip title={isDark ? "Light mode" : "Dark mode"}>
-              <IconButton
-                onClick={toggle}
-                sx={{ color: c.textSecondary }}
-                size="small"
+          <Logo size={32} />
+          <Stack
+            direction="row"
+            spacing={{ xs: 1, sm: 2.5 }}
+            alignItems="center"
+          >
+            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 2.5 }}>
+              <Typography
+                component="a"
+                href="#benefits"
+                sx={{ color: "#555", fontSize: 14, textDecoration: "none" }}
               >
-                {isDark ? (
-                  <LightModeOutlinedIcon fontSize="small" />
-                ) : (
-                  <DarkModeOutlinedIcon fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
+                Features
+              </Typography>
+              <Typography
+                component="a"
+                href="#agents"
+                sx={{ color: "#555", fontSize: 14, textDecoration: "none" }}
+              >
+                For agents
+              </Typography>
+              <Typography
+                component="a"
+                href="#faq"
+                sx={{ color: "#555", fontSize: 14, textDecoration: "none" }}
+              >
+                FAQ
+              </Typography>
+            </Box>
+            <IconButton
+              aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
+              onClick={toggle}
+              size="small"
+            >
+              {mode === "dark" ? (
+                <LightModeOutlinedIcon fontSize="small" />
+              ) : (
+                <DarkModeOutlinedIcon fontSize="small" />
+              )}
+            </IconButton>
             <Button
-              variant="outlined"
-              onClick={() => (window.location.href = ctaHref)}
+              component={Link}
+              href={entryHref}
+              variant="contained"
               sx={{
-                borderColor: c.outlineBorder,
-                color: c.outlineColor,
+                bgcolor: "#050505",
+                color: "#fff",
+                borderRadius: 5,
+                px: 2.5,
                 textTransform: "none",
-                borderRadius: "8px",
-                px: 3,
-                py: 0.75,
-                fontSize: 14,
-                fontWeight: 500,
-                transition: "all 0.3s",
-                "&:hover": {
-                  borderColor: c.brandStart,
-                  bgcolor: c.brandStartSoft,
-                  boxShadow: `0 0 15px ${c.brandShadow}`,
-                },
+                "&:hover": { bgcolor: "#222" },
               }}
             >
-              {ctaLabel}
+              Sign up free
             </Button>
           </Stack>
         </Box>
+      </Container>
 
-        {/* Hero Section */}
-        <Grid container spacing={6} alignItems="center">
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Box sx={{ pr: { md: 4 } }}>
-              <Chip
-                label="First-Class Agent Support"
-                sx={{
-                  background: c.brandEndSoft,
-                  border: `1px solid ${c.brandBorder}`,
-                  color: c.agentChipColor,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  mb: 3,
-                  py: 1.5,
-                }}
-              />
-              <Typography
-                variant="h2"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: -1.5,
-                  lineHeight: 1.15,
-                  mb: 2.5,
-                  background: c.headingGradient,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                Adaptive Study Powered by AI Agents.
-              </Typography>
-              <Typography
-                variant="body1"
-                sx={{
-                  color: c.textSecondary,
-                  fontSize: 17,
-                  lineHeight: 1.6,
-                  mb: 4.5,
-                  maxWidth: 500,
-                }}
-              >
-                AME is the modern assessment platform built equally for humans
-                and AI assistants. Author question banks, analyze learner
-                performance, and generate customized study plans — all over a
-                unified programmatic surface.
-              </Typography>
+      <Container maxWidth="lg">
+        <Box component="main">
+          <Box
+            sx={{
+              bgcolor: "#050505",
+              color: "#fff",
+              px: { xs: 3, sm: 5, md: 7 },
+              py: { xs: 6, md: 9 },
+              borderRadius: { xs: 0, md: 1 },
+            }}
+          >
+            <Grid container spacing={{ xs: 5, md: 7 }} alignItems="center">
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Stack spacing={3}>
+                  <Chip
+                    label="FREE · OPEN · SELF-HOSTABLE"
+                    size="small"
+                    sx={{
+                      alignSelf: "flex-start",
+                      color: "#b7ff19",
+                      border: "1px solid #6c9b00",
+                      bgcolor: "transparent",
+                      fontFamily: "monospace",
+                      letterSpacing: 0.8,
+                    }}
+                  />
+                  <Typography
+                    component="h1"
+                    sx={{
+                      fontSize: { xs: 42, sm: 56, md: 66 },
+                      lineHeight: 0.99,
+                      fontWeight: 800,
+                      letterSpacing: -2.5,
+                    }}
+                  >
+                    Study what you don&apos;t know yet.
+                  </Typography>
+                  <Typography
+                    sx={{
+                      color: "#b6b6b6",
+                      fontSize: { xs: 17, md: 19 },
+                      lineHeight: 1.55,
+                      maxWidth: 500,
+                    }}
+                  >
+                    AME builds question banks, tracks every answer, and adapts
+                    each session to your weakest topics — so no minute of
+                    studying is wasted.
+                  </Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                    <Button
+                      component={Link}
+                      href={entryHref}
+                      variant="contained"
+                      endIcon={<ArrowForwardIcon />}
+                      sx={{
+                        alignSelf: "flex-start",
+                        bgcolor: "#1261e9",
+                        color: "#fff",
+                        borderRadius: 5,
+                        px: 2.75,
+                        py: 1.25,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        "&:hover": { bgcolor: "#0d4fbe" },
+                      }}
+                    >
+                      Sign up free
+                    </Button>
+                    <Button
+                      component={Link}
+                      href={entryHref}
+                      variant="outlined"
+                      sx={{
+                        alignSelf: "flex-start",
+                        color: "#fff",
+                        borderColor: "#666",
+                        borderRadius: 5,
+                        px: 2.5,
+                        py: 1.25,
+                        textTransform: "none",
+                        "&:hover": { borderColor: "#fff" },
+                      }}
+                    >
+                      Try a sample quiz
+                    </Button>
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: "#777" }}>
+                    No credit card required to get started.
+                  </Typography>
+                </Stack>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <QuizPreview />
+              </Grid>
+            </Grid>
+          </Box>
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2.5}>
-                <Button
-                  variant="contained"
-                  onClick={() => (window.location.href = ctaHref)}
-                  endIcon={<ArrowForwardIcon />}
-                  sx={{
-                    background: `linear-gradient(135deg, ${c.brandStart} 0%, ${c.brandEnd} 100%)`,
-                    color: "#0C1817",
-                    textTransform: "none",
-                    borderRadius: "10px",
-                    px: 4,
-                    py: 1.5,
-                    fontSize: 16,
-                    fontWeight: 600,
-                    boxShadow: `0 6px 20px ${c.brandShadow}`,
-                    transition: "all 0.3s",
-                    "&:hover": {
-                      background: `linear-gradient(135deg, ${c.brandEnd} 0%, ${c.brandStart} 100%)`,
-                      transform: "translateY(-2px)",
-                      boxShadow: `0 8px 25px ${c.brandShadow}`,
-                    },
-                  }}
-                >
-                  {ctaLabel}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => window.open("/llms.txt", "_blank")}
-                  sx={{
-                    borderColor: c.ghostBorder,
-                    color: c.ghostColor,
-                    textTransform: "none",
-                    borderRadius: "10px",
-                    px: 3.5,
-                    py: 1.5,
-                    fontSize: 16,
-                    fontWeight: 500,
-                    transition: "all 0.3s",
-                    "&:hover": {
-                      borderColor: c.brandStart,
-                      color: c.textPrimary,
-                      bgcolor: c.brandStartSoft,
-                    },
-                  }}
-                >
-                  Read llms.txt Specs
-                </Button>
-              </Stack>
-            </Box>
-          </Grid>
-
-          {/* AI Discovery Card */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card
-              variant="outlined"
+          <Box
+            id="benefits"
+            sx={{ py: { xs: 6, md: 9 }, px: { xs: 2, md: 4 } }}
+          >
+            <Typography
               sx={{
-                bgcolor: c.cardBg,
-                backdropFilter: "blur(20px)",
-                border: c.cardBorder,
-                borderRadius: "16px",
-                p: 4,
-                boxShadow: c.cardShadow,
-                position: "relative",
-                "&::before": {
-                  content: '""',
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "3px",
-                  background: `linear-gradient(90deg, ${c.brandStart} 0%, ${c.brandEnd} 100%)`,
-                  borderTopLeftRadius: "16px",
-                  borderTopRightRadius: "16px",
-                },
+                color: "#1261e9",
+                fontFamily: "monospace",
+                fontSize: 12,
+                letterSpacing: 1.3,
+                mb: 1,
               }}
             >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  mb: 3,
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="h6"
+              WHY AME
+            </Typography>
+            <Typography
+              component="h2"
+              sx={{
+                fontSize: { xs: 29, md: 38 },
+                lineHeight: 1.15,
+                fontWeight: 800,
+                maxWidth: 700,
+                mb: 4,
+              }}
+            >
+              Everything between &quot;I should study&quot; and &quot;I
+              passed.&quot;
+            </Typography>
+            <Grid container spacing={2}>
+              {benefits.map((benefit) => (
+                <Grid key={benefit.number} size={{ xs: 12, md: 4 }}>
+                  <Card
+                    variant="outlined"
                     sx={{
-                      fontWeight: 700,
-                      letterSpacing: -0.3,
-                      mb: 0.5,
-                      color: c.textPrimary,
+                      height: "100%",
+                      p: 2.5,
+                      borderColor: "#e0e0e0",
+                      borderRadius: 1.5,
+                      boxShadow: "0 4px 0 #f0f0f0",
                     }}
                   >
-                    🤖 LLM Agent Discovery Surface
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{ color: c.textSecondary, display: "block" }}
-                  >
-                    Machine-readable configuration files served publicly
-                  </Typography>
-                </Box>
-                <Chip
-                  label="API v1"
-                  color="primary"
-                  size="small"
-                  sx={{ fontWeight: 600 }}
-                />
-              </Box>
+                    <Typography
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        bgcolor: "#e8f0ff",
+                        color: "#1261e9",
+                        fontFamily: "monospace",
+                        mb: 2,
+                      }}
+                    >
+                      {benefit.number}
+                    </Typography>
+                    <Typography
+                      component="h3"
+                      sx={{ fontSize: 18, fontWeight: 700, mb: 1 }}
+                    >
+                      {benefit.title}
+                    </Typography>
+                    <Typography sx={{ color: "#656565", lineHeight: 1.55 }}>
+                      {benefit.body}
+                    </Typography>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
 
-              <Stack spacing={2} sx={{ mb: 4 }}>
-                {[
-                  {
-                    href: "/llms.txt",
-                    label: "/llms.txt",
-                    desc: "Architecture overview, scopes, and ELO dynamic programming playbooks.",
-                  },
-                  {
-                    href: "/skill.json",
-                    label: "/skill.json",
-                    desc: "MCP-compatible tool definitions and schema parameters.",
-                  },
-                  {
-                    href: "/openapi.yaml",
-                    label: "/openapi.yaml",
-                    desc: "Standard OpenAPI 3.1 schema (YAML) for model client generators.",
-                  },
-                ].map((row) => (
-                  <Box
-                    key={row.href}
-                    onClick={() => window.open(row.href, "_blank")}
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      p: 2,
-                      borderRadius: "10px",
-                      bgcolor: c.rowBg,
-                      border: c.rowBorder,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      "&:hover": {
-                        bgcolor: c.rowHoverBg,
-                        borderColor: c.brandStart,
-                        transform: "translateX(4px)",
-                      },
-                    }}
-                  >
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          fontFamily: "monospace",
-                          fontWeight: 600,
-                          color: c.textPrimary,
-                        }}
-                      >
-                        {row.label}
+          <Box
+            id="agents"
+            sx={{
+              bgcolor: "#f7f7f7",
+              px: { xs: 3, md: 5 },
+              py: 3,
+              display: "flex",
+              gap: 3,
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", md: "center" },
+              flexDirection: { xs: "column", md: "row" },
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontWeight: 700 }}>
+                Bring your AI assistant
+              </Typography>
+              <Typography sx={{ color: "#666", fontSize: 14 }}>
+                First-class agent API — your assistant reads your stats and
+                builds practice for you.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {["/llms.txt", "/skill.json", "/openapi.yaml"].map((href) => (
+                <Button
+                  key={href}
+                  component={Link}
+                  href={href}
+                  variant="outlined"
+                  size="small"
+                  sx={{
+                    color: "#555",
+                    borderColor: "#d0d0d0",
+                    borderRadius: 5,
+                    fontFamily: "monospace",
+                    textTransform: "none",
+                  }}
+                >
+                  {href}
+                </Button>
+              ))}
+            </Stack>
+          </Box>
+
+          <Box id="faq" sx={{ py: { xs: 6, md: 9 }, px: { xs: 2, md: 4 } }}>
+            <Grid container spacing={{ xs: 5, md: 8 }}>
+              <Grid size={{ xs: 12, md: 7 }}>
+                <Typography
+                  component="h2"
+                  sx={{ fontSize: 30, fontWeight: 800, mb: 2 }}
+                >
+                  Questions?
+                </Typography>
+                <Stack divider={<Divider flexItem />}>
+                  {faqs.map((faq) => (
+                    <Box key={faq.question} sx={{ py: 2 }}>
+                      <Typography sx={{ fontWeight: 700, mb: 0.75 }}>
+                        {faq.question}
                       </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{ color: c.textSecondary }}
-                      >
-                        {row.desc}
+                      <Typography sx={{ color: "#666", lineHeight: 1.55 }}>
+                        {faq.answer}
                       </Typography>
                     </Box>
-                    <LinkIcon sx={{ color: c.textSecondary, fontSize: 18 }} />
-                  </Box>
-                ))}
-              </Stack>
-
-              <Divider sx={{ borderColor: c.divider, mb: 3 }} />
-
-              {/* Dynamic Starter Prompt Constructor */}
-              <Box>
-                <Box
+                  ))}
+                </Stack>
+              </Grid>
+              <Grid size={{ xs: 12, md: 5 }}>
+                <Card
+                  variant="outlined"
                   sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 1.5,
+                    p: { xs: 3, md: 4 },
+                    borderColor: "#e0e0e0",
+                    bgcolor: "#fafafa",
+                    borderRadius: 2,
                   }}
                 >
                   <Typography
-                    variant="subtitle2"
-                    sx={{ fontWeight: 600, color: c.textPrimary }}
-                  >
-                    🚀 Boot Prompt for AI Assistants
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="text"
-                    onClick={handleCopyPrompt}
-                    startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
+                    component="h2"
                     sx={{
-                      color: copied ? c.brandStart : c.brandEnd,
-                      textTransform: "none",
-                      fontSize: 12,
+                      fontSize: 27,
+                      lineHeight: 1.1,
+                      fontWeight: 800,
+                      mb: 1.5,
                     }}
                   >
-                    {copied ? "Copied Prompt!" : "Copy Prompt"}
+                    Your next exam is already easier.
+                  </Typography>
+                  <Typography sx={{ color: "#666", lineHeight: 1.5, mb: 2.5 }}>
+                    Start with a few questions and turn your weakest topics into
+                    a focused practice session.
+                  </Typography>
+                  <Button
+                    component={Link}
+                    href={entryHref}
+                    variant="contained"
+                    sx={{
+                      bgcolor: "#1261e9",
+                      borderRadius: 5,
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Sign up free
                   </Button>
-                </Box>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    bgcolor: c.promptBg,
-                    borderColor: c.divider,
-                    borderRadius: "8px",
-                    fontFamily: "monospace",
-                    fontSize: 10.5,
-                    lineHeight: 1.5,
-                    maxHeight: 140,
-                    overflowY: "auto",
-                    color: c.textSecondary,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {starterPrompt}
-                </Paper>
-              </Box>
-            </Card>
-          </Grid>
-        </Grid>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
+        </Box>
       </Container>
+
+      <Box
+        component="footer"
+        sx={{ borderTop: "1px solid #e5e5e5", px: 3, py: 3 }}
+      >
+        <Container
+          maxWidth="lg"
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 2,
+            color: "#999",
+            fontSize: 13,
+            flexWrap: "wrap",
+          }}
+        >
+          <span>© 2026 AME</span>
+          <Stack direction="row" spacing={2}>
+            <Link
+              href="/llms.txt"
+              style={{ color: "inherit", textDecoration: "none" }}
+            >
+              Docs
+            </Link>
+            <a
+              href="https://github.com/mikafans/ame"
+              style={{ color: "inherit", textDecoration: "none" }}
+            >
+              GitHub
+            </a>
+            <Link
+              href="/llms.txt"
+              style={{ color: "inherit", textDecoration: "none" }}
+            >
+              Self-hosting
+            </Link>
+          </Stack>
+        </Container>
+      </Box>
     </Box>
   );
 }
