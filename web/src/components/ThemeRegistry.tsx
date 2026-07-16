@@ -346,6 +346,10 @@ export default function ThemeRegistry({
     }
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", mode === "dark");
+  }, [mode]);
+
   const toggle = useCallback(() => {
     setMode((m) => {
       const next = m === "light" ? "dark" : "light";

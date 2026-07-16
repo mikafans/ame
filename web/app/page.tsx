@@ -1,23 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import Chip from "@mui/material/Chip";
-import Container from "@mui/material/Container";
-import Divider from "@mui/material/Divider";
-import Grid from "@mui/material/Grid";
-import IconButton from "@mui/material/IconButton";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import CheckIcon from "@mui/icons-material/Check";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import { useAuth } from "@/hooks/useAuth";
-import { useColorMode } from "@/components/ThemeRegistry";
+import { ArrowRight, Check, Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
+import { useColorMode } from "@/components/ThemeRegistry";
+import { useAuth } from "@/hooks/useAuth";
 
 const benefits = [
   {
@@ -41,7 +29,7 @@ const faqs = [
   {
     question: "Can I use AME without an AI assistant?",
     answer:
-      "Yes. The web app works on its own. Agent support is an optional way to read your stats and build focused practice.",
+      "Yes. The web app works on its own. Agent support is an optional way to connect an assistant to your assessments and study workflow.",
   },
   {
     question: "Can I self-host AME?",
@@ -57,118 +45,46 @@ const faqs = [
 
 function QuizPreview() {
   return (
-    <Card
+    <div
       role="img"
       aria-label="Preview of an adaptive multiple-choice question"
-      sx={{
-        borderRadius: 2,
-        p: { xs: 2, sm: 2.5 },
-        bgcolor: "#fff",
-        color: "#171717",
-        boxShadow: "0 24px 60px rgba(0, 0, 0, 0.28)",
-      }}
+      className="rounded-xl bg-white p-4 text-neutral-900 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6"
     >
-      <Stack spacing={1.5}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography
-            variant="caption"
-            sx={{ color: "#8a8a8a", fontFamily: "monospace" }}
-          >
-            Q 7 / 20
-          </Typography>
-          <Chip
-            label="Adaptive · ELO 1480"
-            size="small"
-            sx={{
-              bgcolor: "#e8f0ff",
-              color: "#1261e9",
-              fontSize: 11,
-              height: 24,
-            }}
-          />
-        </Stack>
-        <Box
-          sx={{
-            height: 4,
-            borderRadius: 2,
-            bgcolor: "#e8e8e8",
-            overflow: "hidden",
-          }}
-        >
-          <Box sx={{ width: "35%", height: "100%", bgcolor: "#1261e9" }} />
-        </Box>
-        <Typography
-          sx={{ fontSize: { xs: 16, sm: 17 }, fontWeight: 700, pt: 0.5 }}
-        >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-mono text-xs text-neutral-500">Q 7 / 20</span>
+          <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] text-blue-700">
+            Adaptive · ELO 1480
+          </span>
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-neutral-200">
+          <div className="h-full w-[35%] bg-blue-600" />
+        </div>
+        <p className="pt-1 text-base font-bold sm:text-[17px]">
           Which data structure gives O(1) average lookup?
-        </Typography>
-        <Stack spacing={1}>
-          <Box
-            sx={{
-              border: "1px solid #d9d9d9",
-              borderRadius: 1.5,
-              px: 1.5,
-              py: 1.1,
-            }}
-          >
+        </p>
+        <div className="space-y-2">
+          <div className="rounded-lg border border-neutral-300 px-3 py-2.5">
             Binary search tree
-          </Box>
-          <Box
-            sx={{
-              border: "2px solid #1261e9",
-              borderRadius: 1.5,
-              px: 1.5,
-              py: 1.05,
-              bgcolor: "#e8f0ff",
-              display: "flex",
-              justifyContent: "space-between",
-            }}
-          >
+          </div>
+          <div className="flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-100 px-3 py-2 text-blue-950">
             <span>Hash table</span>
-            <CheckIcon sx={{ color: "#5b9700", fontSize: 19 }} />
-          </Box>
-          <Box
-            sx={{
-              border: "1px solid #d9d9d9",
-              borderRadius: 1.5,
-              px: 1.5,
-              py: 1.1,
-            }}
-          >
+            <Check className="size-5 text-lime-700" />
+          </div>
+          <div className="rounded-lg border border-neutral-300 px-3 py-2.5">
             Linked list
-          </Box>
-        </Stack>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ pt: 0.5 }}
-        >
-          <Typography variant="caption" sx={{ color: "#929292" }}>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-xs text-neutral-500">
             Hash maps · your weakest topic
-          </Typography>
-          <Box
-            component="span"
-            sx={{
-              borderRadius: 5,
-              bgcolor: "#050505",
-              color: "#fff",
-              minWidth: 72,
-              px: 1.5,
-              py: 0.75,
-              textAlign: "center",
-              fontSize: 14,
-            }}
-          >
+          </span>
+          <span className="rounded-full bg-neutral-950 px-4 py-2 text-center text-sm text-white">
             Next
-          </Box>
-        </Stack>
-      </Stack>
-    </Card>
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -177,404 +93,209 @@ export default function LandingPage() {
   const { mode, toggle } = useColorMode();
   const signedIn = !!user;
   const entryHref = signedIn ? "/explore" : "/login";
+  const entryLabel = signedIn ? "Open Explore" : "Sign up free";
+  const sampleLabel = signedIn ? "Open Explore" : "Try a sample quiz";
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: "#fff",
-        color: "#171717",
-        fontFamily: "Inter, sans-serif",
-      }}
-    >
-      <Container maxWidth="lg" sx={{ py: { xs: 1.5, sm: 2 } }}>
-        <Box
-          component="header"
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 48,
-          }}
-        >
+    <div className="min-h-screen bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <header className="flex min-h-16 items-center justify-between gap-4">
           <Logo size={32} />
-          <Stack
-            direction="row"
-            spacing={{ xs: 1, sm: 2.5 }}
-            alignItems="center"
-          >
-            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 2.5 }}>
-              <Typography
-                component="a"
+          <div className="flex items-center gap-2 sm:gap-6">
+            <nav className="hidden items-center gap-6 text-sm text-neutral-600 dark:text-neutral-300 sm:flex">
+              <a
+                className="transition hover:text-neutral-950 dark:hover:text-white"
                 href="#benefits"
-                sx={{ color: "#555", fontSize: 14, textDecoration: "none" }}
               >
                 Features
-              </Typography>
-              <Typography
-                component="a"
+              </a>
+              <a
+                className="transition hover:text-neutral-950 dark:hover:text-white"
                 href="#agents"
-                sx={{ color: "#555", fontSize: 14, textDecoration: "none" }}
               >
                 For agents
-              </Typography>
-              <Typography
-                component="a"
+              </a>
+              <a
+                className="transition hover:text-neutral-950 dark:hover:text-white"
                 href="#faq"
-                sx={{ color: "#555", fontSize: 14, textDecoration: "none" }}
               >
                 FAQ
-              </Typography>
-            </Box>
-            <IconButton
+              </a>
+            </nav>
+            <button
+              type="button"
               aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
               onClick={toggle}
-              size="small"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-600 outline-none transition hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               {mode === "dark" ? (
-                <LightModeOutlinedIcon fontSize="small" />
+                <Sun className="size-4" />
               ) : (
-                <DarkModeOutlinedIcon fontSize="small" />
+                <Moon className="size-4" />
               )}
-            </IconButton>
+            </button>
             <Button
-              component={Link}
-              href={entryHref}
-              variant="contained"
-              sx={{
-                bgcolor: "#050505",
-                color: "#fff",
-                borderRadius: 5,
-                px: 2.5,
-                textTransform: "none",
-                "&:hover": { bgcolor: "#222" },
-              }}
+              asChild
+              className="rounded-full bg-neutral-950 px-5 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
             >
-              Sign up free
+              <Link href={entryHref}>{entryLabel}</Link>
             </Button>
-          </Stack>
-        </Box>
-      </Container>
+          </div>
+        </header>
 
-      <Container maxWidth="lg">
-        <Box component="main">
-          <Box
-            sx={{
-              bgcolor: "#050505",
-              color: "#fff",
-              px: { xs: 3, sm: 5, md: 7 },
-              py: { xs: 6, md: 9 },
-              borderRadius: { xs: 0, md: 1 },
-            }}
-          >
-            <Grid container spacing={{ xs: 5, md: 7 }} alignItems="center">
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Stack spacing={3}>
-                  <Chip
-                    label="FREE · OPEN · SELF-HOSTABLE"
-                    size="small"
-                    sx={{
-                      alignSelf: "flex-start",
-                      color: "#b7ff19",
-                      border: "1px solid #6c9b00",
-                      bgcolor: "transparent",
-                      fontFamily: "monospace",
-                      letterSpacing: 0.8,
-                    }}
-                  />
-                  <Typography
-                    component="h1"
-                    sx={{
-                      fontSize: { xs: 42, sm: 56, md: 66 },
-                      lineHeight: 0.99,
-                      fontWeight: 800,
-                      letterSpacing: -2.5,
-                    }}
+        <main>
+          <section className="rounded-none bg-neutral-950 px-6 py-14 text-white sm:px-10 md:rounded-lg md:px-14 md:py-20">
+            <div className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
+              <div className="space-y-6">
+                <span className="inline-flex rounded-full border border-lime-700 px-3 py-1 font-mono text-[11px] tracking-[0.12em] text-lime-300">
+                  OPEN · SELF-HOSTABLE
+                </span>
+                <h1 className="max-w-xl text-[42px] font-extrabold leading-[0.99] tracking-[-0.06em] sm:text-6xl md:text-[66px]">
+                  Study what you don&apos;t know yet.
+                </h1>
+                <p className="max-w-xl text-[17px] leading-7 text-neutral-400 sm:text-[19px]">
+                  AME builds question banks, tracks every answer, and adapts
+                  each session to your weakest topics — so no minute of studying
+                  is wasted.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    asChild
+                    className="rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
                   >
-                    Study what you don&apos;t know yet.
-                  </Typography>
-                  <Typography
-                    sx={{
-                      color: "#b6b6b6",
-                      fontSize: { xs: 17, md: 19 },
-                      lineHeight: 1.55,
-                      maxWidth: 500,
-                    }}
+                    <Link href={entryHref}>
+                      {entryLabel}
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="rounded-full border-neutral-600 px-6 py-3 text-white hover:border-white hover:bg-transparent hover:text-white"
                   >
-                    AME builds question banks, tracks every answer, and adapts
-                    each session to your weakest topics — so no minute of
-                    studying is wasted.
-                  </Typography>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                    <Button
-                      component={Link}
-                      href={entryHref}
-                      variant="contained"
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{
-                        alignSelf: "flex-start",
-                        bgcolor: "#1261e9",
-                        color: "#fff",
-                        borderRadius: 5,
-                        px: 2.75,
-                        py: 1.25,
-                        textTransform: "none",
-                        fontWeight: 700,
-                        "&:hover": { bgcolor: "#0d4fbe" },
-                      }}
-                    >
-                      Sign up free
-                    </Button>
-                    <Button
-                      component={Link}
-                      href={entryHref}
-                      variant="outlined"
-                      sx={{
-                        alignSelf: "flex-start",
-                        color: "#fff",
-                        borderColor: "#666",
-                        borderRadius: 5,
-                        px: 2.5,
-                        py: 1.25,
-                        textTransform: "none",
-                        "&:hover": { borderColor: "#fff" },
-                      }}
-                    >
-                      Try a sample quiz
-                    </Button>
-                  </Stack>
-                  <Typography variant="caption" sx={{ color: "#777" }}>
-                    No credit card required to get started.
-                  </Typography>
-                </Stack>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <QuizPreview />
-              </Grid>
-            </Grid>
-          </Box>
+                    <Link href={entryHref}>{sampleLabel}</Link>
+                  </Button>
+                </div>
+              </div>
+              <QuizPreview />
+            </div>
+          </section>
 
-          <Box
-            id="benefits"
-            sx={{ py: { xs: 6, md: 9 }, px: { xs: 2, md: 4 } }}
-          >
-            <Typography
-              sx={{
-                color: "#1261e9",
-                fontFamily: "monospace",
-                fontSize: 12,
-                letterSpacing: 1.3,
-                mb: 1,
-              }}
-            >
+          <section id="benefits" className="px-2 py-16 sm:px-4 md:py-20">
+            <p className="mb-2 font-mono text-xs tracking-[0.14em] text-blue-600">
               WHY AME
-            </Typography>
-            <Typography
-              component="h2"
-              sx={{
-                fontSize: { xs: 29, md: 38 },
-                lineHeight: 1.15,
-                fontWeight: 800,
-                maxWidth: 700,
-                mb: 4,
-              }}
-            >
+            </p>
+            <h2 className="mb-8 max-w-2xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
               Everything between &quot;I should study&quot; and &quot;I
               passed.&quot;
-            </Typography>
-            <Grid container spacing={2}>
+            </h2>
+            <div className="grid gap-4 md:grid-cols-3">
               {benefits.map((benefit) => (
-                <Grid key={benefit.number} size={{ xs: 12, md: 4 }}>
-                  <Card
-                    variant="outlined"
-                    sx={{
-                      height: "100%",
-                      p: 2.5,
-                      borderColor: "#e0e0e0",
-                      borderRadius: 1.5,
-                      boxShadow: "0 4px 0 #f0f0f0",
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 34,
-                        height: 34,
-                        borderRadius: "50%",
-                        bgcolor: "#e8f0ff",
-                        color: "#1261e9",
-                        fontFamily: "monospace",
-                        mb: 2,
-                      }}
-                    >
-                      {benefit.number}
-                    </Typography>
-                    <Typography
-                      component="h3"
-                      sx={{ fontSize: 18, fontWeight: 700, mb: 1 }}
-                    >
-                      {benefit.title}
-                    </Typography>
-                    <Typography sx={{ color: "#656565", lineHeight: 1.55 }}>
-                      {benefit.body}
-                    </Typography>
-                  </Card>
-                </Grid>
+                <article
+                  key={benefit.number}
+                  className="rounded-xl border border-neutral-200 p-6 shadow-[0_4px_0_#f0f0f0] dark:border-neutral-800 dark:shadow-[0_4px_0_#171717]"
+                >
+                  <span className="mb-4 inline-flex size-9 items-center justify-center rounded-full bg-blue-100 font-mono text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    {benefit.number}
+                  </span>
+                  <h3 className="mb-2 text-lg font-bold">{benefit.title}</h3>
+                  <p className="leading-6 text-neutral-600 dark:text-neutral-400">
+                    {benefit.body}
+                  </p>
+                </article>
               ))}
-            </Grid>
-          </Box>
+            </div>
+          </section>
 
-          <Box
+          <section
             id="agents"
-            sx={{
-              bgcolor: "#f7f7f7",
-              px: { xs: 3, md: 5 },
-              py: 3,
-              display: "flex",
-              gap: 3,
-              justifyContent: "space-between",
-              alignItems: { xs: "flex-start", md: "center" },
-              flexDirection: { xs: "column", md: "row" },
-            }}
+            className="flex flex-col gap-4 bg-neutral-100 px-6 py-6 dark:bg-neutral-900 md:flex-row md:items-center md:justify-between"
           >
-            <Box>
-              <Typography sx={{ fontWeight: 700 }}>
-                Bring your AI assistant
-              </Typography>
-              <Typography sx={{ color: "#666", fontSize: 14 }}>
-                First-class agent API — your assistant reads your stats and
-                builds practice for you.
-              </Typography>
-            </Box>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <div>
+              <h2 className="font-bold">Bring your AI assistant</h2>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                First-class agent API — connect an assistant to your assessments
+                and study workflow.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {["/llms.txt", "/skill.json", "/openapi.yaml"].map((href) => (
                 <Button
                   key={href}
-                  component={Link}
-                  href={href}
-                  variant="outlined"
-                  size="small"
-                  sx={{
-                    color: "#555",
-                    borderColor: "#d0d0d0",
-                    borderRadius: 5,
-                    fontFamily: "monospace",
-                    textTransform: "none",
-                  }}
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-neutral-300 font-mono text-xs font-normal dark:border-neutral-700"
                 >
-                  {href}
+                  <Link href={href}>{href}</Link>
                 </Button>
               ))}
-            </Stack>
-          </Box>
+            </div>
+          </section>
 
-          <Box id="faq" sx={{ py: { xs: 6, md: 9 }, px: { xs: 2, md: 4 } }}>
-            <Grid container spacing={{ xs: 5, md: 8 }}>
-              <Grid size={{ xs: 12, md: 7 }}>
-                <Typography
-                  component="h2"
-                  sx={{ fontSize: 30, fontWeight: 800, mb: 2 }}
-                >
-                  Questions?
-                </Typography>
-                <Stack divider={<Divider flexItem />}>
-                  {faqs.map((faq) => (
-                    <Box key={faq.question} sx={{ py: 2 }}>
-                      <Typography sx={{ fontWeight: 700, mb: 0.75 }}>
-                        {faq.question}
-                      </Typography>
-                      <Typography sx={{ color: "#666", lineHeight: 1.55 }}>
-                        {faq.answer}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </Grid>
-              <Grid size={{ xs: 12, md: 5 }}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: { xs: 3, md: 4 },
-                    borderColor: "#e0e0e0",
-                    bgcolor: "#fafafa",
-                    borderRadius: 2,
-                  }}
-                >
-                  <Typography
-                    component="h2"
-                    sx={{
-                      fontSize: 27,
-                      lineHeight: 1.1,
-                      fontWeight: 800,
-                      mb: 1.5,
-                    }}
-                  >
-                    Your next exam is already easier.
-                  </Typography>
-                  <Typography sx={{ color: "#666", lineHeight: 1.5, mb: 2.5 }}>
-                    Start with a few questions and turn your weakest topics into
-                    a focused practice session.
-                  </Typography>
-                  <Button
-                    component={Link}
-                    href={entryHref}
-                    variant="contained"
-                    sx={{
-                      bgcolor: "#1261e9",
-                      borderRadius: 5,
-                      textTransform: "none",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Sign up free
-                  </Button>
-                </Card>
-              </Grid>
-            </Grid>
-          </Box>
-        </Box>
-      </Container>
+          <section
+            id="faq"
+            className="grid gap-12 px-2 py-16 sm:px-4 md:grid-cols-[1.4fr_1fr] md:py-20"
+          >
+            <div>
+              <h2 className="mb-3 text-3xl font-extrabold tracking-[-0.04em]">
+                Questions?
+              </h2>
+              <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                {faqs.map((faq) => (
+                  <div key={faq.question} className="py-5">
+                    <h3 className="mb-2 font-bold">{faq.question}</h3>
+                    <p className="leading-6 text-neutral-600 dark:text-neutral-400">
+                      {faq.answer}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="self-start rounded-xl border border-neutral-200 bg-neutral-50 p-7 dark:border-neutral-800 dark:bg-neutral-900">
+              <h2 className="mb-3 text-3xl font-extrabold leading-tight tracking-[-0.04em]">
+                Your next exam is already easier.
+              </h2>
+              <p className="mb-6 leading-6 text-neutral-600 dark:text-neutral-400">
+                Start with a few questions and turn your weakest topics into a
+                focused practice session.
+              </p>
+              <Button
+                asChild
+                className="rounded-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+              >
+                <Link href={entryHref}>{entryLabel}</Link>
+              </Button>
+            </div>
+          </section>
+        </main>
+      </div>
 
-      <Box
-        component="footer"
-        sx={{ borderTop: "1px solid #e5e5e5", px: 3, py: 3 }}
-      >
-        <Container
-          maxWidth="lg"
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 2,
-            color: "#999",
-            fontSize: 13,
-            flexWrap: "wrap",
-          }}
-        >
+      <footer className="border-t border-neutral-200 px-4 py-6 text-sm text-neutral-500 dark:border-neutral-800">
+        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
           <span>© 2026 AME</span>
-          <Stack direction="row" spacing={2}>
+          <div className="flex gap-5">
             <Link
               href="/llms.txt"
-              style={{ color: "inherit", textDecoration: "none" }}
+              className="transition hover:text-neutral-950 dark:hover:text-white"
             >
               Docs
             </Link>
             <a
               href="https://github.com/mikafans/ame"
-              style={{ color: "inherit", textDecoration: "none" }}
+              className="transition hover:text-neutral-950 dark:hover:text-white"
             >
               GitHub
             </a>
             <Link
               href="/llms.txt"
-              style={{ color: "inherit", textDecoration: "none" }}
+              className="transition hover:text-neutral-950 dark:hover:text-white"
             >
               Self-hosting
             </Link>
-          </Stack>
-        </Container>
-      </Box>
-    </Box>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
