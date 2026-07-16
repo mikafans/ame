@@ -1,129 +1,54 @@
 "use client";
-
-import React, { useState, useEffect } from "react";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import TextField from "@mui/material/TextField";
-import Switch from "@mui/material/Switch";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Button from "@mui/material/Button";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogActions from "@mui/material/DialogActions";
+import { useState, useEffect } from "react";
 import { api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
-import { components } from "@/api/generated/schema";
-
-type EffectiveSettings = components["schemas"]["EffectiveSettings"];
+import { Button } from "@/components/ui/button";
+import type { components } from "@/api/generated/schema";
 type QuotaSettings = components["schemas"]["QuotaSettings"];
 type RateLimitSettings = components["schemas"]["RateLimitSettings"];
-
+const input =
+  "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // Maintenance mode
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
   const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
-
-  // Dialog for turning on maintenance mode
-  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
-  const [maintenanceDialogLoading, setMaintenanceDialogLoading] =
-    useState(false);
-
-  // Rate limits
+  const [confirm, setConfirm] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [ratelimit, setRatelimit] = useState<RateLimitSettings>({
     free: { burst: 0, rate: 0 },
     premium: { burst: 0, rate: 0 },
   });
-
-  // Quotas
   const [quota, setQuota] = useState<QuotaSettings>({
     agents: { free: 0, premium: 0 },
     assessments: { free: 0, premium: 0 },
     questions: { free: 0, premium: 0 },
   });
-
-  const [rateLimitQuotaSaving, setRateLimitQuotaSaving] = useState(false);
-  const [rateLimitQuotaError, setRateLimitQuotaError] = useState<string | null>(
-    null,
-  );
-  const [rateLimitQuotaSuccess, setRateLimitQuotaSuccess] = useState(false);
-
-  // Fetch settings on mount
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   useEffect(() => {
-    const fetchSettings = async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const { data, error } = await api.GET("/v1/admin/settings");
-        if (error) {
+    api
+      .GET("/v1/admin/settings")
+      .then(({ data, error }) => {
+        if (error)
           setLoadError(
             "Failed to load settings: " + errorMessage(error, "Unknown error"),
           );
-        } else if (data) {
+        else if (data) {
           setMaintenanceMode(data.maintenanceMode);
           setRatelimit(data.ratelimit);
           setQuota(data.quota);
         }
-      } catch (err) {
-        console.error(err);
-        setLoadError("An unexpected error occurred while fetching settings.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSettings();
+      })
+      .catch(() =>
+        setLoadError("An unexpected error occurred while fetching settings."),
+      )
+      .finally(() => setLoading(false));
   }, []);
-
-  // Handle maintenance mode toggle
-  const handleMaintenanceModeChange = (
-    _: React.ChangeEvent<HTMLInputElement>,
-    checked: boolean,
-  ) => {
-    if (checked) {
-      // Turning ON — show dialog
-      setMaintenanceDialogOpen(true);
-    } else {
-      // Turning OFF — save immediately
-      handleSaveMaintenanceMode(false);
-    }
-  };
-
-  // Confirm turning on maintenance mode via dialog
-  const handleConfirmMaintenanceMode = async () => {
-    setMaintenanceDialogLoading(true);
-    setMaintenanceError(null);
-    try {
-      const { data, error } = await api.PUT("/v1/admin/settings", {
-        body: { maintenanceMode: true },
-      });
-      if (error) {
-        setMaintenanceError(
-          "Failed to save: " + errorMessage(error, "Unknown error"),
-        );
-      } else if (data) {
-        setMaintenanceMode(data.maintenanceMode);
-        setMaintenanceDialogOpen(false);
-      }
-    } catch (err) {
-      console.error(err);
-      setMaintenanceError("Network or unexpected server error.");
-    } finally {
-      setMaintenanceDialogLoading(false);
-    }
-  };
-
-  // Save maintenance mode OFF
-  const handleSaveMaintenanceMode = async (value: boolean) => {
-    setMaintenanceSaving(true);
+  const updateMaintenance = async (value: boolean) => {
+    setSavingMaintenance(true);
     setMaintenanceError(null);
     try {
       const { data, error } = await api.PUT("/v1/admin/settings", {
@@ -133,417 +58,205 @@ export default function SettingsPage() {
         setMaintenanceError(
           "Failed to save: " + errorMessage(error, "Unknown error"),
         );
-        setMaintenanceMode(!value);
-      } else if (data) {
-        setMaintenanceMode(data.maintenanceMode);
-      }
-    } catch (err) {
-      console.error(err);
+      } else if (data) setMaintenanceMode(data.maintenanceMode);
+    } catch {
       setMaintenanceError("Network or unexpected server error.");
-      setMaintenanceMode(!value);
     } finally {
-      setMaintenanceSaving(false);
+      setSavingMaintenance(false);
     }
   };
-
-  // Handle rate limit/quota save
-  const handleSaveRateLimitQuota = async () => {
-    setRateLimitQuotaSaving(true);
-    setRateLimitQuotaError(null);
-    setRateLimitQuotaSuccess(false);
+  const confirmMaintenance = async () => {
+    setConfirmLoading(true);
+    await updateMaintenance(true);
+    setConfirm(false);
+    setConfirmLoading(false);
+  };
+  const save = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaved(false);
     try {
       const { data, error } = await api.PUT("/v1/admin/settings", {
         body: { ratelimit, quota },
       });
-      if (error) {
-        setRateLimitQuotaError(
-          "Failed to save: " + errorMessage(error, "Unknown error"),
-        );
-      } else if (data) {
+      if (error)
+        setSaveError("Failed to save: " + errorMessage(error, "Unknown error"));
+      else if (data) {
         setRatelimit(data.ratelimit);
         setQuota(data.quota);
-        setRateLimitQuotaSuccess(true);
-        setTimeout(() => setRateLimitQuotaSuccess(false), 4000);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 4000);
       }
-    } catch (err) {
-      console.error(err);
-      setRateLimitQuotaError("Network or unexpected server error.");
+    } catch {
+      setSaveError("Network or unexpected server error.");
     } finally {
-      setRateLimitQuotaSaving(false);
+      setSaving(false);
     }
   };
-
-  // Update rate limit field
-  const handleRateLimitChange = (
+  const setRate = (
     tier: "free" | "premium",
     field: "burst" | "rate",
     value: string,
-  ) => {
-    setRatelimit((prev) => ({
-      ...prev,
-      [tier]: {
-        ...prev[tier],
-        [field]: parseInt(value, 10) || 0,
-      },
+  ) =>
+    setRatelimit((p) => ({
+      ...p,
+      [tier]: { ...p[tier], [field]: Number(value) || 0 },
     }));
-  };
-
-  // Update quota field
-  const handleQuotaChange = (
+  const setQuotaValue = (
     category: "agents" | "assessments" | "questions",
     tier: "free" | "premium",
     value: string,
-  ) => {
-    setQuota((prev) => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [tier]: parseInt(value, 10) || 0,
-      },
+  ) =>
+    setQuota((p) => ({
+      ...p,
+      [category]: { ...p[category], [tier]: Number(value) || 0 },
     }));
-  };
-
-  if (loading) {
+  if (loading)
     return (
-      <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <CircularProgress size={32} />
-          <Typography color="text.secondary">Loading settings...</Typography>
-        </Box>
-      </Container>
+      <main className="p-12 text-muted-foreground">Loading settings…</main>
     );
-  }
-
   return (
-    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
-      {/* Title */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-          Platform Settings
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Configure platform-wide settings, including maintenance mode, rate
-          limits, and quota controls.
-        </Typography>
-      </Box>
-
-      {loadError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {loadError}
-        </Alert>
-      )}
-
-      {/* Maintenance Mode Section */}
-      <Paper
-        sx={{
-          borderRadius: 3,
-          p: 3,
-          mb: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
-        }}
-      >
-        <Typography
-          variant="h6"
-          fontWeight="bold"
-          sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-        >
-          Maintenance Mode
-        </Typography>
-
-        {maintenanceError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {maintenanceError}
-          </Alert>
-        )}
-
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={maintenanceMode}
-                onChange={handleMaintenanceModeChange}
-                disabled={maintenanceSaving}
-              />
+    <main className="max-w-5xl px-6 py-12 sm:px-12">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold">Platform Settings</h1>
+        <p className="mt-2 text-muted-foreground">
+          Configure maintenance mode, rate limits, and quota controls.
+        </p>
+      </header>
+      {loadError && <Notice tone="error">{loadError}</Notice>}
+      <section className="mb-6 rounded-lg border border-border p-6">
+        <h2 className="mb-4 text-lg font-bold">Maintenance Mode</h2>
+        {maintenanceError && <Notice tone="error">{maintenanceError}</Notice>}
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={maintenanceMode}
+            disabled={savingMaintenance}
+            onChange={(e) =>
+              e.target.checked ? setConfirm(true) : updateMaintenance(false)
             }
-            label={
-              maintenanceMode
-                ? "Maintenance mode is ON"
-                : "Maintenance mode is OFF"
-            }
+            className="size-4 accent-primary"
           />
-          {maintenanceSaving && <CircularProgress size={20} />}
-        </Box>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mt: 1.5, fontSize: 13 }}
-        >
-          When enabled, all non-admin users will receive a 503 Service
-          Unavailable response.
-        </Typography>
-      </Paper>
-
-      {/* Rate Limits Section */}
-      <Paper
-        sx={{
-          borderRadius: 3,
-          p: 3,
-          mb: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
-        }}
-      >
-        <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
-          Rate Limits
-        </Typography>
-
-        {rateLimitQuotaError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {rateLimitQuotaError}
-          </Alert>
-        )}
-
-        {rateLimitQuotaSuccess && (
-          <Alert severity="success" sx={{ mb: 2 }}>
+          {maintenanceMode
+            ? "Maintenance mode is ON"
+            : "Maintenance mode is OFF"}
+          {savingMaintenance && (
+            <span className="text-muted-foreground">Saving…</span>
+          )}
+        </label>
+        <p className="mt-3 text-sm text-muted-foreground">
+          When enabled, all non-admin users receive a 503 Service Unavailable
+          response.
+        </p>
+      </section>
+      <section className="mb-6 rounded-lg border border-border p-6">
+        <h2 className="mb-5 text-lg font-bold">Rate Limits</h2>
+        {saveError && <Notice tone="error">{saveError}</Notice>}
+        {saved && (
+          <Notice tone="success">
             Rate limits and quotas saved successfully.
-          </Alert>
+          </Notice>
         )}
-
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-            gap: 2.5,
-            mb: 3,
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 2 }}>
-              Free Tier
-            </Typography>
-            <TextField
-              label="Burst"
-              type="number"
-              value={ratelimit.free.burst}
-              onChange={(e) =>
-                handleRateLimitChange("free", "burst", e.target.value)
-              }
-              fullWidth
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              label="Rate"
-              type="number"
-              value={ratelimit.free.rate}
-              onChange={(e) =>
-                handleRateLimitChange("free", "rate", e.target.value)
-              }
-              fullWidth
-              size="small"
-            />
-          </Box>
-
-          <Box>
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 2 }}>
-              Premium Tier
-            </Typography>
-            <TextField
-              label="Burst"
-              type="number"
-              value={ratelimit.premium.burst}
-              onChange={(e) =>
-                handleRateLimitChange("premium", "burst", e.target.value)
-              }
-              fullWidth
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              label="Rate"
-              type="number"
-              value={ratelimit.premium.rate}
-              onChange={(e) =>
-                handleRateLimitChange("premium", "rate", e.target.value)
-              }
-              fullWidth
-              size="small"
-            />
-          </Box>
-        </Box>
-      </Paper>
-
-      {/* Quotas Section */}
-      <Paper
-        sx={{
-          borderRadius: 3,
-          p: 3,
-          mb: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
-        }}
-      >
-        <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
-          Usage Quotas
-        </Typography>
-
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
-            gap: 2.5,
-            mb: 3,
-          }}
-        >
-          {/* Agents */}
-          <Box>
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 2 }}>
-              Agents
-            </Typography>
-            <TextField
-              label="Free Tier"
-              type="number"
-              value={quota.agents.free}
-              onChange={(e) =>
-                handleQuotaChange("agents", "free", e.target.value)
-              }
-              fullWidth
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              label="Premium Tier"
-              type="number"
-              value={quota.agents.premium}
-              onChange={(e) =>
-                handleQuotaChange("agents", "premium", e.target.value)
-              }
-              fullWidth
-              size="small"
-            />
-          </Box>
-
-          {/* Assessments */}
-          <Box>
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 2 }}>
-              Assessments
-            </Typography>
-            <TextField
-              label="Free Tier"
-              type="number"
-              value={quota.assessments.free}
-              onChange={(e) =>
-                handleQuotaChange("assessments", "free", e.target.value)
-              }
-              fullWidth
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              label="Premium Tier"
-              type="number"
-              value={quota.assessments.premium}
-              onChange={(e) =>
-                handleQuotaChange("assessments", "premium", e.target.value)
-              }
-              fullWidth
-              size="small"
-            />
-          </Box>
-
-          {/* Questions */}
-          <Box>
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 2 }}>
-              Questions
-            </Typography>
-            <TextField
-              label="Free Tier"
-              type="number"
-              value={quota.questions.free}
-              onChange={(e) =>
-                handleQuotaChange("questions", "free", e.target.value)
-              }
-              fullWidth
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              label="Premium Tier"
-              type="number"
-              value={quota.questions.premium}
-              onChange={(e) =>
-                handleQuotaChange("questions", "premium", e.target.value)
-              }
-              fullWidth
-              size="small"
-            />
-          </Box>
-        </Box>
-
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <Button
-            variant="contained"
-            onClick={handleSaveRateLimitQuota}
-            disabled={rateLimitQuotaSaving}
-            sx={{ borderRadius: 2 }}
-          >
-            {rateLimitQuotaSaving ? (
-              <>
-                <CircularProgress size={16} sx={{ mr: 1 }} />
-                Saving...
-              </>
-            ) : (
-              "Save"
-            )}
-          </Button>
-        </Box>
-      </Paper>
-
-      {/* Dialog: Confirm Maintenance Mode ON */}
-      <Dialog
-        open={maintenanceDialogOpen}
-        onClose={() => {
-          if (!maintenanceDialogLoading) {
-            setMaintenanceDialogOpen(false);
-          }
-        }}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle fontWeight="bold">Enable Maintenance Mode</DialogTitle>
-        <DialogContent dividers>
-          <DialogContentText sx={{ mb: 2 }}>
-            Enabling maintenance mode will return a 503 Service Unavailable
-            response to all non-admin users. Are you sure?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button
-            onClick={() => setMaintenanceDialogOpen(false)}
-            color="inherit"
-            disabled={maintenanceDialogLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmMaintenanceMode}
-            variant="contained"
-            color="warning"
-            disabled={maintenanceDialogLoading}
-          >
-            {maintenanceDialogLoading ? (
-              <CircularProgress size={20} />
-            ) : (
-              "Enable Maintenance Mode"
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        <div className="grid gap-6 sm:grid-cols-2">
+          {(["free", "premium"] as const).map((tier) => (
+            <div key={tier}>
+              <h3 className="mb-3 font-semibold capitalize">{tier} tier</h3>
+              <Field
+                label="Burst"
+                value={ratelimit[tier].burst}
+                onChange={(v) => setRate(tier, "burst", v)}
+              />
+              <Field
+                label="Rate"
+                value={ratelimit[tier].rate}
+                onChange={(v) => setRate(tier, "rate", v)}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="mb-6 rounded-lg border border-border p-6">
+        <h2 className="mb-5 text-lg font-bold">Usage Quotas</h2>
+        <div className="grid gap-6 sm:grid-cols-3">
+          {(["agents", "assessments", "questions"] as const).map((category) => (
+            <div key={category}>
+              <h3 className="mb-3 font-semibold capitalize">{category}</h3>
+              <Field
+                label="Free tier"
+                value={quota[category].free}
+                onChange={(v) => setQuotaValue(category, "free", v)}
+              />
+              <Field
+                label="Premium tier"
+                value={quota[category].premium}
+                onChange={(v) => setQuotaValue(category, "premium", v)}
+              />
+            </div>
+          ))}
+        </div>
+        <Button className="mt-6" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </section>
+      {confirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 className="text-lg font-bold">Enable Maintenance Mode</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              This will return a 503 response to all non-admin users. Are you
+              sure?
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setConfirm(false)}
+                disabled={confirmLoading}
+              >
+                Cancel
+              </Button>
+              <Button onClick={confirmMaintenance} disabled={confirmLoading}>
+                {confirmLoading ? "Enabling…" : "Enable Maintenance Mode"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+function Field({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="mb-3 block text-xs text-muted-foreground">
+      {label}
+      <input
+        className={`${input} mt-1`}
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+function Notice({
+  tone,
+  children,
+}: {
+  tone: "error" | "success";
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`mb-4 rounded-md border px-3 py-2 text-sm ${tone === "error" ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}
+    >
+      {children}
+    </div>
   );
 }
