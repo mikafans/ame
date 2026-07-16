@@ -1,16 +1,9 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import Link from "@mui/material/Link";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
 import { HighlightedCode } from "./HighlightedCode";
 
-// Define the custom schema for rehype-sanitize
 export const customSanitizeSchema = {
   ...defaultSchema,
   tagNames: [
@@ -51,76 +44,43 @@ export const customSanitizeSchema = {
   protocols: {
     ...defaultSchema.protocols,
     href: ["http", "https", "mailto", "tel"],
-    src: ["https"], // Strict https only for images
+    src: ["https"],
   },
 };
-
-/**
- * Sanitizes an SVG string to protect against potential XSS/malicious scripts.
- * Acts as a defense-in-depth layer on top of Mermaid's strict securityLevel.
- */
 export function sanitizeSvg(svg: string): string {
-  // 1. Remove any <script> tags and their contents
-  let cleaned = svg.replace(
-    /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-    "",
-  );
-
-  // 2. Remove event handlers like onload, onclick, onerror, etc.
-  cleaned = cleaned.replace(/\s+on[a-z]+\s*=\s*['"][^'"]*['"]/gi, "");
-  cleaned = cleaned.replace(/\s+on[a-z]+\s*=\s*[^>\s]+/gi, "");
-
-  // 3. Remove javascript: URLs in href or xlink:href
-  cleaned = cleaned.replace(
-    /href\s*=\s*['"]javascript:[^'"]*['"]/gi,
-    'href="#"',
-  );
-  cleaned = cleaned.replace(
-    /xlink:href\s*=\s*['"]javascript:[^'"]*['"]/gi,
-    'xlink:href="#"',
-  );
-
-  return cleaned;
+  return svg
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*['"][^'"]*['"]/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*[^>\s]+/gi, "")
+    .replace(/href\s*=\s*['"]javascript:[^'"]*['"]/gi, 'href="#"')
+    .replace(/xlink:href\s*=\s*['"]javascript:[^'"]*['"]/gi, 'xlink:href="#"');
 }
-
-interface MermaidViewProps {
-  code: string;
-}
-
-/**
- * Client component to render mermaid diagrams dynamically.
- */
-export function MermaidView({ code }: MermaidViewProps) {
-  const [svgContent, setSvgContent] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
+export function MermaidView({ code }: { code: string }) {
+  const [svgContent, setSvgContent] = useState("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
-    let isMounted = true;
-
-    const renderDiagram = async () => {
+    let mounted = true;
+    (async () => {
       try {
         setLoading(true);
-        // Dynamically import mermaid to avoid server-side document references
         const { default: mermaid } = await import("mermaid");
-
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: "strict",
           theme: "default",
         });
-
-        const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
-        const { svg } = await mermaid.render(id, code);
-
-        if (isMounted) {
-          const sanitized = sanitizeSvg(svg);
-          setSvgContent(sanitized);
+        const { svg } = await mermaid.render(
+          `mermaid-${Math.random().toString(36).slice(2, 9)}`,
+          code,
+        );
+        if (mounted) {
+          setSvgContent(sanitizeSvg(svg));
           setError(null);
           setLoading(false);
         }
       } catch (err) {
-        if (isMounted) {
+        if (mounted) {
           console.error("Mermaid rendering failed:", err);
           setError(
             "Failed to render diagram. Please verify the mermaid syntax.",
@@ -128,258 +88,82 @@ export function MermaidView({ code }: MermaidViewProps) {
           setLoading(false);
         }
       }
-    };
-
-    renderDiagram();
-
+    })();
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, [code]);
-
   return (
-    <Box
-      sx={{
-        my: 2,
-        p: 2,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark"
-            ? "rgba(255,255,255,0.02)"
-            : "rgba(0,0,0,0.02)",
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-        overflowX: "auto",
-        width: "100%",
-        boxSizing: "border-box",
-      }}
-    >
+    <div className="my-4 flex w-full flex-col items-center justify-center overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
       {loading && (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: 2 }}>
-          <CircularProgress size={20} />
-          <Typography variant="body2" color="text.secondary">
-            Rendering diagram...
-          </Typography>
-        </Box>
+        <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+          <span className="size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          Rendering diagram...
+        </div>
       )}
       {error && (
-        <Alert severity="error" variant="outlined" sx={{ width: "100%" }}>
+        <div
+          role="alert"
+          className="w-full rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
+        >
           {error}
-        </Alert>
+        </div>
       )}
       {!loading && !error && svgContent && (
-        <Box
+        <div
+          className="flex w-full justify-center [&>svg]:h-auto [&>svg]:max-w-full"
           dangerouslySetInnerHTML={{ __html: svgContent }}
-          sx={{
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-            "& svg": {
-              maxWidth: "100%",
-              height: "auto",
-            },
-          }}
         />
       )}
-    </Box>
+    </div>
   );
 }
 
-interface MarkdownViewProps {
-  content: string;
-}
-
-export function MarkdownView({ content }: MarkdownViewProps) {
+export function MarkdownView({ content }: { content: string }) {
   return (
-    <Box className="markdown-view" sx={{ width: "100%" }}>
+    <div className="markdown-view w-full text-[15px] leading-[1.6] [&_h1]:mb-6 [&_h1]:mt-8 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mb-5 [&_h2]:mt-7 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mb-4 [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_p]:mb-4 [&_a]:text-primary [&_a]:no-underline [&_a:hover]:underline [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-muted/30 [&_blockquote]:py-2 [&_blockquote]:pl-4 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:bg-muted/40 [&_th]:p-3 [&_th]:text-left [&_td]:border [&_td]:border-border [&_td]:p-3">
       <ReactMarkdown
         rehypePlugins={[[rehypeSanitize, customSanitizeSchema]]}
         components={{
-          // Render headings
-          h1: ({ children }) => (
-            <Typography
-              variant="h4"
-              component="h1"
-              gutterBottom
-              sx={{ mt: 3, mb: 1.5, fontWeight: 700 }}
-            >
-              {children}
-            </Typography>
-          ),
-          h2: ({ children }) => (
-            <Typography
-              variant="h5"
-              component="h2"
-              gutterBottom
-              sx={{ mt: 2.5, mb: 1.25, fontWeight: 600 }}
-            >
-              {children}
-            </Typography>
-          ),
-          h3: ({ children }) => (
-            <Typography
-              variant="h6"
-              component="h3"
-              gutterBottom
-              sx={{ mt: 2, mb: 1, fontWeight: 600 }}
-            >
-              {children}
-            </Typography>
-          ),
-          // Render paragraphs
-          p: ({ children }) => (
-            <Typography
-              component="p"
-              variant="body1"
-              sx={{ mb: 2, lineHeight: 1.6, color: "text.primary" }}
-            >
-              {children}
-            </Typography>
-          ),
-          // Render links
-          a: ({ href, children }) => (
-            <Link
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{
-                color: "primary.main",
-                textDecoration: "none",
-                "&:hover": { textDecoration: "underline" },
-              }}
-            >
-              {children}
-            </Link>
-          ),
-          // Render list containers
-          ul: ({ children }) => (
-            <Box component="ul" sx={{ pl: 3, mb: 2, listStyleType: "disc" }}>
-              {children}
-            </Box>
-          ),
-          ol: ({ children }) => (
-            <Box component="ol" sx={{ pl: 3, mb: 2, listStyleType: "decimal" }}>
-              {children}
-            </Box>
-          ),
-          li: ({ children }) => (
-            <Box component="li" sx={{ mb: 0.5 }}>
-              <Typography variant="body1" component="span">
-                {children}
-              </Typography>
-            </Box>
-          ),
-          // Render blockquotes
-          blockquote: ({ children }) => (
-            <Box
-              component="blockquote"
-              sx={{
-                borderLeft: "4px solid",
-                borderColor: "primary.light",
-                pl: 2,
-                py: 0.5,
-                my: 2,
-                color: "text.secondary",
-                bgcolor: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.02)"
-                    : "rgba(0,0,0,0.02)",
-                borderRadius: "0 4px 4px 0",
-              }}
-            >
-              {children}
-            </Box>
-          ),
-          // Render tables
-          table: ({ children }) => (
-            <Box sx={{ overflowX: "auto", my: 2 }}>
-              <Box
-                component="table"
-                sx={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  "& th, & td": {
-                    border: "1px solid",
-                    borderColor: "divider",
-                    p: 1.5,
-                    textAlign: "left",
-                  },
-                  "& th": {
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.04)"
-                        : "rgba(0,0,0,0.02)",
-                    fontWeight: 600,
-                  },
-                }}
-              >
-                {children}
-              </Box>
-            </Box>
-          ),
-          // Custom code block & mermaid rendering
           pre: ({ children }) => <>{children}</>,
           code: ({ children, className, ...rest }) => {
             const match = /language-(\w+)/.exec(className || "");
-            const codeText = String(children).replace(/\n$/, "");
-
-            if (match) {
-              const lang = match[1];
-              if (lang === "mermaid") {
-                return <MermaidView code={codeText} />;
-              }
-              return <HighlightedCode code={codeText} language={lang} />;
-            }
-
+            const text = String(children).replace(/\n$/, "");
+            if (match?.[1] === "mermaid") return <MermaidView code={text} />;
+            if (match)
+              return <HighlightedCode code={text} language={match[1]} />;
             return (
               <code className={className} {...rest}>
                 {children}
               </code>
             );
           },
-          // Custom img component to enforce strict safe requirements
           img: ({ src, alt, ...rest }) => {
-            const srcStr = typeof src === "string" ? src : "";
-            if (!srcStr) return null;
-
-            // Enforce https-only
-            if (!srcStr.startsWith("https://")) {
-              return null;
-            }
-
-            // Exclude SVG images and data URIs
-            const urlLower = srcStr.toLowerCase();
+            const url = typeof src === "string" ? src : "";
             if (
-              urlLower.includes(".svg") ||
-              urlLower.startsWith("data:image/svg")
-            ) {
+              !url.startsWith("https://") ||
+              url.toLowerCase().includes(".svg") ||
+              url.toLowerCase().startsWith("data:image/svg")
+            )
               return null;
-            }
-
             return (
-              <Box
-                component="img"
-                src={srcStr}
+              <img
+                src={url}
                 alt={alt}
-                sx={{
-                  maxWidth: "100%",
-                  height: "auto",
-                  borderRadius: 1,
-                  my: 1.5,
-                  display: "block",
-                }}
+                className="my-3 block h-auto max-w-full rounded"
                 {...rest}
               />
             );
           },
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
         }}
       >
         {content}
       </ReactMarkdown>
-    </Box>
+    </div>
   );
 }
