@@ -1,33 +1,9 @@
 "use client";
-
-import React, { useState, useEffect, useCallback } from "react";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Grid from "@mui/material/Grid";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TablePagination from "@mui/material/TablePagination";
-import Chip from "@mui/material/Chip";
-import IconButton from "@mui/material/IconButton";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { formatDateTime } from "@/utils/format";
-
+import { Button } from "@/components/ui/button";
 interface AuditLogEntry {
   id: string;
   actorUserId?: string | null;
@@ -41,575 +17,227 @@ interface AuditLogEntry {
   metadata: any;
   createdAt: string;
 }
-
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [pageError, setPageError] = useState<string | null>(null);
-
-  // Pagination & Filters state
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  // Active filters sent to API
-  const [filterAction, setFilterAction] = useState("");
-  const [filterActorId, setFilterActorId] = useState("");
-  const [filterTargetId, setFilterTargetId] = useState("");
-
-  // Input fields state (for form submit)
-  const [inputAction, setInputAction] = useState("");
-  const [inputActorId, setInputActorId] = useState("");
-  const [inputTargetId, setInputTargetId] = useState("");
-
-  // Detail Modal
-  const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-
-  const fetchLogs = useCallback(async () => {
+  const [rows, setRows] = useState(10);
+  const [filters, setFilters] = useState({
+    action: "",
+    actorId: "",
+    targetId: "",
+  });
+  const [inputs, setInputs] = useState(filters);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<AuditLogEntry | null>(null);
+  const load = useCallback(async () => {
     setLoading(true);
-    setPageError(null);
     try {
       const { data, error } = await api.GET("/v1/admin/audit", {
         params: {
           query: {
-            limit: rowsPerPage,
-            offset: page * rowsPerPage,
-            action: filterAction.trim() || undefined,
-            actorId: filterActorId.trim() || undefined,
-            targetId: filterTargetId.trim() || undefined,
+            limit: rows,
+            offset: page * rows,
+            action: filters.action || undefined,
+            actorId: filters.actorId || undefined,
+            targetId: filters.targetId || undefined,
           },
         },
       });
-
-      if (error) {
-        setPageError(
+      if (error)
+        setError(
           "Failed to load audit logs: " + errorMessage(error, "Unknown error"),
         );
-        return;
-      }
-
-      if (data) {
+      else if (data) {
         setLogs(data.logs as AuditLogEntry[]);
         setTotal(data.total);
       }
-    } catch (err) {
-      console.error(err);
-      setPageError("An unexpected error occurred while fetching audit logs.");
+    } catch {
+      setError("An unexpected error occurred while fetching audit logs.");
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, filterAction, filterActorId, filterTargetId]);
-
+  }, [page, rows, filters]);
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
-
-  const handleFilterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(0);
-    setFilterAction(inputAction);
-    setFilterActorId(inputActorId);
-    setFilterTargetId(inputTargetId);
-  };
-
-  const handleClearFilters = () => {
-    setPage(0);
-    setInputAction("");
-    setInputActorId("");
-    setInputTargetId("");
-    setFilterAction("");
-    setFilterActorId("");
-    setFilterTargetId("");
-  };
-
-  const handlePageChange = (_: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleRowsPerPageChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleOpenDetails = (log: AuditLogEntry) => {
-    setSelectedLog(log);
-    setDetailOpen(true);
-  };
-
-  // Prettify action text
-  const formatActionName = (action: string): string => {
-    return action
+    load();
+  }, [load]);
+  const label = (value: string) =>
+    value
       .split(/[._]/)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word) => word[0]?.toUpperCase() + word.slice(1))
       .join(" ");
-  };
-
-  // Get action color
-  const getActionColor = (action: string) => {
-    if (
-      action.includes("reject") ||
-      action.includes("fail") ||
-      action.includes("disable")
-    )
-      return "error";
-    if (
-      action.includes("create") ||
-      action.includes("enable") ||
-      action.includes("register")
-    )
-      return "success";
-    if (action.includes("update") || action.includes("patch")) return "warning";
-    return "default";
-  };
-
+  const tone = (value: string) =>
+    value.includes("fail") ||
+    value.includes("disable") ||
+    value.includes("reject")
+      ? "text-red-600"
+      : value.includes("create") || value.includes("enable")
+        ? "text-emerald-600"
+        : value.includes("update") || value.includes("patch")
+          ? "text-amber-600"
+          : "text-muted-foreground";
+  const pages = Math.max(1, Math.ceil(total / rows));
   return (
-    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
-      {/* Title */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-          Audit Logs
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
+    <main className="px-6 py-12 sm:px-12">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold">Audit Logs</h1>
+        <p className="mt-2 text-muted-foreground">
           Track and inspect write actions and security events on the platform.
-        </Typography>
-      </Box>
-
-      {/* Filters Form */}
-      <Paper
-        component="form"
-        onSubmit={handleFilterSubmit}
-        sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
-          bgcolor: (theme) =>
-            theme.palette.mode === "dark"
-              ? "rgba(255,255,255,0.01)"
-              : "rgba(0,0,0,0.005)",
+        </p>
+      </header>
+      <form
+        className="mb-5 grid gap-3 rounded-lg border border-border p-5 sm:grid-cols-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPage(0);
+          setFilters(inputs);
         }}
       >
-        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-          Filter Logs
-        </Typography>
-        <Grid container spacing={2.5} alignItems="center">
-          <Grid size={{ xs: 12, sm: 3 }}>
-            <TextField
-              label="Action"
-              placeholder="e.g. user.disable"
-              size="small"
-              fullWidth
-              value={inputAction}
-              onChange={(e) => setInputAction(e.target.value)}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 3.5 }}>
-            <TextField
-              label="Actor User ID"
-              placeholder="UUID"
-              size="small"
-              fullWidth
-              value={inputActorId}
-              onChange={(e) => setInputActorId(e.target.value)}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 3.5 }}>
-            <TextField
-              label="Target ID"
-              placeholder="UUID"
-              size="small"
-              fullWidth
-              value={inputTargetId}
-              onChange={(e) => setInputTargetId(e.target.value)}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 2 }} sx={{ display: "flex", gap: 1 }}>
-            <Button
-              variant="contained"
-              type="submit"
-              fullWidth
-              sx={{ textTransform: "none", borderRadius: 2, py: 1 }}
-            >
-              Filter
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={handleClearFilters}
-              sx={{ textTransform: "none", borderRadius: 2, py: 1 }}
-            >
-              Clear
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Main Table Paper */}
-      <Paper
-        sx={{
-          borderRadius: 3,
-          overflow: "hidden",
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
-        }}
-      >
-        {pageError && (
-          <Box sx={{ p: 2 }}>
-            <Alert severity="error">{pageError}</Alert>
-          </Box>
-        )}
-
-        <TableContainer>
-          <Table sx={{ minWidth: 700 }}>
-            <TableHead>
-              <TableRow
-                sx={{
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.01)"
-                      : "rgba(0,0,0,0.01)",
-                }}
-              >
-                <TableCell>Timestamp</TableCell>
-                <TableCell>Action</TableCell>
-                <TableCell>Actor</TableCell>
-                <TableCell>Target Type</TableCell>
-                <TableCell>Target</TableCell>
-                <TableCell align="right" sx={{ pr: 3 }}>
-                  Details
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                    <CircularProgress size={32} sx={{ mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">
-                      Loading audit logs...
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : logs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                    <Typography
-                      variant="body1"
-                      color="text.secondary"
-                      fontWeight={500}
-                    >
-                      No audit records found.
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      Try adjusting the filter parameters.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                logs.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    hover
-                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-                  >
-                    <TableCell sx={{ fontSize: 13 }}>
-                      {formatDateTime(row.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={formatActionName(row.action)}
-                        size="small"
-                        color={getActionColor(row.action)}
-                        variant="outlined"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: 10,
-                          borderRadius: 1.5,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {row.actorEmail ? (
-                        <Box>
-                          {row.actorName && (
-                            <Typography variant="body2" fontWeight={500}>
-                              {row.actorName}
-                            </Typography>
-                          )}
-                          <Typography variant="caption" color="text.secondary">
-                            {row.actorEmail}
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "monospace",
-                            fontSize: 11,
-                            color: "text.secondary",
-                          }}
-                        >
-                          {row.actorUserId || "SYSTEM"}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {row.targetType ? (
-                        <Chip
-                          label={row.targetType.toUpperCase()}
-                          size="small"
-                          sx={{ fontSize: 9, height: 18, borderRadius: 1 }}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {row.targetEmail ? (
-                        <Box>
-                          {row.targetName && (
-                            <Typography variant="body2" fontWeight={500}>
-                              {row.targetName}
-                            </Typography>
-                          )}
-                          <Typography variant="caption" color="text.secondary">
-                            {row.targetEmail}
-                          </Typography>
-                        </Box>
-                      ) : row.targetId ? (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "monospace",
-                            fontSize: 11,
-                            color: "text.secondary",
-                          }}
-                        >
-                          {row.targetId}
-                        </Typography>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell align="right" sx={{ pr: 2 }}>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDetails(row)}
-                        color="primary"
-                      >
-                        <InfoOutlinedIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          component="div"
-          count={total}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          sx={{ borderTop: "1px solid", borderColor: "divider" }}
+        <input
+          className="h-9 rounded border border-input bg-background px-3 text-sm"
+          placeholder="Action"
+          value={inputs.action}
+          onChange={(e) => setInputs({ ...inputs, action: e.target.value })}
         />
-      </Paper>
-
-      {/* Details Dialog */}
-      <Dialog
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle fontWeight="bold">Audit Event Details</DialogTitle>
-        <DialogContent dividers>
-          {selectedLog && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "130px 1fr",
-                  gap: 1,
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Event ID:
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                  {selectedLog.id}
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Created At:
-                </Typography>
-                <Typography variant="body2">
-                  {formatDateTime(selectedLog.createdAt)}
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Action:
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {selectedLog.action}
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Actor ID:
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                  {selectedLog.actorUserId || "SYSTEM"}
-                </Typography>
-
-                {selectedLog.actorName && (
-                  <>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      fontWeight={500}
-                    >
-                      Actor Name:
-                    </Typography>
-                    <Typography variant="body2">
-                      {selectedLog.actorName}
-                    </Typography>
-                  </>
-                )}
-
-                {selectedLog.actorEmail && (
-                  <>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      fontWeight={500}
-                    >
-                      Actor Email:
-                    </Typography>
-                    <Typography variant="body2">
-                      {selectedLog.actorEmail}
-                    </Typography>
-                  </>
-                )}
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Target Type:
-                </Typography>
-                <Typography variant="body2">
-                  {selectedLog.targetType || "None"}
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                >
-                  Target ID:
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                  {selectedLog.targetId || "None"}
-                </Typography>
-
-                {selectedLog.targetName && (
-                  <>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      fontWeight={500}
-                    >
-                      Target Name:
-                    </Typography>
-                    <Typography variant="body2">
-                      {selectedLog.targetName}
-                    </Typography>
-                  </>
-                )}
-
-                {selectedLog.targetEmail && (
-                  <>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      fontWeight={500}
-                    >
-                      Target Email:
-                    </Typography>
-                    <Typography variant="body2">
-                      {selectedLog.targetEmail}
-                    </Typography>
-                  </>
-                )}
-              </Box>
-
-              <Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  fontWeight={500}
-                  sx={{ mb: 1 }}
-                >
-                  Event Metadata:
-                </Typography>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(0,0,0,0.2)"
-                        : "rgba(0,0,0,0.02)",
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    maxHeight: 250,
-                    overflowY: "auto",
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {JSON.stringify(selectedLog.metadata, null, 2)}
-                </Paper>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setDetailOpen(false)} variant="contained">
-            Close
+        <input
+          className="h-9 rounded border border-input bg-background px-3 text-sm"
+          placeholder="Actor User ID"
+          value={inputs.actorId}
+          onChange={(e) => setInputs({ ...inputs, actorId: e.target.value })}
+        />
+        <input
+          className="h-9 rounded border border-input bg-background px-3 text-sm"
+          placeholder="Target ID"
+          value={inputs.targetId}
+          onChange={(e) => setInputs({ ...inputs, targetId: e.target.value })}
+        />
+        <div className="flex gap-2">
+          <Button type="submit">Filter</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setInputs({ action: "", actorId: "", targetId: "" });
+              setFilters({ action: "", actorId: "", targetId: "" });
+              setPage(0);
+            }}
+          >
+            Clear
           </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        </div>
+      </form>
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-[850px] text-sm">
+          <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">Action</th>
+              <th className="px-4 py-3">Actor</th>
+              <th className="px-4 py-3">Target</th>
+              <th className="px-4 py-3">Created</th>
+              <th className="px-4 py-3 text-right">Details</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
+                  Loading audit logs…
+                </td>
+              </tr>
+            ) : (
+              logs.map((log) => (
+                <tr key={log.id}>
+                  <td className={`px-4 py-4 font-medium ${tone(log.action)}`}>
+                    {label(log.action)}
+                  </td>
+                  <td className="px-4 py-4">
+                    {log.actorName ||
+                      log.actorEmail ||
+                      log.actorUserId ||
+                      "System"}
+                  </td>
+                  <td className="px-4 py-4 text-muted-foreground">
+                    {log.targetName || log.targetEmail || log.targetId || "—"}
+                  </td>
+                  <td className="px-4 py-4 text-xs text-muted-foreground">
+                    {formatDateTime(log.createdAt)}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelected(log)}
+                    >
+                      View
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-end gap-3 py-4 text-sm text-muted-foreground">
+        <select
+          className="rounded border border-input bg-background px-2 py-1"
+          value={rows}
+          onChange={(e) => {
+            setRows(Number(e.target.value));
+            setPage(0);
+          }}
+        >
+          <option value={10}>10 / page</option>
+          <option value={25}>25 / page</option>
+          <option value={50}>50 / page</option>
+        </select>
+        <span>
+          {total ? page * rows + 1 : 0}–{Math.min((page + 1) * rows, total)} of{" "}
+          {total}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!page}
+          onClick={() => setPage(page - 1)}
+        >
+          Previous
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={page + 1 >= pages}
+          onClick={() => setPage(page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-auto rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 className="text-lg font-semibold">{label(selected.action)}</h2>
+            <pre className="mt-4 overflow-auto rounded-md bg-muted p-4 text-xs">
+              {JSON.stringify(selected.metadata, null, 2)}
+            </pre>
+            <div className="mt-6 flex justify-end">
+              <Button variant="outline" onClick={() => setSelected(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
