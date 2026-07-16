@@ -3,22 +3,14 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
+from container_runtime import compose, engine
+
 ROOT = Path(__file__).resolve().parents[1]
-COMPOSE = os.environ.get(
-    "COMPOSE", "podman compose" if shutil.which("podman") else "docker compose"
-).split()
 BACKUP = Path(os.environ.get("BACKUP_FILE", "backup.dump"))
 RESTORE_DB = os.environ.get("RESTORE_DB", "ame_scratch")
-
-
-def compose(*args: str) -> int:
-    return subprocess.run(
-        [*COMPOSE, "-f", "db/docker-compose.yml", *args], cwd=ROOT, check=False
-    ).returncode
 
 
 def main() -> int:
@@ -30,7 +22,20 @@ def main() -> int:
     if command == "backup":
         with BACKUP.open("wb") as output:
             return subprocess.run(
-                [*COMPOSE, "-f", "db/docker-compose.yml", "exec", "-T", "postgres", "pg_dump", "-U", "postgres", "-d", "ame", "-Fc"],
+                [
+                    *engine(),
+                    "-f",
+                    str(ROOT / "db/docker-compose.yml"),
+                    "exec",
+                    "-T",
+                    "postgres",
+                    "pg_dump",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "ame",
+                    "-Fc",
+                ],
                 cwd=ROOT,
                 stdout=output,
                 check=False,
@@ -40,7 +45,23 @@ def main() -> int:
             raise SystemExit(f"backup not found: {BACKUP}")
         compose("exec", "-T", "postgres", "createdb", "-U", "postgres", RESTORE_DB)
         return subprocess.run(
-            [*COMPOSE, "-f", "db/docker-compose.yml", "exec", "-T", "postgres", "pg_restore", "-U", "postgres", "-d", RESTORE_DB, "--clean", "--if-exists", "--no-owner", "--no-privileges"],
+            [
+                *engine(),
+                "-f",
+                str(ROOT / "db/docker-compose.yml"),
+                "exec",
+                "-T",
+                "postgres",
+                "pg_restore",
+                "-U",
+                "postgres",
+                "-d",
+                RESTORE_DB,
+                "--clean",
+                "--if-exists",
+                "--no-owner",
+                "--no-privileges",
+            ],
             cwd=ROOT,
             stdin=BACKUP.open("rb"),
             check=False,

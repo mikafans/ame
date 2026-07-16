@@ -12,27 +12,22 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+from container_runtime import compose as run_compose
+
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = ROOT / "docker-compose.local.yml"
-COMPOSE = os.environ.get(
-    "COMPOSE",
-    "podman compose" if shutil.which("podman") else "docker compose",
-)
-
-
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [*COMPOSE.split(), "-f", str(COMPOSE_FILE), *args],
-        cwd=ROOT,
-        check=check,
-        text=True,
-    )
+    if check:
+        return run_compose(COMPOSE_FILE, *args)
+    try:
+        return run_compose(COMPOSE_FILE, *args)
+    except subprocess.CalledProcessError as error:
+        return subprocess.CompletedProcess(error.cmd, error.returncode)
 
 
 def wait_for_api(timeout: int = 120) -> None:
