@@ -1,25 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useColorMode } from "@/components/ThemeRegistry";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import Grid from "@mui/material/Grid";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import Alert from "@mui/material/Alert";
-import Chip from "@mui/material/Chip";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import { useTheme } from "@mui/material/styles";
-import { useAuth } from "@/hooks/useAuth";
+import { ArrowRight, Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
-import { BRAND } from "@/lib/brand";
+import { useColorMode } from "@/components/ThemeRegistry";
+import { useAuth } from "@/hooks/useAuth";
 
 type TabId = "signup" | "login";
 
@@ -27,16 +14,6 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, refresh } = useAuth();
   const { mode, toggle } = useColorMode();
-  const theme = useTheme();
-  const isDark = mode === "dark";
-
-  // Redirect to explore page if the user is already authenticated
-  useEffect(() => {
-    if (user) {
-      router.push("/explore");
-    }
-  }, [user, router]);
-
   const [tab, setTab] = useState<TabId>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -44,26 +21,28 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (user) router.push("/explore");
+  }, [user, router]);
+
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ??
     (typeof window !== "undefined"
       ? `http://${window.location.hostname}:28080`
       : "http://localhost:28080");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
     setLoading(true);
     try {
       const endpoint =
-        tab === "signup"
-          ? `${apiUrl}/v1/auth/register`
-          : `${apiUrl}/v1/auth/login`;
+        tab === "signup" ? "/v1/auth/register" : "/v1/auth/login";
       const body =
         tab === "signup"
           ? { email, name: fullName, password, role: "user" }
           : { email, password };
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${apiUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -88,263 +67,175 @@ export default function LoginPage() {
       const returnTo = new URLSearchParams(window.location.search).get(
         "returnTo",
       );
-      // Only honor same-origin relative paths to avoid open-redirect.
-      const dest =
+      const destination =
         returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
           ? returnTo
           : "/explore";
-      router.push(dest);
-    } catch (err) {
+      router.push(destination);
+    } catch (submitError) {
       setError(
-        err instanceof Error ? err.message : "Could not reach the server",
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not reach the server",
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const brand = isDark ? BRAND.dark : BRAND.light;
-  const leftBg = isDark ? brand.background : brand.background;
-  const leftBorder = isDark ? "none" : `1px solid ${theme.palette.divider}`;
-  const subColor = isDark
-    ? "rgba(255,255,255,0.45)"
-    : theme.palette.text.secondary;
-  const agentBg = isDark ? "rgba(98,216,205,0.1)" : "rgba(69,196,185,0.1)";
-  const agentBorder = isDark
-    ? "1px solid rgba(98,216,205,0.28)"
-    : "1px dashed rgba(47,167,158,0.35)";
-  const agentCodeColor = isDark ? brand.primaryLight : brand.primaryDark;
-  const agentTextColor = isDark ? "rgba(255,255,255,0.4)" : "#64748b";
+  const isDark = mode === "dark";
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      {/* Left panel */}
-      <Box
-        sx={{
-          width: { xs: "100%", md: "50%" },
-          display: { xs: "none", md: "flex" },
-          flexDirection: "column",
-          p: "44px 48px",
-          background: leftBg,
-          borderRight: leftBorder,
-        }}
-      >
-        {/* Logo + toggle */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            mb: 5,
-          }}
-        >
+    <div className="flex min-h-screen bg-background text-foreground">
+      <aside className="hidden w-1/2 flex-col border-r border-border bg-muted/30 p-12 md:flex dark:bg-card/30">
+        <div className="flex items-center justify-between">
           <Logo size={30} />
-          <Tooltip title={isDark ? "Light mode" : "Dark mode"}>
-            <IconButton size="small" onClick={toggle}>
-              {isDark ? (
-                <LightModeOutlinedIcon fontSize="small" />
-              ) : (
-                <DarkModeOutlinedIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        {/* Tagline */}
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 600, lineHeight: 1.25, letterSpacing: -0.4, mb: 1 }}
-        >
-          Assessment infrastructure
-          <br />
-          for learners and agents.
-        </Typography>
-        <Typography
-          sx={{ fontSize: 13, color: subColor, lineHeight: 1.65, mb: 4 }}
-        >
-          A structured assessment engine with a real API. Every assessment,
-          attempt, and rubric is typed, documented, and queryable.
-        </Typography>
-
-        {/* Agent block */}
-        <Box
-          sx={{
-            border: agentBorder,
-            borderRadius: 2,
-            p: "12px 16px",
-            background: agentBg,
-            mt: "auto",
-          }}
-        >
-          <Typography
-            sx={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-              color: brand.primary,
-              mb: 0.75,
-            }}
+          <button
+            type="button"
+            aria-label={isDark ? "Use light mode" : "Use dark mode"}
+            onClick={toggle}
+            className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
+            {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
+        </div>
+
+        <div className="mt-16 max-w-lg">
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+            Assessment infrastructure for learners and agents.
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            A structured assessment engine with a real API. Every assessment,
+            attempt, and rubric is typed, documented, and queryable.
+          </p>
+        </div>
+
+        <div className="mt-auto rounded-xl border border-dashed border-primary/40 bg-primary/10 p-4">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
             For agents &amp; integrations
-          </Typography>
-          <Box
-            component="pre"
-            sx={{
-              m: 0,
-              fontFamily: "monospace",
-              fontSize: 11.5,
-              color: agentCodeColor,
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {`curl -X POST $API/v1/me/agents \\
-  -H 'Authorization: Bearer <token>' \\
-  -d '{"label":"my-agent","scopes":["assessment.read"]}'`}
-          </Box>
-          <Typography
-            sx={{
-              fontSize: 11,
-              color: agentTextColor,
-              mt: 0.75,
-              lineHeight: 1.5,
-            }}
-          >
+          </p>
+          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-primary">{`curl -X POST $API/v1/me/agents \
+  -H 'Authorization: Bearer <token>' \
+  -d '{"label":"my-agent","scopes":["assessment.read"]}'`}</pre>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Returns an API key scoped to your account. Sign in first, then
             create agents via your account settings.
-          </Typography>
-        </Box>
-
-        <Typography
-          sx={{
-            fontSize: 10,
-            color: isDark ? "rgba(255,255,255,0.2)" : "text.disabled",
-            letterSpacing: 0.5,
-            mt: 2.5,
-          }}
-        >
+          </p>
+        </div>
+        <p className="mt-5 text-[10px] tracking-wide text-muted-foreground">
           OpenAPI 3.1 · Agents · FERPA · GDPR
-        </Typography>
-      </Box>
+        </p>
+      </aside>
 
-      {/* Right panel — form */}
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          p: { xs: "40px 24px", md: "52px 48px" },
-        }}
-      >
-        <Box sx={{ width: "100%", maxWidth: 380 }}>
-          <Tabs
-            value={tab}
-            onChange={(_, v) => setTab(v)}
-            sx={{ mb: 3.5, borderBottom: 1, borderColor: "divider" }}
+      <main className="flex flex-1 items-center justify-center px-6 py-10 sm:px-12">
+        <div className="w-full max-w-sm">
+          <div
+            role="tablist"
+            aria-label="Authentication mode"
+            className="mb-8 flex border-b border-border"
           >
-            <Tab
-              value="signup"
-              label="Create account"
-              sx={{ textTransform: "none", fontWeight: 500 }}
-            />
-            <Tab
-              value="login"
-              label="Sign in"
-              sx={{ textTransform: "none", fontWeight: 500 }}
-            />
-          </Tabs>
+            {(["signup", "login"] as const).map((tabId) => (
+              <button
+                key={tabId}
+                type="button"
+                role="tab"
+                aria-selected={tab === tabId}
+                onClick={() => {
+                  setTab(tabId);
+                  setError(null);
+                }}
+                className={`flex-1 border-b-2 px-3 py-2.5 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${tab === tabId ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                {tabId === "signup" ? "Create account" : "Sign in"}
+              </button>
+            ))}
+          </div>
 
-          <Box
-            component="form"
-            method="post"
-            onSubmit={handleSubmit}
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-          >
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
             {tab === "signup" && (
-              <TextField
-                label="Full name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                fullWidth
-                size="small"
-                autoComplete="name"
-              />
+              <label
+                className="grid gap-1.5 text-sm font-medium"
+                htmlFor="full-name"
+              >
+                Full name
+                <input
+                  id="full-name"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  autoComplete="name"
+                  className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20"
+                />
+              </label>
             )}
-            <TextField
-              label="Email"
-              type="email"
-              id="email"
-              name="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Password"
-              type="password"
-              id="password"
-              name="password"
-              autoComplete={
-                tab === "signup" ? "new-password" : "current-password"
-              }
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              fullWidth
-              size="small"
-            />
+            <label className="grid gap-1.5 text-sm font-medium" htmlFor="email">
+              Email
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+                className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20"
+              />
+            </label>
+            <label
+              className="grid gap-1.5 text-sm font-medium"
+              htmlFor="password"
+            >
+              Password
+              <input
+                id="password"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete={
+                  tab === "signup" ? "new-password" : "current-password"
+                }
+                required
+                className="h-10 rounded-lg border border-input bg-background px-3 font-normal outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20"
+              />
+            </label>
 
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {error}
+              </div>
+            )}
 
             <Button
               type="submit"
-              variant="contained"
-              size="large"
               disabled={loading}
-              fullWidth
-              sx={{ mt: 0.5 }}
+              size="lg"
+              className="mt-1 w-full"
             >
               {loading
                 ? "Loading…"
                 : tab === "signup"
                   ? "Create account"
                   : "Sign in"}
+              {!loading && <ArrowRight className="size-4" />}
             </Button>
-          </Box>
+          </form>
 
-          <Box
-            sx={{
-              mt: 4,
-              p: 1.75,
-              border: "1px dashed",
-              borderColor: "divider",
-              borderRadius: 2,
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{ fontWeight: 600, display: "block", mb: 0.5 }}
-            >
-              Programmatic access?
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              <Chip
-                label="POST /v1/me/agents"
-                size="small"
-                variant="outlined"
-                sx={{ fontFamily: "monospace", fontSize: 11, mr: 0.5 }}
-              />
+          <div className="mt-8 rounded-xl border border-dashed border-border p-4">
+            <p className="mb-1 text-xs font-semibold">Programmatic access?</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              <code className="rounded border border-border px-1 py-0.5 font-mono text-[11px]">
+                POST /v1/me/agents
+              </code>{" "}
               Create an account, then generate API keys via{" "}
-              <b>Account Settings</b> to programmatically interact with
-              assessments, attempts, and stats.
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+              <strong>Account Settings</strong> to interact with assessments,
+              attempts, and stats.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
