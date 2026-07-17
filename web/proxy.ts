@@ -12,7 +12,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Public routes that never require a token. Everything else under the matcher
 // is treated as an authenticated app route.
-const PUBLIC_PATHS = new Set(["/", "/login"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/self-hosting",
+  "/llms.txt",
+  "/skill.json",
+  "/openapi.yaml",
+]);
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

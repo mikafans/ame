@@ -43,7 +43,7 @@ surface is human-only.
 ## 2. Discovery: is `llms.txt` still relevant?
 
 **Yes — it is the live, canonical contract.** `GET /llms.txt`
-(`agents.rs:79`) serves `api/llms.txt` via `include_str!`, so the file in the
+(`agents.rs:79`) serves `docs/public/llms.txt` via `include_str!`, so the file in the
 repo *is* what agents fetch. It is the human-readable entry point; `skill.json`
 (`build_skill_manifest`, `agents.rs:205`) is its machine-readable twin (the
 18-tool JSON catalog with `input_schema` per tool).
@@ -52,7 +52,7 @@ Two consumers, one source intent:
 
 - `llms.txt` — prose contract + task playbooks (analyze-performance,
   generate-questions, adaptive-generation). This is how an agent *learns* AME.
-- `skill.json` — the tool list an agent *binds* to. `?strict=1` drops the
+- `skill.json` — the tool list an agent *binds* to, including the
   `method`/`path`/`scope` hints.
 
 **Drift to fix**: `llms.txt` §"Getting a key" lists `feedback.write`,

@@ -1,7 +1,7 @@
 # Self-hosting AME
 
 This is the operator guide for running AME on one Linux host with Docker or
-Podman Compose and a TLS reverse proxy. It is separate from `api/llms.txt`:
+Podman Compose and a TLS reverse proxy. It is separate from the agent guide:
 `llms.txt` describes the public HTTP agent interface for AI clients; it is not a
 deployment manifest or an installation guide.
 

@@ -4,7 +4,7 @@ This directory documents the supported deploy shapes. The repo ships container
 artifacts but **not** opinionated infra-as-code — bring your own k8s manifests,
 Terraform, Helm chart, etc.
 
-For a complete single-host installation, see [`SELF-HOSTING.md`](SELF-HOSTING.md).
+For a complete single-host installation, see [`../docs/public/self-hosting.md`](../docs/public/self-hosting.md).
 
 ## Artifacts
 

@@ -30,6 +30,7 @@ def dispatch(target: str) -> int:
             if run("uv", "run", f"scripts/simulate/{script}") != 0: return 1
         return 0
     if target == "openapi": return mise("cargo", "run", "--quiet", "--bin", "gen-openapi", cwd=ROOT / "api")
+    if target == "public-docs": return mise("cargo", "run", "--quiet", "--bin", "gen-public-docs", cwd=ROOT / "api")
     if target == "bench": return mise("cargo", "bench", "--bench", "hot_paths", cwd=ROOT / "api")
     if target == "init-env": return init_env()
     if target == "dev": return dev()

@@ -99,8 +99,8 @@ After making code changes, **always restart the dev server** via `make dev` to p
 
 ## Agent Surface
 
-- `api/llms.txt` is the canonical agent guide (served entry doc with the worked playbooks); reference client at `agents/client.py`.
-- Discovery: `GET /llms.txt` (public) → `GET /skill.json` (public manifest; `?strict=1` drops ame-specific fields).
+- `docs/public/llms.txt` is the canonical agent guide (served entry doc with the worked playbooks); reference client at `agents/client.py`.
+- Discovery: `GET /llms.txt` (public) → `GET /skill.json` (public manifest).
 - Mint a key: an authenticated human owner calls `POST /v1/me/agents` (token-only sub-account; `apiKey` shown once). The old `POST /v1/agents/register` faucet was removed.
 - Write tools run via `POST /v1/agents/run`; read tools are called directly at their advertised method/path.
 

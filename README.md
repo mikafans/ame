@@ -78,8 +78,9 @@ manifests. The API runs its migrations on boot, so no separate migration step is
 needed.
 
 For a single-host self-hosted installation, follow
-[`deploy/SELF-HOSTING.md`](deploy/SELF-HOSTING.md). The public `api/llms.txt`
-route is the agent discovery contract, not deployment documentation.
+[`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
+`docs/public/llms.txt` route is the agent discovery contract, not deployment
+documentation.
 
 ```bash
 cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
@@ -107,6 +108,7 @@ make db-down
 - `design/source/src/*.jsx` — pixel-faithful UI design source of truth.
 - `docs/specs/` — design specs (`2026-05-20-harus-platform-design.md` is canonical).
 - `docs/plans/` — implementation plans.
+- `docs/public/` — canonical public-facing operator, deployment, and agent docs.
 - `docs/ROADMAP.md` — versioned roadmap toward v1.1 "Admin Console GA".
 - `.tmp/` — gitignored scratch space for screenshots and Playwright artifacts.
 

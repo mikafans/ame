@@ -1,7 +1,7 @@
 //! Agent skill-manifest integration tests.
 //!
 //! Covers the agent skill manifest exposed at `/skill.json`: the
-//! tools it advertises and the field-stripping done in `?strict=1` mode.
+//! tools it advertises.
 
 use serde_json::Value;
 use sqlx::PgPool;
@@ -167,37 +167,6 @@ async fn skill_manifest_contains_assessment_tools() {
         assert_eq!(
             t["path"], expected_path,
             "tool {name} must advertise path {expected_path}"
-        );
-    }
-}
-
-#[tokio::test]
-async fn skill_manifest_strict_drops_ame_fields() {
-    let base = serve_lazy().await;
-    let client = reqwest::Client::new();
-
-    let manifest: Value = client
-        .get(format!("{base}/skill.json?strict=1"))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-
-    let tools = manifest["tools"].as_array().unwrap();
-    for tool in tools {
-        assert!(
-            tool.get("method").is_none(),
-            "strict manifest should not have 'method'"
-        );
-        assert!(
-            tool.get("path").is_none(),
-            "strict manifest should not have 'path'"
-        );
-        assert!(
-            tool.get("scope").is_none(),
-            "strict manifest should not have 'scope'"
         );
     }
 }

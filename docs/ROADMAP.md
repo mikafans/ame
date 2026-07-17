@@ -79,7 +79,7 @@ deployment path:
 - Tailwind CSS and local shadcn-style primitives are the web UI foundation.
 - Containerized debug stack with Postgres, Valkey, API, web, and Caddy routing.
 - Single-host self-hosting guide, production compose healthchecks, and agent
-  discovery routes documented separately from `api/llms.txt`.
+  discovery routes documented alongside the other public documents in `docs/public/`.
 
 The next incremental work in this release line is content integrity, data
 retention, support queues, and learner mobile polish.

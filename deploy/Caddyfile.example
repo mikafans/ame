@@ -4,8 +4,5 @@ ame.example.com {
     reverse_proxy /v1/* 127.0.0.1:8080
     reverse_proxy /healthz 127.0.0.1:8080
     reverse_proxy /readyz 127.0.0.1:8080
-    reverse_proxy /llms.txt 127.0.0.1:8080
-    reverse_proxy /skill.json 127.0.0.1:8080
-    reverse_proxy /openapi.yaml 127.0.0.1:8080
     reverse_proxy 127.0.0.1:3000
 }

@@ -2,7 +2,6 @@
 /* eslint-disable @next/next/no-img-element -- brand SVG variants are selected by color mode. */
 
 import { useColorMode } from "@/components/ThemeRegistry";
-import { BRAND_GRADIENT } from "@/lib/brand";
 
 interface BrandMarkProps {
   size?: number;
@@ -25,13 +24,8 @@ export function BrandMark({ size = 32 }: BrandMarkProps) {
       />
       <span
         data-testid="brand-wordmark"
-        className="font-extrabold leading-none tracking-[-0.02em] text-transparent"
-        style={{
-          fontSize: Math.round(size * 0.75),
-          background: BRAND_GRADIENT,
-          backgroundClip: "text",
-          WebkitBackgroundClip: "text",
-        }}
+        className="font-extrabold leading-none tracking-[-0.02em] text-neutral-950 dark:text-white"
+        style={{ fontSize: Math.round(size * 0.75) }}
       >
         ame
       </span>

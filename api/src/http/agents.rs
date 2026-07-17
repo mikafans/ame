@@ -67,12 +67,8 @@ pub struct ActivityQuery {
 // ── handlers ──────────────────────────────────────────────────────────────────
 
 /// GET /skill.json — agent skill manifest (public).
-pub async fn skill_manifest(
-    State(_state): State<AppState>,
-    Query(params): Query<std::collections::HashMap<String, String>>,
-) -> Json<Value> {
-    let strict = params.get("strict").map(|v| v == "1").unwrap_or(false);
-    Json(build_skill_manifest(strict))
+pub async fn skill_manifest(State(_state): State<AppState>) -> Json<Value> {
+    Json(build_skill_manifest())
 }
 
 /// GET /llms.txt — agent entry doc (public, llmstxt.org convention).
@@ -82,7 +78,7 @@ pub async fn llms_txt() -> impl IntoResponse {
             axum::http::header::CONTENT_TYPE,
             "text/plain; charset=utf-8",
         )],
-        include_str!("../../llms.txt"),
+        include_str!("../../../docs/public/llms.txt"),
     )
 }
 
@@ -176,21 +172,18 @@ fn tool(
     method: &str,
     path: &str,
     scope: Option<&str>,
-    strict: bool,
 ) -> Value {
     let mut t = json!({
         "name": name,
         "description": description,
         "input_schema": input_schema,
     });
-    if !strict {
-        t["method"] = json!(method);
-        t["path"] = json!(path);
-        t["scope"] = match scope {
-            Some(s) => json!(s),
-            None => Value::Null,
-        };
-    }
+    t["method"] = json!(method);
+    t["path"] = json!(path);
+    t["scope"] = match scope {
+        Some(s) => json!(s),
+        None => Value::Null,
+    };
     t
 }
 
@@ -202,7 +195,7 @@ fn id_only() -> Value {
     })
 }
 
-fn build_skill_manifest(strict: bool) -> Value {
+pub fn build_skill_manifest() -> Value {
     let tools: Vec<Value> = vec![
         // Assessment
         tool(
@@ -212,7 +205,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/assessments",
             Some("assessment.read"),
-            strict,
         ),
         tool(
             "assessment.get",
@@ -221,7 +213,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/assessments/{id}",
             Some("assessment.read"),
-            strict,
         ),
         tool(
             "assessment.archive",
@@ -230,7 +221,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "assessment.publish",
@@ -239,7 +229,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "assessment.create",
@@ -275,7 +264,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "assessment.batchCreate",
@@ -320,7 +308,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "assessment.update",
@@ -329,7 +316,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "assessment.addQuestion",
@@ -349,7 +335,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         // Questions
         tool(
@@ -359,7 +344,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/questions",
             Some("assessment.read"),
-            strict,
         ),
         tool(
             "question.create",
@@ -368,7 +352,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "question.promote",
@@ -377,7 +360,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "question.update",
@@ -397,7 +379,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "question.deepen",
@@ -413,7 +394,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/questions/{id}/deepen",
             Some("assessment.read"),
-            strict,
         ),
         tool(
             "deepDive.request",
@@ -431,7 +411,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("attempt.write"),
-            strict,
         ),
         tool(
             "deepDive.list",
@@ -445,7 +424,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.read"),
-            strict,
         ),
         tool(
             "deepDive.publish",
@@ -463,7 +441,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         tool(
             "assessment.stats",
@@ -472,7 +449,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/assessments/{id}/stats",
             Some("stats.read"),
-            strict,
         ),
         tool(
             "activity.list",
@@ -481,7 +457,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/agents/activity",
             Some("assessment.read"),
-            strict,
         ),
         tool(
             "stats.user",
@@ -490,7 +465,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/me/stats",
             Some("stats.read"),
-            strict,
         ),
         tool(
             "attempt.list",
@@ -499,7 +473,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "GET",
             "/v1/me/attempts",
             Some("attempt.read"),
-            strict,
         ),
         // Attempt grading
         tool(
@@ -517,7 +490,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("attempt.write"),
-            strict,
         ),
         tool(
             "assessment.delete",
@@ -526,7 +498,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             Some("assessment.write"),
-            strict,
         ),
         // Agent self — run-only tools (POST /v1/agents/run). These operate on the
         // calling agent's own profile/plan and are available to any agent token.
@@ -537,7 +508,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             None,
-            strict,
         ),
         tool(
             "memory.set",
@@ -546,7 +516,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             None,
-            strict,
         ),
         tool(
             "memory.append",
@@ -555,7 +524,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             None,
-            strict,
         ),
         tool(
             "target.set",
@@ -564,7 +532,6 @@ fn build_skill_manifest(strict: bool) -> Value {
             "POST",
             "/v1/agents/run",
             None,
-            strict,
         ),
     ];
 

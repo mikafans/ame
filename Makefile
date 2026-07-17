@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs
+.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs
 
 API_HOST ?= localhost
 API_PORT ?= 28080
@@ -49,6 +49,9 @@ bench-soak: ## Run the duration benchmark against a running API
 # Application and API artifacts
 openapi: ## Regenerate the OpenAPI and generated client artifacts
 	uv run scripts/tasks.py openapi
+
+public-docs: openapi ## Regenerate generated documents in docs/public
+	uv run scripts/tasks.py public-docs
 e2e: db-up ## Run the seeded Playwright suite
 	uv run scripts/e2e.py
 uiux: ## Run the focused UI/UX contract against the host stack

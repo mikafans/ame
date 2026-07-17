@@ -1,11 +1,5 @@
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ame">
-  <defs>
-    <linearGradient id="ame-dark" x1="18" y1="18" x2="82" y2="82" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#62D8CD"/>
-      <stop offset="1" stop-color="#FF9DC0"/>
-    </linearGradient>
-  </defs>
-  <rect width="100" height="100" rx="24" fill="#0C1817"/>
-  <path d="M50 16 79 82H64l-6-15H42l-6 15H21l29-66Zm0 23-5 15h10l-5-15Z" fill="url(#ame-dark)" fill-rule="evenodd"/>
-  <circle cx="78" cy="24" r="5" fill="#FF9DC0"/>
+  <rect width="100" height="100" rx="24" fill="#171717"/>
+  <path d="M50 16 79 82H64l-6-15H42l-6 15H21l29-66Zm0 23-5 15h10l-5-15Z" fill="#F9FAFB" fill-rule="evenodd"/>
+  <circle cx="78" cy="24" r="5" fill="#60A5FA"/>
 </svg>
