@@ -106,11 +106,17 @@ export default function ResultsPage({
           given = String(responseBody.source ?? "");
         let correctAnswer = "";
         if (!attempt?.is_correct) {
-          if ("correct_index" in correct)
-            correctAnswer = String.fromCharCode(
-              65 + Number(correct.correct_index),
+          if ("correct_index" in correct) {
+            const canonical = Number(correct.correct_index);
+            const mappedPosition = presentation.option_order?.findIndex(
+              (index: number) => index === canonical,
             );
-          else if ("correct" in correct)
+            const position =
+              mappedPosition !== undefined && mappedPosition >= 0
+                ? mappedPosition
+                : canonical;
+            correctAnswer = `${String.fromCharCode(65 + position)}: ${question.options?.[canonical]?.text ?? ""}`;
+          } else if ("correct" in correct)
             correctAnswer = correct.correct ? "True" : "False";
           else if ("accepted" in correct)
             correctAnswer = correct.accepted.join(", ");

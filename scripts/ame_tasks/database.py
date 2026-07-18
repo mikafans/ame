@@ -61,4 +61,10 @@ def bulk() -> int:
 
 
 def heavy() -> int:
-    return reset() or seed() or bulk()
+    if reset() != 0:
+        return 1
+    if run("curl", "-fsS", f"http://localhost:{API_PORT}/healthz") != 0:
+        raise SystemExit(
+            "API not running — please start it with 'make dev' in another terminal"
+        )
+    return seed() or bulk()

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import argparse
 
-from .common import ROOT, mise, run
+from .common import PREVIEW_PORT, ROOT, mise, run, web_ready
 from .database import admin, bulk, down, heavy, migrate, reset, seed, up
 from .quality import format_project, lint, test, test_db, test_engine
+from container_runtime import engine
 from .runtime import dev, init_env, stop
 
 
@@ -29,17 +30,25 @@ def dispatch(target: str) -> int:
         for script in ("instructor.py", "learner.py", "agent.py"):
             if run("uv", "run", f"scripts/simulate/{script}") != 0: return 1
         return 0
-    if target == "openapi": return mise("cargo", "run", "--quiet", "--bin", "gen-openapi", cwd=ROOT / "api")
+    if target == "openapi":
+        status = mise("cargo", "run", "--quiet", "--bin", "gen-openapi", cwd=ROOT / "api")
+        if status != 0 or not web_ready(): return status
+        for command in (("bun", "run", "api:gen"), ("bun", "run", "client:gen")):
+            status = mise(*command, cwd=ROOT / "web")
+            if status != 0: return status
+        return 0
     if target == "public-docs": return mise("cargo", "run", "--quiet", "--bin", "gen-public-docs", cwd=ROOT / "api")
     if target == "bench": return mise("cargo", "bench", "--bench", "hot_paths", cwd=ROOT / "api")
     if target == "init-env": return init_env()
     if target == "dev": return dev()
     if target == "stop": return stop()
-    if target == "preview": return mise("uv", "run", "--no-project", "python", "-m", "http.server", "28900", "--bind", "0.0.0.0", "--directory", "design/preview")
+    if target == "preview": return mise("uv", "run", "--no-project", "python", "-m", "http.server", PREVIEW_PORT, "--bind", "0.0.0.0", "--directory", "design/preview")
     if target.startswith("docker-"):
         action = target.removeprefix("docker-")
-        args = ("docker", "compose", "-f", "docker-compose.prod.yml", action)
-        return run(*args, "-d") if action == "up" else run(*args)
+        args = (*engine(), "-f", "docker-compose.prod.yml", action)
+        if action == "up": args += ("-d",)
+        if action == "logs": args += ("-f",)
+        return run(*args)
     raise SystemExit(f"unknown task: {target}")
 
 
