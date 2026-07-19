@@ -23,9 +23,10 @@ The release gate is C1–C6:
 The current implementation already includes the unified `/api/v1` learner API,
 `/public/v1` onboarding API, static Caddy delivery for public contracts,
 prompt-grounded five-step first learning packages, versioned assessments,
-learner-safe results, deep dives, progress reads, streak history, and browser
-coverage. Remaining release work is certification and review evidence, not a
-compatibility migration.
+reviewed agent-grounded explanation/worked-example content, learner-safe
+results, deep dives, progress reads, streak history, and browser coverage.
+Remaining release work is certification and review evidence, not a compatibility
+migration.
 
 ## 0.4 — retention and source-grounded learning
 

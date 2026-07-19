@@ -131,6 +131,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     },
   );
   expect(groundedContentResponse.ok()).toBeTruthy();
+  await page.reload();
   await page.getByRole("button", { name: "Begin" }).last().click();
   await expect(
     page.getByRole("heading", { name: groundedContent.heading }),

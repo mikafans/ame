@@ -140,6 +140,53 @@
       "path": "/api/v1/learning/sessions/{id}/finish"
     },
     {
+      "description": "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "content": {
+            "description": "Use type explanation with heading, body, key_points, or worked_example with heading, prompt, steps, reflection.",
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          "generationRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "Only approved content is learner-visible.",
+            "enum": [
+              "approved"
+            ],
+            "type": "string"
+          },
+          "sourceReferences": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "activityId",
+          "generationRunId",
+          "content",
+          "sourceReferences",
+          "reviewStatus"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.activity.content.author",
+      "path": "/api/v1/learning/activities/{activity_id}/content"
+    },
+    {
       "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
       "input_schema": {
         "properties": {
