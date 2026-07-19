@@ -559,6 +559,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/learning/sessions/{id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /v1/learning/sessions/{id}/finish — finish the current learning activity. */
+        post: operations["finish_learning_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -1418,6 +1435,9 @@ export interface components {
         FieldError: {
             field: string;
             message: string;
+        };
+        FinishLearningSessionBody: {
+            result: Record<string, never>;
         };
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
@@ -3580,6 +3600,61 @@ export interface operations {
             };
             /** @description Session does not exist for this learner */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    finish_learning_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning session ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinishLearningSessionBody"];
+            };
+        };
+        responses: {
+            /** @description Finished learning session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningSessionResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks required scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is already finished */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

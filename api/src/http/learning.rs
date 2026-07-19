@@ -17,7 +17,8 @@ use crate::{
     domain::{
         error::ApiError,
         learning::{
-            ActivityKind, ActivityStatus, CreateLearningSession, GoalStatus, JourneyStatus,
+            ActivityKind, ActivityStatus, CreateLearningSession,
+            FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyStatus,
             LearningActivity, LearningObjective, LearningRepository, LearningSession,
             LearningSessionStatus, ObjectiveStatus,
         },
@@ -102,6 +103,13 @@ pub struct LearningSessionResponse {
     pub finished_at: Option<OffsetDateTime>,
 }
 
+#[derive(Debug, serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FinishLearningSessionBody {
+    #[schema(value_type = Object)]
+    pub result: serde_json::Value,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LearningJourneyResponse {
@@ -123,6 +131,10 @@ pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/learning/journeys/{id}", get(get_journey))
         .route("/v1/learning/sessions/{id}", get(get_learning_session))
+        .route(
+            "/v1/learning/sessions/{id}/finish",
+            axum::routing::post(finish_learning_session),
+        )
         .route(
             "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
             post(start_activity),
@@ -263,6 +275,51 @@ pub async fn get_learning_session(
     Ok(Json(session_response(session)))
 }
 
+/// POST /v1/learning/sessions/{id}/finish — finish the current learning activity.
+#[utoipa::path(
+    post,
+    path = "/v1/learning/sessions/{id}/finish",
+    params(("id" = Uuid, Path, description = "Learning session ID")),
+    request_body = FinishLearningSessionBody,
+    responses(
+        (status = 200, description = "Finished learning session", body = LearningSessionResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 403, description = "Token lacks required scope"),
+        (status = 404, description = "Session does not exist for this learner"),
+        (status = 409, description = "Session is already finished")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn finish_learning_session(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+    Json(body): Json<FinishLearningSessionBody>,
+) -> Result<Json<LearningSessionResponse>, ApiError> {
+    if !auth
+        .token_scopes
+        .contains(&crate::domain::user::Scope::AttemptWrite)
+        && !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::Admin)
+    {
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "attempt.write",
+        )));
+    }
+    let repository = PgLearningRepository::new(state.pool);
+    let session = repository
+        .finish_learning_session(FinishLearningSessionInput {
+            subject_user_id: auth.owner_id(),
+            session_id: id,
+            result: body.result,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(session_response(session)))
+}
+
 fn objective_response(objective: LearningObjective) -> LearningObjectiveResponse {
     LearningObjectiveResponse {
         id: objective.id,
@@ -324,6 +381,9 @@ fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -
                 field: "activityId".to_string(),
                 message: "activity is not ready to start".to_string(),
             }])
+        }
+        crate::domain::learning::LearningRepositoryError::LearningSessionFinished => {
+            ApiError::SessionFinished
         }
         other => ApiError::Internal(other.into()),
     }

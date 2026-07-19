@@ -1217,6 +1217,43 @@ paths:
           description: Session does not exist for this learner
       security:
       - bearer_auth: []
+  /v1/learning/sessions/{id}/finish:
+    post:
+      tags:
+      - learning
+      summary: POST /v1/learning/sessions/{id}/finish — finish the current learning activity.
+      operationId: finish_learning_session
+      parameters:
+      - name: id
+        in: path
+        description: Learning session ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinishLearningSessionBody'
+        required: true
+      responses:
+        '200':
+          description: Finished learning session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '404':
+          description: Session does not exist for this learner
+        '409':
+          description: Session is already finished
+      security:
+      - bearer_auth: []
   /v1/me:
     get:
       tags:
@@ -3336,6 +3373,13 @@ components:
           type: string
         message:
           type: string
+    FinishLearningSessionBody:
+      type: object
+      required:
+      - result
+      properties:
+        result:
+          type: object
     FinishSessionResponse:
       type: object
       required:

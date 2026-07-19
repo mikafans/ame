@@ -2,10 +2,10 @@
 
 use crate::domain::learning::{
     ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateLearningSession,
-    CreateObjective, GoalStatus, JourneyStatus, LearningActivity, LearningGoal, LearningJourney,
-    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
-    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal, validate_journey,
-    validate_objective,
+    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
+    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
+    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal,
+    validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -502,6 +502,58 @@ impl LearningRepository for PgLearningRepository {
                 resource: "learning session",
             }),
         }
+    }
+
+    async fn finish_learning_session(
+        &self,
+        input: FinishLearningSession,
+    ) -> Result<LearningSession, LearningRepositoryError> {
+        let mut transaction = self.pool.begin().await.map_err(storage_error)?;
+        let row = sqlx::query(
+            r#"
+            UPDATE tb_learning_sessions
+            SET status = 'finished', result = $3, finished_at = now()
+            WHERE id = $1 AND subject_user_id = $2 AND status = 'in_progress'
+            RETURNING id, journey_id, activity_id, subject_user_id, actor_identity_id,
+                      status, question_plan, result, started_at, finished_at
+            "#,
+        )
+        .bind(input.session_id)
+        .bind(input.subject_user_id)
+        .bind(input.result)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(storage_error)?;
+        let Some(row) = row else {
+            let current = sqlx::query(
+                "SELECT subject_user_id, status FROM tb_learning_sessions WHERE id = $1",
+            )
+            .bind(input.session_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(storage_error)?;
+            return match current {
+                Some(current)
+                    if current.get::<Uuid, _>("subject_user_id") != input.subject_user_id =>
+                {
+                    Err(LearningRepositoryError::SubjectMismatch)
+                }
+                Some(_) => Err(LearningRepositoryError::LearningSessionFinished),
+                None => Err(LearningRepositoryError::NotFound {
+                    resource: "learning session",
+                }),
+            };
+        };
+        let session = learning_session_from_row(row);
+        sqlx::query(
+            "UPDATE tb_activities SET status = 'completed', updated_at = now() WHERE id = $1",
+        )
+        .bind(session.activity_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(storage_error)?;
+        transaction.commit().await.map_err(storage_error)?;
+        Ok(session)
     }
 }
 

@@ -2,10 +2,10 @@
 
 use crate::domain::learning::{
     ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateLearningSession,
-    CreateObjective, GoalStatus, JourneyStatus, LearningActivity, LearningGoal, LearningJourney,
-    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
-    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal, validate_journey,
-    validate_objective,
+    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
+    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
+    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal,
+    validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -401,6 +401,39 @@ impl LearningRepository for InMemoryLearningRepository {
             }),
         }
     }
+
+    async fn finish_learning_session(
+        &self,
+        input: FinishLearningSession,
+    ) -> Result<LearningSession, LearningRepositoryError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let (activity_id, finished_session) = {
+            let session = state.sessions.get_mut(&input.session_id).ok_or(
+                LearningRepositoryError::NotFound {
+                    resource: "learning session",
+                },
+            )?;
+            if session.subject_user_id != input.subject_user_id {
+                return Err(LearningRepositoryError::SubjectMismatch);
+            }
+            if session.status != LearningSessionStatus::InProgress {
+                return Err(LearningRepositoryError::LearningSessionFinished);
+            }
+            let activity_id = session.activity_id;
+            session.status = LearningSessionStatus::Finished;
+            session.result = Some(input.result);
+            session.finished_at = Some(OffsetDateTime::now_utc());
+            (activity_id, session.clone())
+        };
+        if let Some(activity) = state.activities.get_mut(&activity_id) {
+            activity.status = ActivityStatus::Completed;
+            activity.updated_at = OffsetDateTime::now_utc();
+        }
+        Ok(finished_session)
+    }
 }
 
 pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
@@ -559,6 +592,25 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             .get_learning_session(other_subject, session.id)
             .await,
         Err(LearningRepositoryError::SubjectMismatch)
+    );
+    let finished = repository
+        .finish_learning_session(FinishLearningSession {
+            subject_user_id: subject,
+            session_id: session.id,
+            result: serde_json::json!({"completed": true}),
+        })
+        .await
+        .expect("learning session finishes");
+    assert_eq!(finished.status, LearningSessionStatus::Finished);
+    assert_eq!(
+        repository
+            .finish_learning_session(FinishLearningSession {
+                subject_user_id: subject,
+                session_id: session.id,
+                result: serde_json::json!({"completed": true}),
+            })
+            .await,
+        Err(LearningRepositoryError::LearningSessionFinished)
     );
     assert_eq!(
         repository.get_journey(other_subject, journey.id).await,

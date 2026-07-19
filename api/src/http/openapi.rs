@@ -46,8 +46,8 @@ use crate::{
             ListDeepDivesQuery, ListDeepDivesResponse, PatchDeepDiveBody, PublishDeepDiveBody,
         },
         learning::{
-            LearningActivityResponse, LearningGoalResponse, LearningJourneyResponse,
-            LearningObjectiveResponse, LearningSessionResponse,
+            FinishLearningSessionBody, LearningActivityResponse, LearningGoalResponse,
+            LearningJourneyResponse, LearningObjectiveResponse, LearningSessionResponse,
         },
         me::{
             AgentSummary, AgentTokenSummary, CohortStatsResponse, CreateAgentBody,
@@ -77,6 +77,7 @@ use crate::{
         crate::http::onboarding::start_learning,
         crate::http::learning::get_journey,
         crate::http::learning::get_learning_session,
+        crate::http::learning::finish_learning_session,
         crate::http::learning::start_activity,
         crate::http::me::get_me,
         crate::http::me::list_agents,
@@ -189,6 +190,7 @@ use crate::{
         LearningObjectiveResponse,
         LearningActivityResponse,
         LearningSessionResponse,
+        FinishLearningSessionBody,
         UserInfo,
         MeResponse,
         CreateKeyResponse,

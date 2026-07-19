@@ -176,6 +176,13 @@ pub struct CreateLearningSession {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct FinishLearningSession {
+    pub subject_user_id: Uuid,
+    pub session_id: Uuid,
+    pub result: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct LearningSession {
     pub id: Uuid,
     pub journey_id: Uuid,
@@ -205,6 +212,8 @@ pub enum LearningRepositoryError {
     OrderConflict { resource: &'static str },
     #[error("activity is not ready to start")]
     ActivityNotReady,
+    #[error("learning session is already finished")]
+    LearningSessionFinished,
     #[error("learning repository storage failure: {0}")]
     Storage(String),
 }
@@ -275,6 +284,11 @@ pub trait LearningRepository: Send + Sync {
         &self,
         subject_user_id: Uuid,
         session_id: Uuid,
+    ) -> Result<LearningSession, LearningRepositoryError>;
+
+    async fn finish_learning_session(
+        &self,
+        input: FinishLearningSession,
     ) -> Result<LearningSession, LearningRepositoryError>;
 }
 
