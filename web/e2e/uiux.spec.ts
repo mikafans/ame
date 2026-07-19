@@ -65,6 +65,9 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
 
   await page.getByRole("button", { name: "Begin" }).click();
+  await expect(
+    page.getByRole("heading", { name: `Get oriented on ${prompt}` }).first(),
+  ).toBeVisible();
   await expect(page.getByText(/How familiar are you with .+\?/)).toBeVisible();
   await page.getByRole("button", { name: "new to me" }).click();
   await page
@@ -76,7 +79,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     page.getByText("Complete. Your next activity is now ready."),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Try a short first task" }).first(),
+    page.getByRole("heading", { name: /Try a short first task for/ }).first(),
   ).toBeVisible();
   await expect(
     page.getByText("This objective has the weakest available evidence."),

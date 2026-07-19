@@ -649,6 +649,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preview_renders_the_learner_goal_through_the_catalog_copy() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let prompt = "I would like to learn Flink and the Flink Kubernetes Operator";
+
+        let preview = service
+            .preview_from_prompt(prompt, &CatalogPromptInterpreter)
+            .await
+            .expect("prompt preview succeeds");
+
+        assert!(
+            preview
+                .objectives
+                .iter()
+                .all(|objective| { objective.statement.contains(prompt) })
+        );
+        assert!(preview.first_activity.title.contains(prompt));
+    }
+
+    #[tokio::test]
+    async fn preview_preserves_odd_but_valid_goal_text_without_template_execution() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let prompt = "Learn {{goal}} <script>alert(1)</script>";
+
+        let preview = service
+            .preview_from_prompt(prompt, &CatalogPromptInterpreter)
+            .await
+            .expect("prompt preview succeeds");
+
+        assert!(preview.objectives[0].statement.contains(prompt));
+        assert!(preview.first_activity.title.contains(prompt));
+    }
+
+    #[tokio::test]
     async fn self_host_start_learning_requires_authentication_to_retry() {
         let service = SelfHostOnboardingService::new(
             InMemoryIdentityRepository::default(),
