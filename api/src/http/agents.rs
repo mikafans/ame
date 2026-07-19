@@ -459,6 +459,14 @@ pub fn build_skill_manifest() -> Value {
             Some("assessment.read"),
         ),
         tool(
+            "learning.journey.get",
+            "Read the owner's intent, objectives, activities, persisted evidence-backed recommendation, and source attribution for a learning journey.",
+            id_only(),
+            "POST",
+            "/v1/agents/run",
+            Some("plan.read"),
+        ),
+        tool(
             "stats.user",
             "Read the caller's aggregate learning statistics.",
             json!({"type":"object","properties":{}}),
@@ -551,6 +559,7 @@ pub fn build_skill_manifest() -> Value {
                 "assessment.stats",
                 "question.list",
                 "activity.list",
+                "learning.journey.get",
                 "stats.user",
                 "attempt.list",
                 "assessment.create",
@@ -722,6 +731,10 @@ async fn dispatch_run(
             require_scope(&auth, Scope::AssessmentRead)?;
             run_activity_list(&state, &auth, body.params).await
         }
+        "learning.journey.get" => {
+            require_scope(&auth, Scope::PlanRead)?;
+            run_learning_journey_get(&state, &auth, body.params).await
+        }
         "stats.user" => {
             require_scope(&auth, Scope::StatsRead)?;
             run_stats_user(&state, &auth, body.params).await
@@ -736,6 +749,22 @@ async fn dispatch_run(
         "target.set" => run_target_set(&state, &user_id, body.params).await,
         other => Err(ApiError::UnknownTool(other.to_string())),
     }
+}
+
+async fn run_learning_journey_get(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    params: Value,
+) -> Result<Json<RunResponse>, ApiError> {
+    let journey_id = parse_id(&params)?;
+    let response =
+        super::learning::get_journey(State(state.clone()), auth.clone(), Path(journey_id)).await?;
+    Ok(Json(RunResponse {
+        ok: true,
+        tool: "learning.journey.get".into(),
+        result: serde_json::to_value(response.0).unwrap_or(Value::Null),
+        error: None,
+    }))
 }
 
 async fn run_assessment_create(

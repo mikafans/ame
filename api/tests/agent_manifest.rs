@@ -52,7 +52,7 @@ async fn skill_manifest_contains_assessment_tools() {
     let tool_names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
     // Writes: assessment.create, assessment.batchCreate, assessment.update, assessment.addQuestion, assessment.delete, assessment.archive, assessment.publish, question.create, question.promote, question.update, attempt.grade
-    // Reads: assessment.list, assessment.get, assessment.stats, question.list, activity.list, stats.user
+    // Reads: assessment.list, assessment.get, assessment.stats, question.list, activity.list, learning.journey.get, stats.user
     // Self: profile.get, memory.set, memory.append, target.set
     let all_expected = [
         "assessment.list",
@@ -70,6 +70,7 @@ async fn skill_manifest_contains_assessment_tools() {
         "question.promote",
         "question.update",
         "activity.list",
+        "learning.journey.get",
         "stats.user",
         "attempt.list",
         "attempt.grade",
@@ -125,7 +126,8 @@ async fn skill_manifest_contains_assessment_tools() {
             | "profile.get"
             | "memory.set"
             | "memory.append"
-            | "target.set" => "POST",
+            | "target.set"
+            | "learning.journey.get" => "POST",
             _ => panic!("unknown tool name: {}", name),
         };
         let expected_path = match name {
@@ -138,6 +140,7 @@ async fn skill_manifest_contains_assessment_tools() {
             "activity.list" => "/v1/agents/activity",
             "stats.user" => "/v1/me/stats",
             "attempt.list" => "/v1/me/attempts",
+            "learning.journey.get" => "/v1/agents/run",
             // Writes: all via /v1/agents/run
             "assessment.create"
             | "assessment.batchCreate"
