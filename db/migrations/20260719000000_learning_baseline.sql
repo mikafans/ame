@@ -239,6 +239,7 @@ CREATE TABLE tb_question_versions (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v7(),
     question_id uuid NOT NULL REFERENCES tb_questions (id) ON DELETE CASCADE,
     version integer NOT NULL,
+    kind text NOT NULL,
     prompt text NOT NULL,
     payload jsonb NOT NULL DEFAULT '{}'::jsonb,
     explanation text,
@@ -249,6 +250,9 @@ CREATE TABLE tb_question_versions (
     review_status text NOT NULL DEFAULT 'draft',
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT tb_question_versions_version_check CHECK (version > 0),
+    CONSTRAINT tb_question_versions_kind_check CHECK (
+        kind IN ('multiple_choice', 'true_false', 'short_answer', 'essay', 'code')
+    ),
     CONSTRAINT tb_question_versions_points_check CHECK (points > 0),
     CONSTRAINT tb_question_versions_review_check CHECK (
         review_status IN ('draft', 'review', 'approved', 'rejected')
