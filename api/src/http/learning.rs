@@ -249,9 +249,10 @@ pub async fn start_activity(
     auth: AuthenticatedUser,
     Path((journey_id, activity_id)): Path<(Uuid, Uuid)>,
 ) -> Result<(StatusCode, Json<LearningSessionResponse>), ApiError> {
-    if !auth
-        .token_scopes
-        .contains(&crate::domain::user::Scope::AttemptWrite)
+    if auth.is_agent()
+        && !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::AttemptWrite)
         && !auth
             .token_scopes
             .contains(&crate::domain::user::Scope::Admin)
@@ -322,9 +323,10 @@ pub async fn finish_learning_session(
     Path(id): Path<Uuid>,
     Json(body): Json<FinishLearningSessionBody>,
 ) -> Result<Json<LearningSessionResponse>, ApiError> {
-    if !auth
-        .token_scopes
-        .contains(&crate::domain::user::Scope::AttemptWrite)
+    if auth.is_agent()
+        && !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::AttemptWrite)
         && !auth
             .token_scopes
             .contains(&crate::domain::user::Scope::Admin)

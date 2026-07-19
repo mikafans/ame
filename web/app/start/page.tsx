@@ -6,10 +6,12 @@ import { ArrowRight } from "lucide-react";
 import { api } from "@/api/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 function StartLearningForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refresh } = useAuth();
   const [prompt, setPrompt] = useState(searchParams.get("prompt") ?? "");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,6 +34,7 @@ function StartLearningForm() {
       if (!response.ok || !data) {
         throw new Error("Could not start your learning journey");
       }
+      await refresh();
       router.push(`/learning/journeys/${data.journeyId}`);
     } catch (submitError) {
       setError(

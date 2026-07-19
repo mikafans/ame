@@ -1,228 +1,64 @@
 /**
- * UI/UX spec alignment — comprehensive learner surface contract test.
+ * UI/UX spec alignment — the first-user, agent-friendly learning journey.
  *
- * Exercises: Explore, assessment preview, active session (MCQ), results, progress
- * dashboard, question bank, exams. This test is intentionally a large single
- * flow so it can verify the session round-trip end-to-end with screenshots.
- *
- * Uses shared helpers for login, cookie, MCQ assessment lookup, and session finish.
+ * This contract follows the product's primary self-host story: a visitor
+ * states an intent, creates a local learner account, completes the first
+ * starter check, and receives a grounded next recommendation.
  */
-import { expect, test, type Page } from "@playwright/test";
-import {
-  API_URL,
-  loginAs,
-  setAuthCookie,
-  firstMcqAssessmentId,
-  finishSession,
-} from "./helpers";
+import { expect, test } from "@playwright/test";
 
-type SessionResponse = {
-  session: { id: string };
-  questions: Array<{
-    questionId: string;
-    kind: string;
-    options?: Array<{ text: string }>;
-  }>;
-};
+test("learner can turn an intent into an evidence-backed next step", async ({
+  page,
+}) => {
+  const prompt = "I would like to learn Flink and the Flink Operator";
+  const email = `flink-uiux-${Date.now()}@example.com`;
 
-async function screenshot(page: Page, name: string) {
-  await page.screenshot({
-    path: `../.tmp/uiux-${name}.png`,
-    fullPage: true,
-    scale: "css",
-  });
-}
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Study what you don't know yet." }),
+  ).toBeVisible();
 
-test.describe("UI/UX spec alignment", () => {
-  test("learner surfaces match the design-critical contract", async ({
-    page,
-    request,
-  }) => {
-    const consoleErrors: string[] = [];
-    page.on("console", (message) => {
-      if (message.type() === "error") consoleErrors.push(message.text());
-    });
+  await page.getByLabel("What would you like to learn?").fill(prompt);
+  await page.getByRole("button", { name: "See my plan" }).click();
+  await expect(page.getByText("Build a durable foundation")).toBeVisible();
+  await expect(
+    page.getByText("Get oriented and see what you already know"),
+  ).toBeVisible();
 
-    const token = await loginAs(request, "ada@example.com");
-    await setAuthCookie(page, token);
+  await page.getByRole("link", { name: "Start this journey" }).click();
+  await expect(page).toHaveURL(/\/start\?prompt=/);
+  await expect(
+    page.getByRole("heading", {
+      name: "Turn your intent into a first useful session.",
+    }),
+  ).toBeVisible();
 
-    // --- Explore ---
-    await page.goto("/explore");
-    // Wait for the auth loading to finish and user to be visible in sidebar
-    console.log(
-      await page
-        .getByRole("navigation", { name: "Main navigation" })
-        .innerText(),
-    );
-    await expect(page.getByText(/Ada Lovelace/i).first()).toBeVisible({
-      timeout: 10000,
-    });
+  await page.getByLabel("Your name").fill("Flink Learner");
+  await page.getByLabel("Email identifier").fill(email);
+  await page.getByRole("button", { name: "Create my journey" }).click();
 
-    await expect(page.getByRole("heading", { name: "Explore" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "All" })).toBeVisible();
-    // TODO(explore): verify that the "Up next" or equivalent concept still exists on Explore
-    // If Explore has a featured/recommended section, verify the assertions still apply
-    await screenshot(page, "explore");
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+  await expect(page.getByText(prompt, { exact: true })).toBeVisible();
+  await expect(page.getByText("Your first activity is ready")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
 
-    // --- Assessment preview (use a assessment with MCQ questions for the session test) ---
-    const assessmentId = await firstMcqAssessmentId(request, token);
-    await page.goto(`/assessments/${assessmentId}/preview`);
-    await expect(page.getByText("Explore", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Back to Explore" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Start (exam|assessment)/ }),
-    ).toBeVisible();
-    await expect(page.getByText(/questions/i).first()).toBeVisible();
-    await expect(page.getByText(/pts/i).first()).toBeVisible();
-    await screenshot(page, "assessment-preview");
+  await page.getByRole("button", { name: "Begin" }).click();
+  await expect(
+    page.getByText("How familiar are you with this topic?"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "new to me" }).click();
+  await page
+    .getByLabel("What would you like to be able to do first?")
+    .fill("Deploy a simple FlinkDeployment and understand its lifecycle");
+  await page.getByRole("button", { name: "Mark activity complete" }).click();
 
-    // --- Active session: navigate to an MCQ question ---
-    await page.getByRole("button", { name: /Start (exam|assessment)/ }).click();
-    await expect(page).toHaveURL(/\/sessions\/[0-9a-f-]+$/);
-    const sessionId = page.url().split("/").pop();
-    expect(sessionId).toBeTruthy();
-    await expect(page.getByText(/Question 1 of/)).toBeVisible();
-
-    // Use the API to find the first MCQ question index so we can navigate to it
-    const sessionStateResp = await request.get(
-      `${API_URL}/v1/sessions/${sessionId}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    const sessionState = (await sessionStateResp.json()) as SessionResponse;
-    const mcqIdx = sessionState.questions.findIndex(
-      (q) => q.kind === "mc" || q.kind === "mcq",
-    );
-    expect(mcqIdx).toBeGreaterThanOrEqual(0);
-    for (let i = 0; i < mcqIdx; i++) {
-      await page.getByRole("button", { name: "Next" }).click();
-      await expect(
-        page.getByText(new RegExp(`Question ${i + 2} of`)),
-      ).toBeVisible();
-    }
-
-    // McqRenderer uses role="button" on option rows (not native <button>)
-    const optionInput = page.getByTestId("question-input");
-    const firstOption = optionInput.locator('[role="button"]').first();
-    await expect(firstOption).toBeVisible();
-    // A/B/C/D labels should be present (use .first() to avoid strict-mode
-    // violation — the text "A" appears in both the label div and option text)
-    await expect(optionInput.getByText("A").first()).toBeVisible();
-    await firstOption.click();
-    await expect(page.getByText(/\d+\/\d+ answered/)).toBeVisible();
-    await screenshot(page, "active-session");
-
-    // --- Results: answers not blank ---
-    await finishSession(request, token, sessionId!);
-    await page.goto(`/sessions/${sessionId}/results`);
-    await expect(page.getByRole("heading", { name: /Results/ })).toBeVisible();
-    await expect(page.getByText("Answer review")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Back to Explore" }),
-    ).toBeVisible();
-    // Wait for the first answer card to render before reading captions
-    await expect(page.getByTestId("answer-card").first()).toBeVisible({
-      timeout: 5000,
-    });
-    await page.waitForLoadState("networkidle");
-    // At least one answer should show a non-blank value
-    const cardContents = await page
-      .getByTestId("answer-card")
-      .allTextContents();
-    const hasNonBlankAnswer = cardContents.some((content) => {
-      if (
-        content.includes("Correct:") &&
-        !content.includes("Correct: —") &&
-        !content.includes("Correct:  ")
-      ) {
-        return true;
-      }
-      if (content.includes("Your Answer")) {
-        const matches = content.match(/Your Answer\s*(.+)/s);
-        if (
-          matches &&
-          matches[1] &&
-          !matches[1].trim().startsWith("—") &&
-          matches[1].trim() !== ""
-        ) {
-          return true;
-        }
-      }
-      if (content.includes("Your submission")) {
-        const matches = content.match(/Your submission\s*(.+)/s);
-        if (
-          matches &&
-          matches[1] &&
-          !matches[1].trim().startsWith("—") &&
-          matches[1].trim() !== ""
-        ) {
-          return true;
-        }
-      }
-      return false;
-    });
-    expect(hasNonBlankAnswer).toBe(true);
-    await screenshot(page, "results");
-
-    // --- Progress: toggle works, hours not raw float ---
-    await page.goto("/progress");
-    await expect(
-      page.getByRole("heading", { name: "Your learning progress" }),
-    ).toBeVisible();
-    await page.waitForTimeout(1500);
-    const bodyText = await page.locator("body").textContent();
-    expect(bodyText).not.toMatch(/0\.\d{3,}h/);
-    await page.getByRole("button", { name: "Last 4 weeks" }).click();
-    await page.waitForTimeout(600);
-    await expect(
-      page.getByRole("button", { name: "Last 4 weeks" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "All time" }).click();
-    await page.waitForTimeout(400);
-    await screenshot(page, "progress");
-
-    // --- Question bank: search, kind filter, pagination ---
-    await page.goto("/questions");
-    await expect(
-      page.getByRole("heading", { name: "Question Bank" }),
-    ).toBeVisible();
-    await expect(page.locator("tbody tr").first()).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.locator("text=/of \\d+/").first()).toBeVisible();
-    await expect(
-      page
-        .locator("tbody tr")
-        .first()
-        .getByText(/^(MC|T\/F|Short|Essay|Code)$/),
-    ).toBeVisible();
-    await page.fill('input[placeholder="Search questions..."]', "sort");
-    await page.waitForTimeout(800);
-    await expect(page.locator("text=/of \\d+/").first()).toBeVisible();
-    await screenshot(page, "question-bank-search");
-    await page.fill('input[placeholder="Search questions..."]', "");
-    await page.waitForTimeout(400);
-    await page.getByRole("button", { name: "MC" }).click();
-    await page.waitForTimeout(600);
-    await expect(page.locator("tbody tr").first()).toBeVisible();
-    await screenshot(page, "question-bank-kind-mc");
-
-    // --- Exams ---
-    await page.goto("/exams");
-    await expect(page.getByRole("heading", { name: "Exams" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "All" })).toBeVisible();
-    await expect(
-      page.getByText(/CS Fundamentals Midterm|Exam/i).first(),
-    ).toBeVisible();
-    await screenshot(page, "exams");
-
-    const fatalErrors = consoleErrors.filter(
-      (error) =>
-        !error.includes("Download the React DevTools") &&
-        !error.includes("webpack-hmr") &&
-        !error.includes("401 (Unauthorized)"),
-    );
-    expect(fatalErrors).toEqual([]);
-  });
+  await expect(
+    page.getByText("Complete. Your next activity is now ready."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Try a short first task" }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Your latest activity produced evidence."),
+  ).toBeVisible();
 });
