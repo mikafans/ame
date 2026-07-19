@@ -1,0 +1,41 @@
+{$AME_HOSTNAME} {
+    # Public machine-readable documents are static repository artifacts.
+    handle /public/llms.txt {
+        root * /srv/docs
+        file_server
+    }
+
+    handle /public/skill.json {
+        root * /srv/docs
+        file_server
+    }
+
+    handle /public/openapi.yaml {
+        root * /srv/docs
+        file_server
+    }
+
+    handle /api/* {
+        reverse_proxy api:8080
+    }
+
+    handle /public/v1/* {
+        reverse_proxy api:8080
+    }
+
+    handle /healthz {
+        reverse_proxy api:8080
+    }
+
+    handle /readyz {
+        reverse_proxy api:8080
+    }
+
+    handle /metrics {
+        reverse_proxy api:8080
+    }
+
+    handle {
+        reverse_proxy web:3000
+    }
+}

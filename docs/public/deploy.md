@@ -10,16 +10,17 @@ For a complete single-host installation, see [`self-hosting.md`](self-hosting.md
 
 - `api/Dockerfile` — multi-stage Rust build, ~50 MB Debian-slim runtime.
 - `web/Dockerfile` — multi-stage Next.js standalone build, runs on Node 22.
-- `docker-compose.prod.yml` (repo root) — Postgres + Valkey + API + web with
-  healthchecks and embedded API migrations.
+- `docker-compose.prod.yml` (repo root) — Postgres + Valkey + API + web +
+  containerized Caddy with healthchecks and embedded API migrations.
 
 ## Smoke deploy (single host)
 
 ```bash
 cp .env.example .env
-# Set at minimum: POSTGRES_PASSWORD, NEXT_PUBLIC_API_URL
+# Set at minimum: POSTGRES_PASSWORD, AME_HOSTNAME, NEXT_PUBLIC_API_URL,
+# AME_CORS_ORIGINS
 docker compose -f docker-compose.prod.yml up --build -d
-docker compose -f docker-compose.prod.yml logs -f api
+docker compose -f docker-compose.prod.yml logs -f caddy
 ```
 
 Or via the Makefile shortcuts:
@@ -40,12 +41,12 @@ old data separately and start the new deployment with a fresh database.
 Before pointing real users at a deployment:
 
 - [ ] `POSTGRES_PASSWORD` is rotated from the example value.
-- [ ] Terminate TLS at a reverse proxy (Caddy, nginx, Envoy, cloudflared). The
-      API speaks plain HTTP.
+- [ ] Set `AME_HOSTNAME` to the public DNS name so the Caddy container can
+      terminate TLS. The API speaks plain HTTP inside the Compose network.
 - [ ] `AME_CORS_ORIGINS` is set to your frontend origin(s), comma-separated. It
       defaults to `http://localhost:3000`; setting it to `*` re-enables permissive
       CORS (credentials are then disallowed per the CORS spec).
-- [ ] Add a rate limiter in front of `/public/v1/auth/login`,
+- [ ] Confirm the API's configured rate limits for `/public/v1/auth/login`,
       `/public/v1/auth/register`, and `/public/v1/onboarding/start`.
 - [ ] Configure log shipping — the API logs structured tracing to stdout.
 - [ ] Back up `pgdata` volume on a schedule.

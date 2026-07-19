@@ -14,7 +14,7 @@ test("sign up CTA opens the account creation form", async ({ page }) => {
 test("visitor can preview a first learning journey from an intent", async ({
   page,
 }) => {
-  await page.route("**/v1/onboarding/preview", async (route) => {
+  await page.route("**/public/v1/onboarding/preview", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

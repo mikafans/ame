@@ -1,116 +1,53 @@
-project: ame-platform
-description: Assessment/exam SaaS — Rust API + Bun/Next.js frontend
+project: ame
+version: 0.3.0
+description: Agent-first, self-hostable learning platform with one owner-scoped learner API.
 
-# --- Runtime ports ---
-ports:
-  api: 8080
-  frontend: 3000
-  postgres: 5432
+runtime:
+  local_origin: http://localhost:28800
+  services:
+    postgres: postgres:18
+    valkey: valkey:8
+    api: rust-axum
+    web: nextjs-react
+    caddy: caddy:2.10-alpine
+  compose:
+    development: docker-compose.local.yml
+    production: docker-compose.prod.yml
 
-# --- Backend ---
 api:
-  language: Rust
-  edition: "2024"
-  binary: ame-api
-  framework: axum 0.8
-  async: tokio 1.x (full features)
-  db:
-    driver: sqlx 0.8.3
-    features: [postgres, uuid, time, json]
-    engine: PostgreSQL 18 (Docker)
-    migrations: db/migrations/ (single squash: 20260521200000_squash.sql)
-    cli: sqlx-cli (cargo install sqlx-cli --features postgres)
-    table_prefix: tb_  # all tables use tb_ prefix (e.g. tb_users, tb_sessions)
-  auth:
-    mechanism: custom token (UUID v7 + HMAC-SHA256 hex suffix)
-    hashing: argon2
-    scope_system: true  # RequireAnyScope<...> guards on routes
-  openapi:
-    generator: utoipa 5 (via gen-openapi binary)
-    snapshot: api/openapi.yaml  # committed to git; drift fails CI
-    serve: GET /openapi.json
-  http:
-    middleware: tower-http (trace, cors)
-  key_deps:
-    - serde / serde_json
-    - uuid (v4 + v7)
-    - time 0.3
-    - anyhow / thiserror
-    - reqwest 0.12 (rustls, used in tests)
-  test_suites:
-    unit: cargo test (inline)
-    integration: api/tests/*.rs (requires AME_RUN_DB_TESTS=1 + db-up)
-      files: [auth, bank, exams, health, planner, sessions, shares, stats]
-  module_boundaries:
-    - engine/ and assess/ may depend on bank/ and domain/
-    - reverse dependencies forbidden
+  authenticated_prefix: /api/v1
+  public_prefix: /public/v1
+  operational_paths: [/healthz, /readyz, /metrics]
+  static_public_paths:
+    - /public/llms.txt
+    - /public/skill.json
+    - /public/openapi.yaml
+  authentication: learner bearer token or browser session cookie
+  agent_model: agents use the same learner-owned API; no agent account or scope layer
+  generated_contracts:
+    openapi: api/openapi.yaml
+    frontend_types: web/src/api/generated/schema.d.ts
+    public_manifest: docs/public/skill.json
 
-# --- Frontend ---
-frontend:
-  runtime: Bun (latest via mise)
-  framework: Next.js 16.2 (App Router)
-  language: TypeScript 5.7 (strict, noEmit)
-  react: "19.x"
-  ui_library: Tailwind CSS v4 + local shadcn-style primitives
-  styling:
-    system: Tailwind utility classes + CSS variables
-    css_baseline: Tailwind base layer
-    tailwind: active
-  fonts: Inter via Google Fonts
-  api_client:
-    codegen: openapi-typescript 7.x → web/src/api/generated/schema.d.ts
-    client: openapi-fetch 0.17
-    regen: bun run api:gen  # or make openapi
-  path_alias: "@" → web/src/
-  test:
-    unit: bun test src/
-    e2e: Playwright (@playwright/test 1.60)
-      runner: bunx playwright test
-      specs: web/e2e/  # learner-flow, uiux-spec, plan10-author-agent, roles/
-      focused_uiux: make uiux  # runs uiux-spec.spec.ts only
+data:
+  database: PostgreSQL 18
+  cache: Valkey 8
+  migrations: db/migrations/20260719000000_learning_baseline.sql
+  policy: fresh 0.3 baseline; no compatibility migration
+  durable_resources:
+    - learners and login sessions
+    - goals, journeys, objectives, and activities
+    - versioned questions and assessments
+    - attempts, answers, grading, and evidence
+    - deep dives, recommendations, mastery, and streak events
 
-# --- Database ---
-database:
-  engine: PostgreSQL 18
-  docker_compose: db/docker-compose.yml
-  container: ame-postgres
-  url: postgres://postgres:postgres@localhost:5432/ame
-  data_volume: /tmp/ame-db-data  # local dev only
-  seed_script: uv run --script scripts/seed.py  # inline deps, not uv run scripts/seed.py
+verification:
+  unit_and_contract: make check
+  api_black_box: uv run pytest api_tests -v
+  browser: make local-uiux
+  full_stack: make local-up
+  public_contract_source: docs/public/
 
-# --- Tooling ---
-tooling:
-  env_manager: mise  # wraps all commands: mise exec -- <cmd>
-  nix: devShell (tools come from here first)
-  task_runner: make  # see Makefile for all targets
-  python: uv (scripts/seed.py, api_tests/, sqlfluff)
-  sql_linter: sqlfluff (via uvx sqlfluff)
-  formatter: prettier (web), cargo fmt (api)
-  linter: eslint (web), cargo clippy -D warnings (api)
-
-# --- Make targets (key ones) ---
-make_targets:
-  check: "fmt-check + lint + unit tests  [pre-commit gate]"
-  ci: "check + test-db + e2e  [full CI gate]"
-  dev: "db-up + migrate + start API (:8080) + frontend (:3000)"
-  stop: "kill :8080/:3000 + docker-compose down"
-  db-reset: "wipe /tmp/ame-db-data, recreate, migrate"
-  db-seed: "uv run scripts/seed.py  (requires API running)"
-  test-db: "DB-backed integration tests (requires db-up)"
-  e2e: "Playwright full suite"
-  uiux: "focused uiux-spec.spec.ts only"
-  openapi: "regenerate api/openapi.yaml + web schema.d.ts"
-  simulate: "run all three role simulation scripts"
-
-# --- Seed credentials (local dev) ---
-dev_accounts:
-  ada:  { email: ada@example.com,    password: password123 }
-  mira: { email: mira@example.com, password: password123 }
-
-# --- Key conventions ---
-conventions:
-  temp_files: /tmp  # user prefers /tmp for local dev artifacts
-  commits: "conventional commits: feat:, fix:, chore:, deploy:  (no emojis)"
-  staging: "git add <specific files> only — never git add -A"
-  worktrees: git worktrees under project root for feature isolation
-  no_demo_mode: "DEMO_MODE removed in PR 9; auth via real seed users only"
+documentation:
+  plan: docs/plans/2026-07-19-agent-first-learning-rework.md
+  public_operator_docs: docs/public/
