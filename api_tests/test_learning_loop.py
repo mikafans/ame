@@ -88,6 +88,13 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert assessment_response.status_code == 200, assessment_response.text
     assessment = assessment_response.json()
+    discovered_assessment = client.get(
+        "/api/v1/assessments",
+        params={"activityId": activity_id},
+        headers=headers,
+    )
+    assert discovered_assessment.status_code == 200, discovered_assessment.text
+    assert discovered_assessment.json()["id"] == assessment["id"]
     assert client.get(
         f"/api/v1/assessments/{assessment['id']}", headers=headers
     ).status_code == 200

@@ -297,6 +297,24 @@
       "path": "/api/v1/assessments/{assessment_id}"
     },
     {
+      "description": "Discover the learner-owned assessment attached to an activity before starting it.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.assessment.get_for_activity",
+      "path": "/api/v1/assessments?activityId={activity_id}"
+    },
+    {
       "description": "Start or resume an attempt against one immutable assessment version.",
       "input_schema": {
         "properties": {

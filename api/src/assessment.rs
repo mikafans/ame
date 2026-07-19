@@ -30,6 +30,12 @@ pub trait AssessmentRepository: Send + Sync {
         subject_user_id: Uuid,
         assessment_id: Uuid,
     ) -> Result<Assessment, AssessmentRepositoryError>;
+
+    async fn get_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Option<Assessment>, AssessmentRepositoryError>;
 }
 
 #[derive(Clone, Default)]
@@ -101,6 +107,24 @@ impl AssessmentRepository for InMemoryAssessmentRepository {
             return Err(AssessmentRepositoryError::SubjectMismatch);
         }
         Ok(assessment.clone())
+    }
+
+    async fn get_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Option<Assessment>, AssessmentRepositoryError> {
+        let assessments = self
+            .assessments
+            .lock()
+            .map_err(|error| AssessmentRepositoryError::Storage(error.to_string()))?;
+        Ok(assessments
+            .values()
+            .find(|assessment| {
+                assessment.activity_id == activity_id
+                    && assessment.subject_user_id == subject_user_id
+            })
+            .cloned())
     }
 }
 

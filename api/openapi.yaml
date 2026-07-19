@@ -190,6 +190,28 @@ paths:
       security:
       - bearer: []
   /api/v1/assessments:
+    get:
+      tags:
+      - assessments
+      operationId: get_assessment_for_activity
+      parameters:
+      - name: activityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Assessment attached to the activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+        '404':
+          description: No assessment exists for this learner's activity
+      security:
+      - bearer: []
     post:
       tags:
       - assessments
@@ -910,6 +932,14 @@ components:
         properties:
           Internal:
             type: string
+    AssessmentActivityQuery:
+      type: object
+      required:
+      - activityId
+      properties:
+        activityId:
+          type: string
+          format: uuid
     AssessmentItemBody:
       type: object
       required:

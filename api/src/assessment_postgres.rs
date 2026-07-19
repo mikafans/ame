@@ -133,6 +133,41 @@ impl AssessmentRepository for PgAssessmentRepository {
         .collect();
         assessment_from_row(&row, items)
     }
+
+    async fn get_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Option<Assessment>, AssessmentRepositoryError> {
+        let row = sqlx::query(
+            "SELECT id, subject_user_id, source_actor_id, activity_id, version, mode, status, created_at FROM tb_assessments WHERE activity_id = $1 AND subject_user_id = $2",
+        )
+        .bind(activity_id)
+        .bind(subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let assessment_id: Uuid = row.get("id");
+        let items = sqlx::query(
+            "SELECT id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
+        )
+        .bind(assessment_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .into_iter()
+        .map(|item| AssessmentItemInput {
+            id: item.get("id"),
+            question_version_id: item.get("question_version_id"),
+            order_index: item.get("order_index"),
+            points: item.get::<i32, _>("points_override") as u32,
+        })
+        .collect();
+        Ok(Some(assessment_from_row(&row, items)?))
+    }
 }
 
 fn assessment_from_row(

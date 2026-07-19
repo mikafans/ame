@@ -103,7 +103,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_assessment_for_activity"];
         put?: never;
         post: operations["create_assessment"];
         delete?: never;
@@ -555,6 +555,10 @@ export interface components {
             Validation: components["schemas"]["FieldError"][];
         } | "SessionFinished" | "LearningSessionResultConflict" | "IdempotencyConflict" | "TooManyRequests" | "Maintenance" | {
             Internal: string;
+        };
+        AssessmentActivityQuery: {
+            /** Format: uuid */
+            activityId: string;
         };
         AssessmentItemBody: {
             /** Format: int32 */
@@ -1289,6 +1293,35 @@ export interface operations {
                 content?: never;
             };
             /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_assessment_for_activity: {
+        parameters: {
+            query: {
+                activityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment attached to the activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentResponse"];
+                };
+            };
+            /** @description No assessment exists for this learner's activity */
             404: {
                 headers: {
                     [name: string]: unknown;

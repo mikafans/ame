@@ -96,6 +96,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["assessmentId"],"properties":{"assessmentId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.assessment.get_for_activity",
+            "Discover the learner-owned assessment attached to an activity before starting it.",
+            "GET",
+            "/api/v1/assessments?activityId={activity_id}",
+            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.attempt.start",
             "Start or resume an attempt against one immutable assessment version.",
             "POST",

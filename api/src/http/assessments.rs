@@ -2,7 +2,7 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -61,11 +61,45 @@ pub struct AssessmentItemResponse {
     pub points: u32,
 }
 
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentActivityQuery {
+    pub activity_id: Uuid,
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/assessments", post(create_assessment))
+        .route("/v1/assessments", get(get_assessment_for_activity))
         .route("/v1/assessments/{assessment_id}", get(get_assessment))
         .with_state(state)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/assessments",
+    params(AssessmentActivityQuery),
+    responses(
+        (status = 200, description = "Assessment attached to the activity", body = AssessmentResponse),
+        (status = 404, description = "No assessment exists for this learner's activity")
+    ),
+    security(("bearer" = [])),
+    tag = "assessments"
+)]
+pub async fn get_assessment_for_activity(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Query(query): Query<AssessmentActivityQuery>,
+) -> Result<Json<AssessmentResponse>, ApiError> {
+    let assessment = PgAssessmentRepository::new(state.pool)
+        .get_for_activity(auth.owner_id(), query.activity_id)
+        .await
+        .map_err(map_assessment_error)?
+        .ok_or(ApiError::NotFound {
+            resource: "assessment",
+        })?;
+    Ok(Json(assessment_response(assessment)))
 }
 
 #[utoipa::path(
