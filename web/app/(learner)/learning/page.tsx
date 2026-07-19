@@ -25,6 +25,8 @@ type JourneySummary = {
 };
 
 type Snapshot = { mastery: number; confidence: number; evidenceCount: number };
+type Objective = { id: string; statement: string };
+type ObjectiveProgress = { objective: Objective; snapshot: Snapshot | null };
 type StreakEvent = { qualifyingDay: string };
 type TimelineEvent = {
   kind: string;
@@ -36,6 +38,9 @@ export default function LearningHomePage() {
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<Record<string, Snapshot>>({});
+  const [objectiveProgress, setObjectiveProgress] = useState<
+    Record<string, ObjectiveProgress[]>
+  >({});
   const [streaks, setStreaks] = useState<Record<string, number>>({});
   const [timelines, setTimelines] = useState<Record<string, TimelineEvent[]>>(
     {},
@@ -78,35 +83,35 @@ export default function LearningHomePage() {
                 )
               : [],
           );
-          const objective = (
-            data as { objectives?: { id: string }[] } | undefined
-          )?.objectives?.[0];
           if (!response.ok) return null;
-          if (!objective) {
-            return {
-              journeyId: journey.id,
-              snapshot: null,
-              streakDays,
-              timeline:
-                timelineResponse.response.ok && timelineResponse.data
-                  ? (timelineResponse.data as TimelineEvent[])
-                  : [],
-            };
-          }
-          const snapshot = await api.GET(
-            "/api/v1/progress/{journey_id}/objectives/{objective_id}",
-            {
-              params: {
-                path: { journey_id: journey.id, objective_id: objective.id },
-              },
-            },
+          const objectives = ((data as { objectives?: Objective[] })
+            .objectives ?? []);
+          const objectiveProgress = await Promise.all(
+            objectives.map(async (objective) => {
+              const snapshot = await api.GET(
+                "/api/v1/progress/{journey_id}/objectives/{objective_id}",
+                {
+                  params: {
+                    path: {
+                      journey_id: journey.id,
+                      objective_id: objective.id,
+                    },
+                  },
+                },
+              );
+              return {
+                objective,
+                snapshot:
+                  snapshot.response.ok && snapshot.data
+                    ? (snapshot.data as Snapshot)
+                    : null,
+              };
+            }),
           );
           return {
             journeyId: journey.id,
-            snapshot:
-              snapshot.response.ok && snapshot.data
-                ? (snapshot.data as Snapshot)
-                : null,
+            snapshot: objectiveProgress[0]?.snapshot ?? null,
+            objectiveProgress,
             streakDays,
             timeline:
               timelineResponse.response.ok && timelineResponse.data
@@ -126,6 +131,15 @@ export default function LearningHomePage() {
                 value.snapshot !== null,
             )
             .map((value) => [value.journeyId, value.snapshot]),
+        ),
+      );
+      setObjectiveProgress(
+        Object.fromEntries(
+          results
+            .filter(
+              (value): value is NonNullable<typeof value> => value !== null,
+            )
+            .map((value) => [value.journeyId, value.objectiveProgress]),
         ),
       );
       setStreaks(
@@ -242,6 +256,38 @@ export default function LearningHomePage() {
           ))}
         </section>
       )}
+
+      <section className="space-y-4">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            Signals, not guesses
+          </p>
+          <h2 className="mt-2 text-2xl font-bold">Objective progress</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Each objective keeps its own evidence-backed signal as you learn.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {journeys.flatMap((journey) =>
+            (objectiveProgress[journey.id] ?? []).map(
+              ({ objective, snapshot }) => (
+                <div
+                  key={objective.id}
+                  data-testid={`objective-progress-${objective.id}`}
+                  className="rounded-2xl border border-border bg-card p-5"
+                >
+                  <p className="font-medium leading-6">{objective.statement}</p>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {snapshot
+                      ? `${Math.round(snapshot.mastery * 100)}% signal · ${snapshot.evidenceCount} evidence`
+                      : "No signal yet"}
+                  </p>
+                </div>
+              ),
+            ),
+          )}
+        </div>
+      </section>
 
       {!loading && journeys.length > 0 && (
         <section className="grid gap-4 sm:grid-cols-3">
