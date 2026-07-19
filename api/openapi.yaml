@@ -1379,60 +1379,6 @@ paths:
           description: Email already belongs to a learner
         '422':
           description: Validation failed
-  /v1/plans:
-    post:
-      tags:
-      - crate::http::plans
-      operationId: create_plan
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePlanBody'
-        required: true
-      responses:
-        '201':
-          description: Study plan created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StudyPlan'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/plans/{id}:
-    get:
-      tags:
-      - crate::http::plans
-      operationId: get_plan
-      parameters:
-      - name: id
-        in: path
-        description: Plan id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Study plan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StudyPlan'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '404':
-          description: Not found
-      security:
-      - bearer_auth: []
   /v1/questions:
     get:
       tags:
@@ -2983,18 +2929,6 @@ components:
           format: uuid
         secret:
           type: string
-    CreatePlanBody:
-      type: object
-      required:
-      - goal
-      properties:
-        goal:
-          type: string
-        lookbackDays:
-          type:
-          - integer
-          - 'null'
-          format: int64
     CreateQuestionsBody:
       type: object
       required:
@@ -4281,64 +4215,6 @@ components:
         userId:
           type: string
           format: uuid
-    StudyPlan:
-      type: object
-      required:
-      - id
-      - user_id
-      - goal
-      - lookback_days
-      - generated_at
-      - weeks
-      properties:
-        generated_at:
-          type: string
-          format: date-time
-        goal:
-          type: string
-        id:
-          type: string
-          format: uuid
-        lookback_days:
-          type: integer
-          format: int64
-        user_id:
-          type: string
-          format: uuid
-        weeks:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyPlanWeek'
-    StudyPlanItem:
-      type: object
-      required:
-      - kind
-      - ref_id
-      - hours_est
-      properties:
-        hours_est:
-          type: number
-          format: double
-        kind:
-          type: string
-        ref_id:
-          type: string
-    StudyPlanWeek:
-      type: object
-      required:
-      - week_num
-      - focus
-      - items
-      properties:
-        focus:
-          type: string
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyPlanItem'
-        week_num:
-          type: integer
-          minimum: 0
     Tag:
       type: object
       required:

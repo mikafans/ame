@@ -114,23 +114,6 @@ test.describe("agent management (owner API)", () => {
     expect(stats).toHaveProperty("current_streak");
   });
 
-  test("owner can create and retrieve a study plan", async ({ request }) => {
-    const cr = await request.post(`${API_URL}/v1/plans`, {
-      headers: { Authorization: `Bearer ${ownerToken}` },
-      data: { goal: "e2e plan goal", lookbackDays: 7 },
-    });
-    expect([200, 201]).toContain(cr.status());
-    const planId = (await cr.json()).id;
-
-    const gr = await request.get(`${API_URL}/v1/plans/${planId}`, {
-      headers: { Authorization: `Bearer ${ownerToken}` },
-    });
-    expect(gr.status()).toBe(200);
-    const plan = await gr.json();
-    expect(plan.weeks).toBeDefined();
-    expect(plan.weeks.length).toBeGreaterThan(0);
-  });
-
   test("owner can revoke (delete) the agent", async ({ request }) => {
     // agentId may be undefined if the create step captured it; skip gracefully
     if (!agentId) {

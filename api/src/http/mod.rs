@@ -147,7 +147,6 @@ pub mod me;
 pub mod messages;
 pub mod onboarding;
 pub mod openapi;
-pub mod plans;
 pub mod questions;
 pub mod quota;
 pub mod sessions;
@@ -212,7 +211,6 @@ pub fn router(pool: PgPool) -> Router {
         .merge(sessions::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(me::router(state.clone()))
-        .merge(plans::router(state.clone()))
         .merge(agents::logged_router(state.clone()))
         .merge(messages::router(state.clone()))
         .route("/v1/me/export", axum::routing::get(export::export_data))

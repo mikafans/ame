@@ -639,38 +639,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/plans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["create_plan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/plans/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_plan"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/questions": {
         parameters: {
             query?: never;
@@ -1282,11 +1250,6 @@ export interface components {
             id: string;
             secret: string;
         };
-        CreatePlanBody: {
-            goal: string;
-            /** Format: int64 */
-            lookbackDays?: number | null;
-        };
         CreateQuestionsBody: {
             questions: components["schemas"]["QuestionInsert"][];
         };
@@ -1782,29 +1745,6 @@ export interface components {
             token: string;
             /** Format: uuid */
             userId: string;
-        };
-        StudyPlan: {
-            /** Format: date-time */
-            generated_at: string;
-            goal: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: int64 */
-            lookback_days: number;
-            /** Format: uuid */
-            user_id: string;
-            weeks: components["schemas"]["StudyPlanWeek"][];
-        };
-        StudyPlanItem: {
-            /** Format: double */
-            hours_est: number;
-            kind: string;
-            ref_id: string;
-        };
-        StudyPlanWeek: {
-            focus: string;
-            items: components["schemas"]["StudyPlanItem"][];
-            week_num: number;
         };
         Tag: {
             /** Format: date-time */
@@ -3711,95 +3651,6 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_plan: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreatePlanBody"];
-            };
-        };
-        responses: {
-            /** @description Study plan created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyPlan"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_plan: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Plan id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Study plan */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyPlan"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not found */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -23,7 +23,6 @@ use crate::{
     engine::{
         elo::{QuestionRating, UserTagRating},
         graders::GradeOutcome,
-        planner::StudyPlan,
         sessions::SessionResult,
     },
     http::{
@@ -52,7 +51,6 @@ use crate::{
             UpdateAgentBody,
         },
         onboarding::{StartLearningBody, StartLearningResponse},
-        plans::CreatePlanBody,
         questions::{
             CreateQuestionsBody, CreateQuestionsResponse, ListQuestionsResponse,
             QuestionDeepenResponse,
@@ -112,8 +110,6 @@ use crate::{
         crate::http::sessions::finish,
         crate::http::sessions::list_pending_attempts,
         crate::http::sessions::grade_attempt,
-        crate::http::plans::create_plan,
-        crate::http::plans::get_plan,
         crate::http::tags::list_tags,
         crate::http::admin::list_users,
         crate::http::admin::patch_user_admin,
@@ -201,8 +197,6 @@ use crate::{
         PatchSessionBody,
         GradeOutcome,
         SessionResult,
-        StudyPlan,
-        CreatePlanBody,
         ListUsersResponse,
         PatchUserAdminBody,
         TokenEntry,
