@@ -216,7 +216,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get_for_activity"];
         put?: never;
         post: operations["create"];
         delete?: never;
@@ -672,6 +672,10 @@ export interface components {
             rationale?: string | null;
             reviewStatus?: components["schemas"]["ContentReviewStatus"];
             sourceReferences?: string[];
+        };
+        DeepDiveActivityQuery: {
+            /** Format: uuid */
+            activityId: string;
         };
         DeepDiveResponse: {
             /** Format: uuid */
@@ -1488,6 +1492,35 @@ export interface operations {
         responses: {
             /** @description Logged out */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_for_activity: {
+        parameters: {
+            query: {
+                activityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deep dive attached to the activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDiveResponse"];
+                };
+            };
+            /** @description No deep dive exists for this learner's activity */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

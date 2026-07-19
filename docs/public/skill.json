@@ -547,6 +547,24 @@
       "path": "/api/v1/deep-dives"
     },
     {
+      "description": "Discover the source-backed deep dive attached to an activity.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.deep_dive.get_for_activity",
+      "path": "/api/v1/deep-dives?activityId={activity_id}"
+    },
+    {
       "description": "Read one source-backed deep dive owned by the learner.",
       "input_schema": {
         "properties": {

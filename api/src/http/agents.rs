@@ -159,6 +159,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["journeyId","activityId","objectiveId","triggeringEvidenceId","title","body","example","sourceReferences","applicationTask"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"triggeringEvidenceId":{"type":"string","format":"uuid"},"title":{"type":"string"},"body":{"type":"string"},"example":{"type":"string"},"sourceReferences":{"type":"array"},"applicationTask":{"type":"string"}}}),
         ),
         endpoint(
+            "learning.deep_dive.get_for_activity",
+            "Discover the source-backed deep dive attached to an activity.",
+            "GET",
+            "/api/v1/deep-dives?activityId={activity_id}",
+            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.deep_dive.get",
             "Read one source-backed deep dive owned by the learner.",
             "GET",

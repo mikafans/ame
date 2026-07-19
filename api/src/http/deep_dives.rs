@@ -2,7 +2,7 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -55,11 +55,45 @@ pub struct DeepDiveResponse {
     pub content_version: u32,
 }
 
+#[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepDiveActivityQuery {
+    pub activity_id: Uuid,
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/deep-dives", post(create))
+        .route("/v1/deep-dives", get(get_for_activity))
         .route("/v1/deep-dives/{id}", get(get_one))
         .with_state(state)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/deep-dives",
+    params(DeepDiveActivityQuery),
+    responses(
+        (status = 200, description = "Deep dive attached to the activity", body = DeepDiveResponse),
+        (status = 404, description = "No deep dive exists for this learner's activity")
+    ),
+    security(("bearer" = [])),
+    tag = "deep-dives"
+)]
+pub async fn get_for_activity(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Query(query): Query<DeepDiveActivityQuery>,
+) -> Result<Json<DeepDiveResponse>, ApiError> {
+    let value = PgDeepDiveRepository::new(state.pool)
+        .get_for_activity(auth.owner_id(), query.activity_id)
+        .await
+        .map_err(map_error)?
+        .ok_or(ApiError::NotFound {
+            resource: "deep dive",
+        })?;
+    Ok(Json(response(value)))
 }
 
 #[utoipa::path(post, path = "/api/v1/deep-dives", request_body = CreateDeepDiveBody, responses((status = 200, body = DeepDiveResponse)), security(("bearer" = [])), tag = "deep-dives")]

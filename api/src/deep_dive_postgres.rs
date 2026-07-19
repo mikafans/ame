@@ -112,6 +112,63 @@ impl DeepDiveRepository for PgDeepDiveRepository {
             created_at: row.get("created_at"),
         })
     }
+
+    async fn get_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Option<DeepDive>, DeepDiveError> {
+        let row = sqlx::query(
+            "SELECT d.id, d.subject_user_id, d.source_actor_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.activity_id = $1 AND d.subject_user_id = $2",
+        )
+        .bind(activity_id)
+        .bind(subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        row.map(|row| deep_dive_from_row(&row)).transpose()
+    }
+}
+
+fn deep_dive_from_row(row: &sqlx::postgres::PgRow) -> Result<DeepDive, DeepDiveError> {
+    let body: serde_json::Value = row.get("body");
+    Ok(DeepDive {
+        id: row.get("id"),
+        input: CreateDeepDive {
+            subject_user_id: row.get("subject_user_id"),
+            source_actor_id: row.get("source_actor_id"),
+            journey_id: row.get("journey_id"),
+            activity_id: row.get("activity_id"),
+            objective_id: row.get("objective_id"),
+            triggering_evidence_id: row.get("triggering_evidence_id"),
+            title: body
+                .get("title")
+                .and_then(|value| value.as_str())
+                .unwrap_or("Deep dive")
+                .to_string(),
+            body: body
+                .get("body")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            example: body
+                .get("example")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            caveats: serde_json::from_value(body.get("caveats").cloned().unwrap_or_default())
+                .map_err(storage_error)?,
+            source_references: serde_json::from_value(row.get("source_references"))
+                .map_err(storage_error)?,
+            application_task: row
+                .get::<Option<serde_json::Value>, _>("application_task")
+                .and_then(|value| value.as_str().map(ToString::to_string))
+                .unwrap_or_default(),
+            review_status: parse_review_status(row.get("review_status"))?,
+        },
+        content_version: row.get::<i32, _>("content_version") as u32,
+        created_at: row.get("created_at"),
+    })
 }
 
 fn review_status_value(status: ContentReviewStatus) -> &'static str {

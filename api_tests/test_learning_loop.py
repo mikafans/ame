@@ -209,6 +209,13 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert deep_dive_response.status_code == 200, deep_dive_response.text
     deep_dive_id = deep_dive_response.json()["id"]
+    discovered_deep_dive = client.get(
+        "/api/v1/deep-dives",
+        params={"activityId": activity_id},
+        headers=headers,
+    )
+    assert discovered_deep_dive.status_code == 200, discovered_deep_dive.text
+    assert discovered_deep_dive.json()["id"] == deep_dive_id
     deep_dive = client.get(f"/api/v1/deep-dives/{deep_dive_id}", headers=headers)
     assert deep_dive.status_code == 200, deep_dive.text
 

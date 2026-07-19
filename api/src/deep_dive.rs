@@ -18,6 +18,11 @@ pub struct InMemoryDeepDiveRepository {
 pub trait DeepDiveRepository: Send + Sync {
     async fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError>;
     async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError>;
+    async fn get_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Option<DeepDive>, DeepDiveError>;
 }
 
 impl InMemoryDeepDiveRepository {
@@ -58,6 +63,24 @@ impl DeepDiveRepository for InMemoryDeepDiveRepository {
 
     async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError> {
         self.get(subject_user_id, id)
+    }
+
+    async fn get_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Option<DeepDive>, DeepDiveError> {
+        let deep_dives = self
+            .deep_dives
+            .lock()
+            .map_err(|error| DeepDiveError::Storage(error.to_string()))?;
+        Ok(deep_dives
+            .values()
+            .find(|deep_dive| {
+                deep_dive.input.activity_id == activity_id
+                    && deep_dive.input.subject_user_id == subject_user_id
+            })
+            .cloned())
     }
 }
 

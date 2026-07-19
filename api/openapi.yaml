@@ -363,6 +363,28 @@ paths:
         '200':
           description: Logged out
   /api/v1/deep-dives:
+    get:
+      tags:
+      - deep-dives
+      operationId: get_for_activity
+      parameters:
+      - name: activityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Deep dive attached to the activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveResponse'
+        '404':
+          description: No deep dive exists for this learner's activity
+      security:
+      - bearer: []
     post:
       tags:
       - deep-dives
@@ -1232,6 +1254,14 @@ components:
           type: array
           items:
             type: string
+    DeepDiveActivityQuery:
+      type: object
+      required:
+      - activityId
+      properties:
+        activityId:
+          type: string
+          format: uuid
     DeepDiveResponse:
       type: object
       required:
