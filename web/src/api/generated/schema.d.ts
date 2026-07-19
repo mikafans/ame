@@ -1677,7 +1677,6 @@ export interface components {
             email: string;
             name: string;
             password: string;
-            role: string;
         };
         /** @enum {string} */
         Role: "user" | "admin" | "agent";

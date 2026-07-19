@@ -4021,15 +4021,12 @@ components:
       - email
       - name
       - password
-      - role
       properties:
         email:
           type: string
         name:
           type: string
         password:
-          type: string
-        role:
           type: string
     Role:
       type: string

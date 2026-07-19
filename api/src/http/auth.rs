@@ -22,7 +22,6 @@ pub struct RegisterBody {
     pub email: String,
     pub name: String,
     pub password: String,
-    pub role: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -55,6 +54,22 @@ fn set_token_cookie_header(token: &str, secure: bool) -> String {
     // True cross-domain deploys (e.g. web and api on completely different domains)
     // will require SameSite=None and Secure to allow the cookie on subrequests.
     format!("ame_token={token}; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=2592000")
+}
+
+fn registration_error(error: sqlx::Error) -> ApiError {
+    if error
+        .as_database_error()
+        .and_then(|database| database.code())
+        .as_deref()
+        == Some("23505")
+    {
+        ApiError::Validation(vec![FieldError {
+            field: "email".into(),
+            message: "email already registered".into(),
+        }])
+    } else {
+        ApiError::Internal(error.into())
+    }
 }
 
 /// POST /v1/auth/register — register a new user with email and password.
@@ -97,52 +112,47 @@ pub async fn register(
         }]));
     }
 
-    // Validate role — only user is valid for human registration
-    let normalized_role = body.role.to_lowercase();
-    match normalized_role.as_str() {
-        "user" => {}
-        _ => {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "role".into(),
-                message: "must be 'user'".to_string(),
-            }]));
-        }
-    }
-
-    // Hash password
+    // Human registration always creates a learner; role elevation is an
+    // administrative action, never a client-controlled registration field.
     let password_hash = hash_password(&body.password)?;
-
-    // Insert user
     let user_id = Uuid::now_v7();
+    let email = crate::auth::token::canonical_email(trimmed_email);
+    let mut transaction = state
+        .pool
+        .begin()
+        .await
+        .map_err(|error| ApiError::Internal(error.into()))?;
+    sqlx::query("SET CONSTRAINTS ALL DEFERRED")
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| ApiError::Internal(error.into()))?;
     let result = sqlx::query(
-        "INSERT INTO tb_users (id, email, display_name, role, password_hash)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, display_name, role, plan, created_at, NULL::uuid AS owner_user_id",
+        "INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
+         VALUES ($1, $2, $2, $3, 'learner', $4)
+         RETURNING id, email_canonical, display_name, role",
     )
     .bind(user_id)
-    .bind(trimmed_email)
-    .bind(&body.name)
-    .bind(&normalized_role)
+    .bind(&email)
+    .bind(body.name.trim())
     .bind(&password_hash)
-    .fetch_optional(&state.pool)
+    .fetch_one(&mut *transaction)
     .await
-    .map_err(|e| {
-        // Check for unique violation on email
-        if e.to_string()
-            .contains("duplicate key value violates unique constraint")
-        {
-            ApiError::Validation(vec![FieldError {
-                field: "email".into(),
-                message: "email already registered".into(),
-            }])
-        } else {
-            ApiError::Internal(e.into())
-        }
-    })?
-    .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("insert returned no rows")))?;
-
+    .map_err(registration_error)?;
+    sqlx::query(
+        "INSERT INTO tb_identities (id, identity_type, owner_user_id, label)
+         VALUES ($1, 'human', $1, $2)",
+    )
+    .bind(user_id)
+    .bind(body.name.trim())
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| ApiError::Internal(error.into()))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| ApiError::Internal(error.into()))?;
     let user_id: Uuid = result.get("id");
-    let email: String = result.get("email");
+    let email: String = result.get("email_canonical");
     let display_name: String = result.get("display_name");
     let role: String = result.get("role");
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
@@ -198,13 +208,12 @@ pub async fn login(
         return Err(ApiError::TooManyRequests);
     }
 
-    // Fetch user by email canonical
+    // Fetch only clean user columns. Identity status is checked by the
+    // authentication repository on the subsequent request.
     let user_row = sqlx::query(
-        "SELECT u.id, u.email, u.display_name, u.role, u.password_hash, u.deactivated_at, \
-                u.plan, u.created_at, NULL::uuid AS owner_user_id, \
-                NULL::timestamptz as owner_deactivated_at, \
-                u.plan as owner_plan \
-         FROM tb_users u \
+        "SELECT u.id, u.email_canonical, u.display_name, u.role, u.password_hash, u.status, \
+                i.status AS identity_status \
+         FROM tb_users u JOIN tb_identities i ON i.id = u.id \
          WHERE u.email_canonical = $1",
     )
     .bind(&canonical)
@@ -218,9 +227,10 @@ pub async fn login(
     let (hash_to_verify, is_valid_user) = match &user_row {
         Some(row) => {
             let hash: Option<String> = row.get("password_hash");
-            let deactivated_at: Option<time::OffsetDateTime> = row.get("deactivated_at");
-            match (hash, deactivated_at) {
-                (Some(h), None) => (h.to_string(), true),
+            let status: String = row.get("status");
+            let identity_status: String = row.get("identity_status");
+            match (hash, status.as_str(), identity_status.as_str()) {
+                (Some(h), "active", "active") => (h.to_string(), true),
                 _ => (dummy_hash.to_string(), false),
             }
         }
@@ -243,7 +253,7 @@ pub async fn login(
     };
 
     let user_id: Uuid = user_row.get("id");
-    let email: String = user_row.get("email");
+    let email: String = user_row.get("email_canonical");
     let display_name: String = user_row.get("display_name");
     let role: String = user_row.get("role");
 
@@ -349,22 +359,21 @@ pub async fn logout(
                 .and_then(|v| crate::auth::token::parse_token_value(&v))
         })
     {
-        // Login session: delete source-of-truth row + cache (both fail-open / best-effort).
-        let _ = sqlx::query("DELETE FROM tb_login_sessions WHERE id = $1")
-            .bind(parsed.id)
-            .execute(&state.pool)
-            .await;
-        if let Ok(mut conn) = state.valkey.get().await {
-            use redis::AsyncCommands;
-            let _: Result<(), _> = conn.del(format!("ame:login:{}", parsed.id)).await;
+        match parsed.kind {
+            crate::auth::token::TokenKind::Login => {
+                let _ =
+                    sqlx::query("UPDATE tb_login_sessions SET revoked_at = NOW() WHERE id = $1")
+                        .bind(parsed.id)
+                        .execute(&state.pool)
+                        .await;
+            }
+            crate::auth::token::TokenKind::Agent => {
+                let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
+                    .bind(parsed.id)
+                    .execute(&state.pool)
+                    .await;
+            }
         }
-
-        // Mark database tokens as revoked & invalidate cache (for PAT/agents)
-        let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
-            .bind(parsed.id)
-            .execute(&state.pool)
-            .await;
-        crate::auth::extractor::invalidate_token(&state.valkey, parsed.id).await;
     }
 
     (
