@@ -1,7 +1,8 @@
 # Single-host routing via Traefik (k3s default ingress controller).
 # The API and web share one origin so the browser bundle's NEXT_PUBLIC_API_URL
 # can point at the same host — no CORS. API path prefixes are more specific than
-# "/", so Traefik routes them to the API; everything else falls through to web.
+# "/", so Traefik routes them to the API; canonical machine documents are served
+# by the Caddy static sidecar; everything else falls through to web.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -38,9 +39,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ame-web
+                name: ame-public-docs
                 port:
-                  number: 3000
+                  number: 8081
           - path: /
             pathType: Prefix
             backend:
