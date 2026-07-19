@@ -813,10 +813,12 @@ mod tests {
         assert_eq!(activities[3].kind, ActivityKind::Diagnostic);
         assert_eq!(activities[1].payload["content"]["type"], "explanation");
         assert_eq!(activities[2].payload["content"]["type"], "worked_example");
-        assert!(activities[1].payload["content"]["body"]
-            .as_str()
-            .expect("explanation body")
-            .contains(&expected_goal));
+        assert!(
+            activities[1].payload["content"]["body"]
+                .as_str()
+                .expect("explanation body")
+                .contains(&expected_goal)
+        );
         assert!(
             activities
                 .iter()
