@@ -139,7 +139,7 @@ pub async fn record_evidence(
             journey_id: body.journey_id,
             objective_id: body.objective_id,
             activity_id: body.activity_id,
-            attempt_id: Some(body.attempt_id),
+            attempt_id: body.attempt_id,
             value: body.value,
             derivation_version: body.derivation_version,
         })

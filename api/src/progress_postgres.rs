@@ -266,7 +266,7 @@ impl ProgressRepository for PgProgressRepository {
             input.journey_id,
             input.objective_id,
             input.activity_id,
-            input.attempt_id,
+            Some(input.attempt_id),
         )
         .await?;
         let row = sqlx::query(

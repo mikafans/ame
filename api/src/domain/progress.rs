@@ -10,7 +10,7 @@ pub struct MasteryEvidenceInput {
     pub journey_id: Uuid,
     pub objective_id: Uuid,
     pub activity_id: Uuid,
-    pub attempt_id: Option<Uuid>,
+    pub attempt_id: Uuid,
     pub value: f32,
     pub derivation_version: u32,
 }

@@ -97,6 +97,14 @@ impl InMemoryProgressRepository {
         {
             return Err(ProgressError::SubjectMismatch);
         }
+        if !state.completed_attempts.contains_key(&(
+            input.subject_user_id,
+            input.journey_id,
+            input.activity_id,
+            input.attempt_id,
+        )) {
+            return Err(ProgressError::SubjectMismatch);
+        }
         let evidence = MasteryEvidence {
             id: Uuid::now_v7(),
             input,
@@ -330,7 +338,7 @@ mod tests {
             journey_id: Uuid::now_v7(),
             objective_id: objective,
             activity_id: Uuid::now_v7(),
-            attempt_id: None,
+            attempt_id: Uuid::now_v7(),
             value,
             derivation_version: 1,
         }
@@ -345,11 +353,25 @@ mod tests {
         let strong = Uuid::now_v7();
         let mut weak_input = evidence(subject, weak, 0.25);
         weak_input.journey_id = journey;
+        repository.register_completed_attempt(
+            subject,
+            journey,
+            weak_input.activity_id,
+            weak_input.attempt_id,
+            OffsetDateTime::now_utc(),
+        );
         repository
             .record_evidence(weak_input)
             .expect("evidence records");
         let mut strong_input = evidence(subject, strong, 0.9);
         strong_input.journey_id = journey;
+        repository.register_completed_attempt(
+            subject,
+            journey,
+            strong_input.activity_id,
+            strong_input.attempt_id,
+            OffsetDateTime::now_utc(),
+        );
         repository
             .record_evidence(strong_input)
             .expect("evidence records");
@@ -378,9 +400,7 @@ mod tests {
         let missing_attempt = evidence(owner, Uuid::now_v7(), 0.5);
         assert_eq!(
             repository.record_evidence(missing_attempt),
-            Err(ProgressError::EmptyField {
-                field: "attempt_id"
-            })
+            Err(ProgressError::SubjectMismatch)
         );
         let mut invalid = evidence(Uuid::now_v7(), Uuid::now_v7(), 1.1);
         assert_eq!(
@@ -390,6 +410,13 @@ mod tests {
         invalid.subject_user_id = owner;
         invalid.value = 0.5;
         invalid.journey_id = journey;
+        repository.register_completed_attempt(
+            owner,
+            journey,
+            invalid.activity_id,
+            invalid.attempt_id,
+            OffsetDateTime::now_utc(),
+        );
         repository
             .record_evidence(invalid)
             .expect("valid evidence records");
