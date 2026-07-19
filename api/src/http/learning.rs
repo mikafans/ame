@@ -103,6 +103,16 @@ pub struct LearningSessionResponse {
     pub finished_at: Option<OffsetDateTime>,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningRecommendationResponse {
+    pub activity_id: Uuid,
+    pub title: String,
+    pub objective_ids: Vec<Uuid>,
+    pub rationale: String,
+    pub based_on_session_id: Option<Uuid>,
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FinishLearningSessionBody {
@@ -132,6 +142,7 @@ pub struct LearningJourneyResponse {
     pub goal: LearningGoalResponse,
     pub objectives: Vec<LearningObjectiveResponse>,
     pub activities: Vec<LearningActivityResponse>,
+    pub recommendation: Option<LearningRecommendationResponse>,
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
@@ -184,6 +195,12 @@ pub async fn get_journey(
         .list_activities(auth.owner_id(), journey.id)
         .await
         .map_err(map_learning_error)?;
+    let latest_session = repository
+        .latest_finished_learning_session(auth.owner_id(), journey.id)
+        .await
+        .map_err(map_learning_error)?;
+    let activity_responses: Vec<_> = activities.into_iter().map(activity_response).collect();
+    let recommendation = next_recommendation(&activity_responses, latest_session.as_ref());
 
     Ok(Json(LearningJourneyResponse {
         id: journey.id,
@@ -204,7 +221,8 @@ pub async fn get_journey(
             created_at: goal.created_at,
         },
         objectives: objectives.into_iter().map(objective_response).collect(),
-        activities: activities.into_iter().map(activity_response).collect(),
+        activities: activity_responses,
+        recommendation,
     }))
 }
 
@@ -316,6 +334,31 @@ pub async fn finish_learning_session(
         )));
     }
     let repository = PgLearningRepository::new(state.pool);
+    let current_session = repository
+        .get_learning_session(auth.owner_id(), id)
+        .await
+        .map_err(map_learning_error)?;
+    let activity = repository
+        .list_activities(auth.owner_id(), current_session.journey_id)
+        .await
+        .map_err(map_learning_error)?
+        .into_iter()
+        .find(|activity| activity.id == current_session.activity_id)
+        .ok_or(ApiError::NotFound {
+            resource: "activity",
+        })?;
+    let evidence = body
+        .responses
+        .iter()
+        .map(|response| {
+            serde_json::json!({
+                "responseId": response.id,
+                "value": response.value,
+                "objectiveIds": activity.objective_ids.clone(),
+                "activityId": activity.id,
+            })
+        })
+        .collect::<Vec<_>>();
     let session = repository
         .finish_learning_session(FinishLearningSessionInput {
             subject_user_id: auth.owner_id(),
@@ -323,11 +366,38 @@ pub async fn finish_learning_session(
             result: serde_json::json!({
                 "completed": body.completed,
                 "responses": body.responses,
+                "evidence": evidence,
             }),
         })
         .await
         .map_err(map_learning_error)?;
     Ok(Json(session_response(session)))
+}
+
+fn next_recommendation(
+    activities: &[LearningActivityResponse],
+    latest_session: Option<&LearningSession>,
+) -> Option<LearningRecommendationResponse> {
+    let activity = activities
+        .iter()
+        .find(|activity| activity.status == ActivityStatus::Ready)?;
+    let has_evidence = latest_session
+        .and_then(|session| session.result.as_ref())
+        .and_then(|result| result.get("evidence"))
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|evidence| !evidence.is_empty());
+    Some(LearningRecommendationResponse {
+        activity_id: activity.id,
+        title: activity.title.clone(),
+        objective_ids: activity.objective_ids.clone(),
+        rationale: if has_evidence {
+            "Your latest activity produced evidence. Continue with this next step to build on it."
+                .to_string()
+        } else {
+            "This is the next planned step in your learning journey.".to_string()
+        },
+        based_on_session_id: latest_session.map(|session| session.id),
+    })
 }
 
 fn objective_response(objective: LearningObjective) -> LearningObjectiveResponse {

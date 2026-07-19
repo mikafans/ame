@@ -417,6 +417,39 @@ impl LearningRepository for InMemoryLearningRepository {
         }
     }
 
+    async fn latest_finished_learning_session(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Option<LearningSession>, LearningRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        if state
+            .journeys
+            .get(&journey_id)
+            .is_some_and(|journey| journey.subject_user_id != subject_user_id)
+        {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if !state.journeys.contains_key(&journey_id) {
+            return Err(LearningRepositoryError::NotFound {
+                resource: "journey",
+            });
+        }
+        Ok(state
+            .sessions
+            .values()
+            .filter(|session| {
+                session.journey_id == journey_id
+                    && session.subject_user_id == subject_user_id
+                    && session.status == LearningSessionStatus::Finished
+            })
+            .max_by_key(|session| session.finished_at)
+            .cloned())
+    }
+
     async fn finish_learning_session(
         &self,
         input: FinishLearningSession,

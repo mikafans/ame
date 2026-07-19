@@ -3720,6 +3720,10 @@ components:
             $ref: '#/components/schemas/LearningObjectiveResponse'
         promise:
           type: string
+        recommendation:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/LearningRecommendationResponse'
         sourceActorId:
           type: string
           format: uuid
@@ -3763,6 +3767,31 @@ components:
         successCriteria:
           type: string
         verb:
+          type: string
+    LearningRecommendationResponse:
+      type: object
+      required:
+      - activityId
+      - title
+      - objectiveIds
+      - rationale
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        basedOnSessionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        objectiveIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        rationale:
+          type: string
+        title:
           type: string
     LearningResponseBody:
       type: object

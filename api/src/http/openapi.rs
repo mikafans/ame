@@ -47,8 +47,8 @@ use crate::{
         },
         learning::{
             FinishLearningSessionBody, LearningActivityResponse, LearningGoalResponse,
-            LearningJourneyResponse, LearningObjectiveResponse, LearningResponseBody,
-            LearningSessionResponse,
+            LearningJourneyResponse, LearningObjectiveResponse, LearningRecommendationResponse,
+            LearningResponseBody, LearningSessionResponse,
         },
         me::{
             AgentSummary, AgentTokenSummary, CohortStatsResponse, CreateAgentBody,
@@ -196,6 +196,7 @@ use crate::{
         StartLearningResponse,
         LearningGoalResponse,
         LearningJourneyResponse,
+        LearningRecommendationResponse,
         LearningObjectiveResponse,
         LearningActivityResponse,
         LearningSessionResponse,

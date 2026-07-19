@@ -286,6 +286,12 @@ pub trait LearningRepository: Send + Sync {
         session_id: Uuid,
     ) -> Result<LearningSession, LearningRepositoryError>;
 
+    async fn latest_finished_learning_session(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Option<LearningSession>, LearningRepositoryError>;
+
     async fn finish_learning_session(
         &self,
         input: FinishLearningSession,

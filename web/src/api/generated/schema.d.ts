@@ -1573,6 +1573,7 @@ export interface components {
             id: string;
             objectives: components["schemas"]["LearningObjectiveResponse"][];
             promise: string;
+            recommendation?: null | components["schemas"]["LearningRecommendationResponse"];
             /** Format: uuid */
             sourceActorId: string;
             status: components["schemas"]["JourneyStatus"];
@@ -1594,6 +1595,15 @@ export interface components {
             subjectUserId: string;
             successCriteria: string;
             verb: string;
+        };
+        LearningRecommendationResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            basedOnSessionId?: string | null;
+            objectiveIds: string[];
+            rationale: string;
+            title: string;
         };
         LearningResponseBody: {
             id: string;

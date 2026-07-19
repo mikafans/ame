@@ -520,6 +520,30 @@ impl LearningRepository for PgLearningRepository {
         }
     }
 
+    async fn latest_finished_learning_session(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Option<LearningSession>, LearningRepositoryError> {
+        let journey = self.get_journey(subject_user_id, journey_id).await?;
+        sqlx::query(
+            r#"
+            SELECT id, journey_id, activity_id, subject_user_id, actor_identity_id,
+                   status, question_plan, result, started_at, finished_at
+            FROM tb_learning_sessions
+            WHERE journey_id = $1 AND subject_user_id = $2 AND status = 'finished'
+            ORDER BY finished_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(journey.id)
+        .bind(subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| row.map(learning_session_from_row))
+        .map_err(storage_error)
+    }
+
     async fn finish_learning_session(
         &self,
         input: FinishLearningSession,

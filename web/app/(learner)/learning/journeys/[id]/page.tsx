@@ -186,6 +186,19 @@ export default function LearningJourneyPage() {
       </aside>
 
       <main className="space-y-8">
+        {journey.recommendation && (
+          <section className="border-l-4 border-primary bg-primary/5 p-5">
+            <p className="font-mono text-xs uppercase tracking-[0.12em] text-primary">
+              Recommended next
+            </p>
+            <h2 className="mt-2 text-xl font-semibold">
+              {journey.recommendation.title}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {journey.recommendation.rationale}
+            </p>
+          </section>
+        )}
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Your path</h2>
