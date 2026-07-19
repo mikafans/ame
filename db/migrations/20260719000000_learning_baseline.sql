@@ -58,6 +58,7 @@ CREATE TABLE tb_identities (
     identity_type text NOT NULL,
     owner_user_id uuid REFERENCES tb_users (id) ON DELETE CASCADE,
     label text NOT NULL,
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     status text NOT NULL DEFAULT 'active',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),

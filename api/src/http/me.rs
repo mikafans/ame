@@ -151,9 +151,11 @@ pub async fn list_agents(
     user: AuthenticatedUser,
 ) -> Result<Json<ListAgentsResponse>, ApiError> {
     let agent_rows = sqlx::query(
-        "SELECT id, label as display_name, focus_tags, created_at
-         FROM tb_agents
-         WHERE owner_user_id = $1 AND deactivated_at IS NULL
+        "SELECT i.id, i.label AS display_name,
+                COALESCE(i.metadata->'focus_tags', '[]'::jsonb) AS focus_tags,
+                i.created_at
+         FROM tb_agents a JOIN tb_identities i ON i.id = a.id
+         WHERE a.owner_user_id = $1 AND a.revoked_at IS NULL AND i.status = 'active'
          ORDER BY created_at DESC",
     )
     .bind(user.user.id)
@@ -164,8 +166,8 @@ pub async fn list_agents(
     let token_rows = sqlx::query(
         "SELECT id, agent_id, name, scopes, last_used_at, created_at, expires_at
          FROM tb_api_tokens
-         WHERE agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL)
-         AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())
+         WHERE agent_id IN (SELECT id FROM tb_agents WHERE owner_user_id = $1 AND revoked_at IS NULL)
+         AND revoked_at IS NULL AND expires_at > now()
          ORDER BY created_at DESC",
     )
     .bind(user.user.id)
@@ -268,28 +270,38 @@ pub async fn create_agent(
 
     let agent_id = Uuid::now_v7();
     sqlx::query(
-        "INSERT INTO tb_agents (id, owner_user_id, label, focus_tags) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO tb_identities (id, identity_type, owner_user_id, label, metadata)
+         VALUES ($1, 'agent', $2, $3, jsonb_build_object('focus_tags', $4::jsonb))",
     )
     .bind(agent_id)
     .bind(user.user.id)
     .bind(&body.label)
-    .bind(&body.focus_tags)
+    .bind(serde_json::to_value(&body.focus_tags).map_err(|e| ApiError::Internal(e.into()))?)
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
+
+    sqlx::query("INSERT INTO tb_agents (id, owner_user_id) VALUES ($1, $2)")
+        .bind(agent_id)
+        .bind(user.user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     let token_id = Uuid::now_v7();
     let secret = crate::auth::token::generate_secret();
     let hash = crate::auth::token::hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(token_id)
     .bind(agent_id)
     .bind(&body.label)
     .bind(&hash)
     .bind(&body.scopes)
+    .bind(OffsetDateTime::now_utc() + time::Duration::days(365))
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -354,7 +366,8 @@ pub async fn create_agent_token(
     }
 
     let exists = sqlx::query(
-        "SELECT 1 FROM tb_agents WHERE id = $1 AND owner_user_id = $2 AND deactivated_at IS NULL",
+        "SELECT 1 FROM tb_agents a JOIN tb_identities i ON i.id = a.id
+         WHERE a.id = $1 AND a.owner_user_id = $2 AND a.revoked_at IS NULL AND i.status = 'active'",
     )
     .bind(id)
     .bind(user.user.id)
@@ -371,13 +384,15 @@ pub async fn create_agent_token(
     let hash = crate::auth::token::hash_secret(&secret);
 
     sqlx::query(
-        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes) VALUES ($1, $2, $3, $4, $5)"
+        "INSERT INTO tb_api_tokens (id, agent_id, name, token_hash, scopes, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(token_id)
     .bind(id)
     .bind(&body.name)
     .bind(&hash)
     .bind(&body.scopes)
+    .bind(OffsetDateTime::now_utc() + time::Duration::days(365))
     .execute(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
@@ -464,7 +479,7 @@ pub async fn update_agent(
 
     // 1. Verify existence and ownership
     let exists = sqlx::query(
-        "SELECT 1 FROM tb_agents WHERE id = $1 AND owner_user_id = $2 AND deactivated_at IS NULL",
+        "SELECT 1 FROM tb_agents WHERE id = $1 AND owner_user_id = $2 AND revoked_at IS NULL",
     )
     .bind(id)
     .bind(user.user.id)
@@ -477,15 +492,26 @@ pub async fn update_agent(
     }
 
     sqlx::query(
-        "UPDATE tb_agents \
-         SET label = COALESCE($1, label), \
-             focus_tags = COALESCE($2, focus_tags), \
-             current_goal = COALESCE($3, current_goal), \
-             next_target = COALESCE($4, next_target) \
-         WHERE id = $5 AND owner_user_id = $6 AND deactivated_at IS NULL",
+        "UPDATE tb_identities i SET label = COALESCE($1, i.label),
+         metadata = i.metadata
+           || CASE WHEN $2::jsonb IS NULL THEN '{}'::jsonb
+                   ELSE jsonb_build_object('focus_tags', $2::jsonb) END
+           || CASE WHEN $3::text IS NULL THEN '{}'::jsonb
+                   ELSE jsonb_build_object('current_goal', $3) END
+           || CASE WHEN $4::text IS NULL THEN '{}'::jsonb
+                   ELSE jsonb_build_object('next_target', $4) END
+         FROM tb_agents a
+         WHERE i.id = a.id AND a.id = $5 AND a.owner_user_id = $6
+           AND a.revoked_at IS NULL AND i.status = 'active'",
     )
     .bind(body.label.as_deref())
-    .bind(body.focus_tags.as_ref())
+    .bind(
+        body.focus_tags
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|e| ApiError::Internal(e.into()))?,
+    )
     .bind(body.current_goal.as_deref())
     .bind(body.next_target.as_deref())
     .bind(id)
@@ -537,7 +563,7 @@ pub async fn delete_agent(
 
     // 1. Deactivate the agent record
     let affected =
-        sqlx::query("UPDATE tb_agents SET deactivated_at = now() WHERE id = $1 AND owner_user_id = $2 AND deactivated_at IS NULL")
+        sqlx::query("UPDATE tb_agents SET revoked_at = now() WHERE id = $1 AND owner_user_id = $2 AND revoked_at IS NULL")
             .bind(id)
             .bind(user.user.id)
             .execute(&mut *tx)

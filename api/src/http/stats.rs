@@ -376,7 +376,7 @@ pub async fn me_stats(
     };
 
     let agent_active_fut = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL",
+        "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND revoked_at IS NULL",
     )
     .bind(uid)
     .fetch_one(&state.pool);

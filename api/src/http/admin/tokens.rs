@@ -87,6 +87,7 @@ pub async fn list_tokens(
     let mut count_qb = sqlx::QueryBuilder::new(
         "SELECT COUNT(*) FROM tb_api_tokens t \
          JOIN tb_agents a ON a.id = t.agent_id \
+         JOIN tb_identities i ON i.id = a.id \
          JOIN tb_users o ON a.owner_user_id = o.id",
     );
     let mut has_where = false;
@@ -97,7 +98,7 @@ pub async fn list_tokens(
         count_qb.push_bind(search_pat.clone());
         count_qb.push(" OR o.email ILIKE ");
         count_qb.push_bind(search_pat.clone());
-        count_qb.push(" OR a.label ILIKE ");
+        count_qb.push(" OR i.label ILIKE ");
         count_qb.push_bind(search_pat);
         count_qb.push(")");
         has_where = true;
@@ -153,10 +154,11 @@ pub async fn list_tokens(
     // 2. Get paginated tokens
     let mut qb = sqlx::QueryBuilder::new(
         "SELECT t.id, t.name, t.agent_id as user_id, \
-         o.email as email, a.label as display_name, 'agent' as role, \
+         o.email as email, i.label as display_name, 'agent' as role, \
          t.scopes, t.last_used_at, t.revoked_at, t.expires_at, t.created_at \
          FROM tb_api_tokens t \
          JOIN tb_agents a ON a.id = t.agent_id \
+         JOIN tb_identities i ON i.id = a.id \
          JOIN tb_users o ON a.owner_user_id = o.id",
     );
 
@@ -168,7 +170,7 @@ pub async fn list_tokens(
         qb.push_bind(search_pat.clone());
         qb.push(" OR o.email ILIKE ");
         qb.push_bind(search_pat.clone());
-        qb.push(" OR a.label ILIKE ");
+        qb.push(" OR i.label ILIKE ");
         qb.push_bind(search_pat);
         qb.push(")");
         has_where = true;

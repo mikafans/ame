@@ -108,9 +108,9 @@ pub async fn activity(
 
     let rows = if let Some(cursor) = q.cursor {
         sqlx::query(
-            "SELECT a.id, a.ts, a.actor_id AS agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+            "SELECT a.id, a.ts, a.actor_id AS agent_id, i.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
-             LEFT JOIN tb_agents ag ON a.actor_id = ag.id
+             LEFT JOIN tb_identities i ON a.actor_id = i.id
              WHERE a.actor_id = ANY($1) AND a.id < $2
              ORDER BY a.id DESC
              LIMIT $3",
@@ -122,9 +122,9 @@ pub async fn activity(
         .await
     } else {
         sqlx::query(
-            "SELECT a.id, a.ts, a.actor_id AS agent_id, ag.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
+            "SELECT a.id, a.ts, a.actor_id AS agent_id, i.label as agent_name, a.tool_name, a.method, a.path, a.status, a.note, a.target_id
              FROM tb_activity_log a
-             LEFT JOIN tb_agents ag ON a.actor_id = ag.id
+             LEFT JOIN tb_identities i ON a.actor_id = i.id
              WHERE a.actor_id = ANY($1)
              ORDER BY a.id DESC
              LIMIT $2",
@@ -1623,8 +1623,9 @@ async fn load_agent_profile(
     agent_id: &Uuid,
 ) -> Result<sqlx::postgres::PgRow, ApiError> {
     sqlx::query(
-        "SELECT label, focus_tags, current_goal, next_target, memory \
-         FROM tb_agents WHERE id = $1",
+        "SELECT i.label, i.metadata FROM tb_agents a
+         JOIN tb_identities i ON i.id = a.id
+         WHERE a.id = $1 AND a.revoked_at IS NULL AND i.status = 'active'",
     )
     .bind(agent_id)
     .fetch_optional(&state.pool)
@@ -1663,12 +1664,13 @@ async fn run_profile_get(
         })
         .collect();
 
+    let metadata = profile.get::<Value, _>("metadata");
     let agent = json!({
         "label": profile.get::<String, _>("label"),
-        "focusTags": profile.get::<Vec<String>, _>("focus_tags"),
-        "currentGoal": profile.get::<Option<String>, _>("current_goal"),
-        "nextTarget": profile.get::<Option<String>, _>("next_target"),
-        "memory": profile.get::<Value, _>("memory"),
+        "focusTags": metadata.get("focus_tags").cloned().unwrap_or_else(|| json!([])),
+        "currentGoal": metadata.get("current_goal").cloned().unwrap_or(Value::Null),
+        "nextTarget": metadata.get("next_target").cloned().unwrap_or(Value::Null),
+        "memory": metadata.get("memory").cloned().unwrap_or_else(|| json!({})),
     });
 
     Ok(Json(RunResponse {
@@ -1720,9 +1722,12 @@ async fn update_profile_memory(
 ) -> Result<Json<RunResponse>, ApiError> {
     // `memory || $1` shallow-merges; `$1` replaces.
     let sql = if merge {
-        "UPDATE tb_agents SET memory = memory || $1 WHERE id = $2 RETURNING memory"
+        "UPDATE tb_identities SET metadata = metadata || jsonb_build_object('memory',
+         COALESCE(metadata->'memory', '{}'::jsonb) || $1::jsonb)
+         WHERE id = $2 RETURNING metadata->'memory' AS memory"
     } else {
-        "UPDATE tb_agents SET memory = $1 WHERE id = $2 RETURNING memory"
+        "UPDATE tb_identities SET metadata = jsonb_set(metadata, '{memory}', $1::jsonb)
+         WHERE id = $2 RETURNING metadata->'memory' AS memory"
     };
     let row = sqlx::query(sql)
         .bind(&value)
@@ -1751,10 +1756,12 @@ async fn run_target_set(
     let next_target = params.get("nextTarget").and_then(|v| v.as_str());
 
     let row = sqlx::query(
-        "UPDATE tb_agents \
-         SET current_goal = COALESCE($1, current_goal), \
-             next_target = COALESCE($2, next_target) \
-         WHERE id = $3 RETURNING current_goal, next_target",
+        "UPDATE tb_identities SET metadata = metadata
+         || CASE WHEN $1::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('current_goal', $1) END
+         || CASE WHEN $2::text IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('next_target', $2) END
+         WHERE id = $3
+         RETURNING metadata->>'current_goal' AS current_goal,
+                   metadata->>'next_target' AS next_target",
     )
     .bind(current_goal)
     .bind(next_target)
