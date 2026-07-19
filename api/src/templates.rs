@@ -249,6 +249,25 @@ mod tests {
     }
 
     #[test]
+    fn builtins_use_the_canonical_0_3_template_ids() {
+        let catalog = builtin_catalog().expect("built-in catalog must parse");
+        let ids: Vec<&str> = catalog
+            .templates
+            .iter()
+            .map(|template| template.id.as_str())
+            .collect();
+
+        assert_eq!(
+            ids,
+            vec![
+                "understand-a-subject",
+                "prepare-for-an-exam",
+                "build-a-project"
+            ]
+        );
+    }
+
+    #[test]
     fn topic_blueprints_are_valid_and_template_fallbacks_exist() {
         let topics = super::topic_blueprints().expect("topic blueprint catalog must parse");
 
