@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::str::FromStr;
 
 use crate::domain::user::{Scope, User};
@@ -37,92 +36,6 @@ impl AuthenticatedUser {
     /// shared truth (level/progress) reads.
     pub fn owner_id(&self) -> Uuid {
         self.owner_id
-    }
-}
-
-/// Clean-baseline human session authentication used by the redesigned
-/// onboarding path. The legacy [`AuthenticatedUser`] extractor remains for
-/// endpoints that have not migrated to the new learning schema yet.
-#[derive(Debug, Clone, Copy)]
-pub struct CleanLearnerAuth {
-    pub user_id: Uuid,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct OptionalCleanLearnerAuth(pub Option<CleanLearnerAuth>);
-
-impl FromRequestParts<AppState> for OptionalCleanLearnerAuth {
-    type Rejection = Infallible;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        Ok(Self(
-            CleanLearnerAuth::from_request_parts(parts, state)
-                .await
-                .ok(),
-        ))
-    }
-}
-
-impl FromRequestParts<AppState> for CleanLearnerAuth {
-    type Rejection = ApiError;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        let parsed = parts
-            .headers
-            .get(header::AUTHORIZATION)
-            .and_then(|header| header.to_str().ok())
-            .and_then(parse_bearer_token)
-            .or_else(|| {
-                parts
-                    .headers
-                    .get(header::COOKIE)
-                    .and_then(|header| header.to_str().ok())
-                    .and_then(|cookies| {
-                        cookies.split(';').find_map(|cookie| {
-                            cookie.trim().strip_prefix("ame_token=").map(str::to_owned)
-                        })
-                    })
-                    .and_then(|token| parse_token_value(&token))
-            })
-            .filter(|token| token.kind == crate::auth::token::TokenKind::Login)
-            .ok_or(ApiError::Unauthorized)?;
-
-        let row = sqlx::query(
-            r#"
-            SELECT s.token_hash, s.expires_at, s.revoked_at, s.user_id,
-                   u.status, u.role
-            FROM tb_login_sessions s
-            JOIN tb_users u ON u.id = s.user_id
-            WHERE s.id = $1 AND u.role = 'learner'
-            "#,
-        )
-        .bind(parsed.id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|error| ApiError::Internal(error.into()))?
-        .ok_or(ApiError::Unauthorized)?;
-
-        let token_hash: String = row.get("token_hash");
-        let expires_at: time::OffsetDateTime = row.get("expires_at");
-        let revoked_at: Option<time::OffsetDateTime> = row.get("revoked_at");
-        let status: String = row.get("status");
-        if revoked_at.is_some()
-            || expires_at <= time::OffsetDateTime::now_utc()
-            || status != "active"
-            || !verify_token_secret(&token_hash, &parsed.secret)
-        {
-            return Err(ApiError::Unauthorized);
-        }
-
-        Ok(Self {
-            user_id: row.get("user_id"),
-        })
     }
 }
 

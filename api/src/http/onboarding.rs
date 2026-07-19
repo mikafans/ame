@@ -1,6 +1,6 @@
 //! Public self-host onboarding boundary.
 
-use axum::{Json, Router, extract::State, http::StatusCode, routing::post};
+use axum::{Extension, Json, Router, extract::State, http::StatusCode, routing::post};
 use serde::{Deserialize, Serialize};
 use time::Duration;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::extractor::OptionalCleanLearnerAuth,
+    auth::extractor::AuthenticatedUser,
     domain::{error::ApiError, identity::RegistrationMode},
     http::AppState,
     identity_postgres::PgIdentityRepository,
@@ -64,7 +64,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 )]
 pub async fn start_learning(
     State(state): State<AppState>,
-    authenticated: OptionalCleanLearnerAuth,
+    authenticated: Option<Extension<AuthenticatedUser>>,
     Json(body): Json<StartLearningBody>,
 ) -> Result<
     (
@@ -79,7 +79,7 @@ pub async fn start_learning(
         identity.clone(),
         PgLearningRepository::new(state.pool.clone()),
     );
-    let auth_user_id = authenticated.0.map(|user| user.user_id);
+    let auth_user_id = authenticated.map(|Extension(user)| user.owner_id());
     let started = onboarding
         .start_from_prompt(
             StartLearningPromptRequest {
