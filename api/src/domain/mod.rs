@@ -3,6 +3,7 @@
 pub mod assessment;
 pub mod attempt;
 pub mod error;
+pub mod identity;
 pub mod learning;
 pub mod question;
 pub mod session;

@@ -10,6 +10,7 @@ pub mod config;
 pub mod domain;
 pub mod engine;
 pub mod http;
+pub mod identity;
 pub mod learning;
 pub mod learning_postgres;
 pub mod onboarding;
