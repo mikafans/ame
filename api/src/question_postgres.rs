@@ -28,7 +28,7 @@ impl PgQuestionRepository {
         let row = sqlx::query(
             r#"SELECT q.subject_user_id, qv.id, qv.question_id, qv.version,
                       qv.kind, qv.prompt, qv.payload, qv.explanation, qv.rationale,
-                      qv.points, qv.review_status, qv.source_references, qv.created_at
+                      qv.points, qv.difficulty, qv.review_status, qv.source_references, qv.created_at
                FROM tb_questions q
                JOIN tb_question_versions qv ON qv.question_id = q.id
                WHERE qv.id = $1"#,
@@ -131,7 +131,7 @@ impl QuestionRepository for PgQuestionRepository {
         let row = sqlx::query(
             r#"SELECT q.subject_user_id, qv.id, qv.question_id, qv.version,
                       qv.kind, qv.prompt, qv.payload, qv.explanation, qv.rationale,
-                      qv.points, qv.review_status, qv.source_references, qv.created_at
+                      qv.points, qv.difficulty, qv.review_status, qv.source_references, qv.created_at
                FROM tb_questions q
                JOIN tb_question_versions qv ON qv.question_id = q.id
                WHERE q.id = $1 AND qv.version = $2"#,
@@ -161,16 +161,16 @@ async fn insert_version(
     let payload = json!({
         "options": input.options,
         "accepted_answers": input.accepted_answers,
-        "difficulty": null
+        "difficulty": input.difficulty
     });
     let row = sqlx::query(
         r#"INSERT INTO tb_question_versions (
                 question_id, version, kind, prompt, payload, explanation,
                 rationale, points, difficulty, source_references, review_status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id, question_id, version, kind, prompt, payload,
-                      explanation, rationale, points, review_status,
+                      explanation, rationale, points, difficulty, review_status,
                       source_references, created_at"#,
     )
     .bind(question.id)
@@ -181,6 +181,7 @@ async fn insert_version(
     .bind(&input.explanation)
     .bind(&input.rationale)
     .bind(input.points as i32)
+    .bind(&input.difficulty)
     .bind(source_references)
     .bind(version_review_status(input.review_status))
     .fetch_one(&mut **transaction)
@@ -221,6 +222,7 @@ fn question_version_from_row(
         explanation: row.get("explanation"),
         rationale: row.get("rationale"),
         points: row.get::<i32, _>("points") as u32,
+        difficulty: row.get("difficulty"),
         review_status: parse_version_review_status(row.get("review_status"))?,
         source_references: serde_json::from_value(row.get("source_references"))
             .map_err(|error| QuestionRepositoryError::Storage(error.to_string()))?,

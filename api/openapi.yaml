@@ -1012,11 +1012,15 @@ components:
     AssessmentItemBody:
       type: object
       required:
+      - objectiveId
       - questionId
       - questionVersion
       - orderIndex
       - points
       properties:
+        objectiveId:
+          type: string
+          format: uuid
         orderIndex:
           type: integer
           format: int32
@@ -1035,12 +1039,16 @@ components:
       type: object
       required:
       - id
+      - objectiveId
       - questionVersionId
       - orderIndex
       - points
       - question
       properties:
         id:
+          type: string
+          format: uuid
+        objectiveId:
           type: string
           format: uuid
         orderIndex:
@@ -1077,6 +1085,10 @@ components:
       - prompt
       - options
       properties:
+        difficulty:
+          type:
+          - string
+          - 'null'
         kind:
           $ref: '#/components/schemas/QuestionKind'
         options:
@@ -1338,6 +1350,10 @@ components:
           type: array
           items:
             type: string
+        difficulty:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string
@@ -2012,6 +2028,10 @@ components:
           type: array
           items:
             type: string
+        difficulty:
+          type:
+          - string
+          - 'null'
         explanation:
           type:
           - string

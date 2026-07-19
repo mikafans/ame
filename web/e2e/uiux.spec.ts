@@ -127,6 +127,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
       status: "published",
       items: [
         {
+          objectiveId: objective.id,
           questionId: question.questionId,
           questionVersion: question.version,
           orderIndex: 0,
@@ -229,6 +230,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
         status: "published",
         items: [
           {
+            objectiveId: objective.id,
             questionId: question.questionId,
             questionVersion: question.version,
             orderIndex: 0,

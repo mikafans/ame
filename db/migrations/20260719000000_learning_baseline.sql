@@ -296,6 +296,7 @@ CREATE TABLE tb_assessment_items (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v7(),
     assessment_id uuid NOT NULL REFERENCES tb_assessments (id) ON DELETE CASCADE,
     section_id uuid REFERENCES tb_assessment_sections (id) ON DELETE SET NULL,
+    objective_id uuid NOT NULL REFERENCES tb_journey_objectives (id) ON DELETE RESTRICT,
     question_version_id uuid NOT NULL REFERENCES tb_question_versions (id) ON DELETE RESTRICT,
     order_index integer NOT NULL,
     points_override integer,

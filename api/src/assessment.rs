@@ -193,6 +193,7 @@ mod tests {
             question_id: Uuid::now_v7(),
             version: 1,
             kind: QuestionKind::MultipleChoice,
+            difficulty: None,
             prompt: "Choose".into(),
             options: vec![
                 QuestionOption {
@@ -230,6 +231,7 @@ mod tests {
                     mode: AssessmentMode::Practice,
                     items: vec![AssessmentItemInput {
                         id: Uuid::now_v7(),
+                        objective_id: Uuid::now_v7(),
                         question_version_id: version.id,
                         order_index: 0,
                         points: 1,
@@ -262,6 +264,7 @@ mod tests {
                     mode: AssessmentMode::Graded,
                     items: vec![AssessmentItemInput {
                         id: Uuid::now_v7(),
+                        objective_id: Uuid::now_v7(),
                         question_version_id: version.id,
                         order_index: 0,
                         points: 1,
@@ -287,6 +290,7 @@ mod tests {
                     mode: AssessmentMode::Practice,
                     items: vec![AssessmentItemInput {
                         id: Uuid::now_v7(),
+                        objective_id: Uuid::now_v7(),
                         question_version_id: version.id,
                         order_index: 0,
                         points: 1,
@@ -319,6 +323,7 @@ mod tests {
             mode: AssessmentMode::Graded,
             items: vec![AssessmentItemInput {
                 id: Uuid::now_v7(),
+                objective_id: Uuid::now_v7(),
                 question_version_id: question.id,
                 order_index: 0,
                 points: 2,

@@ -65,7 +65,7 @@ pub fn build_skill_manifest() -> Value {
             "Create a learner-owned versioned question with explanation and provenance metadata.",
             "POST",
             "/api/v1/questions",
-            json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
+            json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
         ),
         endpoint(
             "learning.question.get",
@@ -79,14 +79,14 @@ pub fn build_skill_manifest() -> Value {
             "Create the next immutable version of a learner-owned question.",
             "POST",
             "/api/v1/questions/{question_id}/versions",
-            json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string"},"prompt":{"type":"string"},"points":{"type":"integer","minimum":1}}}),
+            json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string"},"prompt":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.assessment.create",
             "Compose approved question versions into a learner-owned practice or graded assessment.",
             "POST",
             "/api/v1/assessments",
-            json!({"type":"object","required":["activityId","mode","items"],"properties":{"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array"},"status":{"type":"string"}}}),
+            json!({"type":"object","required":["activityId","mode","items"],"properties":{"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array","items":{"type":"object","required":["objectiveId","questionId","questionVersion","orderIndex","points"],"properties":{"objectiveId":{"type":"string","format":"uuid"},"questionId":{"type":"string","format":"uuid"},"questionVersion":{"type":"integer"},"orderIndex":{"type":"integer"},"points":{"type":"integer","minimum":1}}}},"status":{"type":"string"}}}),
         ),
         endpoint(
             "learning.assessment.get",

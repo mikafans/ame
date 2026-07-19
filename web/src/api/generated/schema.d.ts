@@ -593,6 +593,8 @@ export interface components {
             activityId: string;
         };
         AssessmentItemBody: {
+            /** Format: uuid */
+            objectiveId: string;
             /** Format: int32 */
             orderIndex: number;
             /** Format: int32 */
@@ -605,6 +607,8 @@ export interface components {
         AssessmentItemResponse: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            objectiveId: string;
             /** Format: int32 */
             orderIndex: number;
             /** Format: int32 */
@@ -620,6 +624,7 @@ export interface components {
             text: string;
         };
         AssessmentQuestionResponse: {
+            difficulty?: string | null;
             kind: components["schemas"]["QuestionKind"];
             options: components["schemas"]["AssessmentOptionResponse"][];
             prompt: string;
@@ -719,6 +724,7 @@ export interface components {
         };
         CreateQuestionBody: {
             acceptedAnswers?: string[];
+            difficulty?: string | null;
             explanation?: string | null;
             kind: components["schemas"]["QuestionKind"];
             options?: components["schemas"]["QuestionOption"][];
@@ -989,6 +995,7 @@ export interface components {
         };
         QuestionResponse: {
             acceptedAnswers: string[];
+            difficulty?: string | null;
             explanation?: string | null;
             /** Format: uuid */
             id: string;

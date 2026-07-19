@@ -36,6 +36,7 @@ pub struct CreateAssessmentBody {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentItemBody {
+    pub objective_id: Uuid,
     pub question_id: Uuid,
     pub question_version: u32,
     pub order_index: i32,
@@ -57,6 +58,7 @@ pub struct AssessmentResponse {
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentItemResponse {
     pub id: Uuid,
+    pub objective_id: Uuid,
     pub question_version_id: Uuid,
     pub order_index: i32,
     pub points: u32,
@@ -68,6 +70,7 @@ pub struct AssessmentItemResponse {
 pub struct AssessmentQuestionResponse {
     pub kind: QuestionKind,
     pub prompt: String,
+    pub difficulty: Option<String>,
     pub options: Vec<AssessmentOptionResponse>,
 }
 
@@ -145,6 +148,7 @@ pub async fn create_assessment(
             .map_err(map_assessment_error)?;
         items.push(AssessmentItemInput {
             id: Uuid::now_v7(),
+            objective_id: item.objective_id,
             question_version_id: question.id,
             order_index: item.order_index,
             points: item.points,
@@ -228,12 +232,14 @@ fn assessment_response(
                 )))?;
             Ok(AssessmentItemResponse {
                 id: item.id,
+                objective_id: item.objective_id,
                 question_version_id: item.question_version_id,
                 order_index: item.order_index,
                 points: item.points,
                 question: AssessmentQuestionResponse {
                     kind: question.kind,
                     prompt: question.prompt.clone(),
+                    difficulty: question.difficulty.clone(),
                     options: question
                         .options
                         .iter()

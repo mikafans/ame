@@ -58,6 +58,21 @@ impl AssessmentRepository for PgAssessmentRepository {
         if activity.get::<Uuid, _>("subject_user_id") != input.subject_user_id {
             return Err(AssessmentRepositoryError::SubjectMismatch);
         }
+        for item in &input.items {
+            let linked = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS (SELECT 1 FROM tb_activity_objectives WHERE activity_id = $1 AND objective_id = $2)",
+            )
+            .bind(input.activity_id)
+            .bind(item.objective_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(storage_error)?;
+            if !linked {
+                return Err(AssessmentRepositoryError::InvalidItem(
+                    "assessment item objective is not linked to the activity".to_string(),
+                ));
+            }
+        }
         let row = sqlx::query(
             r#"INSERT INTO tb_assessments (
                     activity_id, subject_user_id, source_actor_id, version,
@@ -85,10 +100,11 @@ impl AssessmentRepository for PgAssessmentRepository {
         let assessment = assessment_from_row(&row, input.items.clone())?;
         for item in &input.items {
             sqlx::query(
-                "INSERT INTO tb_assessment_items (id, assessment_id, question_version_id, order_index, points_override) VALUES ($1, $2, $3, $4, $5)",
+                "INSERT INTO tb_assessment_items (id, assessment_id, objective_id, question_version_id, order_index, points_override) VALUES ($1, $2, $3, $4, $5, $6)",
             )
             .bind(item.id)
             .bind(assessment.id)
+            .bind(item.objective_id)
             .bind(item.question_version_id)
             .bind(item.order_index)
             .bind(item.points as i32)
@@ -117,7 +133,7 @@ impl AssessmentRepository for PgAssessmentRepository {
             return Err(AssessmentRepositoryError::SubjectMismatch);
         }
         let items = sqlx::query(
-            "SELECT id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
+            "SELECT id, objective_id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
         )
         .bind(assessment_id)
         .fetch_all(&self.pool)
@@ -126,6 +142,7 @@ impl AssessmentRepository for PgAssessmentRepository {
         .into_iter()
         .map(|item| AssessmentItemInput {
             id: item.get("id"),
+            objective_id: item.get("objective_id"),
             question_version_id: item.get("question_version_id"),
             order_index: item.get("order_index"),
             points: item.get::<i32, _>("points_override") as u32,
@@ -152,7 +169,7 @@ impl AssessmentRepository for PgAssessmentRepository {
         };
         let assessment_id: Uuid = row.get("id");
         let items = sqlx::query(
-            "SELECT id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
+            "SELECT id, objective_id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
         )
         .bind(assessment_id)
         .fetch_all(&self.pool)
@@ -161,6 +178,7 @@ impl AssessmentRepository for PgAssessmentRepository {
         .into_iter()
         .map(|item| AssessmentItemInput {
             id: item.get("id"),
+            objective_id: item.get("objective_id"),
             question_version_id: item.get("question_version_id"),
             order_index: item.get("order_index"),
             points: item.get::<i32, _>("points_override") as u32,

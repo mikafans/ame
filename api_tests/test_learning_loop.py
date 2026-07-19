@@ -63,6 +63,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "points": 1,
             "reviewStatus": "approved",
             "explanation": "The JobManager coordinates scheduling and execution.",
+            "difficulty": "introductory",
             "sourceReferences": ["https://nightlies.apache.org/flink/"],
         },
     )
@@ -79,6 +80,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "status": "draft",
             "items": [
                 {
+                    "objectiveId": objective_id,
                     "questionId": question["questionId"],
                     "questionVersion": question["version"],
                     "orderIndex": 0,
@@ -106,6 +108,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "status": "published",
             "items": [
                 {
+                    "objectiveId": objective_id,
                     "questionId": question["questionId"],
                     "questionVersion": question["version"],
                     "orderIndex": 0,
@@ -125,6 +128,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert discovered_assessment.json()["id"] == assessment["id"]
     projected_question = assessment["items"][0]["question"]
     assert projected_question["prompt"]
+    assert projected_question["difficulty"] == "introductory"
     assert projected_question["options"]
     assert "is_correct" not in projected_question["options"][0]
     assert client.get(
