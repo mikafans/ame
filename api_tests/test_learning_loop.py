@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import uuid
 
 
@@ -274,18 +276,34 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert recommendation.status_code == 200, recommendation.text
 
+    learner_day = datetime.now(ZoneInfo("Asia/Tokyo")).date()
     streak_body = {
         "journeyId": journey_id,
         "activityId": activity_id,
         "qualifyingEventKey": f"attempt:{attempt['id']}",
         "learnerTimezone": "Asia/Tokyo",
-        "qualifyingDay": "2026-07-19",
+        "qualifyingDay": learner_day.isoformat(),
     }
     unverified_streak_body = {**streak_body, "qualifyingEventKey": "agent-asserted"}
     unverified_streak = client.post(
         "/api/v1/progress/streaks", headers=headers, json=unverified_streak_body
     )
     assert unverified_streak.status_code == 422, unverified_streak.text
+    mismatched_streak = client.post(
+        "/api/v1/progress/streaks",
+        headers=headers,
+        json={
+            **streak_body,
+            "qualifyingDay": (learner_day - timedelta(days=1)).isoformat(),
+        },
+    )
+    assert mismatched_streak.status_code == 422, mismatched_streak.text
+    invalid_timezone_streak = client.post(
+        "/api/v1/progress/streaks",
+        headers=headers,
+        json={**streak_body, "learnerTimezone": "Not/A-Timezone"},
+    )
+    assert invalid_timezone_streak.status_code == 422, invalid_timezone_streak.text
     cross_owner_streak = client.post(
         "/api/v1/progress/streaks", headers=other_headers, json=streak_body
     )
