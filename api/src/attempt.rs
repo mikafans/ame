@@ -24,6 +24,11 @@ pub trait AttemptRepository: Send + Sync {
         assessment: &Assessment,
     ) -> Result<Attempt, AttemptError>;
     async fn get(&self, subject_user_id: Uuid, attempt_id: Uuid) -> Result<Attempt, AttemptError>;
+    async fn list_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Vec<Attempt>, AttemptError>;
     async fn save_answer(
         &self,
         subject_user_id: Uuid,
@@ -101,6 +106,26 @@ impl AttemptRepository for InMemoryAttemptRepository {
             return Err(AttemptError::SubjectMismatch);
         }
         Ok(attempt.clone())
+    }
+
+    async fn list_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Vec<Attempt>, AttemptError> {
+        let mut attempts = self
+            .attempts
+            .lock()
+            .map_err(|error| AttemptError::Storage(error.to_string()))?
+            .values()
+            .filter(|attempt| {
+                attempt.input.subject_user_id == subject_user_id
+                    && attempt.input.activity_id == activity_id
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        attempts.sort_by_key(|attempt| attempt.created_at);
+        Ok(attempts)
     }
 
     async fn save_answer(

@@ -47,6 +47,11 @@ GET /api/v1/questions/{question_id}/versions/{version}
 POST /api/v1/questions/{question_id}/versions
 POST /api/v1/assessments
 GET /api/v1/assessments/{assessment_id}
+GET /api/v1/learning/journeys/{journey_id}/attempts
+GET /api/v1/attempts/{attempt_id}
+POST /api/v1/attempts/{attempt_id}/answers
+POST /api/v1/attempts/{attempt_id}/finish
+GET /api/v1/progress/{journey_id}/streaks
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,

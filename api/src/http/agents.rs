@@ -131,6 +131,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.attempt.history",
+            "Read all assessment attempts in one learner-owned journey, including durable results.",
+            "GET",
+            "/api/v1/learning/journeys/{journey_id}/attempts",
+            json!({"type":"object","required":["journeyId"],"properties":{"journeyId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.progress.evidence",
             "Record rebuildable mastery evidence linked to a learner activity or attempt.",
             "POST",

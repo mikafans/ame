@@ -176,6 +176,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert persisted_attempt.status_code == 200, persisted_attempt.text
     assert persisted_attempt.json()["score"] == 1
     assert persisted_attempt.json()["items"][0]["evaluationStatus"] == "correct"
+    attempt_history = client.get(
+        f"/api/v1/learning/journeys/{journey_id}/attempts", headers=headers
+    )
+    assert attempt_history.status_code == 200, attempt_history.text
+    assert [item["id"] for item in attempt_history.json()] == [attempt["id"]]
     repeated_finish = client.post(
         f"/api/v1/attempts/{attempt['id']}/finish", headers=headers
     )
@@ -277,6 +282,10 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert other_streaks.status_code == 200, other_streaks.text
     assert other_streaks.json() == []
+    other_attempt_history = client.get(
+        f"/api/v1/learning/journeys/{journey_id}/attempts", headers=other_headers
+    )
+    assert other_attempt_history.status_code == 404, other_attempt_history.text
     forbidden_journey = client.get(
         f"/api/v1/learning/journeys/{journey_id}", headers=other_headers
     )

@@ -52,6 +52,7 @@ use crate::http::{
         crate::http::assessments::get_assessment,
         crate::http::attempts::start_attempt,
         crate::http::attempts::get_attempt,
+        crate::http::attempts::list_journey_attempts,
         crate::http::attempts::save_answer,
         crate::http::attempts::finish_attempt,
         crate::http::progress::record_evidence,

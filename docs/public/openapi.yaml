@@ -509,6 +509,30 @@ paths:
           description: Activity is not ready
       security:
       - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/attempts:
+    get:
+      tags:
+      - attempts
+      operationId: list_journey_attempts
+      parameters:
+      - name: journey_id
+        in: path
+        description: Learning journey ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Attempts in the learner-owned journey
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
   /api/v1/learning/sessions/{id}:
     get:
       tags:
@@ -1131,6 +1155,7 @@ components:
       - status
       - responses
       - items
+      - createdAt
       properties:
         assessmentId:
           type: string
@@ -1144,6 +1169,8 @@ components:
           - number
           - 'null'
           format: float
+        createdAt:
+          type: string
         id:
           type: string
           format: uuid

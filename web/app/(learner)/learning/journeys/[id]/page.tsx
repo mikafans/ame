@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowRight, Check, Clock3 } from "lucide-react";
+import { ArrowRight, Check, Clock3, History } from "lucide-react";
 import { api } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function LearningJourneyPage() {
   const [session, setSession] = useState<LearningSession | null>(null);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [attemptHistory, setAttemptHistory] = useState<Attempt[]>([]);
   const [deepDive, setDeepDive] = useState<DeepDive | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [startingActivity, setStartingActivity] = useState<string | null>(null);
@@ -87,6 +88,17 @@ export default function LearningJourneyPage() {
     }
   }
 
+  async function loadAttemptHistory() {
+    const result = await api.GET(
+      "/api/v1/learning/journeys/{journey_id}/attempts",
+      { params: { path: { journey_id: params.id } } },
+    );
+    if (!result.response.ok || !result.data) {
+      throw new Error("Could not load assessment history");
+    }
+    setAttemptHistory(result.data);
+  }
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -99,6 +111,7 @@ export default function LearningJourneyPage() {
         }
         if (cancelled) return;
         setJourney(journeyResult.data);
+        await loadAttemptHistory();
         const storedSessionId = window.localStorage.getItem(
           `ame-learning-session:${params.id}`,
         );
@@ -256,6 +269,7 @@ export default function LearningJourneyPage() {
         params: { path: { id: params.id } },
       });
       if (refreshed.response.ok && refreshed.data) setJourney(refreshed.data);
+      await loadAttemptHistory();
       await loadDeepDive(session.activityId);
     } catch (finishError) {
       setError(
@@ -622,6 +636,40 @@ export default function LearningJourneyPage() {
                 </ul>
               </div>
             )}
+          </section>
+        )}
+        {attemptHistory.length > 0 && (
+          <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <History className="size-5 text-primary" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                  Assessment history
+                </p>
+                <h2 className="mt-1 text-xl font-bold">Your saved attempts</h2>
+              </div>
+            </div>
+            <ul className="mt-5 space-y-2">
+              {attemptHistory.map((historyAttempt) => (
+                <li
+                  key={historyAttempt.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm"
+                >
+                  <span className="text-muted-foreground">
+                    {historyAttempt.createdAt.slice(0, 10)}
+                  </span>
+                  <span className="font-medium">
+                    {historyAttempt.status === "submitted"
+                      ? "Pending review"
+                      : historyAttempt.status === "graded" &&
+                          historyAttempt.score !== null &&
+                          historyAttempt.maxPoints
+                        ? `${historyAttempt.score}/${historyAttempt.maxPoints} points`
+                        : historyAttempt.status.replaceAll("_", " ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
         {error && (

@@ -406,6 +406,24 @@
       "path": "/api/v1/attempts/{attempt_id}"
     },
     {
+      "description": "Read all assessment attempts in one learner-owned journey, including durable results.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.attempt.history",
+      "path": "/api/v1/learning/journeys/{journey_id}/attempts"
+    },
+    {
       "description": "Record rebuildable mastery evidence linked to a learner activity or attempt.",
       "input_schema": {
         "properties": {

@@ -292,6 +292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning/journeys/{journey_id}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_journey_attempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/sessions/{id}": {
         parameters: {
             query?: never;
@@ -640,6 +656,7 @@ export interface components {
             assessmentVersion: number;
             /** Format: float */
             awardedPoints?: number | null;
+            createdAt: string;
             /** Format: uuid */
             id: string;
             items: components["schemas"]["AttemptItemResponse"][];
@@ -1725,6 +1742,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_journey_attempts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning journey ID */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attempts in the learner-owned journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"][];
+                };
             };
         };
     };

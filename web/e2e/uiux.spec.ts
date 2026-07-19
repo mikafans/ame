@@ -204,6 +204,12 @@ test("learner can complete an agent-provided assessment and open its deep dive",
       name: "A coordinator gives the system a shared decision point",
     }),
   ).toBeVisible();
+  await expect(
+    page.getByText("Assessment history", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Your saved attempts", { exact: true }),
+  ).toBeVisible();
 
   const refreshedJourneyResponse = await page.request.get(
     `/api/v1/learning/journeys/${journeyId}`,

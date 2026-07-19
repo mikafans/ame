@@ -20,8 +20,10 @@ use crate::{
         assessment::AssessmentStatus,
         attempt::{Attempt, AttemptError, StartAttempt},
         error::{ApiError, FieldError},
+        learning::LearningRepository,
     },
     http::AppState,
+    learning_postgres::PgLearningRepository,
     question_postgres::PgQuestionRepository,
 };
 
@@ -51,6 +53,7 @@ pub struct AttemptResponse {
     pub score: Option<f32>,
     pub awarded_points: Option<f32>,
     pub max_points: Option<f32>,
+    pub created_at: String,
     pub submitted_at: Option<String>,
 }
 
@@ -72,6 +75,10 @@ pub fn router(state: AppState) -> Router<AppState> {
             post(start_attempt),
         )
         .route("/v1/attempts/{attempt_id}", get(get_attempt))
+        .route(
+            "/v1/learning/journeys/{journey_id}/attempts",
+            get(list_journey_attempts),
+        )
         .route("/v1/attempts/{attempt_id}/answers", post(save_answer))
         .route("/v1/attempts/{attempt_id}/finish", post(finish_attempt))
         .with_state(state)
@@ -135,6 +142,46 @@ pub async fn get_attempt(
         .await
         .map_err(map_attempt_error)?;
     Ok(Json(attempt_response(attempt)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/journeys/{journey_id}/attempts",
+    params(("journey_id" = Uuid, Path, description = "Learning journey ID")),
+    responses((status = 200, description = "Attempts in the learner-owned journey", body = [AttemptResponse])),
+    security(("bearer" = [])),
+    tag = "attempts"
+)]
+pub async fn list_journey_attempts(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<Vec<AttemptResponse>>, ApiError> {
+    let activities = PgLearningRepository::new(state.pool.clone())
+        .list_activities(auth.owner_id(), journey_id)
+        .await
+        .map_err(|error| match error {
+            crate::domain::learning::LearningRepositoryError::NotFound { .. }
+            | crate::domain::learning::LearningRepositoryError::SubjectMismatch => {
+                ApiError::NotFound {
+                    resource: "journey",
+                }
+            }
+            other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
+        })?;
+    let repository = PgAttemptRepository::new(state.pool);
+    let mut attempts = Vec::new();
+    for activity in activities {
+        attempts.extend(
+            repository
+                .list_for_activity(auth.owner_id(), activity.id)
+                .await
+                .map_err(map_attempt_error)?
+                .into_iter()
+                .map(attempt_response),
+        );
+    }
+    Ok(Json(attempts))
 }
 
 #[utoipa::path(
@@ -249,6 +296,10 @@ fn attempt_response(attempt: Attempt) -> AttemptResponse {
             .as_ref()
             .map(|value| value.max_points)
             .or(attempt.stored_max_points),
+        created_at: attempt
+            .created_at
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default(),
         submitted_at: attempt.submitted_at.map(|value| {
             value
                 .format(&time::format_description::well_known::Rfc3339)

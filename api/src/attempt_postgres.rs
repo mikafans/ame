@@ -87,6 +87,33 @@ impl AttemptRepository for PgAttemptRepository {
         self.load_attempt(attempt_id, input).await
     }
 
+    async fn list_for_activity(
+        &self,
+        subject_user_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<Vec<Attempt>, AttemptError> {
+        let rows = sqlx::query(
+            "SELECT id, learning_session_id, activity_id, subject_user_id, assessment_id, assessment_version FROM tb_attempts WHERE subject_user_id = $1 AND activity_id = $2 ORDER BY created_at",
+        )
+        .bind(subject_user_id)
+        .bind(activity_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        let mut attempts = Vec::with_capacity(rows.len());
+        for row in rows {
+            let input = StartAttempt {
+                subject_user_id: row.get("subject_user_id"),
+                learning_session_id: row.get("learning_session_id"),
+                activity_id: row.get("activity_id"),
+                assessment_id: row.get("assessment_id"),
+                assessment_version: row.get::<i32, _>("assessment_version") as u32,
+            };
+            attempts.push(self.load_attempt(row.get("id"), input).await?);
+        }
+        Ok(attempts)
+    }
+
     async fn save_answer(
         &self,
         subject_user_id: Uuid,
