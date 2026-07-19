@@ -328,3 +328,80 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   await page.getByRole("button", { name: "Submit assessment" }).click();
   await expect(page.getByText("Assessment complete")).toBeVisible();
 });
+
+test("learner can finish a manual-review assessment without false progress", async ({
+  page,
+}) => {
+  const prompt = "I would like to understand a subject deeply";
+  const email = `manual-review-uiux-${Date.now()}@example.com`;
+
+  await page.goto("/start");
+  await page.getByLabel("What would you like to learn?").fill(prompt);
+  await page.getByLabel("Your name").fill("Manual Review Learner");
+  await page.getByLabel("Email identifier").fill(email);
+  await page.getByLabel("Password").fill("manual-review-local-2026");
+  await page.getByRole("button", { name: "Create my journey" }).click();
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+
+  const journeyId = page
+    .url()
+    .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
+  expect(journeyId).toBeTruthy();
+  const journeyResponse = await page.request.get(
+    `/api/v1/learning/journeys/${journeyId}`,
+  );
+  expect(journeyResponse.ok()).toBeTruthy();
+  const journey = await journeyResponse.json();
+  const activity = journey.activities[0];
+  const objective = journey.objectives[0];
+  const generationRunId = await publishedGenerationRun(
+    page,
+    "question.compose",
+  );
+  const questionResponse = await page.request.post("/api/v1/questions", {
+    data: {
+      generationRunId,
+      kind: "essay",
+      prompt: "Explain the first principle in your own words.",
+      points: 2,
+      reviewStatus: "approved",
+      sourceReferences: ["https://example.com/learning"],
+    },
+  });
+  expect(questionResponse.ok()).toBeTruthy();
+  const question = await questionResponse.json();
+  const assessmentResponse = await page.request.post("/api/v1/assessments", {
+    data: {
+      activityId: activity.id,
+      mode: "graded",
+      status: "published",
+      items: [
+        {
+          objectiveId: objective.id,
+          questionId: question.questionId,
+          questionVersion: question.version,
+          orderIndex: 0,
+          points: 2,
+        },
+      ],
+    },
+  });
+  expect(assessmentResponse.ok()).toBeTruthy();
+
+  await page.getByRole("button", { name: "Begin" }).click();
+  await expect(
+    page.getByText("Graded assessment", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Answer question 1")
+    .fill("I can explain the principle and apply it to a new example.");
+  await page.getByRole("button", { name: "Submit assessment" }).click();
+
+  await expect(
+    page.getByText("Assessment submitted · pending review"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Complete. Your next activity is now ready."),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
