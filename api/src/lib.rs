@@ -5,6 +5,7 @@
 pub mod assessment;
 pub mod assessment_postgres;
 pub mod attempt;
+pub mod attempt_postgres;
 pub mod audit;
 pub mod auth;
 pub mod authentication;

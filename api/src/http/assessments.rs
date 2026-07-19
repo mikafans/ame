@@ -89,6 +89,7 @@ pub async fn create_assessment(
             .await
             .map_err(map_assessment_error)?;
         items.push(AssessmentItemInput {
+            id: Uuid::now_v7(),
             question_version_id: question.id,
             order_index: item.order_index,
             points: item.points,

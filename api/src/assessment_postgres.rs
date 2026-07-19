@@ -85,8 +85,9 @@ impl AssessmentRepository for PgAssessmentRepository {
         let assessment = assessment_from_row(&row, input.items.clone())?;
         for item in &input.items {
             sqlx::query(
-                "INSERT INTO tb_assessment_items (assessment_id, question_version_id, order_index, points_override) VALUES ($1, $2, $3, $4)",
+                "INSERT INTO tb_assessment_items (id, assessment_id, question_version_id, order_index, points_override) VALUES ($1, $2, $3, $4, $5)",
             )
+            .bind(item.id)
             .bind(assessment.id)
             .bind(item.question_version_id)
             .bind(item.order_index)
@@ -116,7 +117,7 @@ impl AssessmentRepository for PgAssessmentRepository {
             return Err(AssessmentRepositoryError::SubjectMismatch);
         }
         let items = sqlx::query(
-            "SELECT question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
+            "SELECT id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
         )
         .bind(assessment_id)
         .fetch_all(&self.pool)
@@ -124,6 +125,7 @@ impl AssessmentRepository for PgAssessmentRepository {
         .map_err(storage_error)?
         .into_iter()
         .map(|item| AssessmentItemInput {
+            id: item.get("id"),
             question_version_id: item.get("question_version_id"),
             order_index: item.get("order_index"),
             points: item.get::<i32, _>("points_override") as u32,

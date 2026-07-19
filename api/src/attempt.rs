@@ -78,7 +78,7 @@ impl AttemptRepository for InMemoryAttemptRepository {
             item_question_versions: assessment
                 .items
                 .iter()
-                .map(|item| (item.question_version_id, item.question_version_id))
+                .map(|item| (item.id, item.question_version_id))
                 .collect(),
             grade: None,
             created_at: OffsetDateTime::now_utc(),
@@ -128,7 +128,9 @@ impl AttemptRepository for InMemoryAttemptRepository {
         if *expected_question_version != question_version_id {
             return Err(AttemptError::StaleQuestionVersion);
         }
-        attempt.responses.insert(item_id, response);
+        attempt
+            .responses
+            .insert(*expected_question_version, response);
         Ok(attempt.clone())
     }
 
@@ -217,6 +219,7 @@ mod tests {
             version: 1,
             mode: AssessmentMode::Practice,
             items: vec![AssessmentItemInput {
+                id: Uuid::now_v7(),
                 question_version_id: question_id,
                 order_index: 0,
                 points: 1,
@@ -252,7 +255,7 @@ mod tests {
                 .id,
             first.id
         );
-        let item_id = assessment.items[0].question_version_id;
+        let item_id = assessment.items[0].id;
         let saved = repository
             .save_answer(
                 subject,
@@ -327,7 +330,7 @@ mod tests {
                 .save_answer(
                     assessment.subject_user_id,
                     attempt.id,
-                    assessment.items[0].question_version_id,
+                    assessment.items[0].id,
                     Uuid::now_v7(),
                     serde_json::json!({})
                 )

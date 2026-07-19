@@ -30,6 +30,7 @@ impl Default for AssessmentStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssessmentItemInput {
+    pub id: Uuid,
     pub question_version_id: Uuid,
     pub order_index: i32,
     pub points: u32,
