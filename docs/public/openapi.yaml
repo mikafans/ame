@@ -1506,6 +1506,7 @@ components:
       - caveats
       - sourceReferences
       - applicationTask
+      - reviewStatus
       - contentVersion
       properties:
         activityId:
@@ -1537,6 +1538,8 @@ components:
         objectiveId:
           type: string
           format: uuid
+        reviewStatus:
+          $ref: '#/components/schemas/ContentReviewStatus'
         sourceReferences:
           type: array
           items:

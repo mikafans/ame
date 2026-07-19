@@ -631,7 +631,7 @@
       "path": "/api/v1/progress/{journey_id}/timeline"
     },
     {
-      "description": "Create a source-backed deep dive from a published deep_dive.create generation run, linked to matching owned evidence.",
+      "description": "Create a source-backed deep dive from a published deep_dive.create generation run, linked to matching owned evidence. Unreviewed content is stored for review but is not learner-readable until approved.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -657,6 +657,16 @@
           },
           "objectiveId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "Content is returned by learner reads only when approved.",
+            "enum": [
+              "draft",
+              "review",
+              "approved",
+              "rejected"
+            ],
             "type": "string"
           },
           "sourceReferences": {
@@ -689,7 +699,7 @@
       "path": "/api/v1/deep-dives"
     },
     {
-      "description": "Discover the source-backed deep dive attached to an activity.",
+      "description": "Discover the approved source-backed deep dive attached to an activity. Draft and review content is not returned.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -707,7 +717,7 @@
       "path": "/api/v1/deep-dives?activityId={activity_id}"
     },
     {
-      "description": "Read one source-backed deep dive owned by the learner.",
+      "description": "Read one approved source-backed deep dive owned by the learner; draft and review content is not returned.",
       "input_schema": {
         "properties": {
           "id": {

@@ -808,6 +808,7 @@ export interface components {
             journeyId: string;
             /** Format: uuid */
             objectiveId: string;
+            reviewStatus: components["schemas"]["ContentReviewStatus"];
             sourceReferences: string[];
             title: string;
             /** Format: uuid */

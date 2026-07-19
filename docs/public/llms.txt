@@ -73,7 +73,10 @@ generation run with the matching operation (`question.compose` or
 reject missing, failed, cross-owner, and operation-mismatched provenance. A
 deep dive must also reference existing evidence owned by the same learner and
 matching its journey, objective, and activity; include at least one source
-reference.
+reference. Deep dives carry an explicit `reviewStatus`; `draft`, `review`, and
+`rejected` content may be stored for the authoring/review workflow but are not
+returned by learner deep-dive reads. Only `approved` deep dives appear through
+`GET /api/v1/deep-dives?activityId=...` or `GET /api/v1/deep-dives/{id}`.
 
 Provider generation runs are owner-scoped and retryable. Reusing the same
 `retryKey` for the same operation returns the existing run. A run may move
