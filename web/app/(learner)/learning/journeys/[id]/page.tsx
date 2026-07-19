@@ -225,18 +225,20 @@ export default function LearningJourneyPage() {
       throw new Error("Could not grade the assessment");
     }
     setAttempt(finishedAttempt.data);
-    const evidence = await api.POST("/api/v1/progress/evidence", {
-      body: {
-        journeyId: params.id,
-        objectiveId: journey?.objectives[0]?.id ?? "",
-        activityId: session.activityId,
-        attemptId: attempt.id,
-        value: finishedAttempt.data.score ?? 0,
-        derivationVersion: 1,
-      },
-    });
-    if (!evidence.response.ok) {
-      throw new Error("Could not record assessment evidence");
+    if (finishedAttempt.data.status === "graded") {
+      const evidence = await api.POST("/api/v1/progress/evidence", {
+        body: {
+          journeyId: params.id,
+          objectiveId: journey?.objectives[0]?.id ?? "",
+          activityId: session.activityId,
+          attemptId: attempt.id,
+          value: finishedAttempt.data.score ?? 0,
+          derivationVersion: 1,
+        },
+      });
+      if (!evidence.response.ok) {
+        throw new Error("Could not record assessment evidence");
+      }
     }
   }
 
