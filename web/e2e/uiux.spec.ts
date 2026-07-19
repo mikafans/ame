@@ -105,6 +105,11 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   const journey = await journeyResponse.json();
   const activity = journey.activities[0];
   const objective = journey.objectives[0];
+  const sessionResponse = await page.request.post(
+    `/api/v1/learning/journeys/${journeyId}/activities/${activity.id}/start`,
+  );
+  expect(sessionResponse.ok()).toBeTruthy();
+  const session = await sessionResponse.json();
 
   const questionResponse = await page.request.post("/api/v1/questions", {
     data: {
@@ -139,6 +144,29 @@ test("learner can complete an agent-provided assessment and open its deep dive",
     },
   });
   expect(assessmentResponse.ok()).toBeTruthy();
+  const assessment = await assessmentResponse.json();
+  const attemptResponse = await page.request.post(
+    `/api/v1/assessments/${assessment.id}/attempts`,
+    { data: { learningSessionId: session.id } },
+  );
+  expect(attemptResponse.ok()).toBeTruthy();
+  const attempt = await attemptResponse.json();
+  const item = assessment.items[0];
+  const answerResponse = await page.request.post(
+    `/api/v1/attempts/${attempt.id}/answers`,
+    {
+      data: {
+        assessmentItemId: item.id,
+        questionVersionId: item.questionVersionId,
+        response: { option_id: "right" },
+      },
+    },
+  );
+  expect(answerResponse.ok()).toBeTruthy();
+  const finishResponse = await page.request.post(
+    `/api/v1/attempts/${attempt.id}/finish`,
+  );
+  expect(finishResponse.ok()).toBeTruthy();
 
   const evidenceResponse = await page.request.post(
     "/api/v1/progress/evidence",
@@ -147,6 +175,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
         journeyId,
         objectiveId: objective.id,
         activityId: activity.id,
+        attemptId: attempt.id,
         value: 0.5,
         derivationVersion: 1,
       },
