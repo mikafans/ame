@@ -690,6 +690,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/onboarding/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /v1/onboarding/preview — explain the first journey without creating state. */
+        post: operations["preview_learning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/onboarding/start": {
         parameters: {
             query?: never;
@@ -1700,6 +1717,30 @@ export interface components {
             section?: string | null;
             /** Format: int32 */
             version: number;
+        };
+        PreviewActivityResponse: {
+            /** Format: int64 */
+            estimatedMinutes: number;
+            kind: components["schemas"]["ActivityKind"];
+            purpose: string;
+            title: string;
+        };
+        PreviewLearningBody: {
+            prompt: string;
+        };
+        PreviewLearningResponse: {
+            firstActivity: components["schemas"]["PreviewActivityResponse"];
+            normalizedStatement: string;
+            objectives: components["schemas"]["PreviewObjectiveResponse"][];
+            promise: string;
+            templateId: string;
+            /** Format: int32 */
+            templateVersion: number;
+        };
+        PreviewObjectiveResponse: {
+            statement: string;
+            successCriteria: string;
+            verb: string;
         };
         PublishDeepDiveBody: {
             bodyMarkdown: string;
@@ -3963,6 +4004,37 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_learning: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewLearningBody"];
+            };
+        };
+        responses: {
+            /** @description Preview of the first learning journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewLearningResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

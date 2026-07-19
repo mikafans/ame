@@ -1483,6 +1483,27 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
+  /v1/onboarding/preview:
+    post:
+      tags:
+      - onboarding
+      summary: POST /v1/onboarding/preview — explain the first journey without creating state.
+      operationId: preview_learning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewLearningBody'
+        required: true
+      responses:
+        '200':
+          description: Preview of the first learning journey
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewLearningResponse'
+        '422':
+          description: Validation failed
   /v1/onboarding/start:
     post:
       tags:
@@ -4054,6 +4075,69 @@ components:
         version:
           type: integer
           format: int32
+    PreviewActivityResponse:
+      type: object
+      required:
+      - kind
+      - title
+      - purpose
+      - estimatedMinutes
+      properties:
+        estimatedMinutes:
+          type: integer
+          format: int64
+        kind:
+          $ref: '#/components/schemas/ActivityKind'
+        purpose:
+          type: string
+        title:
+          type: string
+    PreviewLearningBody:
+      type: object
+      required:
+      - prompt
+      properties:
+        prompt:
+          type: string
+    PreviewLearningResponse:
+      type: object
+      required:
+      - normalizedStatement
+      - promise
+      - templateId
+      - templateVersion
+      - objectives
+      - firstActivity
+      properties:
+        firstActivity:
+          $ref: '#/components/schemas/PreviewActivityResponse'
+        normalizedStatement:
+          type: string
+        objectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreviewObjectiveResponse'
+        promise:
+          type: string
+        templateId:
+          type: string
+        templateVersion:
+          type: integer
+          format: int32
+          minimum: 0
+    PreviewObjectiveResponse:
+      type: object
+      required:
+      - verb
+      - statement
+      - successCriteria
+      properties:
+        statement:
+          type: string
+        successCriteria:
+          type: string
+        verb:
+          type: string
     PublishDeepDiveBody:
       type: object
       required:

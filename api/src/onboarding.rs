@@ -86,6 +86,28 @@ pub struct PromptInterpretation {
     pub template_version_id: Option<Uuid>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LearningPreview {
+    pub interpretation: PromptInterpretation,
+    pub objectives: Vec<PreviewObjective>,
+    pub first_activity: PreviewActivity,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewObjective {
+    pub verb: String,
+    pub statement: String,
+    pub success_criteria: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewActivity {
+    pub kind: ActivityKind,
+    pub title: String,
+    pub purpose: String,
+    pub estimated_minutes: i64,
+}
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum PromptInterpretationError {
     #[error("learning prompt must not be empty")]
@@ -419,6 +441,62 @@ where
         }
     }
 
+    pub async fn preview_from_prompt<P: LearningPromptInterpreter>(
+        &self,
+        raw_prompt: &str,
+        interpreter: &P,
+    ) -> Result<LearningPreview, PromptInterpretationError> {
+        let interpretation = interpreter.interpret(raw_prompt).await?;
+        let blueprint = starter_blueprint(
+            &BootstrapPlan {
+                subject_user_id: Uuid::nil(),
+                source_actor_id: Uuid::nil(),
+                raw_intent: interpretation.normalized_statement.clone(),
+                normalized_statement: interpretation.normalized_statement.clone(),
+                promise: interpretation.promise.clone(),
+                template_id: interpretation.template_id.clone(),
+                template_version: interpretation.template_version,
+                template_version_id: interpretation.template_version_id,
+                idempotency_key: "preview".to_string(),
+            },
+            Uuid::nil(),
+        );
+        let first_activity = blueprint
+            .activities
+            .first()
+            .expect("starter blueprint must contain a first activity");
+        let estimated_minutes = first_activity
+            .payload
+            .get("estimated_minutes")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
+        let purpose = first_activity
+            .payload
+            .get("purpose")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("first learning step")
+            .to_string();
+
+        Ok(LearningPreview {
+            interpretation,
+            objectives: blueprint
+                .objectives
+                .into_iter()
+                .map(|objective| PreviewObjective {
+                    verb: objective.verb,
+                    statement: objective.statement,
+                    success_criteria: objective.success_criteria,
+                })
+                .collect(),
+            first_activity: PreviewActivity {
+                kind: first_activity.kind,
+                title: first_activity.title.clone(),
+                purpose,
+                estimated_minutes,
+            },
+        })
+    }
+
     pub async fn start_learning(
         &self,
         request: StartLearningRequest,
@@ -528,7 +606,7 @@ mod tests {
         StartLearningRequest,
     };
     use crate::domain::identity::RegistrationMode;
-    use crate::domain::learning::{LearningRepository, LearningRepositoryError};
+    use crate::domain::learning::{ActivityKind, LearningRepository, LearningRepositoryError};
     use crate::identity::InMemoryIdentityRepository;
     use crate::learning::InMemoryLearningRepository;
     use uuid::Uuid;
@@ -590,6 +668,26 @@ mod tests {
             result.bootstrap.goal.raw_intent,
             "I would like to learn music theory"
         );
+    }
+
+    #[tokio::test]
+    async fn preview_from_prompt_does_not_require_storage_and_exposes_first_step() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let preview = service
+            .preview_from_prompt(
+                "I would like to learn music theory",
+                &CatalogPromptInterpreter,
+            )
+            .await
+            .expect("preview succeeds");
+
+        assert_eq!(preview.interpretation.template_id, "learn-a-subject");
+        assert_eq!(preview.objectives.len(), 3);
+        assert_eq!(preview.first_activity.kind, ActivityKind::Explanation);
+        assert_eq!(preview.first_activity.estimated_minutes, 5);
     }
 
     #[tokio::test]

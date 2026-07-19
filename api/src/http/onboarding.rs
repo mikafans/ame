@@ -14,7 +14,7 @@ use crate::{
     identity_postgres::PgIdentityRepository,
     learning_postgres::PgLearningRepository,
     onboarding::{
-        CatalogPromptInterpreter, SelfHostOnboardingService, StartLearningError,
+        CatalogPromptInterpreter, LearningPreview, SelfHostOnboardingService, StartLearningError,
         StartLearningPromptRequest,
     },
     session::{BrowserSessionService, SessionCredentialError},
@@ -27,6 +27,40 @@ pub struct StartLearningBody {
     pub display_name: String,
     pub prompt: String,
     pub idempotency_key: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewLearningBody {
+    pub prompt: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewLearningResponse {
+    pub normalized_statement: String,
+    pub promise: String,
+    pub template_id: String,
+    pub template_version: u32,
+    pub objectives: Vec<PreviewObjectiveResponse>,
+    pub first_activity: PreviewActivityResponse,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewObjectiveResponse {
+    pub verb: String,
+    pub statement: String,
+    pub success_criteria: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewActivityResponse {
+    pub kind: crate::domain::learning::ActivityKind,
+    pub title: String,
+    pub purpose: String,
+    pub estimated_minutes: i64,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -44,9 +78,35 @@ pub struct StartLearningResponse {
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/v1/onboarding/preview", post(preview_learning))
         .route("/v1/onboarding/start", post(start_learning))
         .layer(RequestBodyLimitLayer::new(64 * 1024))
         .with_state(state)
+}
+
+/// POST /v1/onboarding/preview — explain the first journey without creating state.
+#[utoipa::path(
+    post,
+    path = "/v1/onboarding/preview",
+    request_body = PreviewLearningBody,
+    responses(
+        (status = 200, description = "Preview of the first learning journey", body = PreviewLearningResponse),
+        (status = 422, description = "Validation failed")
+    ),
+    tag = "onboarding"
+)]
+pub async fn preview_learning(
+    State(state): State<AppState>,
+    Json(body): Json<PreviewLearningBody>,
+) -> Result<Json<PreviewLearningResponse>, ApiError> {
+    let identity = PgIdentityRepository::new(state.pool.clone());
+    let onboarding =
+        SelfHostOnboardingService::new(identity, PgLearningRepository::new(state.pool.clone()));
+    let preview = onboarding
+        .preview_from_prompt(&body.prompt, &CatalogPromptInterpreter)
+        .await
+        .map_err(map_preview_error)?;
+    Ok(Json(preview_response(preview)))
 }
 
 /// POST /v1/onboarding/start — create or resume a learner's first journey.
@@ -155,4 +215,40 @@ fn map_start_learning_error(error: StartLearningError) -> ApiError {
 
 fn map_session_error(error: SessionCredentialError) -> ApiError {
     ApiError::Internal(error.into())
+}
+
+fn map_preview_error(error: crate::onboarding::PromptInterpretationError) -> ApiError {
+    match error {
+        crate::onboarding::PromptInterpretationError::EmptyPrompt => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "prompt".into(),
+                message: "must not be empty".into(),
+            }])
+        }
+        error => ApiError::Internal(error.into()),
+    }
+}
+
+fn preview_response(preview: LearningPreview) -> PreviewLearningResponse {
+    PreviewLearningResponse {
+        normalized_statement: preview.interpretation.normalized_statement,
+        promise: preview.interpretation.promise,
+        template_id: preview.interpretation.template_id,
+        template_version: preview.interpretation.template_version,
+        objectives: preview
+            .objectives
+            .into_iter()
+            .map(|objective| PreviewObjectiveResponse {
+                verb: objective.verb,
+                statement: objective.statement,
+                success_criteria: objective.success_criteria,
+            })
+            .collect(),
+        first_activity: PreviewActivityResponse {
+            kind: preview.first_activity.kind,
+            title: preview.first_activity.title,
+            purpose: preview.first_activity.purpose,
+            estimated_minutes: preview.first_activity.estimated_minutes,
+        },
+    }
 }
