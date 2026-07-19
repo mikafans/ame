@@ -55,3 +55,17 @@ test("visitor can preview a first learning journey from an intent", async ({
     page.getByRole("link", { name: "Start this journey" }),
   ).toHaveAttribute("href", /\/start\?prompt=/);
 });
+
+test("saved color mode is applied before the first page render", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("ame.colorMode", "dark");
+  });
+  await page.goto("/");
+
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(
+    page.getByRole("button", { name: "Use light mode" }),
+  ).toBeVisible();
+});

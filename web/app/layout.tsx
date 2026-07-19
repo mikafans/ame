@@ -34,8 +34,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (() => {
+                try {
+                  const mode = localStorage.getItem("ame.colorMode");
+                  if (mode === "dark" || mode === "light") {
+                    document.documentElement.classList.toggle(
+                      "dark",
+                      mode === "dark",
+                    );
+                  }
+                } catch {}
+              })();
+            `,
+          }}
+        />
         <link
           rel="alternate"
           type="text/plain"
