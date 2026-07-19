@@ -11,6 +11,7 @@ pub mod domain;
 pub mod engine;
 pub mod http;
 pub mod identity;
+pub mod identity_postgres;
 pub mod learning;
 pub mod learning_postgres;
 pub mod onboarding;

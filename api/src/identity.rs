@@ -16,6 +16,23 @@ pub struct InMemoryIdentityRepository {
     state: Arc<Mutex<State>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct IdentityContractFixtures {
+    pub duplicate_email: &'static str,
+    pub display_name: &'static str,
+    pub token_hash: &'static str,
+}
+
+impl Default for IdentityContractFixtures {
+    fn default() -> Self {
+        Self {
+            duplicate_email: "Ada.Lovelace+first@Example.COM",
+            display_name: "Ada",
+            token_hash: "hashed-session-secret",
+        }
+    }
+}
+
 #[derive(Default)]
 struct State {
     accounts: HashMap<Uuid, LearnerAccount>,
@@ -119,61 +136,70 @@ impl IdentityRepository for InMemoryIdentityRepository {
     }
 }
 
+pub async fn exercise_identity_repository_contract<R: IdentityRepository>(
+    repository: &R,
+    fixtures: IdentityContractFixtures,
+) {
+    let account = repository
+        .create_learner(CreateLearner {
+            email: fixtures.duplicate_email.to_string(),
+            display_name: fixtures.display_name.to_string(),
+        })
+        .await
+        .expect("learner creates");
+    assert_eq!(account.email, "ada.lovelace@example.com");
+    assert_eq!(account.status, AccountStatus::Active);
+
+    let existing = repository
+        .find_learner_by_email("ada.lovelace@example.com")
+        .await
+        .expect("lookup succeeds")
+        .expect("account exists");
+    assert_eq!(existing.id, account.id);
+
+    assert_eq!(
+        repository
+            .create_learner(CreateLearner {
+                email: "ada.lovelace@example.com".to_string(),
+                display_name: "Overwritten".to_string(),
+            })
+            .await,
+        Err(IdentityRepositoryError::AccountAlreadyExists)
+    );
+
+    let session = repository
+        .create_browser_session(CreateBrowserSession {
+            user_id: account.id,
+            token_hash: fixtures.token_hash.to_string(),
+            expires_at: OffsetDateTime::now_utc() + time::Duration::hours(3),
+        })
+        .await
+        .expect("session creates");
+    assert_eq!(
+        repository
+            .get_browser_session(session.id)
+            .await
+            .expect("session reads"),
+        session
+    );
+}
+
 #[cfg(test)]
 mod contract_tests {
-    use super::InMemoryIdentityRepository;
-    use crate::domain::identity::{
-        AccountStatus, CreateBrowserSession, CreateLearner, IdentityRepository,
-        IdentityRepositoryError,
+    use super::{
+        IdentityContractFixtures, InMemoryIdentityRepository, exercise_identity_repository_contract,
     };
-    use time::{Duration, OffsetDateTime};
+    use crate::domain::identity::{
+        CreateBrowserSession, CreateLearner, IdentityRepository, IdentityRepositoryError,
+    };
+    use time::OffsetDateTime;
     use uuid::Uuid;
 
     #[tokio::test]
     async fn open_registration_is_collision_safe_and_session_is_durable() {
         let repository = InMemoryIdentityRepository::default();
-        let account = repository
-            .create_learner(CreateLearner {
-                email: " Ada.Lovelace+first@Example.COM ".to_string(),
-                display_name: "Ada".to_string(),
-            })
-            .await
-            .expect("learner creates");
-        assert_eq!(account.email, "ada.lovelace@example.com");
-        assert_eq!(account.status, AccountStatus::Active);
-
-        let existing = repository
-            .find_learner_by_email("ada.lovelace@example.com")
-            .await
-            .expect("lookup succeeds")
-            .expect("account exists");
-        assert_eq!(existing.id, account.id);
-
-        assert_eq!(
-            repository
-                .create_learner(CreateLearner {
-                    email: "ada.lovelace@example.com".to_string(),
-                    display_name: "Overwritten".to_string(),
-                })
-                .await,
-            Err(IdentityRepositoryError::AccountAlreadyExists)
-        );
-
-        let session = repository
-            .create_browser_session(CreateBrowserSession {
-                user_id: account.id,
-                token_hash: "hashed-session-secret".to_string(),
-                expires_at: OffsetDateTime::now_utc() + Duration::hours(3),
-            })
-            .await
-            .expect("session creates");
-        assert_eq!(
-            repository
-                .get_browser_session(session.id)
-                .await
-                .expect("session reads"),
-            session
-        );
+        exercise_identity_repository_contract(&repository, IdentityContractFixtures::default())
+            .await;
     }
 
     #[tokio::test]
