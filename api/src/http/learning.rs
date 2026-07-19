@@ -65,7 +65,6 @@ pub struct LearningActivityResponse {
     pub journey_id: Uuid,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
-    pub source_run_id: Option<Uuid>,
     pub kind: ActivityKind,
     pub title: String,
     pub order_index: i32,
@@ -145,8 +144,23 @@ pub struct LearningJourneyResponse {
     pub recommendation: Option<LearningRecommendationResponse>,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningJourneySummaryResponse {
+    pub id: Uuid,
+    pub promise: String,
+    pub status: JourneyStatus,
+    pub raw_intent: String,
+    pub next_activity_id: Option<Uuid>,
+    pub next_activity_title: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/v1/learning/journeys", get(list_journeys))
         .route("/v1/learning/journeys/{id}", get(get_journey))
         .route("/v1/learning/sessions/{id}", get(get_learning_session))
         .route(
@@ -158,6 +172,56 @@ pub fn router(state: AppState) -> Router<AppState> {
             post(start_activity),
         )
         .with_state(state)
+}
+
+/// GET /v1/learning/journeys — list the caller's learner-owned journeys.
+#[utoipa::path(
+    get,
+    path = "/v1/learning/journeys",
+    responses(
+        (status = 200, description = "Learner journeys", body = [LearningJourneySummaryResponse]),
+        (status = 401, description = "Missing or invalid token")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn list_journeys(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<Vec<LearningJourneySummaryResponse>>, ApiError> {
+    let repository = PgLearningRepository::new(state.pool);
+    let journeys = repository
+        .list_journeys(auth.owner_id())
+        .await
+        .map_err(map_learning_error)?;
+    let mut response = Vec::with_capacity(journeys.len());
+    for journey in journeys {
+        let goal = repository
+            .get_goal(auth.owner_id(), journey.goal_id)
+            .await
+            .map_err(map_learning_error)?;
+        let next_activity = repository
+            .list_activities(auth.owner_id(), journey.id)
+            .await
+            .map_err(map_learning_error)?
+            .into_iter()
+            .find(|activity| {
+                matches!(
+                    activity.status,
+                    ActivityStatus::Ready | ActivityStatus::InProgress
+                )
+            });
+        response.push(LearningJourneySummaryResponse {
+            id: journey.id,
+            promise: journey.promise,
+            status: journey.status,
+            raw_intent: goal.raw_intent,
+            next_activity_id: next_activity.as_ref().map(|activity| activity.id),
+            next_activity_title: next_activity.map(|activity| activity.title),
+            created_at: journey.created_at,
+        });
+    }
+    Ok(Json(response))
 }
 
 /// GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey.
@@ -237,7 +301,7 @@ pub async fn get_journey(
     responses(
         (status = 201, description = "Learning session started or resumed", body = LearningSessionResponse),
         (status = 401, description = "Missing or invalid token"),
-        (status = 403, description = "Token lacks required scope"),
+        (status = 403, description = "The authenticated learner cannot access this resource"),
         (status = 404, description = "Activity does not exist for this learner"),
         (status = 422, description = "Activity is not ready")
     ),
@@ -249,18 +313,6 @@ pub async fn start_activity(
     auth: AuthenticatedUser,
     Path((journey_id, activity_id)): Path<(Uuid, Uuid)>,
 ) -> Result<(StatusCode, Json<LearningSessionResponse>), ApiError> {
-    if auth.is_agent()
-        && !auth
-            .token_scopes
-            .contains(&crate::domain::user::Scope::AttemptWrite)
-        && !auth
-            .token_scopes
-            .contains(&crate::domain::user::Scope::Admin)
-    {
-        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
-            "attempt.write",
-        )));
-    }
     let repository = PgLearningRepository::new(state.pool);
     let session = repository
         .start_learning_session(CreateLearningSession {
@@ -310,7 +362,7 @@ pub async fn get_learning_session(
     responses(
         (status = 200, description = "Finished learning session", body = LearningSessionResponse),
         (status = 401, description = "Missing or invalid token"),
-        (status = 403, description = "Token lacks required scope"),
+        (status = 403, description = "The authenticated learner cannot access this resource"),
         (status = 404, description = "Session does not exist for this learner"),
         (status = 409, description = "Session is already finished")
     ),
@@ -323,18 +375,6 @@ pub async fn finish_learning_session(
     Path(id): Path<Uuid>,
     Json(body): Json<FinishLearningSessionBody>,
 ) -> Result<Json<LearningSessionResponse>, ApiError> {
-    if auth.is_agent()
-        && !auth
-            .token_scopes
-            .contains(&crate::domain::user::Scope::AttemptWrite)
-        && !auth
-            .token_scopes
-            .contains(&crate::domain::user::Scope::Admin)
-    {
-        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
-            "attempt.write",
-        )));
-    }
     let repository = PgLearningRepository::new(state.pool);
     let current_session = repository
         .get_learning_session(auth.owner_id(), id)
@@ -422,7 +462,6 @@ fn activity_response(activity: LearningActivity) -> LearningActivityResponse {
         journey_id: activity.journey_id,
         subject_user_id: activity.subject_user_id,
         source_actor_id: activity.source_actor_id,
-        source_run_id: activity.source_run_id,
         kind: activity.kind,
         title: activity.title,
         order_index: activity.order_index,
@@ -466,6 +505,9 @@ fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -
         }
         crate::domain::learning::LearningRepositoryError::LearningSessionFinished => {
             ApiError::SessionFinished
+        }
+        crate::domain::learning::LearningRepositoryError::LearningSessionResultConflict => {
+            ApiError::LearningSessionResultConflict
         }
         other => ApiError::Internal(other.into()),
     }

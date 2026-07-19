@@ -138,7 +138,6 @@ pub struct CreateActivity {
     pub journey_id: Uuid,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
-    pub source_run_id: Option<Uuid>,
     pub kind: ActivityKind,
     pub title: String,
     pub order_index: i32,
@@ -154,7 +153,6 @@ pub struct LearningActivity {
     pub journey_id: Uuid,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
-    pub source_run_id: Option<Uuid>,
     pub kind: ActivityKind,
     pub title: String,
     pub order_index: i32,
@@ -214,6 +212,8 @@ pub enum LearningRepositoryError {
     ActivityNotReady,
     #[error("learning session is already finished")]
     LearningSessionFinished,
+    #[error("learning session was finished with a different result")]
+    LearningSessionResultConflict,
     #[error("learning repository storage failure: {0}")]
     Storage(String),
 }
@@ -245,6 +245,11 @@ pub trait LearningRepository: Send + Sync {
         subject_user_id: Uuid,
         journey_id: Uuid,
     ) -> Result<LearningJourney, LearningRepositoryError>;
+
+    async fn list_journeys(
+        &self,
+        subject_user_id: Uuid,
+    ) -> Result<Vec<LearningJourney>, LearningRepositoryError>;
 
     async fn set_journey_status(
         &self,

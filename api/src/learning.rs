@@ -156,6 +156,24 @@ impl LearningRepository for InMemoryLearningRepository {
         }
     }
 
+    async fn list_journeys(
+        &self,
+        subject_user_id: Uuid,
+    ) -> Result<Vec<LearningJourney>, LearningRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut journeys: Vec<_> = state
+            .journeys
+            .values()
+            .filter(|journey| journey.subject_user_id == subject_user_id)
+            .cloned()
+            .collect();
+        journeys.sort_by_key(|journey| std::cmp::Reverse(journey.created_at));
+        Ok(journeys)
+    }
+
     async fn set_journey_status(
         &self,
         subject_user_id: Uuid,
@@ -295,7 +313,6 @@ impl LearningRepository for InMemoryLearningRepository {
             journey_id: input.journey_id,
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
-            source_run_id: input.source_run_id,
             kind: input.kind,
             title: input.title,
             order_index: input.order_index,
@@ -468,7 +485,11 @@ impl LearningRepository for InMemoryLearningRepository {
                 return Err(LearningRepositoryError::SubjectMismatch);
             }
             if session.status != LearningSessionStatus::InProgress {
-                return Err(LearningRepositoryError::LearningSessionFinished);
+                return match session.result.as_ref() {
+                    Some(result) if *result == input.result => Ok(session.clone()),
+                    Some(_) => Err(LearningRepositoryError::LearningSessionResultConflict),
+                    None => Err(LearningRepositoryError::LearningSessionFinished),
+                };
             }
             let activity_id = session.activity_id;
             session.status = LearningSessionStatus::Finished;
@@ -516,13 +537,13 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let subject = fixtures.subject_user_id;
     let other_subject = fixtures.other_subject_user_id;
     let actor = fixtures.source_actor_id;
-    let idempotency_key = Some("onboarding/music-theory".to_string());
+    let idempotency_key = Some("onboarding/learner-selected-topic".to_string());
     let input = CreateGoal {
         subject_user_id: subject,
         source_actor_id: actor,
         template_version_id: None,
-        raw_intent: "I would like to learn music theory".to_string(),
-        normalized_statement: "Understand foundational music theory".to_string(),
+        raw_intent: "I would like to learn a learner-selected topic".to_string(),
+        normalized_statement: "Understand the learner-selected topic".to_string(),
         idempotency_key: idempotency_key.clone(),
     };
 
@@ -619,7 +640,6 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             journey_id: journey.id,
             subject_user_id: subject,
             source_actor_id: actor,
-            source_run_id: None,
             kind: crate::domain::learning::ActivityKind::Diagnostic,
             title: "Interval diagnostic".to_string(),
             order_index: 0,
@@ -635,7 +655,6 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             journey_id: journey.id,
             subject_user_id: subject,
             source_actor_id: actor,
-            source_run_id: None,
             kind: crate::domain::learning::ActivityKind::Practice,
             title: "Interval practice".to_string(),
             order_index: 1,
@@ -715,15 +734,24 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             .status,
         ActivityStatus::Ready
     );
+    let finished_retry = repository
+        .finish_learning_session(FinishLearningSession {
+            subject_user_id: subject,
+            session_id: session.id,
+            result: serde_json::json!({"completed": true}),
+        })
+        .await
+        .expect("identical finish retry is idempotent");
+    assert_eq!(finished_retry, finished);
     assert_eq!(
         repository
             .finish_learning_session(FinishLearningSession {
                 subject_user_id: subject,
                 session_id: session.id,
-                result: serde_json::json!({"completed": true}),
+                result: serde_json::json!({"completed": false}),
             })
             .await,
-        Err(LearningRepositoryError::LearningSessionFinished)
+        Err(LearningRepositoryError::LearningSessionResultConflict)
     );
     assert_eq!(
         repository.get_journey(other_subject, journey.id).await,

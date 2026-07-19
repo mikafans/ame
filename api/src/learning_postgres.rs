@@ -209,6 +209,25 @@ impl LearningRepository for PgLearningRepository {
         }
     }
 
+    async fn list_journeys(
+        &self,
+        subject_user_id: Uuid,
+    ) -> Result<Vec<LearningJourney>, LearningRepositoryError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            FROM tb_learning_journeys
+            WHERE subject_user_id = $1
+            ORDER BY created_at DESC
+            "#,
+        )
+        .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows.into_iter().map(journey_from_row).collect())
+    }
+
     async fn set_journey_status(
         &self,
         subject_user_id: Uuid,
@@ -330,11 +349,11 @@ impl LearningRepository for PgLearningRepository {
         let row = sqlx::query(
             r#"
             INSERT INTO tb_activities (
-                journey_id, subject_user_id, source_actor_id, source_run_id,
+                journey_id, subject_user_id, source_actor_id,
                 kind, title, order_index, payload_schema_version, payload, status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id, journey_id, subject_user_id, source_actor_id, source_run_id,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, journey_id, subject_user_id, source_actor_id,
                       kind, title, order_index, payload_schema_version, payload,
                       status, created_at, updated_at
             "#,
@@ -342,7 +361,6 @@ impl LearningRepository for PgLearningRepository {
         .bind(journey.id)
         .bind(input.subject_user_id)
         .bind(input.source_actor_id)
-        .bind(input.source_run_id)
         .bind(activity_kind_value(input.kind))
         .bind(&input.title)
         .bind(input.order_index)
@@ -385,7 +403,7 @@ impl LearningRepository for PgLearningRepository {
         let rows = sqlx::query(
             r#"
             SELECT a.id, a.journey_id, a.subject_user_id, a.source_actor_id,
-                   a.source_run_id, a.kind, a.title, a.order_index,
+                   a.kind, a.title, a.order_index,
                    a.payload_schema_version, a.payload, a.status,
                    a.created_at, a.updated_at,
                    COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids
@@ -560,13 +578,16 @@ impl LearningRepository for PgLearningRepository {
         )
         .bind(input.session_id)
         .bind(input.subject_user_id)
-        .bind(input.result)
+        .bind(&input.result)
         .fetch_optional(&mut *transaction)
         .await
         .map_err(storage_error)?;
         let Some(row) = row else {
             let current = sqlx::query(
-                "SELECT subject_user_id, status FROM tb_learning_sessions WHERE id = $1",
+                r#"SELECT id, journey_id, activity_id, subject_user_id, actor_identity_id,
+                          status, question_plan, result, started_at, finished_at
+                   FROM tb_learning_sessions
+                   WHERE id = $1"#,
             )
             .bind(input.session_id)
             .fetch_optional(&mut *transaction)
@@ -578,7 +599,14 @@ impl LearningRepository for PgLearningRepository {
                 {
                     Err(LearningRepositoryError::SubjectMismatch)
                 }
-                Some(_) => Err(LearningRepositoryError::LearningSessionFinished),
+                Some(current) => {
+                    let session = learning_session_from_row(current);
+                    match session.result.as_ref() {
+                        Some(result) if *result == input.result => Ok(session),
+                        Some(_) => Err(LearningRepositoryError::LearningSessionResultConflict),
+                        None => Err(LearningRepositoryError::LearningSessionFinished),
+                    }
+                }
                 None => Err(LearningRepositoryError::NotFound {
                     resource: "learning session",
                 }),
@@ -698,7 +726,6 @@ fn activity_from_row(row: sqlx::postgres::PgRow, objective_ids: Vec<Uuid>) -> Le
         journey_id: row.get("journey_id"),
         subject_user_id: row.get("subject_user_id"),
         source_actor_id: row.get("source_actor_id"),
-        source_run_id: row.get("source_run_id"),
         kind: activity_kind(row.get::<String, _>("kind").as_str()),
         title: row.get("title"),
         order_index: row.get("order_index"),

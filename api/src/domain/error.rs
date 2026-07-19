@@ -14,40 +14,20 @@ pub enum ApiError {
     Unauthorized,
     #[error("forbidden: {0}")]
     Forbidden(Cow<'static, str>),
-    #[error("scope required: {0}")]
-    ScopeRequired(Cow<'static, str>),
     #[error("not found: {resource}")]
     NotFound { resource: &'static str },
     #[error("validation failed")]
     Validation(Vec<FieldError>),
-    #[error("invalid payload for kind {kind}: {reason}")]
-    InvalidPayload { kind: String, reason: String },
-    #[error("exam pool insufficient")]
-    ExamPoolInsufficient {
-        section: String,
-        required: usize,
-        available: usize,
-    },
     #[error("session already finished")]
     SessionFinished,
-    #[error("exam expired")]
-    ExamExpired,
+    #[error("learning session result conflicts with the completed result")]
+    LearningSessionResultConflict,
     #[error("idempotency key conflict")]
     IdempotencyConflict,
-    #[error("scoring unavailable")]
-    ScoringUnavailable,
     #[error("too many requests")]
     TooManyRequests,
-    #[error("unknown tool: {0}")]
-    UnknownTool(String),
     #[error("service in maintenance mode")]
     Maintenance,
-    #[error("quota exceeded")]
-    QuotaExceeded {
-        kind: String,
-        limit: i64,
-        usage: i64,
-    },
     #[error(transparent)]
     #[schema(value_type = String)]
     Internal(#[from] anyhow::Error),
@@ -66,18 +46,14 @@ impl ApiError {
     pub fn status_code(&self) -> StatusCode {
         match self {
             ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
-            ApiError::Forbidden(_) | ApiError::ScopeRequired(_) => StatusCode::FORBIDDEN,
+            ApiError::Forbidden(_) => StatusCode::FORBIDDEN,
             ApiError::NotFound { .. } => StatusCode::NOT_FOUND,
-            ApiError::Validation(_)
-            | ApiError::InvalidPayload { .. }
-            | ApiError::ExamPoolInsufficient { .. } => StatusCode::UNPROCESSABLE_ENTITY,
-            ApiError::SessionFinished | ApiError::IdempotencyConflict => StatusCode::CONFLICT,
-            ApiError::ExamExpired => StatusCode::GONE,
-            ApiError::ScoringUnavailable | ApiError::Maintenance => StatusCode::SERVICE_UNAVAILABLE,
-            ApiError::TooManyRequests | ApiError::QuotaExceeded { .. } => {
-                StatusCode::TOO_MANY_REQUESTS
-            }
-            ApiError::UnknownTool(_) => StatusCode::BAD_REQUEST,
+            ApiError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            ApiError::SessionFinished
+            | ApiError::LearningSessionResultConflict
+            | ApiError::IdempotencyConflict => StatusCode::CONFLICT,
+            ApiError::Maintenance => StatusCode::SERVICE_UNAVAILABLE,
+            ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -93,12 +69,6 @@ impl IntoResponse for ApiError {
                 None,
             ),
             ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.to_string(), None),
-            ApiError::ScopeRequired(scope) => (
-                StatusCode::FORBIDDEN,
-                "scope_required",
-                format!("token lacks required scope: {}", scope),
-                Some(json!({ "scope": scope })),
-            ),
             ApiError::NotFound { resource } => (
                 StatusCode::NOT_FOUND,
                 "not_found",
@@ -111,32 +81,16 @@ impl IntoResponse for ApiError {
                 "body fails schema validation".to_string(),
                 Some(json!({ "fields": fields })),
             ),
-            ApiError::InvalidPayload { kind, reason } => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "invalid_question_payload",
-                format!("payload doesn't match declared kind {}: {}", kind, reason),
-                None,
-            ),
-            ApiError::ExamPoolInsufficient {
-                section,
-                required,
-                available,
-            } => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "exam_pool_insufficient",
-                "dynamic blueprint can't be filled".to_string(),
-                Some(json!({ "section": section, "required": required, "available": available })),
-            ),
             ApiError::SessionFinished => (
                 StatusCode::CONFLICT,
                 "session_finished",
                 "answering a finished/abandoned session".to_string(),
                 None,
             ),
-            ApiError::ExamExpired => (
-                StatusCode::GONE,
-                "exam_expired",
-                "answering after deadline".to_string(),
+            ApiError::LearningSessionResultConflict => (
+                StatusCode::CONFLICT,
+                "session_result_conflict",
+                "the session was already finished with a different result".to_string(),
                 None,
             ),
             ApiError::IdempotencyConflict => (
@@ -145,22 +99,10 @@ impl IntoResponse for ApiError {
                 "same Idempotency-Key reused with different body".to_string(),
                 None,
             ),
-            ApiError::ScoringUnavailable => (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "scoring_unavailable",
-                "grade required an unavailable dependency".to_string(),
-                None,
-            ),
             ApiError::TooManyRequests => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "rate_limited",
                 "rate limit exceeded".to_string(),
-                None,
-            ),
-            ApiError::UnknownTool(tool) => (
-                StatusCode::BAD_REQUEST,
-                "unknown_tool",
-                format!("unknown or non-runnable tool: {}", tool),
                 None,
             ),
             ApiError::Maintenance => (
@@ -168,12 +110,6 @@ impl IntoResponse for ApiError {
                 "maintenance",
                 "the service is temporarily in maintenance mode".to_string(),
                 None,
-            ),
-            ApiError::QuotaExceeded { kind, limit, usage } => (
-                StatusCode::TOO_MANY_REQUESTS,
-                "quota_exceeded",
-                format!("plan quota exceeded for {}", kind),
-                Some(json!({ "kind": kind, "limit": limit, "usage": usage })),
             ),
             ApiError::Internal(err) => {
                 let request_id = uuid::Uuid::now_v7().to_string();
