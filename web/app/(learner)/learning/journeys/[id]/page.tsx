@@ -102,7 +102,13 @@ export default function LearningJourneyPage() {
         const storedSessionId = window.localStorage.getItem(
           `ame-learning-session:${params.id}`,
         );
-        if (!storedSessionId) return;
+        if (!storedSessionId) {
+          const completedActivity = journeyResult.data.activities
+            .filter((activity) => activity.status === "completed")
+            .sort((left, right) => right.orderIndex - left.orderIndex)[0];
+          if (completedActivity) await loadDeepDive(completedActivity.id);
+          return;
+        }
         const sessionResult = await api.GET("/api/v1/learning/sessions/{id}", {
           params: { path: { id: storedSessionId } },
         });
