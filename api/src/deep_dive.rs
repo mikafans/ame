@@ -9,10 +9,12 @@ use std::{
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+type EvidenceKey = (Uuid, Uuid, Uuid, Uuid, Uuid);
+
 #[derive(Clone, Default)]
 pub struct InMemoryDeepDiveRepository {
     deep_dives: Arc<Mutex<HashMap<Uuid, DeepDive>>>,
-    verified_evidence: Arc<Mutex<HashSet<(Uuid, Uuid, Uuid, Uuid, Uuid)>>>,
+    verified_evidence: Arc<Mutex<HashSet<EvidenceKey>>>,
 }
 
 #[async_trait]
