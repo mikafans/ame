@@ -81,8 +81,25 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(
     page.getByText("This objective has the weakest available evidence."),
   ).toBeVisible();
+  const journeyId = page
+    .url()
+    .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
+  expect(journeyId).toBeTruthy();
   await page.goto("/learning");
   await expect(page.getByText(/Recent:/)).toBeVisible();
+  const journeyDetailResponse = await page.request.get(
+    `/api/v1/learning/journeys/${journeyId}`,
+  );
+  expect(journeyDetailResponse.ok()).toBeTruthy();
+  const journeyDetail = await journeyDetailResponse.json();
+  await expect(
+    page.getByRole("heading", { name: "Objective progress" }),
+  ).toBeVisible();
+  for (const objective of journeyDetail.objectives) {
+    await expect(
+      page.getByTestId(`objective-progress-${objective.id}`),
+    ).toContainText(objective.statement);
+  }
 });
 
 test("a returning learner resumes from the learning desk", async ({ page }) => {
