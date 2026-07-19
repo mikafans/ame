@@ -3,6 +3,7 @@
 use axum::{Extension, Json, Router, extract::State, http::StatusCode, routing::post};
 use serde::{Deserialize, Serialize};
 use time::Duration;
+use tower_http::limit::RequestBodyLimitLayer;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -44,6 +45,7 @@ pub struct StartLearningResponse {
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/onboarding/start", post(start_learning))
+        .layer(RequestBodyLimitLayer::new(64 * 1024))
         .with_state(state)
 }
 

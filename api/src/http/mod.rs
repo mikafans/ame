@@ -8,6 +8,7 @@ use axum_prometheus::PrometheusMetricLayer;
 use sqlx::PgPool;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::{
+    limit::RequestBodyLimitLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     trace::TraceLayer,
 };
@@ -290,6 +291,7 @@ pub fn router(pool: PgPool) -> Router {
                     },
                 ),
         )
+        .layer(RequestBodyLimitLayer::new(1024 * 1024))
         .layer(cors)
         .layer(middleware::from_fn(security_headers_middleware))
         .with_state(state)
