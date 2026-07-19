@@ -22,6 +22,12 @@ pub enum AssessmentStatus {
     Retired,
 }
 
+impl Default for AssessmentStatus {
+    fn default() -> Self {
+        Self::Draft
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssessmentItemInput {
     pub question_version_id: Uuid,

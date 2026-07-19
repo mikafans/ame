@@ -96,6 +96,38 @@ export interface paths {
         patch: operations["patch_user_admin"];
         trace?: never;
     };
+    "/v1/assessments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_assessment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assessments/{assessment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_assessment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -364,6 +396,39 @@ export interface components {
         } | "SessionFinished" | "LearningSessionResultConflict" | "IdempotencyConflict" | "TooManyRequests" | "Maintenance" | {
             Internal: string;
         };
+        AssessmentItemBody: {
+            /** Format: int32 */
+            orderIndex: number;
+            /** Format: int32 */
+            points: number;
+            /** Format: uuid */
+            questionId: string;
+            /** Format: int32 */
+            questionVersion: number;
+        };
+        AssessmentItemResponse: {
+            /** Format: int32 */
+            orderIndex: number;
+            /** Format: int32 */
+            points: number;
+            /** Format: uuid */
+            questionVersionId: string;
+        };
+        /** @enum {string} */
+        AssessmentMode: "practice" | "graded";
+        AssessmentResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["AssessmentItemResponse"][];
+            mode: components["schemas"]["AssessmentMode"];
+            status: components["schemas"]["AssessmentStatus"];
+            /** Format: int32 */
+            version: number;
+        };
+        /** @enum {string} */
+        AssessmentStatus: "draft" | "published" | "retired";
         AuditLogEntry: {
             action: string;
             actorEmail?: string | null;
@@ -387,6 +452,13 @@ export interface components {
         };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
+        CreateAssessmentBody: {
+            /** Format: uuid */
+            activityId: string;
+            items: components["schemas"]["AssessmentItemBody"][];
+            mode: components["schemas"]["AssessmentMode"];
+            status?: components["schemas"]["AssessmentStatus"];
+        };
         CreateQuestionBody: {
             acceptedAnswers?: string[];
             explanation?: string | null;
@@ -912,6 +984,53 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    create_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAssessmentBody"];
+            };
+        };
+        responses: {
+            /** @description Created assessment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentResponse"];
+                };
+            };
+        };
+    };
+    get_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assessment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentResponse"];
+                };
             };
         };
     };

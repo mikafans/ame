@@ -45,6 +45,8 @@ POST /v1/learning/sessions/{id}/finish
 POST /v1/questions
 GET /v1/questions/{question_id}/versions/{version}
 POST /v1/questions/{question_id}/versions
+POST /v1/assessments
+GET /v1/assessments/{assessment_id}
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,

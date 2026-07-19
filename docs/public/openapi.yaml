@@ -189,6 +189,48 @@ paths:
           description: User not found
       security:
       - bearer: []
+  /v1/assessments:
+    post:
+      tags:
+      - assessments
+      operationId: create_assessment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssessmentBody'
+        required: true
+      responses:
+        '200':
+          description: Created assessment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+      security:
+      - bearer: []
+  /v1/assessments/{assessment_id}:
+    get:
+      tags:
+      - assessments
+      operationId: get_assessment
+      parameters:
+      - name: assessment_id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Assessment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+      security:
+      - bearer: []
   /v1/auth/login:
     post:
       tags:
@@ -633,6 +675,84 @@ components:
         properties:
           Internal:
             type: string
+    AssessmentItemBody:
+      type: object
+      required:
+      - questionId
+      - questionVersion
+      - orderIndex
+      - points
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        points:
+          type: integer
+          format: int32
+          minimum: 0
+        questionId:
+          type: string
+          format: uuid
+        questionVersion:
+          type: integer
+          format: int32
+          minimum: 0
+    AssessmentItemResponse:
+      type: object
+      required:
+      - questionVersionId
+      - orderIndex
+      - points
+      properties:
+        orderIndex:
+          type: integer
+          format: int32
+        points:
+          type: integer
+          format: int32
+          minimum: 0
+        questionVersionId:
+          type: string
+          format: uuid
+    AssessmentMode:
+      type: string
+      enum:
+      - practice
+      - graded
+    AssessmentResponse:
+      type: object
+      required:
+      - id
+      - activityId
+      - version
+      - mode
+      - status
+      - items
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentItemResponse'
+        mode:
+          $ref: '#/components/schemas/AssessmentMode'
+        status:
+          $ref: '#/components/schemas/AssessmentStatus'
+        version:
+          type: integer
+          format: int32
+          minimum: 0
+    AssessmentStatus:
+      type: string
+      enum:
+      - draft
+      - published
+      - retired
     AuditLogEntry:
       type: object
       required:
@@ -698,6 +818,24 @@ components:
       - approved
       - rejected
       - retired
+    CreateAssessmentBody:
+      type: object
+      required:
+      - activityId
+      - mode
+      - items
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentItemBody'
+        mode:
+          $ref: '#/components/schemas/AssessmentMode'
+        status:
+          $ref: '#/components/schemas/AssessmentStatus'
     CreateQuestionBody:
       type: object
       required:

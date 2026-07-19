@@ -244,6 +244,57 @@
       "method": "POST",
       "name": "learning.question.revise",
       "path": "/v1/questions/{question_id}/versions"
+    },
+    {
+      "description": "Compose approved question versions into a learner-owned practice or graded assessment.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "items": {
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "practice",
+              "graded"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId",
+          "mode",
+          "items"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.assessment.create",
+      "path": "/v1/assessments"
+    },
+    {
+      "description": "Read one learner-owned assessment and its exact question-version membership.",
+      "input_schema": {
+        "properties": {
+          "assessmentId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assessmentId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.assessment.get",
+      "path": "/v1/assessments/{assessment_id}"
     }
   ]
 }

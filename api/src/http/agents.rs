@@ -100,6 +100,20 @@ pub fn build_skill_manifest() -> Value {
             "/v1/questions/{question_id}/versions",
             json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string"},"prompt":{"type":"string"},"points":{"type":"integer","minimum":1}}}),
         ),
+        endpoint(
+            "learning.assessment.create",
+            "Compose approved question versions into a learner-owned practice or graded assessment.",
+            "POST",
+            "/v1/assessments",
+            json!({"type":"object","required":["activityId","mode","items"],"properties":{"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array"},"status":{"type":"string"}}}),
+        ),
+        endpoint(
+            "learning.assessment.get",
+            "Read one learner-owned assessment and its exact question-version membership.",
+            "GET",
+            "/v1/assessments/{assessment_id}",
+            json!({"type":"object","required":["assessmentId"],"properties":{"assessmentId":{"type":"string","format":"uuid"}}}),
+        ),
     ];
 
     json!({
