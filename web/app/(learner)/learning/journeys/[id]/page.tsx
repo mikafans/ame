@@ -25,6 +25,23 @@ type StarterContent = {
   instructions: string;
   questions: StarterQuestion[];
 };
+type ExplanationContent = {
+  type: "explanation";
+  heading: string;
+  body: string;
+  key_points: string[];
+};
+type WorkedExampleContent = {
+  type: "worked_example";
+  heading: string;
+  prompt: string;
+  steps: string[];
+  reflection: string;
+};
+type ActivityContent =
+  | StarterContent
+  | ExplanationContent
+  | WorkedExampleContent;
 
 export default function LearningJourneyPage() {
   const params = useParams<{ id: string }>();
@@ -300,7 +317,7 @@ export default function LearningJourneyPage() {
     ? journey.activities.find((activity) => activity.id === session.activityId)
     : null;
   const activeContent = activeActivity?.payload
-    ? ((activeActivity.payload as unknown as { content?: StarterContent })
+    ? ((activeActivity.payload as unknown as { content?: ActivityContent })
         .content ?? null)
     : null;
 
@@ -522,6 +539,63 @@ export default function LearningJourneyPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            {session.status === "in_progress" &&
+              !assessmentLoading &&
+              !assessment &&
+              activeContent?.type === "explanation" && (
+                <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                      Explanation
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">
+                      {activeContent.heading}
+                    </h3>
+                  </div>
+                  <p className="leading-7 text-foreground">
+                    {activeContent.body}
+                  </p>
+                  <ul className="space-y-2 rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6">
+                    {activeContent.key_points.map((point) => (
+                      <li key={point} className="flex gap-2">
+                        <Check className="mt-1 size-4 shrink-0 text-primary" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            {session.status === "in_progress" &&
+              !assessmentLoading &&
+              !assessment &&
+              activeContent?.type === "worked_example" && (
+                <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                      Worked example
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">
+                      {activeContent.heading}
+                    </h3>
+                  </div>
+                  <p className="rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6 text-foreground">
+                    {activeContent.prompt}
+                  </p>
+                  <ol className="space-y-2 text-sm leading-6">
+                    {activeContent.steps.map((step, index) => (
+                      <li key={step} className="flex gap-3">
+                        <span className="font-mono text-primary">
+                          {index + 1}.
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="border-t border-primary/20 pt-4 text-sm leading-6 text-muted-foreground">
+                    {activeContent.reflection}
+                  </p>
                 </div>
               )}
             {session.status === "in_progress" && assessment && attempt ? (
