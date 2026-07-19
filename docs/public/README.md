@@ -10,8 +10,9 @@ users and external clients.
 - [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/public/skill.json`.
 
 Build and runtime projections must consume these files; do not create parallel
-copies under `api/`, `deploy/`, or `web/`. Containerized Caddy serves the three
-machine-readable documents directly from `docs/public`; the API has no runtime
-handlers for these documents.
+copies under `api/`, `deploy/`, or `web/`. The Compose Caddy container and the
+reference Kubernetes Caddy sidecar serve the three machine-readable documents
+directly from `docs/public`; the API has no runtime handlers for these
+documents.
 
 Regenerate generated public documents with `make public-docs`.
