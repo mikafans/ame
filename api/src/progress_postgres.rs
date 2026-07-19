@@ -76,6 +76,37 @@ impl PgProgressRepository {
         }
     }
 
+    async fn ensure_owned_activity(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+    ) -> Result<(), ProgressError> {
+        let owned = sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS (
+                    SELECT 1
+                      FROM tb_learning_journeys j
+                      JOIN tb_activities a
+                        ON a.journey_id = j.id
+                       AND a.subject_user_id = j.subject_user_id
+                     WHERE j.id = $1
+                       AND j.subject_user_id = $2
+                       AND a.id = $3
+                )"#,
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .bind(activity_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        if owned {
+            Ok(())
+        } else {
+            Err(ProgressError::SubjectMismatch)
+        }
+    }
+
     async fn refresh_snapshot(
         &self,
         subject_user_id: Uuid,
@@ -344,6 +375,8 @@ impl ProgressRepository for PgProgressRepository {
         input: StreakEventInput,
     ) -> Result<StreakEvent, ProgressError> {
         validate_streak_event(&input)?;
+        self.ensure_owned_activity(input.subject_user_id, input.journey_id, input.activity_id)
+            .await?;
         let row = sqlx::query(
             r#"INSERT INTO tb_streak_events (
                     subject_user_id, journey_id, activity_id, qualifying_event_key,

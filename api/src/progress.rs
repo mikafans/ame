@@ -187,6 +187,11 @@ impl InMemoryProgressRepository {
             .state
             .lock()
             .map_err(|error| ProgressError::Storage(error.to_string()))?;
+        if let Some(owner_id) = state.journey_owners.get(&input.journey_id)
+            && *owner_id != input.subject_user_id
+        {
+            return Err(ProgressError::SubjectMismatch);
+        }
         if let Some(event) = state.streak_events.get(&input.qualifying_event_key) {
             if event.input == input {
                 return Ok(event.clone());
@@ -367,14 +372,17 @@ mod tests {
     #[test]
     fn streak_recording_is_idempotent_and_timezone_explicit() {
         let repository = InMemoryProgressRepository::default();
+        let owner = Uuid::now_v7();
+        let journey = Uuid::now_v7();
         let input = StreakEventInput {
-            subject_user_id: Uuid::now_v7(),
-            journey_id: Uuid::now_v7(),
+            subject_user_id: owner,
+            journey_id: journey,
             activity_id: Uuid::now_v7(),
             qualifying_event_key: "activity:1:finish".into(),
             learner_timezone: "Asia/Tokyo".into(),
             qualifying_day: date!(2026 - 07 - 19),
         };
+        repository.register_journey(owner, journey);
         let first = repository
             .record_streak_event(input.clone())
             .expect("streak records");
@@ -384,11 +392,17 @@ mod tests {
                 .expect("retry is idempotent"),
             first
         );
-        let mut conflict = input;
+        let mut conflict = input.clone();
         conflict.learner_timezone = "UTC".into();
         assert_eq!(
             repository.record_streak_event(conflict),
             Err(ProgressError::DuplicateStreakEvent)
+        );
+        let mut cross_owner = input;
+        cross_owner.subject_user_id = Uuid::now_v7();
+        assert_eq!(
+            repository.record_streak_event(cross_owner),
+            Err(ProgressError::SubjectMismatch)
         );
     }
 }
