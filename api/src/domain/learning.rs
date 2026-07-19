@@ -60,6 +60,14 @@ pub enum ActivityStatus {
     Failed,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LearningSessionStatus {
+    InProgress,
+    Finished,
+    Abandoned,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateGoal {
     pub subject_user_id: Uuid,
@@ -158,6 +166,29 @@ pub struct LearningActivity {
     pub updated_at: OffsetDateTime,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateLearningSession {
+    pub journey_id: Uuid,
+    pub activity_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub actor_identity_id: Uuid,
+    pub question_plan: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningSession {
+    pub id: Uuid,
+    pub journey_id: Uuid,
+    pub activity_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub actor_identity_id: Uuid,
+    pub status: LearningSessionStatus,
+    pub question_plan: serde_json::Value,
+    pub result: Option<serde_json::Value>,
+    pub started_at: OffsetDateTime,
+    pub finished_at: Option<OffsetDateTime>,
+}
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum LearningRepositoryError {
     #[error("learning field {field} must not be empty")]
@@ -172,6 +203,8 @@ pub enum LearningRepositoryError {
     JourneyAlreadyExists,
     #[error("{resource} order already exists in this journey")]
     OrderConflict { resource: &'static str },
+    #[error("activity is not ready to start")]
+    ActivityNotReady,
     #[error("learning repository storage failure: {0}")]
     Storage(String),
 }
@@ -232,6 +265,17 @@ pub trait LearningRepository: Send + Sync {
         subject_user_id: Uuid,
         journey_id: Uuid,
     ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
+
+    async fn start_learning_session(
+        &self,
+        input: CreateLearningSession,
+    ) -> Result<LearningSession, LearningRepositoryError>;
+
+    async fn get_learning_session(
+        &self,
+        subject_user_id: Uuid,
+        session_id: Uuid,
+    ) -> Result<LearningSession, LearningRepositoryError>;
 }
 
 pub(crate) fn validate_goal(input: &CreateGoal) -> Result<(), LearningRepositoryError> {

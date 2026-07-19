@@ -3,7 +3,9 @@
 use axum::{
     Json, Router,
     extract::{Path, State},
+    http::StatusCode,
     routing::get,
+    routing::post,
 };
 use serde::Serialize;
 use time::OffsetDateTime;
@@ -15,8 +17,9 @@ use crate::{
     domain::{
         error::ApiError,
         learning::{
-            ActivityKind, ActivityStatus, GoalStatus, JourneyStatus, LearningActivity,
-            LearningObjective, LearningRepository, ObjectiveStatus,
+            ActivityKind, ActivityStatus, CreateLearningSession, GoalStatus, JourneyStatus,
+            LearningActivity, LearningObjective, LearningRepository, LearningSession,
+            LearningSessionStatus, ObjectiveStatus,
         },
     },
     http::AppState,
@@ -80,6 +83,27 @@ pub struct LearningActivityResponse {
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct LearningSessionResponse {
+    pub id: Uuid,
+    pub journey_id: Uuid,
+    pub activity_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub actor_identity_id: Uuid,
+    pub status: LearningSessionStatus,
+    #[schema(value_type = Object)]
+    pub question_plan: serde_json::Value,
+    #[schema(value_type = Option<Object>)]
+    pub result: Option<serde_json::Value>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub started_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub finished_at: Option<OffsetDateTime>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LearningJourneyResponse {
     pub id: Uuid,
     pub goal_id: Uuid,
@@ -98,6 +122,10 @@ pub struct LearningJourneyResponse {
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/learning/journeys/{id}", get(get_journey))
+        .route(
+            "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
+            post(start_activity),
+        )
         .with_state(state)
 }
 
@@ -160,6 +188,54 @@ pub async fn get_journey(
     }))
 }
 
+/// POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
+#[utoipa::path(
+    post,
+    path = "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
+    params(
+        ("journey_id" = Uuid, Path, description = "Learning journey ID"),
+        ("activity_id" = Uuid, Path, description = "Learning activity ID")
+    ),
+    responses(
+        (status = 201, description = "Learning session started or resumed", body = LearningSessionResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 403, description = "Token lacks required scope"),
+        (status = 404, description = "Activity does not exist for this learner"),
+        (status = 422, description = "Activity is not ready")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn start_activity(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path((journey_id, activity_id)): Path<(Uuid, Uuid)>,
+) -> Result<(StatusCode, Json<LearningSessionResponse>), ApiError> {
+    if !auth
+        .token_scopes
+        .contains(&crate::domain::user::Scope::AttemptWrite)
+        && !auth
+            .token_scopes
+            .contains(&crate::domain::user::Scope::Admin)
+    {
+        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
+            "attempt.write",
+        )));
+    }
+    let repository = PgLearningRepository::new(state.pool);
+    let session = repository
+        .start_learning_session(CreateLearningSession {
+            journey_id,
+            activity_id,
+            subject_user_id: auth.owner_id(),
+            actor_identity_id: auth.user.id,
+            question_plan: serde_json::json!([]),
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok((StatusCode::CREATED, Json(session_response(session))))
+}
+
 fn objective_response(objective: LearningObjective) -> LearningObjectiveResponse {
     LearningObjectiveResponse {
         id: objective.id,
@@ -193,6 +269,21 @@ fn activity_response(activity: LearningActivity) -> LearningActivityResponse {
     }
 }
 
+fn session_response(session: LearningSession) -> LearningSessionResponse {
+    LearningSessionResponse {
+        id: session.id,
+        journey_id: session.journey_id,
+        activity_id: session.activity_id,
+        subject_user_id: session.subject_user_id,
+        actor_identity_id: session.actor_identity_id,
+        status: session.status,
+        question_plan: session.question_plan,
+        result: session.result,
+        started_at: session.started_at,
+        finished_at: session.finished_at,
+    }
+}
+
 fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -> ApiError {
     match error {
         crate::domain::learning::LearningRepositoryError::NotFound { resource } => {
@@ -201,6 +292,12 @@ fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -
         crate::domain::learning::LearningRepositoryError::SubjectMismatch => ApiError::NotFound {
             resource: "journey",
         },
+        crate::domain::learning::LearningRepositoryError::ActivityNotReady => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "activityId".to_string(),
+                message: "activity is not ready to start".to_string(),
+            }])
+        }
         other => ApiError::Internal(other.into()),
     }
 }

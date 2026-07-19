@@ -1,10 +1,11 @@
 //! Learning repositories and their contract tests.
 
 use crate::domain::learning::{
-    ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective, GoalStatus,
-    JourneyStatus, LearningActivity, LearningGoal, LearningJourney, LearningObjective,
-    LearningRepository, LearningRepositoryError, ObjectiveStatus, validate_activity, validate_goal,
-    validate_journey, validate_objective,
+    ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateLearningSession,
+    CreateObjective, GoalStatus, JourneyStatus, LearningActivity, LearningGoal, LearningJourney,
+    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
+    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -40,6 +41,7 @@ struct State {
     journeys: HashMap<Uuid, LearningJourney>,
     objectives: HashMap<Uuid, LearningObjective>,
     activities: HashMap<Uuid, LearningActivity>,
+    sessions: HashMap<Uuid, LearningSession>,
 }
 
 #[async_trait]
@@ -335,6 +337,70 @@ impl LearningRepository for InMemoryLearningRepository {
         activities.sort_by_key(|activity| activity.order_index);
         Ok(activities)
     }
+
+    async fn start_learning_session(
+        &self,
+        input: CreateLearningSession,
+    ) -> Result<LearningSession, LearningRepositoryError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let activity =
+            state
+                .activities
+                .get(&input.activity_id)
+                .ok_or(LearningRepositoryError::NotFound {
+                    resource: "activity",
+                })?;
+        if activity.journey_id != input.journey_id
+            || activity.subject_user_id != input.subject_user_id
+        {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity.status != ActivityStatus::Ready {
+            return Err(LearningRepositoryError::ActivityNotReady);
+        }
+        if let Some(existing) = state.sessions.values().find(|session| {
+            session.activity_id == input.activity_id
+                && session.subject_user_id == input.subject_user_id
+                && session.status == LearningSessionStatus::InProgress
+        }) {
+            return Ok(existing.clone());
+        }
+        let session = LearningSession {
+            id: Uuid::now_v7(),
+            journey_id: input.journey_id,
+            activity_id: input.activity_id,
+            subject_user_id: input.subject_user_id,
+            actor_identity_id: input.actor_identity_id,
+            status: LearningSessionStatus::InProgress,
+            question_plan: input.question_plan,
+            result: None,
+            started_at: OffsetDateTime::now_utc(),
+            finished_at: None,
+        };
+        state.sessions.insert(session.id, session.clone());
+        Ok(session)
+    }
+
+    async fn get_learning_session(
+        &self,
+        subject_user_id: Uuid,
+        session_id: Uuid,
+    ) -> Result<LearningSession, LearningRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        match state.sessions.get(&session_id) {
+            Some(session) if session.subject_user_id == subject_user_id => Ok(session.clone()),
+            Some(_) => Err(LearningRepositoryError::SubjectMismatch),
+            None => Err(LearningRepositoryError::NotFound {
+                resource: "learning session",
+            }),
+        }
+    }
 }
 
 pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
@@ -463,10 +529,35 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             .list_activities(subject, journey.id)
             .await
             .expect("activities list"),
-        vec![activity]
+        vec![activity.clone()]
     );
     assert_eq!(
         repository.list_activities(other_subject, journey.id).await,
+        Err(LearningRepositoryError::SubjectMismatch)
+    );
+    let session_input = CreateLearningSession {
+        journey_id: journey.id,
+        activity_id: activity.id,
+        subject_user_id: subject,
+        actor_identity_id: actor,
+        question_plan: serde_json::json!([]),
+    };
+    let session = repository
+        .start_learning_session(session_input.clone())
+        .await
+        .expect("learning session starts");
+    assert_eq!(session.status, LearningSessionStatus::InProgress);
+    assert_eq!(
+        repository
+            .start_learning_session(session_input)
+            .await
+            .expect("learning session retry resumes"),
+        session
+    );
+    assert_eq!(
+        repository
+            .get_learning_session(other_subject, session.id)
+            .await,
         Err(LearningRepositoryError::SubjectMismatch)
     );
     assert_eq!(

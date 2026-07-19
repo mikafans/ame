@@ -1,10 +1,11 @@
 //! PostgreSQL implementation of the learning repository contract.
 
 use crate::domain::learning::{
-    ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective,
-    GoalStatus, JourneyStatus, LearningActivity, LearningGoal, LearningJourney, LearningObjective,
-    LearningRepository, LearningRepositoryError, ObjectiveStatus, validate_activity, validate_goal,
-    validate_journey, validate_objective,
+    ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateLearningSession,
+    CreateObjective, GoalStatus, JourneyStatus, LearningActivity, LearningGoal, LearningJourney,
+    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
+    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -408,6 +409,100 @@ impl LearningRepository for PgLearningRepository {
             })
             .collect())
     }
+
+    async fn start_learning_session(
+        &self,
+        input: CreateLearningSession,
+    ) -> Result<LearningSession, LearningRepositoryError> {
+        let journey = self
+            .get_journey(input.subject_user_id, input.journey_id)
+            .await?;
+        let activity = sqlx::query(
+            "SELECT journey_id, subject_user_id, status FROM tb_activities WHERE id = $1",
+        )
+        .bind(input.activity_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(LearningRepositoryError::NotFound {
+            resource: "activity",
+        })?;
+        let activity_journey_id: Uuid = activity.get("journey_id");
+        let activity_subject_id: Uuid = activity.get("subject_user_id");
+        if activity_journey_id != journey.id || activity_subject_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity.get::<String, _>("status") != "ready" {
+            return Err(LearningRepositoryError::ActivityNotReady);
+        }
+
+        if let Some(row) = sqlx::query(
+            r#"
+            SELECT id, journey_id, activity_id, subject_user_id, actor_identity_id,
+                   status, question_plan, result, started_at, finished_at
+            FROM tb_learning_sessions
+            WHERE activity_id = $1 AND subject_user_id = $2 AND status = 'in_progress'
+            ORDER BY started_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(input.activity_id)
+        .bind(input.subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        {
+            return Ok(learning_session_from_row(row));
+        }
+
+        let row = sqlx::query(
+            r#"
+            INSERT INTO tb_learning_sessions (
+                journey_id, activity_id, subject_user_id, actor_identity_id, question_plan
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, journey_id, activity_id, subject_user_id, actor_identity_id,
+                      status, question_plan, result, started_at, finished_at
+            "#,
+        )
+        .bind(journey.id)
+        .bind(input.activity_id)
+        .bind(input.subject_user_id)
+        .bind(input.actor_identity_id)
+        .bind(input.question_plan)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(learning_session_from_row(row))
+    }
+
+    async fn get_learning_session(
+        &self,
+        subject_user_id: Uuid,
+        session_id: Uuid,
+    ) -> Result<LearningSession, LearningRepositoryError> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, journey_id, activity_id, subject_user_id, actor_identity_id,
+                   status, question_plan, result, started_at, finished_at
+            FROM tb_learning_sessions
+            WHERE id = $1
+            "#,
+        )
+        .bind(session_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        match row {
+            Some(row) if row.get::<Uuid, _>("subject_user_id") == subject_user_id => {
+                Ok(learning_session_from_row(row))
+            }
+            Some(_) => Err(LearningRepositoryError::SubjectMismatch),
+            None => Err(LearningRepositoryError::NotFound {
+                resource: "learning session",
+            }),
+        }
+    }
 }
 
 fn storage_error(error: sqlx::Error) -> LearningRepositoryError {
@@ -558,6 +653,29 @@ fn activity_status_value(status: ActivityStatus) -> &'static str {
         ActivityStatus::InProgress => "in_progress",
         ActivityStatus::Completed => "completed",
         ActivityStatus::Failed => "failed",
+    }
+}
+
+fn learning_session_from_row(row: sqlx::postgres::PgRow) -> LearningSession {
+    LearningSession {
+        id: row.get("id"),
+        journey_id: row.get("journey_id"),
+        activity_id: row.get("activity_id"),
+        subject_user_id: row.get("subject_user_id"),
+        actor_identity_id: row.get("actor_identity_id"),
+        status: learning_session_status(row.get::<String, _>("status").as_str()),
+        question_plan: row.get("question_plan"),
+        result: row.get("result"),
+        started_at: row.get("started_at"),
+        finished_at: row.get("finished_at"),
+    }
+}
+
+fn learning_session_status(value: &str) -> LearningSessionStatus {
+    match value {
+        "finished" => LearningSessionStatus::Finished,
+        "abandoned" => LearningSessionStatus::Abandoned,
+        _ => LearningSessionStatus::InProgress,
     }
 }
 

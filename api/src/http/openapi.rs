@@ -47,7 +47,7 @@ use crate::{
         },
         learning::{
             LearningActivityResponse, LearningGoalResponse, LearningJourneyResponse,
-            LearningObjectiveResponse,
+            LearningObjectiveResponse, LearningSessionResponse,
         },
         me::{
             AgentSummary, AgentTokenSummary, CohortStatsResponse, CreateAgentBody,
@@ -76,6 +76,7 @@ use crate::{
         crate::http::auth::logout,
         crate::http::onboarding::start_learning,
         crate::http::learning::get_journey,
+        crate::http::learning::start_activity,
         crate::http::me::get_me,
         crate::http::me::list_agents,
         crate::http::me::create_agent,
@@ -186,6 +187,7 @@ use crate::{
         LearningJourneyResponse,
         LearningObjectiveResponse,
         LearningActivityResponse,
+        LearningSessionResponse,
         UserInfo,
         MeResponse,
         CreateKeyResponse,

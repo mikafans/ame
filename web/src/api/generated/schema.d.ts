@@ -525,6 +525,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session. */
+        post: operations["start_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -1523,6 +1540,27 @@ export interface components {
             successCriteria: string;
             verb: string;
         };
+        LearningSessionResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            actorIdentityId: string;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            questionPlan: Record<string, never>;
+            result?: Record<string, never> | null;
+            /** Format: date-time */
+            startedAt: string;
+            status: components["schemas"]["LearningSessionStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+        };
+        /** @enum {string} */
+        LearningSessionStatus: "in_progress" | "finished" | "abandoned";
         ListAgentsResponse: {
             agents: components["schemas"]["AgentSummary"][];
         };
@@ -3435,6 +3473,59 @@ export interface operations {
             };
             /** @description Journey does not exist for this learner */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning journey ID */
+                journey_id: string;
+                /** @description Learning activity ID */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Learning session started or resumed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningSessionResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks required scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity is not ready */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

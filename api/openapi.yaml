@@ -1152,6 +1152,44 @@ paths:
           description: Journey does not exist for this learner
       security:
       - bearer_auth: []
+  /v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
+    post:
+      tags:
+      - learning
+      summary: POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
+      operationId: start_activity
+      parameters:
+      - name: journey_id
+        in: path
+        description: Learning journey ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: activity_id
+        in: path
+        description: Learning activity ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: Learning session started or resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Token lacks required scope
+        '404':
+          description: Activity does not exist for this learner
+        '422':
+          description: Activity is not ready
+      security:
+      - bearer_auth: []
   /v1/me:
     get:
       tags:
@@ -3629,6 +3667,55 @@ components:
           type: string
         verb:
           type: string
+    LearningSessionResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - activityId
+      - subjectUserId
+      - actorIdentityId
+      - status
+      - questionPlan
+      - startedAt
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        actorIdentityId:
+          type: string
+          format: uuid
+        finishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        questionPlan:
+          type: object
+        result:
+          type:
+          - object
+          - 'null'
+        startedAt:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/LearningSessionStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+    LearningSessionStatus:
+      type: string
+      enum:
+      - in_progress
+      - finished
+      - abandoned
     ListAgentsResponse:
       type: object
       required:
