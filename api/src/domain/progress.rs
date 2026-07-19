@@ -113,5 +113,18 @@ pub fn validate_streak_event(input: &StreakEventInput) -> Result<(), ProgressErr
             field: "learner_timezone",
         });
     }
+    attempt_id_from_event_key(&input.qualifying_event_key)?;
     Ok(())
+}
+
+pub fn attempt_id_from_event_key(event_key: &str) -> Result<Uuid, ProgressError> {
+    let attempt_id = event_key
+        .strip_prefix("attempt:")
+        .filter(|value| !value.is_empty())
+        .ok_or(ProgressError::EmptyField {
+            field: "qualifying_event_key",
+        })?;
+    Uuid::parse_str(attempt_id).map_err(|_| ProgressError::EmptyField {
+        field: "qualifying_event_key",
+    })
 }

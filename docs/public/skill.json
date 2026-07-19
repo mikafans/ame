@@ -549,7 +549,7 @@
       "path": "/api/v1/progress/{journey_id}/recommendation"
     },
     {
-      "description": "Record an idempotent qualifying learning day for a journey.",
+      "description": "Record an idempotent qualifying learning day from a completed attempt event (attempt:<id>).",
       "input_schema": {
         "properties": {
           "activityId": {

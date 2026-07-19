@@ -2,11 +2,12 @@
 
 use crate::domain::progress::{
     MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError, Recommendation,
-    StreakEvent, StreakEventInput, validate_evidence, validate_streak_event,
+    StreakEvent, StreakEventInput, attempt_id_from_event_key, validate_evidence,
+    validate_streak_event,
 };
 use async_trait::async_trait;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 use time::OffsetDateTime;
@@ -22,6 +23,7 @@ struct ProgressState {
     evidence: Vec<MasteryEvidence>,
     streak_events: HashMap<String, StreakEvent>,
     journey_owners: HashMap<Uuid, Uuid>,
+    completed_attempts: HashSet<(Uuid, Uuid, Uuid, Uuid)>,
 }
 
 #[async_trait]
@@ -61,6 +63,21 @@ impl InMemoryProgressRepository {
     pub fn register_journey(&self, subject_user_id: Uuid, journey_id: Uuid) {
         if let Ok(mut state) = self.state.lock() {
             state.journey_owners.insert(journey_id, subject_user_id);
+        }
+    }
+
+    pub fn register_completed_attempt(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+        attempt_id: Uuid,
+    ) {
+        if let Ok(mut state) = self.state.lock() {
+            state.journey_owners.insert(journey_id, subject_user_id);
+            state
+                .completed_attempts
+                .insert((subject_user_id, journey_id, activity_id, attempt_id));
         }
     }
 
@@ -190,6 +207,15 @@ impl InMemoryProgressRepository {
         if let Some(owner_id) = state.journey_owners.get(&input.journey_id)
             && *owner_id != input.subject_user_id
         {
+            return Err(ProgressError::SubjectMismatch);
+        }
+        let attempt_id = attempt_id_from_event_key(&input.qualifying_event_key)?;
+        if !state.completed_attempts.contains(&(
+            input.subject_user_id,
+            input.journey_id,
+            input.activity_id,
+            attempt_id,
+        )) {
             return Err(ProgressError::SubjectMismatch);
         }
         if let Some(event) = state.streak_events.get(&input.qualifying_event_key) {
@@ -374,15 +400,18 @@ mod tests {
         let repository = InMemoryProgressRepository::default();
         let owner = Uuid::now_v7();
         let journey = Uuid::now_v7();
+        let activity = Uuid::now_v7();
+        let attempt = Uuid::now_v7();
         let input = StreakEventInput {
             subject_user_id: owner,
             journey_id: journey,
-            activity_id: Uuid::now_v7(),
-            qualifying_event_key: "activity:1:finish".into(),
+            activity_id: activity,
+            qualifying_event_key: format!("attempt:{attempt}"),
             learner_timezone: "Asia/Tokyo".into(),
             qualifying_day: date!(2026 - 07 - 19),
         };
         repository.register_journey(owner, journey);
+        repository.register_completed_attempt(owner, journey, activity, attempt);
         let first = repository
             .record_streak_event(input.clone())
             .expect("streak records");

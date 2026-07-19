@@ -3,7 +3,8 @@
 use crate::{
     domain::progress::{
         MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError, Recommendation,
-        StreakEvent, StreakEventInput, validate_evidence, validate_streak_event,
+        StreakEvent, StreakEventInput, attempt_id_from_event_key, validate_evidence,
+        validate_streak_event,
     },
     progress::ProgressRepository,
 };
@@ -103,6 +104,41 @@ impl PgProgressRepository {
         .await
         .map_err(storage_error)?;
         if owned {
+            Ok(())
+        } else {
+            Err(ProgressError::SubjectMismatch)
+        }
+    }
+
+    async fn ensure_completed_attempt(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+        attempt_id: Uuid,
+    ) -> Result<(), ProgressError> {
+        let valid = sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS (
+                    SELECT 1
+                      FROM tb_attempts at
+                      JOIN tb_learning_sessions ls
+                        ON ls.id = at.learning_session_id
+                     WHERE at.id = $1
+                       AND at.subject_user_id = $2
+                       AND at.activity_id = $3
+                       AND ls.journey_id = $4
+                       AND at.status = 'graded'
+                       AND at.review_status IN ('not_required', 'complete')
+                )"#,
+        )
+        .bind(attempt_id)
+        .bind(subject_user_id)
+        .bind(activity_id)
+        .bind(journey_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        if valid {
             Ok(())
         } else {
             Err(ProgressError::SubjectMismatch)
@@ -377,8 +413,16 @@ impl ProgressRepository for PgProgressRepository {
         input: StreakEventInput,
     ) -> Result<StreakEvent, ProgressError> {
         validate_streak_event(&input)?;
+        let attempt_id = attempt_id_from_event_key(&input.qualifying_event_key)?;
         self.ensure_owned_activity(input.subject_user_id, input.journey_id, input.activity_id)
             .await?;
+        self.ensure_completed_attempt(
+            input.subject_user_id,
+            input.journey_id,
+            input.activity_id,
+            attempt_id,
+        )
+        .await?;
         let row = sqlx::query(
             r#"INSERT INTO tb_streak_events (
                     subject_user_id, journey_id, activity_id, qualifying_event_key,

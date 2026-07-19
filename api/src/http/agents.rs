@@ -160,7 +160,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.progress.streak.record",
-            "Record an idempotent qualifying learning day for a journey.",
+            "Record an idempotent qualifying learning day from a completed attempt event (attempt:<id>).",
             "POST",
             "/api/v1/progress/streaks",
             json!({"type":"object","required":["journeyId","activityId","qualifyingEventKey","learnerTimezone","qualifyingDay"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"qualifyingEventKey":{"type":"string"},"learnerTimezone":{"type":"string"},"qualifyingDay":{"type":"string","format":"date"}}}),
