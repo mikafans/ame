@@ -1,11 +1,8 @@
-//! HTTP handlers for question bank management.
-
-use std::str::FromStr;
+//! Learner-owned question authoring and version reads.
 
 use axum::{
     Json, Router,
-    extract::{Path, Query},
-    http::StatusCode,
+    extract::{Path, State},
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -13,435 +10,203 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::scope::{RequireAnyScope, ScopeOneOf},
-    bank::questions as repo,
+    auth::extractor::AuthenticatedUser,
     domain::{
-        error::ApiError,
-        question::{Question, QuestionKind, QuestionStatus, QuestionVersion},
-        user::Scope,
+        error::{ApiError, FieldError},
+        question::{ContentReviewStatus, CreateQuestion, QuestionKind, QuestionOption},
     },
-    http::{AppState, db::DbConn},
+    http::AppState,
+    question::QuestionRepository,
+    question_postgres::PgQuestionRepository,
 };
 
-pub struct QuestionReadScopes;
-impl ScopeOneOf for QuestionReadScopes {
-    const SCOPES: &'static [Scope] = &[Scope::AssessmentRead, Scope::Admin];
-}
-
-pub struct QuestionWriteScopes;
-impl ScopeOneOf for QuestionWriteScopes {
-    const SCOPES: &'static [Scope] = &[Scope::AssessmentWrite, Scope::Admin];
-}
-
-#[derive(Debug, Deserialize, utoipa::IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct ListQuestionsQuery {
-    pub tag: Option<String>,
-    pub status: Option<String>,
-    pub search: Option<String>,
-    pub kind: Option<String>,
-    pub min_rating: Option<f64>,
-    pub max_rating: Option<f64>,
-    pub limit: Option<i64>,
-    pub offset: Option<i64>,
-    #[serde(alias = "cursor")]
-    pub after: Option<String>,
-    #[serde(alias = "assessmentId")]
-    pub assessment_id: Option<Uuid>,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ListQuestionsResponse {
-    pub questions: Vec<Question>,
-    pub total: i64,
-    pub next_cursor: Option<String>,
-}
-
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateQuestionsBody {
-    pub questions: Vec<repo::QuestionInsert>,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct CreateQuestionsResponse {
-    pub questions: Vec<Question>,
-}
-
-#[utoipa::path(
-    get,
-    path = "/v1/questions",
-    params(ListQuestionsQuery),
-    responses(
-        (status = 200, description = "List of questions", body = ListQuestionsResponse),
-        (status = 401, description = "Unauthorized"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn list_questions(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionReadScopes>,
-    Query(q): Query<ListQuestionsQuery>,
-) -> Result<Json<ListQuestionsResponse>, ApiError> {
-    let kind = q.kind.and_then(|k| QuestionKind::from_str(&k).ok());
-
-    // Filter by owner unless admin
-    let created_by = if auth.0.user.role == crate::domain::user::Role::Admin {
-        None
-    } else {
-        Some(auth.0.owner_id)
-    };
-
-    let status = match q.status.as_deref() {
-        Some(s) => Some(QuestionStatus::from_str(s).map_err(|e| {
-            ApiError::Validation(vec![crate::domain::error::FieldError {
-                field: "status".into(),
-                message: e,
-            }])
-        })?),
-        None => None,
-    };
-
-    let filter = repo::QuestionFilter {
-        tag: q.tag,
-        status,
-        search: q.search,
-        kind,
-        min_rating: q.min_rating,
-        max_rating: q.max_rating,
-        limit: q.limit,
-        offset: q.offset,
-        created_by,
-        assessment_id: q.assessment_id,
-    };
-
-    let after = match q.after {
-        Some(c) => Some(repo::decode_cursor(&c).ok_or_else(|| {
-            ApiError::Validation(vec![crate::domain::error::FieldError {
-                field: "after".into(),
-                message: "invalid cursor format".into(),
-            }])
-        })?),
-        None => None,
-    };
-
-    let paged = repo::list_questions_paged(&mut db, &filter, after).await?;
-
-    Ok(Json(ListQuestionsResponse {
-        questions: paged.rows,
-        total: paged.total,
-        next_cursor: paged.next_cursor,
-    }))
-}
-
-#[utoipa::path(
-    get,
-    path = "/v1/questions/{id}",
-    params(("id" = Uuid, Path, description = "Question id")),
-    responses(
-        (status = 200, description = "Question details", body = Question),
-        (status = 404, description = "Question not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn get_question(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionReadScopes>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Question>, ApiError> {
-    let question = repo::get_question(&mut db, id)
-        .await?
-        .ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-
-    // Check ownership if not admin
-    if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
-    {
-        return Err(ApiError::NotFound {
-            resource: "question",
-        });
-    }
-
-    Ok(Json(question))
-}
-
-#[utoipa::path(
-    get,
-    path = "/v1/questions/{id}/versions",
-    params(("id" = Uuid, Path, description = "Question id")),
-    responses(
-        (status = 200, description = "Question history", body = Vec<QuestionVersion>),
-        (status = 404, description = "Question not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn list_versions(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionReadScopes>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Vec<QuestionVersion>>, ApiError> {
-    let _question = repo::get_question(&mut db, id)
-        .await?
-        .ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-
-    // Check ownership if not admin
-    if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
-    {
-        return Err(ApiError::NotFound {
-            resource: "question",
-        });
-    }
-
-    let versions = repo::get_question_versions(&mut db, id).await?;
-    Ok(Json(versions))
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/questions",
-    request_body = CreateQuestionsBody,
-    responses(
-        (status = 201, description = "Questions created", body = CreateQuestionsResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 422, description = "Validation failed"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn create_questions(
-    axum::extract::State(state): axum::extract::State<AppState>,
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionWriteScopes>,
-    Json(body): Json<CreateQuestionsBody>,
-) -> Result<(StatusCode, Json<CreateQuestionsResponse>), ApiError> {
-    let count = body.questions.len() as i64;
-    if count > 0 {
-        crate::http::quota::check_quota(
-            &state.pool,
-            Some(&state.valkey),
-            &state.config,
-            auth.0.owner_id,
-            crate::http::quota::QuotaKind::Question,
-            count,
-        )
-        .await?;
-    }
-
-    let questions =
-        repo::create_questions(&mut db, auth.0.user.id, auth.0.owner_id, body.questions).await?;
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateQuestionsResponse { questions }),
-    ))
-}
-
-#[utoipa::path(
-    patch,
-    path = "/v1/questions/{id}",
-    params(("id" = Uuid, Path, description = "Question id")),
-    request_body = repo::QuestionPatch,
-    responses(
-        (status = 200, description = "Question updated", body = Question),
-        (status = 404, description = "Question not found"),
-        (status = 422, description = "Validation failed"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn update_question(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionWriteScopes>,
-    Path(id): Path<Uuid>,
-    Json(patch): Json<repo::QuestionPatch>,
-) -> Result<Json<Question>, ApiError> {
-    let _question = repo::get_question(&mut db, id)
-        .await?
-        .ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-
-    if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
-    {
-        return Err(ApiError::NotFound {
-            resource: "question",
-        });
-    }
-
-    let updated = repo::update_question(&mut db, id, patch).await?;
-    Ok(Json(updated))
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/questions/{id}/promote",
-    params(("id" = Uuid, Path, description = "Question id")),
-    responses(
-        (status = 200, description = "Question promoted to live", body = Question),
-        (status = 404, description = "Question not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn promote_question(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionWriteScopes>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Question>, ApiError> {
-    let _question = repo::get_question(&mut db, id)
-        .await?
-        .ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-
-    if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
-    {
-        return Err(ApiError::NotFound {
-            resource: "question",
-        });
-    }
-
-    Ok(Json(repo::promote_question(&mut db, id).await?))
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/questions/{id}/archive",
-    params(("id" = Uuid, Path, description = "Question id")),
-    responses(
-        (status = 200, description = "Question archived", body = Question),
-        (status = 404, description = "Question not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn archive_question(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionWriteScopes>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Question>, ApiError> {
-    let _question = repo::get_question(&mut db, id)
-        .await?
-        .ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-
-    if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
-    {
-        return Err(ApiError::NotFound {
-            resource: "question",
-        });
-    }
-
-    Ok(Json(repo::archive_question(&mut db, id).await?))
-}
-
-#[derive(Debug, Deserialize, utoipa::IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct DeepenQuery {
-    pub exclude: Option<String>,
+#[serde(rename_all = "camelCase")]
+pub struct CreateQuestionBody {
+    pub kind: QuestionKind,
+    pub prompt: String,
+    #[serde(default)]
+    pub options: Vec<QuestionOption>,
+    #[serde(default)]
+    pub accepted_answers: Vec<String>,
+    pub explanation: Option<String>,
+    pub rationale: Option<String>,
+    pub points: u32,
+    #[serde(default)]
+    pub review_status: ContentReviewStatus,
+    #[serde(default)]
+    pub source_references: Vec<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct QuestionDeepenResponse {
-    pub question: Question,
-    pub related: Vec<Question>,
-}
-
-#[utoipa::path(
-    get,
-    path = "/v1/questions/{id}/deepen",
-    params(
-        ("id" = Uuid, Path, description = "Question id"),
-        DeepenQuery
-    ),
-    responses(
-        (status = 200, description = "Question deepen bundle", body = QuestionDeepenResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden"),
-        (status = 404, description = "Question not found"),
-    ),
-    security(("bearer" = [])),
-    tag = "questions"
-)]
-pub async fn get_question_deepen(
-    mut db: DbConn,
-    auth: RequireAnyScope<QuestionReadScopes>,
-    Path(id): Path<Uuid>,
-    Query(q): Query<DeepenQuery>,
-) -> Result<Json<QuestionDeepenResponse>, ApiError> {
-    let question = repo::get_question(&mut db, id)
-        .await?
-        .ok_or(ApiError::NotFound {
-            resource: "question",
-        })?;
-
-    // Check ownership if not admin
-    if auth.0.user.role != crate::domain::user::Role::Admin
-        && !repo::question_in_owner_scope(&mut db, id, auth.0.owner_id).await?
-    {
-        return Err(ApiError::NotFound {
-            resource: "question",
-        });
-    }
-
-    // Reuse existing in-progress/pending session gate (no key reveal pre-submit)
-    if auth.0.user.role != crate::domain::user::Role::Admin {
-        let active: bool = sqlx::query_scalar(
-            r#"
-            SELECT EXISTS (
-                SELECT 1 FROM tb_sessions s
-                WHERE s.owner_id = $1
-                  AND s.status = 'in_progress'
-                  AND s.question_plan->'items' @> jsonb_build_array(jsonb_build_object('question_id', $2))
-            )
-            "#
-        )
-        .bind(auth.0.user.id)
-        .bind(id)
-        .fetch_one(&mut *db)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!(e)))?;
-
-        if active {
-            return Err(ApiError::Forbidden(std::borrow::Cow::Borrowed(
-                "cannot access deepening details while an active session is in progress",
-            )));
-        }
-    }
-
-    let exclude_ids: Vec<Uuid> = q
-        .exclude
-        .unwrap_or_default()
-        .split(',')
-        .filter_map(|s| Uuid::parse_str(s.trim()).ok())
-        .collect();
-
-    let related = repo::get_related_questions(&mut db, id, &exclude_ids).await?;
-
-    Ok(Json(QuestionDeepenResponse { question, related }))
+pub struct QuestionResponse {
+    pub id: Uuid,
+    pub question_id: Uuid,
+    pub version: u32,
+    pub kind: QuestionKind,
+    pub prompt: String,
+    pub options: Vec<QuestionOption>,
+    pub accepted_answers: Vec<String>,
+    pub explanation: Option<String>,
+    pub rationale: Option<String>,
+    pub points: u32,
+    pub review_status: ContentReviewStatus,
+    pub source_references: Vec<String>,
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/v1/questions", get(list_questions).post(create_questions))
+        .route("/v1/questions", post(create_question))
         .route(
-            "/v1/questions/{id}",
-            get(get_question).patch(update_question),
+            "/v1/questions/{question_id}/versions/{version}",
+            get(get_question_version),
         )
-        .route("/v1/questions/{id}/deepen", get(get_question_deepen))
-        .route("/v1/questions/{id}/versions", get(list_versions))
-        .route("/v1/questions/{id}/promote", post(promote_question))
-        .route("/v1/questions/{id}/archive", post(archive_question))
+        .route(
+            "/v1/questions/{question_id}/versions",
+            post(create_question_version),
+        )
         .with_state(state)
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/questions",
+    request_body = CreateQuestionBody,
+    responses((status = 200, description = "Created question version", body = QuestionResponse)),
+    security(("bearer" = [])),
+    tag = "questions"
+)]
+pub async fn create_question(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Json(body): Json<CreateQuestionBody>,
+) -> Result<Json<QuestionResponse>, ApiError> {
+    let repository = PgQuestionRepository::new(state.pool);
+    let (_, version) = repository
+        .create_question(CreateQuestion {
+            subject_user_id: auth.owner_id(),
+            source_actor_id: auth.owner_id(),
+            kind: body.kind,
+            prompt: body.prompt,
+            options: body.options,
+            accepted_answers: body.accepted_answers,
+            explanation: body.explanation,
+            rationale: body.rationale,
+            points: body.points,
+            review_status: body.review_status,
+            source_references: body.source_references,
+        })
+        .await
+        .map_err(map_question_error)?;
+    Ok(Json(question_response(version)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/questions/{question_id}/versions",
+    params(("question_id" = Uuid, Path, description = "Question ID")),
+    request_body = CreateQuestionBody,
+    responses((status = 200, description = "Created question version", body = QuestionResponse)),
+    security(("bearer" = [])),
+    tag = "questions"
+)]
+pub async fn create_question_version(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(question_id): Path<Uuid>,
+    Json(body): Json<CreateQuestionBody>,
+) -> Result<Json<QuestionResponse>, ApiError> {
+    let repository = PgQuestionRepository::new(state.pool);
+    let version = repository
+        .create_version(
+            auth.owner_id(),
+            question_id,
+            CreateQuestion {
+                subject_user_id: auth.owner_id(),
+                source_actor_id: auth.owner_id(),
+                kind: body.kind,
+                prompt: body.prompt,
+                options: body.options,
+                accepted_answers: body.accepted_answers,
+                explanation: body.explanation,
+                rationale: body.rationale,
+                points: body.points,
+                review_status: body.review_status,
+                source_references: body.source_references,
+            },
+        )
+        .await
+        .map_err(map_question_error)?;
+    Ok(Json(question_response(version)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/questions/{question_id}/versions/{version}",
+    params(
+        ("question_id" = Uuid, Path, description = "Question ID"),
+        ("version" = u32, Path, description = "Question version")
+    ),
+    responses((status = 200, description = "Question version", body = QuestionResponse)),
+    security(("bearer" = [])),
+    tag = "questions"
+)]
+pub async fn get_question_version(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path((question_id, version)): Path<(Uuid, u32)>,
+) -> Result<Json<QuestionResponse>, ApiError> {
+    let repository = PgQuestionRepository::new(state.pool);
+    let version = repository
+        .get_version(auth.owner_id(), question_id, version)
+        .await
+        .map_err(map_question_error)?;
+    Ok(Json(question_response(version)))
+}
+
+fn question_response(version: crate::domain::question::QuestionVersion) -> QuestionResponse {
+    QuestionResponse {
+        id: version.id,
+        question_id: version.question_id,
+        version: version.version,
+        kind: version.kind,
+        prompt: version.prompt,
+        options: version.options,
+        accepted_answers: version.accepted_answers,
+        explanation: version.explanation,
+        rationale: version.rationale,
+        points: version.points,
+        review_status: version.review_status,
+        source_references: version.source_references,
+    }
+}
+
+fn map_question_error(error: crate::domain::question::QuestionRepositoryError) -> ApiError {
+    match error {
+        crate::domain::question::QuestionRepositoryError::EmptyField { field } => {
+            ApiError::Validation(vec![FieldError {
+                field: field.to_string(),
+                message: "must not be empty".into(),
+            }])
+        }
+        crate::domain::question::QuestionRepositoryError::InvalidQuestion(message) => {
+            ApiError::Validation(vec![FieldError {
+                field: "question".into(),
+                message,
+            }])
+        }
+        crate::domain::question::QuestionRepositoryError::NotFound { resource } => {
+            ApiError::NotFound { resource }
+        }
+        crate::domain::question::QuestionRepositoryError::SubjectMismatch => ApiError::NotFound {
+            resource: "question",
+        },
+        crate::domain::question::QuestionRepositoryError::VersionConflict => {
+            ApiError::IdempotencyConflict
+        }
+        crate::domain::question::QuestionRepositoryError::Storage(error) => {
+            ApiError::Internal(anyhow::anyhow!(error))
+        }
+    }
 }

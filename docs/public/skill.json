@@ -1,118 +1,83 @@
 {
   "auth": {
-    "format": "<id>_<secret>",
+    "format": "ame_token",
+    "registration": "POST /v1/onboarding/start returns a learner bearer token; no separate integration identity is required.",
     "type": "bearer"
   },
-  "description": "ame — study, sweetened. Read and write assessments, attempts, and study plans.",
+  "description": "ame — study, sweetened. An agent-friendly learning API with one owner-scoped learner model.",
   "entrypoint": "/llms.txt",
   "name": "ame",
-  "run": {
-    "body": {
-      "params": {
-        "...": "..."
-      },
-      "tool": "<tool name>"
-    },
-    "description": "Execute a composite or write tool.",
-    "endpoint": "/v1/agents/run",
-    "method": "POST",
-    "runnable_tools": [
-      "assessment.list",
-      "assessment.get",
-      "assessment.stats",
-      "question.list",
-      "activity.list",
-      "learning.journey.get",
-      "stats.user",
-      "attempt.list",
-      "assessment.create",
-      "assessment.batchCreate",
-      "assessment.update",
-      "assessment.addQuestion",
-      "assessment.delete",
-      "assessment.archive",
-      "assessment.publish",
-      "question.create",
-      "question.promote",
-      "question.update",
-      "deepDive.request",
-      "deepDive.list",
-      "deepDive.publish",
-      "attempt.grade",
-      "profile.get",
-      "memory.set",
-      "memory.append",
-      "target.set"
-    ]
-  },
+  "principles": [
+    "Agents and people use the same authenticated learner API.",
+    "Every learning resource is scoped to the bearer token's learner.",
+    "The API never sends email; email is an account identifier in self-host mode.",
+    "Use idempotencyKey when starting a journey."
+  ],
   "schema_version": "v1",
   "tools": [
     {
-      "description": "List assessments accessible to the caller.",
+      "description": "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
       "input_schema": {
         "properties": {
-          "course": {
-            "type": "string"
-          },
-          "mode": {
-            "enum": [
-              "practice",
-              "graded"
-            ],
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "assessment.list",
-      "path": "/v1/assessments",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Get assessment details.",
-      "input_schema": {
-        "properties": {
-          "id": {
+          "prompt": {
             "type": "string"
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "assessment.get",
-      "path": "/v1/assessments/{id}",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Archive an assessment.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
+          "prompt"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "assessment.archive",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "name": "learning.preview",
+      "path": "/v1/onboarding/preview"
     },
     {
-      "description": "Publish an assessment to make it active and promote draft questions to live.",
+      "description": "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
+      "input_schema": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "displayName",
+          "prompt",
+          "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.start",
+      "path": "/v1/onboarding/start"
+    },
+    {
+      "description": "List the authenticated learner's journeys and the next activity for each.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.journey.list",
+      "path": "/v1/learning/journeys"
+    },
+    {
+      "description": "Read one authenticated learner's intent, objectives, activities, and evidence.",
       "input_schema": {
         "properties": {
           "id": {
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -121,427 +86,99 @@
         ],
         "type": "object"
       },
-      "method": "POST",
-      "name": "assessment.publish",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "method": "GET",
+      "name": "learning.journey.get",
+      "path": "/v1/learning/journeys/{id}"
     },
     {
-      "description": "Create a new assessment, optionally importing questions.",
+      "description": "Start an activity in an owned journey.",
       "input_schema": {
         "properties": {
-          "course": {
+          "activityId": {
+            "format": "uuid",
             "type": "string"
           },
-          "description": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.activity.start",
+      "path": "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"
+    },
+    {
+      "description": "Finish a learning session and persist the learner's evidence and responses.",
+      "input_schema": {
+        "properties": {
+          "completed": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
             "type": "string"
           },
-          "method": {
-            "enum": [
-              "manual",
-              "agent"
-            ],
-            "type": "string"
-          },
-          "mode": {
-            "enum": [
-              "practice",
-              "graded"
-            ],
-            "type": "string"
-          },
-          "objectives": {
+          "responses": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "completed",
+          "responses"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.session.finish",
+      "path": "/v1/learning/sessions/{id}/finish"
+    },
+    {
+      "description": "Create a learner-owned versioned question with explanation and provenance metadata.",
+      "input_schema": {
+        "properties": {
+          "acceptedAnswers": {
             "items": {
               "type": "string"
             },
             "type": "array"
           },
-          "questions": {
-            "items": {
-              "properties": {
-                "explanation": {
-                  "type": "string"
-                },
-                "kind": {
-                  "enum": [
-                    "mc",
-                    "tf",
-                    "short",
-                    "essay",
-                    "code"
-                  ],
-                  "type": "string"
-                },
-                "payload": {
-                  "type": "object"
-                },
-                "points": {
-                  "type": "integer"
-                },
-                "prompt": {
-                  "type": "string"
-                },
-                "tags": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "kind",
-                "prompt",
-                "payload"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "status": {
-            "enum": [
-              "draft",
-              "active",
-              "archived"
-            ],
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "title",
-          "mode",
-          "method"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.create",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Batch-create multiple assessments in one call.",
-      "input_schema": {
-        "properties": {
-          "items": {
-            "items": {
-              "properties": {
-                "course": {
-                  "type": "string"
-                },
-                "description": {
-                  "type": "string"
-                },
-                "method": {
-                  "enum": [
-                    "manual",
-                    "agent"
-                  ],
-                  "type": "string"
-                },
-                "mode": {
-                  "enum": [
-                    "practice",
-                    "graded"
-                  ],
-                  "type": "string"
-                },
-                "objectives": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "questions": {
-                  "items": {
-                    "properties": {
-                      "explanation": {
-                        "type": "string"
-                      },
-                      "kind": {
-                        "enum": [
-                          "mc",
-                          "tf",
-                          "short",
-                          "essay",
-                          "code"
-                        ],
-                        "type": "string"
-                      },
-                      "payload": {
-                        "type": "object"
-                      },
-                      "points": {
-                        "type": "integer"
-                      },
-                      "prompt": {
-                        "type": "string"
-                      },
-                      "tags": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "prompt",
-                      "payload"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
-                "status": {
-                  "enum": [
-                    "draft",
-                    "active",
-                    "archived"
-                  ],
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "title",
-                "mode",
-                "method"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.batchCreate",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Update assessment metadata.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.update",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Attach a bank question to an assessment or create a new question inline.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "description": "assessment id",
-            "format": "uuid",
+          "explanation": {
             "type": "string"
           },
           "kind": {
-            "description": "required if questionId absent",
             "enum": [
-              "mc",
-              "tf",
-              "short",
+              "multiple_choice",
+              "true_false",
+              "short_answer",
               "essay",
               "code"
             ],
             "type": "string"
           },
-          "pointsOverride": {
-            "description": "override default points",
-            "type": "integer"
-          },
-          "prompt": {
-            "description": "question text",
-            "type": "string"
-          },
-          "questionId": {
-            "description": "existing bank question id (optional)",
-            "format": "uuid",
-            "type": "string"
-          },
-          "sectionId": {
-            "description": "target section (defaults to first)",
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.addQuestion",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "List questions in the bank.",
-      "input_schema": {
-        "properties": {
-          "after": {
-            "type": "string"
-          },
-          "assessmentId": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "cursor": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer"
-          },
-          "status": {
-            "enum": [
-              "draft",
-              "live",
-              "archived"
-            ],
-            "type": "string"
-          },
-          "tag": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "question.list",
-      "path": "/v1/questions",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Batch-create one or more questions in the bank.",
-      "input_schema": {
-        "properties": {
-          "questions": {
-            "items": {
-              "properties": {
-                "explanation": {
-                  "type": "string"
-                },
-                "kind": {
-                  "enum": [
-                    "mc",
-                    "tf",
-                    "short",
-                    "essay",
-                    "code"
-                  ],
-                  "type": "string"
-                },
-                "payload": {
-                  "type": "object"
-                },
-                "points": {
-                  "type": "integer"
-                },
-                "prompt": {
-                  "type": "string"
-                },
-                "status": {
-                  "enum": [
-                    "draft",
-                    "live",
-                    "archived"
-                  ],
-                  "type": "string"
-                },
-                "tags": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "kind",
-                "prompt",
-                "payload"
-              ],
-              "type": "object"
-            },
+          "options": {
             "type": "array"
-          }
-        },
-        "required": [
-          "questions"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "question.create",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Promote one draft question to live.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "question.promote",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Update a question in the bank.",
-      "input_schema": {
-        "properties": {
-          "explanation": {
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "payload": {
-            "type": "object"
           },
           "points": {
+            "minimum": 1,
             "type": "integer"
           },
           "prompt": {
             "type": "string"
           },
-          "tags": {
+          "rationale": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "type": "string"
+          },
+          "sourceReferences": {
             "items": {
               "type": "string"
             },
@@ -549,324 +186,64 @@
           }
         },
         "required": [
-          "id"
+          "kind",
+          "prompt",
+          "points"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "question.update",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "name": "learning.question.create",
+      "path": "/v1/questions"
     },
     {
-      "description": "Retrieve deepen/review details for a question (tags, related questions, references, study notes). Returns 403 Forbidden if there is an active session for this question.",
-      "input_schema": {
-        "properties": {
-          "exclude": {
-            "description": "Comma-separated list of question IDs to exclude",
-            "type": "string"
-          },
-          "id": {
-            "description": "Question ID",
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "question.deepen",
-      "path": "/v1/questions/{id}/deepen",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Request a durable Deep Dive explanation for an owned question.",
+      "description": "Read one exact learner-owned question version for reproducible assessment history.",
       "input_schema": {
         "properties": {
           "questionId": {
             "format": "uuid",
             "type": "string"
           },
-          "reason": {
-            "type": "string"
-          },
-          "sourceAttemptId": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "sourceSessionId": {
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "questionId"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "deepDive.request",
-      "path": "/v1/agents/run",
-      "scope": "attempt.write"
-    },
-    {
-      "description": "List the owner's Deep Dive requests.",
-      "input_schema": {
-        "properties": {
-          "status": {
-            "enum": [
-              "requested",
-              "drafting",
-              "published",
-              "needs_revision",
-              "archived"
-            ],
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "deepDive.list",
-      "path": "/v1/agents/run",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Publish authored Markdown for an owned Deep Dive request.",
-      "input_schema": {
-        "properties": {
-          "bodyMarkdown": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "published",
-              "drafting",
-              "needs_revision",
-              "requested"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "bodyMarkdown"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "deepDive.publish",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Get per-assessment performance stats (avg, median, distribution, per-question metrics).",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "assessment.stats",
-      "path": "/v1/assessments/{id}/stats",
-      "scope": "stats.read"
-    },
-    {
-      "description": "List agent activity log.",
-      "input_schema": {
-        "properties": {
-          "cursor": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "limit": {
+          "version": {
+            "minimum": 1,
             "type": "integer"
           }
         },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "activity.list",
-      "path": "/v1/agents/activity",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Read the owner's intent, objectives, activities, persisted evidence-backed recommendation, and source attribution for a learning journey.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
         "required": [
-          "id"
+          "questionId",
+          "version"
         ],
         "type": "object"
       },
-      "method": "POST",
-      "name": "learning.journey.get",
-      "path": "/v1/agents/run",
-      "scope": "plan.read"
-    },
-    {
-      "description": "Read the caller's aggregate learning statistics.",
-      "input_schema": {
-        "properties": {},
-        "type": "object"
-      },
       "method": "GET",
-      "name": "stats.user",
-      "path": "/v1/me/stats",
-      "scope": "stats.read"
+      "name": "learning.question.get",
+      "path": "/v1/questions/{question_id}/versions/{version}"
     },
     {
-      "description": "List the owner's per-attempt history, optionally filtered to one session.",
+      "description": "Create the next immutable version of a learner-owned question.",
       "input_schema": {
         "properties": {
-          "limit": {
+          "kind": {
+            "type": "string"
+          },
+          "points": {
+            "minimum": 1,
             "type": "integer"
           },
-          "offset": {
-            "type": "integer"
-          },
-          "sessionId": {
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "attempt.list",
-      "path": "/v1/me/attempts",
-      "scope": "attempt.read"
-    },
-    {
-      "description": "Grade a pending essay or code attempt.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "notes": {
-            "type": "string"
-          },
-          "score": {
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "type": "number"
-          }
-        },
-        "required": [
-          "id",
-          "score"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "attempt.grade",
-      "path": "/v1/agents/run",
-      "scope": "attempt.write"
-    },
-    {
-      "description": "Delete an assessment.",
-      "input_schema": {
-        "properties": {
-          "id": {
+          "prompt": {
             "type": "string"
           }
         },
         "required": [
-          "id"
+          "kind",
+          "prompt",
+          "points"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "assessment.delete",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Get the agent's own config (label, focus tags, goal, memory) plus the owner's per-tag ELO ratings.",
-      "input_schema": {
-        "properties": {},
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "profile.get",
-      "path": "/v1/agents/run",
-      "scope": null
-    },
-    {
-      "description": "Replace the agent's memory blob wholesale.",
-      "input_schema": {
-        "properties": {
-          "memory": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "memory"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "memory.set",
-      "path": "/v1/agents/run",
-      "scope": null
-    },
-    {
-      "description": "Shallow-merge the given keys into the agent's memory blob.",
-      "input_schema": {
-        "properties": {
-          "append": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "append"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "memory.append",
-      "path": "/v1/agents/run",
-      "scope": null
-    },
-    {
-      "description": "Update the agent's current goal and/or next target.",
-      "input_schema": {
-        "properties": {
-          "currentGoal": {
-            "type": "string"
-          },
-          "nextTarget": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "target.set",
-      "path": "/v1/agents/run",
-      "scope": null
+      "name": "learning.question.revise",
+      "path": "/v1/questions/{question_id}/versions"
     }
   ]
 }

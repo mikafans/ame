@@ -41,65 +41,6 @@ pub async fn auth_extract_middleware(
     next.run(req).await
 }
 
-/// Agent-role tokens (sub-accounts) are confined to a small allowlist of endpoints.
-/// All other REST paths return 403 Forbidden. Runs AFTER `auth_extract_middleware`
-/// so the cached user is available for the role check.
-pub async fn agent_guard_middleware(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
-    use crate::auth::extractor::AuthenticatedUser;
-    use crate::domain::user::Role;
-    use axum::response::IntoResponse;
-
-    if let Some(auth) = req.extensions().get::<AuthenticatedUser>()
-        && auth.user.role == Role::Agent
-    {
-        let path = req.uri().path();
-        let method = req.method().as_str();
-
-        // Allowlist: method + pattern (using routed MatchedPath when available,
-        // or raw path as fallback).
-        let matched_path = req
-            .extensions()
-            .get::<axum::extract::MatchedPath>()
-            .map(|p| p.as_str())
-            .unwrap_or(path);
-
-        let allowed = matches!(
-            (method, matched_path),
-            ("GET", "/v1/assessments")
-                | ("GET", "/v1/assessments/{id}")
-                | ("GET", "/v1/assessments/{id}/stats")
-                | ("GET", "/v1/questions")
-                | ("GET", "/v1/questions/{id}/deepen")
-                | ("GET", "/v1/me/attempts")
-                | ("GET", "/v1/me/stats")
-                | ("GET", "/v1/agents/activity")
-                | ("GET", "/v1/learning/journeys/{id}")
-                | ("GET", "/v1/learning/sessions/{id}")
-                | ("POST", "/v1/learning/sessions/{id}/finish")
-                | (
-                    "POST",
-                    "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"
-                )
-                | ("POST", "/v1/agents/run")
-                | ("GET", "/llms.txt")
-                | ("GET", "/skill.json")
-                | ("GET", "/openapi.yaml")
-        );
-
-        if !allowed {
-            return crate::domain::error::ApiError::Forbidden(std::borrow::Cow::Borrowed(
-                "agents are limited to read endpoints and POST /v1/agents/run",
-            ))
-            .into_response();
-        }
-    }
-
-    next.run(req).await
-}
-
 /// Resolves the effective platform settings once per request, stashes them in
 /// request extensions (so `rate_limit_middleware` reuses the same blob), and
 /// returns 503 for non-admins while maintenance mode is on. Runs AFTER
@@ -113,7 +54,6 @@ pub async fn maintenance_mode_middleware(
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     use crate::auth::extractor::AuthenticatedUser;
-    use crate::domain::user::Scope;
     use axum::response::IntoResponse;
 
     let settings = crate::settings::get_effective(&state.pool, &state.valkey, &state.config).await;
@@ -127,7 +67,7 @@ pub async fn maintenance_mode_middleware(
         let is_admin = req
             .extensions()
             .get::<AuthenticatedUser>()
-            .map(|a| a.token_scopes.contains(&Scope::Admin))
+            .map(|a| a.user.role == crate::domain::user::Role::Admin)
             .unwrap_or(false);
         if !exempt && !is_admin {
             return crate::domain::error::ApiError::Maintenance.into_response();
@@ -139,27 +79,17 @@ pub async fn maintenance_mode_middleware(
     next.run(req).await
 }
 
-pub mod activity;
 pub mod admin;
 pub mod agents;
-pub mod assessments;
 pub mod auth;
 pub mod db;
-pub mod deep_dives;
-pub mod explore;
-pub mod export;
 pub mod health;
 pub mod idempotency;
 pub mod learning;
 pub mod me;
-pub mod messages;
 pub mod onboarding;
 pub mod openapi;
 pub mod questions;
-pub mod quota;
-pub mod sessions;
-pub mod stats;
-pub mod tags;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
     let (layer, handle) = PrometheusMetricLayer::pair();
@@ -215,31 +145,18 @@ pub fn router(pool: PgPool) -> Router {
 
     // Endpoints that should be logged (activity_log)
     let logged_router = Router::new()
-        .merge(assessments::router(state.clone()))
-        .merge(sessions::router(state.clone()))
-        .merge(deep_dives::router(state.clone()))
-        .merge(me::router(state.clone()))
-        .merge(agents::logged_router(state.clone()))
-        .merge(messages::router(state.clone()))
+        .merge(me::current_router(state.clone()))
         .merge(learning::router(state.clone()))
-        .route("/v1/me/export", axum::routing::get(export::export_data))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             idempotency::idempotency_middleware,
-        ))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            activity::activity_log_middleware,
         ));
 
     let api_routes = Router::new()
         .merge(admin::router(state.clone()))
-        .merge(questions::router(state.clone()))
-        .merge(explore::router(state.clone()))
         .merge(openapi::router(state.clone()))
         .merge(onboarding::router(state.clone()))
-        .merge(stats::router(state.clone()))
-        .merge(tags::router(state.clone()))
+        .merge(questions::router(state.clone()))
         .merge(agents::public_router(state.clone()))
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))
@@ -253,7 +170,6 @@ pub fn router(pool: PgPool) -> Router {
             state.clone(),
             maintenance_mode_middleware,
         ))
-        .layer(middleware::from_fn(agent_guard_middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,

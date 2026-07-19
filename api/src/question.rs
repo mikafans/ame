@@ -1,8 +1,8 @@
 //! Question repository contract and deterministic grading primitives.
 
 use crate::domain::question::{
-    ContentReviewStatus, CreateQuestion, Question, QuestionKind, QuestionOption,
-    QuestionRepositoryError, QuestionVersion, validate_question,
+    CreateQuestion, Question, QuestionKind, QuestionRepositoryError, QuestionVersion,
+    validate_question,
 };
 use async_trait::async_trait;
 use std::{

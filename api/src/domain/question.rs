@@ -26,6 +26,12 @@ pub enum ContentReviewStatus {
     Retired,
 }
 
+impl Default for ContentReviewStatus {
+    fn default() -> Self {
+        Self::Draft
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct QuestionOption {
     pub id: String,
