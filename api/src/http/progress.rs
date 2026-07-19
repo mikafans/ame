@@ -326,7 +326,7 @@ pub async fn record_streak(
     }))
 }
 
-fn map_progress_error(error: ProgressError) -> ApiError {
+pub(crate) fn map_progress_error(error: ProgressError) -> ApiError {
     match error {
         ProgressError::NotFound | ProgressError::SubjectMismatch => ApiError::NotFound {
             resource: "progress",

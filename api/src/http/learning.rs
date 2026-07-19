@@ -8,6 +8,7 @@ use axum::{
     routing::post,
 };
 use serde::Serialize;
+use sqlx::PgPool;
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -25,6 +26,7 @@ use crate::{
     },
     http::AppState,
     learning_postgres::PgLearningRepository,
+    progress::ProgressRepository,
 };
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -106,8 +108,10 @@ pub struct LearningSessionResponse {
 #[serde(rename_all = "camelCase")]
 pub struct LearningRecommendationResponse {
     pub activity_id: Uuid,
+    pub objective_id: Uuid,
     pub title: String,
     pub objective_ids: Vec<Uuid>,
+    pub evidence_ids: Vec<Uuid>,
     pub rationale: String,
     pub based_on_session_id: Option<Uuid>,
 }
@@ -242,6 +246,7 @@ pub async fn get_journey(
     auth: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LearningJourneyResponse>, ApiError> {
+    let progress_pool = state.pool.clone();
     let repository = PgLearningRepository::new(state.pool);
     let journey = repository
         .get_journey(auth.owner_id(), id)
@@ -264,7 +269,14 @@ pub async fn get_journey(
         .await
         .map_err(map_learning_error)?;
     let activity_responses: Vec<_> = activities.into_iter().map(activity_response).collect();
-    let recommendation = next_recommendation(&activity_responses, latest_session.as_ref());
+    let recommendation = next_recommendation(
+        progress_pool,
+        auth.owner_id(),
+        journey.id,
+        &activity_responses,
+        latest_session.as_ref(),
+    )
+    .await?;
 
     Ok(Json(LearningJourneyResponse {
         id: journey.id,
@@ -417,30 +429,56 @@ pub async fn finish_learning_session(
     Ok(Json(session_response(session)))
 }
 
-fn next_recommendation(
+async fn next_recommendation(
+    pool: PgPool,
+    subject_user_id: Uuid,
+    journey_id: Uuid,
     activities: &[LearningActivityResponse],
     latest_session: Option<&LearningSession>,
-) -> Option<LearningRecommendationResponse> {
+) -> Result<Option<LearningRecommendationResponse>, ApiError> {
+    let objective_activities = activities
+        .iter()
+        .filter(|activity| {
+            matches!(
+                activity.status,
+                ActivityStatus::Ready | ActivityStatus::InProgress
+            )
+        })
+        .flat_map(|activity| {
+            activity
+                .objective_ids
+                .iter()
+                .map(move |objective_id| (*objective_id, activity.id))
+        })
+        .collect::<Vec<_>>();
+    let Some(value) = (!objective_activities.is_empty())
+        .then(|| crate::progress_postgres::PgProgressRepository::new(pool))
+    else {
+        return Ok(None);
+    };
+    let recommendation = ProgressRepository::recommend_weakest(
+        &value,
+        subject_user_id,
+        journey_id,
+        &objective_activities,
+    )
+    .await
+    .map_err(crate::http::progress::map_progress_error)?;
     let activity = activities
         .iter()
-        .find(|activity| activity.status == ActivityStatus::Ready)?;
-    let has_evidence = latest_session
-        .and_then(|session| session.result.as_ref())
-        .and_then(|result| result.get("evidence"))
-        .and_then(serde_json::Value::as_array)
-        .is_some_and(|evidence| !evidence.is_empty());
-    Some(LearningRecommendationResponse {
+        .find(|activity| activity.id == recommendation.activity_id)
+        .ok_or(ApiError::NotFound {
+            resource: "recommended activity",
+        })?;
+    Ok(Some(LearningRecommendationResponse {
         activity_id: activity.id,
+        objective_id: recommendation.objective_id,
         title: activity.title.clone(),
         objective_ids: activity.objective_ids.clone(),
-        rationale: if has_evidence {
-            "Your latest activity produced evidence. Continue with this next step to build on it."
-                .to_string()
-        } else {
-            "This is the next planned step in your learning journey.".to_string()
-        },
+        evidence_ids: recommendation.evidence_ids,
+        rationale: recommendation.reason,
         based_on_session_id: latest_session.map(|session| session.id),
-    })
+    }))
 }
 
 fn objective_response(objective: LearningObjective) -> LearningObjectiveResponse {
