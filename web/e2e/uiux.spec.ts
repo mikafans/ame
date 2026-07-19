@@ -201,4 +201,40 @@ test("learner can complete an agent-provided assessment and open its deep dive",
       name: "A coordinator gives the system a shared decision point",
     }),
   ).toBeVisible();
+
+  const refreshedJourneyResponse = await page.request.get(
+    `/api/v1/learning/journeys/${journeyId}`,
+  );
+  expect(refreshedJourneyResponse.ok()).toBeTruthy();
+  const refreshedJourney = await refreshedJourneyResponse.json();
+  const nextActivity = refreshedJourney.activities.find(
+    (candidate: { status: string }) => candidate.status === "ready",
+  );
+  expect(nextActivity).toBeTruthy();
+  const gradedAssessmentResponse = await page.request.post(
+    "/api/v1/assessments",
+    {
+      data: {
+        activityId: nextActivity.id,
+        mode: "graded",
+        status: "published",
+        items: [
+          {
+            questionId: question.questionId,
+            questionVersion: question.version,
+            orderIndex: 0,
+            points: 1,
+          },
+        ],
+      },
+    },
+  );
+  expect(gradedAssessmentResponse.ok()).toBeTruthy();
+  await page.getByRole("button", { name: "Begin" }).click();
+  await expect(
+    page.getByText("Graded assessment", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "A coordinator" }).click();
+  await page.getByRole("button", { name: "Submit assessment" }).click();
+  await expect(page.getByText("Assessment complete")).toBeVisible();
 });
