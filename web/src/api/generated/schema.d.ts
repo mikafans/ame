@@ -853,11 +853,15 @@ export interface components {
             /** Format: date-time */
             ts: string;
         };
+        /** @enum {string} */
+        ActivityKind: "explanation" | "example" | "diagnostic" | "practice" | "feedback" | "application" | "reflection" | "milestone" | "timed_practice" | "recommendation";
         ActivityResponse: {
             items: components["schemas"]["ActivityEntry"][];
             /** Format: uuid */
             nextCursor?: string | null;
         };
+        /** @enum {string} */
+        ActivityStatus: "proposed" | "ready" | "in_progress" | "completed" | "failed";
         AddAssessmentQuestionBody: {
             kind?: null | components["schemas"]["QuestionKind"];
             /** Format: int32 */
@@ -1446,6 +1450,31 @@ export interface components {
         };
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
+        LearningActivityResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            kind: components["schemas"]["ActivityKind"];
+            objectiveIds: string[];
+            /** Format: int32 */
+            orderIndex: number;
+            payload: Record<string, never>;
+            /** Format: int32 */
+            payloadSchemaVersion: number;
+            /** Format: uuid */
+            sourceActorId: string;
+            /** Format: uuid */
+            sourceRunId?: string | null;
+            status: components["schemas"]["ActivityStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            title: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         LearningGoalResponse: {
             /** Format: date-time */
             createdAt: string;
@@ -1462,6 +1491,7 @@ export interface components {
             templateVersionId?: string | null;
         };
         LearningJourneyResponse: {
+            activities: components["schemas"]["LearningActivityResponse"][];
             /** Format: date-time */
             createdAt: string;
             goal: components["schemas"]["LearningGoalResponse"];
@@ -1469,12 +1499,29 @@ export interface components {
             goalId: string;
             /** Format: uuid */
             id: string;
+            objectives: components["schemas"]["LearningObjectiveResponse"][];
             promise: string;
             /** Format: uuid */
             sourceActorId: string;
             status: components["schemas"]["JourneyStatus"];
             /** Format: uuid */
             subjectUserId: string;
+        };
+        LearningObjectiveResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: int32 */
+            orderIndex: number;
+            statement: string;
+            status: components["schemas"]["ObjectiveStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            successCriteria: string;
+            verb: string;
         };
         ListAgentsResponse: {
             agents: components["schemas"]["AgentSummary"][];
@@ -1540,6 +1587,8 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        /** @enum {string} */
+        ObjectiveStatus: "active" | "paused" | "completed";
         PatchDeepDiveBody: {
             status?: string | null;
             userNote?: string | null;

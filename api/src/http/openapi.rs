@@ -45,7 +45,10 @@ use crate::{
             CreateDeepDiveBody, DeepDive, DeepDiveRevision, DeepDiveRevisionsResponse,
             ListDeepDivesQuery, ListDeepDivesResponse, PatchDeepDiveBody, PublishDeepDiveBody,
         },
-        learning::{LearningGoalResponse, LearningJourneyResponse},
+        learning::{
+            LearningActivityResponse, LearningGoalResponse, LearningJourneyResponse,
+            LearningObjectiveResponse,
+        },
         me::{
             AgentSummary, AgentTokenSummary, CohortStatsResponse, CreateAgentBody,
             CreateAgentTokenBody, CreateKeyResponse, ListAttemptsResponse, MeResponse,
@@ -181,6 +184,8 @@ use crate::{
         StartLearningResponse,
         LearningGoalResponse,
         LearningJourneyResponse,
+        LearningObjectiveResponse,
+        LearningActivityResponse,
         UserInfo,
         MeResponse,
         CreateKeyResponse,

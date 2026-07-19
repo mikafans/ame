@@ -1897,6 +1897,19 @@ components:
         ts:
           type: string
           format: date-time
+    ActivityKind:
+      type: string
+      enum:
+      - explanation
+      - example
+      - diagnostic
+      - practice
+      - feedback
+      - application
+      - reflection
+      - milestone
+      - timed_practice
+      - recommendation
     ActivityResponse:
       type: object
       required:
@@ -1911,6 +1924,14 @@ components:
           - string
           - 'null'
           format: uuid
+    ActivityStatus:
+      type: string
+      enum:
+      - proposed
+      - ready
+      - in_progress
+      - completed
+      - failed
     AddAssessmentQuestionBody:
       type: object
       properties:
@@ -3436,6 +3457,65 @@ components:
       - paused
       - completed
       - failed
+    LearningActivityResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - subjectUserId
+      - sourceActorId
+      - kind
+      - title
+      - orderIndex
+      - payloadSchemaVersion
+      - payload
+      - objectiveIds
+      - status
+      - createdAt
+      - updatedAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ActivityKind'
+        objectiveIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        payload:
+          type: object
+        payloadSchemaVersion:
+          type: integer
+          format: int32
+        sourceActorId:
+          type: string
+          format: uuid
+        sourceRunId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ActivityStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
     LearningGoalResponse:
       type: object
       required:
@@ -3481,7 +3561,13 @@ components:
       - status
       - createdAt
       - goal
+      - objectives
+      - activities
       properties:
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
         createdAt:
           type: string
           format: date-time
@@ -3493,6 +3579,10 @@ components:
         id:
           type: string
           format: uuid
+        objectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningObjectiveResponse'
         promise:
           type: string
         sourceActorId:
@@ -3503,6 +3593,42 @@ components:
         subjectUserId:
           type: string
           format: uuid
+    LearningObjectiveResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - subjectUserId
+      - verb
+      - statement
+      - successCriteria
+      - orderIndex
+      - status
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        statement:
+          type: string
+        status:
+          $ref: '#/components/schemas/ObjectiveStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        successCriteria:
+          type: string
+        verb:
+          type: string
     ListAgentsResponse:
       type: object
       required:
@@ -3671,6 +3797,12 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
+    ObjectiveStatus:
+      type: string
+      enum:
+      - active
+      - paused
+      - completed
     PatchDeepDiveBody:
       type: object
       properties:
