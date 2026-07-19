@@ -103,11 +103,18 @@ pub struct LearningSessionResponse {
     pub finished_at: Option<OffsetDateTime>,
 }
 
-#[derive(Debug, serde::Deserialize, ToSchema)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FinishLearningSessionBody {
-    #[schema(value_type = Object)]
-    pub result: serde_json::Value,
+    pub completed: bool,
+    pub responses: Vec<LearningResponseBody>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningResponseBody {
+    pub id: String,
+    pub value: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -313,7 +320,10 @@ pub async fn finish_learning_session(
         .finish_learning_session(FinishLearningSessionInput {
             subject_user_id: auth.owner_id(),
             session_id: id,
-            result: body.result,
+            result: serde_json::json!({
+                "completed": body.completed,
+                "responses": body.responses,
+            }),
         })
         .await
         .map_err(map_learning_error)?;

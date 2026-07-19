@@ -394,6 +394,23 @@ fn starter_blueprint(plan: &BootstrapPlan, journey_id: Uuid) -> StarterBlueprint
                     "purpose": "orientation",
                     "intent": plan.normalized_statement,
                     "estimated_minutes": 5
+                    ,"content": {
+                        "type": "starter_check",
+                        "instructions": "Give AME a quick starting signal so the next step can fit you.",
+                        "questions": [
+                            {
+                                "id": "familiarity",
+                                "kind": "single_choice",
+                                "prompt": "How familiar are you with this topic?",
+                                "options": ["new_to_me", "some_exposure", "comfortable"]
+                            },
+                            {
+                                "id": "outcome",
+                                "kind": "short_text",
+                                "prompt": "What would you like to be able to do first?"
+                            }
+                        ]
+                    }
                 }),
                 status: ActivityStatus::Ready,
             },

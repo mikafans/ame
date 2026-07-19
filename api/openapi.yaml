@@ -3397,10 +3397,15 @@ components:
     FinishLearningSessionBody:
       type: object
       required:
-      - result
+      - completed
+      - responses
       properties:
-        result:
-          type: object
+        completed:
+          type: boolean
+        responses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningResponseBody'
     FinishSessionResponse:
       type: object
       required:
@@ -3758,6 +3763,16 @@ components:
         successCriteria:
           type: string
         verb:
+          type: string
+    LearningResponseBody:
+      type: object
+      required:
+      - id
+      - value
+      properties:
+        id:
+          type: string
+        value:
           type: string
     LearningSessionResponse:
       type: object

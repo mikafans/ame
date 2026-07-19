@@ -1454,7 +1454,8 @@ export interface components {
             message: string;
         };
         FinishLearningSessionBody: {
-            result: Record<string, never>;
+            completed: boolean;
+            responses: components["schemas"]["LearningResponseBody"][];
         };
         FinishSessionResponse: {
             result: components["schemas"]["SessionResult"];
@@ -1593,6 +1594,10 @@ export interface components {
             subjectUserId: string;
             successCriteria: string;
             verb: string;
+        };
+        LearningResponseBody: {
+            id: string;
+            value: string;
         };
         LearningSessionResponse: {
             /** Format: uuid */

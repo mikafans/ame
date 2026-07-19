@@ -9,6 +9,17 @@ import { Button } from "@/components/ui/button";
 
 type Journey = components["schemas"]["LearningJourneyResponse"];
 type LearningSession = components["schemas"]["LearningSessionResponse"];
+type StarterQuestion = {
+  id: string;
+  kind: "single_choice" | "short_text";
+  prompt: string;
+  options?: string[];
+};
+type StarterContent = {
+  type: "starter_check";
+  instructions: string;
+  questions: StarterQuestion[];
+};
 
 export default function LearningJourneyPage() {
   const params = useParams<{ id: string }>();
@@ -17,6 +28,7 @@ export default function LearningJourneyPage() {
   const [error, setError] = useState<string | null>(null);
   const [startingActivity, setStartingActivity] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [responses, setResponses] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +90,7 @@ export default function LearningJourneyPage() {
       if (!response.ok || !data)
         throw new Error("Could not start this activity");
       setSession(data);
+      setResponses({});
       window.localStorage.setItem(`ame-learning-session:${params.id}`, data.id);
     } catch (startError) {
       setError(
@@ -99,7 +112,13 @@ export default function LearningJourneyPage() {
         "/v1/learning/sessions/{id}/finish",
         {
           params: { path: { id: session.id } },
-          body: { result: {} },
+          body: {
+            completed: true,
+            responses: Object.entries(responses).map(([id, value]) => ({
+              id,
+              value,
+            })),
+          },
         },
       );
       if (!response.ok || !data)
@@ -135,6 +154,10 @@ export default function LearningJourneyPage() {
   );
   const activeActivity = session
     ? journey.activities.find((activity) => activity.id === session.activityId)
+    : null;
+  const activeContent = activeActivity?.payload
+    ? ((activeActivity.payload as unknown as { content?: StarterContent })
+        .content ?? null)
     : null;
 
   return (
@@ -217,6 +240,60 @@ export default function LearningJourneyPage() {
               ? String(activeActivity.payload.purpose)
               : "Take this focused first step, then AME will open the next one."}
           </p>
+          {session.status === "in_progress" &&
+            activeContent?.type === "starter_check" && (
+              <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
+                <p className="text-sm font-medium">
+                  {activeContent.instructions}
+                </p>
+                {activeContent.questions.map((question) => (
+                  <div key={question.id} className="space-y-2">
+                    <label
+                      htmlFor={`learning-${question.id}`}
+                      className="block text-sm font-medium"
+                    >
+                      {question.prompt}
+                    </label>
+                    {question.kind === "single_choice" ? (
+                      <div className="flex flex-wrap gap-2">
+                        {question.options?.map((option) => (
+                          <Button
+                            key={option}
+                            type="button"
+                            variant={
+                              responses[question.id] === option
+                                ? "default"
+                                : "outline"
+                            }
+                            onClick={() =>
+                              setResponses((current) => ({
+                                ...current,
+                                [question.id]: option,
+                              }))
+                            }
+                            className="rounded-full"
+                          >
+                            {option.replaceAll("_", " ")}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        id={`learning-${question.id}`}
+                        value={responses[question.id] ?? ""}
+                        onChange={(event) =>
+                          setResponses((current) => ({
+                            ...current,
+                            [question.id]: event.target.value,
+                          }))
+                        }
+                        className="h-11 w-full rounded-xl border border-input bg-background px-4 text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           {session.status === "in_progress" ? (
             <Button
               type="button"
