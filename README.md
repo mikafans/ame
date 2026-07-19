@@ -105,18 +105,20 @@ make db-down
 - `web/` — Next.js frontend (App Router, Tailwind CSS and local shadcn-style primitives).
 - `db/` — `docker-compose.yml` + sqlx migrations.
 - `design/source/src/*.jsx` — pixel-faithful UI design source of truth.
-- `docs/specs/` — design specs (`2026-05-20-harus-platform-design.md` is canonical).
+- `docs/specs/` — supporting design and schema specifications.
 - `docs/plans/` — implementation plans.
 - `docs/public/` — canonical public-facing operator, deployment, and agent docs.
-- `docs/ROADMAP.md` — versioned roadmap toward v1.1 "Admin Console GA".
+- `docs/ROADMAP.md` — the current agent-first release roadmap.
 - `.tmp/` — gitignored scratch space for screenshots and Playwright artifacts.
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the path to **v1.1 "Admin Console GA"**.
-Current: **v0.3.0** — learner landing refresh, frontend foundation migration, and
-self-hosting documentation. The next roadmap milestone is the v0.3 content and
-data-hygiene track.
+[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the certifiable agent-first learning
+loop and its later milestones. Current: **v0.3.0** — one unified learner API,
+durable journeys, question-backed practice and exams, evidence-based progress,
+deep dives, and a self-hostable Postgres + Valkey + API + web + Caddy origin.
+The canonical design and user stories are in
+[`docs/plans/2026-07-19-agent-first-learning-rework.md`](docs/plans/2026-07-19-agent-first-learning-rework.md).
 
 ## Contributing
 
