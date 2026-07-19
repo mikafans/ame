@@ -19,7 +19,7 @@ test("visitor can preview a first learning journey from an intent", async ({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        normalizedStatement: "Learn music theory",
+        normalizedStatement: "Learn distributed systems",
         promise:
           "Build a durable foundation through guided practice and review",
         templateId: "learn-a-subject",
@@ -27,7 +27,7 @@ test("visitor can preview a first learning journey from an intent", async ({
         objectives: [
           {
             verb: "identify",
-            statement: "Identify the core concepts: music theory",
+            statement: "Identify the core concepts: distributed systems",
             successCriteria: "Name the essential ideas and how they relate",
           },
         ],
@@ -44,7 +44,7 @@ test("visitor can preview a first learning journey from an intent", async ({
   await page.goto("/");
   await page
     .getByLabel("What would you like to learn?")
-    .fill("I would like to learn music theory");
+    .fill("I would like to learn distributed systems");
   await page.getByRole("button", { name: "See my plan" }).click();
 
   await expect(page.getByText("Build a durable foundation")).toBeVisible();

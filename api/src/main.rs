@@ -32,25 +32,12 @@ async fn main() -> anyhow::Result<()> {
                 cost: ame_api::config::CostConfig { read: 1, write: 5 },
                 trusted_proxies: Some(1),
             },
-            quota: ame_api::config::QuotaConfig {
-                agents: ame_api::config::TierQuotaConfig {
-                    free: 1,
-                    premium: 100,
-                },
-                assessments: ame_api::config::TierQuotaConfig {
-                    free: 50,
-                    premium: 5000,
-                },
-                questions: ame_api::config::TierQuotaConfig {
-                    free: 50,
-                    premium: 5000,
-                },
-            },
             batch: ame_api::config::BatchConfig {
                 free: 50,
                 premium: 500,
             },
             login: ame_api::config::LoginConfig::default(),
+            registration: ame_api::config::RegistrationConfig::default(),
         }
     });
 

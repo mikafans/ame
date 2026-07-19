@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 const BUILTIN_TEMPLATES: &str = include_str!("../templates/index.json");
+const TOPIC_BLUEPRINTS: &str = include_str!("../templates/topic-blueprints.json");
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct TemplateCatalog {
@@ -14,6 +15,7 @@ pub struct LearningTemplate {
     pub version: u32,
     pub title: String,
     pub description: String,
+    pub promise: String,
     pub when_to_use: String,
     pub inputs: TemplateInputs,
     pub stages: Vec<String>,
@@ -41,11 +43,85 @@ pub struct TemplateRecommendation {
     pub reason: &'static str,
 }
 
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct TopicBlueprint {
+    pub id: String,
+    pub template_id: String,
+    pub aliases: Vec<String>,
+    pub objectives: Vec<TopicObjective>,
+    pub first_activity: TopicFirstActivity,
+    pub follow_up_activities: Vec<TopicActivity>,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct TopicObjective {
+    pub verb: String,
+    pub statement: String,
+    pub success_criteria: String,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct TopicFirstActivity {
+    pub kind: String,
+    pub title: String,
+    pub purpose: String,
+    pub estimated_minutes: i64,
+    pub context: String,
+    pub instructions: String,
+    pub questions: Vec<serde_json::Value>,
+    pub objective_orders: Vec<i32>,
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct TopicActivity {
+    pub kind: String,
+    pub title: String,
+    pub objective_orders: Vec<i32>,
+    pub payload: serde_json::Value,
+    pub status: String,
+}
+
 pub fn builtin_catalog() -> Result<TemplateCatalog, String> {
     let catalog: TemplateCatalog = serde_json::from_str(BUILTIN_TEMPLATES)
         .map_err(|error| format!("invalid built-in learning templates: {error}"))?;
     validate_catalog(&catalog)?;
     Ok(catalog)
+}
+
+pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
+    let topics: Vec<TopicBlueprint> = serde_json::from_str(TOPIC_BLUEPRINTS)
+        .map_err(|error| format!("invalid topic blueprints: {error}"))?;
+    if topics.iter().any(|topic| {
+        topic.id.trim().is_empty()
+            || topic.template_id.trim().is_empty()
+            || topic.objectives.is_empty()
+            || topic.first_activity.questions.is_empty()
+            || topic.follow_up_activities.is_empty()
+    }) {
+        return Err("topic blueprints must contain identity, objectives, and questions".into());
+    }
+    Ok(topics)
+}
+
+pub fn find_topic_blueprint(prompt: &str) -> Result<Option<TopicBlueprint>, String> {
+    let normalized = prompt.trim().to_lowercase();
+    topic_blueprints().map(|topics| {
+        topics.into_iter().find(|topic| {
+            topic
+                .aliases
+                .iter()
+                .any(|alias| normalized.contains(&alias.to_lowercase()))
+        })
+    })
+}
+
+pub fn find_template_blueprint(template_id: &str) -> Result<Option<TopicBlueprint>, String> {
+    topic_blueprints().map(|topics| {
+        topics
+            .into_iter()
+            .find(|topic| topic.template_id == template_id && topic.aliases.is_empty())
+    })
 }
 
 /// Select a safe built-in starting shape before an agent enriches the journey.
@@ -104,7 +180,10 @@ fn validate_catalog(catalog: &TemplateCatalog) -> Result<(), String> {
         if template.version == 0 {
             return Err(format!("template {} has an invalid version", template.id));
         }
-        if template.title.trim().is_empty() || template.description.trim().is_empty() {
+        if template.title.trim().is_empty()
+            || template.description.trim().is_empty()
+            || template.promise.trim().is_empty()
+        {
             return Err(format!(
                 "template {} must have display metadata",
                 template.id
@@ -139,7 +218,9 @@ fn validate_catalog(catalog: &TemplateCatalog) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{TemplateRecommendation, builtin_catalog, recommend_builtin_template};
+    use super::{
+        TemplateRecommendation, builtin_catalog, find_topic_blueprint, recommend_builtin_template,
+    };
 
     #[test]
     fn builtins_are_a_valid_versioned_catalog() {
@@ -168,9 +249,32 @@ mod tests {
     }
 
     #[test]
+    fn topic_blueprints_are_valid_and_template_fallbacks_exist() {
+        let topics = super::topic_blueprints().expect("topic blueprint catalog must parse");
+
+        assert!(topics.iter().all(|topic| {
+            !topic.id.is_empty()
+                && !topic.template_id.is_empty()
+                && !topic.objectives.is_empty()
+                && !topic.first_activity.questions.is_empty()
+                && !topic.follow_up_activities.is_empty()
+        }));
+        assert!(
+            super::find_template_blueprint("learn-a-subject")
+                .expect("topic blueprint catalog must parse")
+                .is_some()
+        );
+        assert!(
+            find_topic_blueprint("I want to learn an unlisted subject")
+                .expect("topic blueprint catalog must parse")
+                .is_none()
+        );
+    }
+
+    #[test]
     fn recommendation_selects_exam_template_for_exam_intent() {
         assert_eq!(
-            recommend_builtin_template("I want to prepare for a music theory exam"),
+            recommend_builtin_template("I want to prepare for a distributed systems exam"),
             TemplateRecommendation {
                 template_id: "exam-prep",
                 reason: "The intent names an exam, certification, test, or qualification target."
@@ -192,7 +296,7 @@ mod tests {
     #[test]
     fn recommendation_defaults_to_subject_template() {
         assert_eq!(
-            recommend_builtin_template("I would like to learn music theory"),
+            recommend_builtin_template("I would like to learn distributed systems"),
             TemplateRecommendation {
                 template_id: "learn-a-subject",
                 reason: "The intent names a subject without an explicit exam or project target."

@@ -15,36 +15,36 @@ type LearningPreview = components["schemas"]["PreviewLearningResponse"];
 const benefits = [
   {
     number: "01",
-    title: "Study plans that adapt",
-    body: "Plans start from your performance and change as you answer. Spend your next session where it matters most.",
+    title: "Start with a real intention",
+    body: "Name the thing you want to learn in plain language. ame turns that first signal into a promise, objectives, and a useful beginning.",
   },
   {
     number: "02",
-    title: "Questions, organized",
-    body: "Collect questions from anywhere into tagged banks. Turn a bank into a timed assessment when you are ready.",
+    title: "Learn in small moves",
+    body: "Each journey gives you one next activity with a reason. Explanations, practice, and reflection can grow as your understanding does.",
   },
   {
     number: "03",
-    title: "Progress you can see",
-    body: "Track movement by topic so you can replace 'I should study' with a clear next step.",
+    title: "Keep the whole story",
+    body: "Your intent, work, evidence, and next step stay together. An agent and the web app can continue the same journey without a parallel model.",
   },
 ];
 
 const faqs = [
   {
-    question: "Can I use AME without an AI assistant?",
+    question: "Can I use ame without an AI assistant?",
     answer:
-      "Yes. The web app works on its own. Agent support is an optional way to connect an assistant to your assessments and study workflow.",
+      "Yes. The web app and agents use the same learning journey API. Start in either place and continue in the other.",
   },
   {
     question: "Can I self-host AME?",
     answer:
-      "AME is designed to be self-hostable. Follow the repository deployment documentation to run the platform on your own infrastructure.",
+      "Yes. The recommended local stack is Postgres, Valkey, API, web, and Caddy. The self-hosting guide is available from the footer.",
   },
   {
     question: "What should I do first?",
     answer:
-      "Create an account, open Explore, and start an assessment from the question bank. Your first session gives you a useful baseline.",
+      "Write one prompt about what you want to learn. Preview the first journey, add an email identifier, and begin.",
   },
 ];
 
@@ -52,39 +52,41 @@ function QuizPreview() {
   return (
     <div
       role="img"
-      aria-label="Preview of an adaptive multiple-choice question"
-      className="rounded-xl bg-white p-4 text-neutral-900 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6"
+      aria-label="Preview of a first learning activity"
+      className="rounded-xl bg-card p-4 text-card-foreground shadow-[0_24px_60px_oklch(0.1_0.06_300_/_0.28)] sm:p-6"
     >
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-xs text-neutral-500">Q 7 / 20</span>
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] text-blue-700">
-            Adaptive · ELO 1480
+          <span className="font-mono text-xs text-muted-foreground">
+            STEP 1 / START
+          </span>
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] text-primary">
+            First signal · 5 min
           </span>
         </div>
-        <div className="h-1 overflow-hidden rounded-full bg-neutral-200">
-          <div className="h-full w-[35%] bg-blue-600" />
+        <div className="h-1 overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-[35%] bg-primary" />
         </div>
         <p className="pt-1 text-base font-bold sm:text-[17px]">
-          Which data structure gives O(1) average lookup?
+          What would make this topic useful to you?
         </p>
         <div className="space-y-2">
-          <div className="rounded-lg border border-neutral-300 px-3 py-2.5">
-            Binary search tree
+          <div className="rounded-lg border border-border px-3 py-2.5">
+            Understand the core ideas
           </div>
-          <div className="flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-100 px-3 py-2 text-blue-950">
-            <span>Hash table</span>
-            <Check className="size-5 text-lime-700" />
+          <div className="flex items-center justify-between rounded-lg border-2 border-primary bg-primary/10 px-3 py-2 text-card-foreground">
+            <span>Build something small</span>
+            <Check className="size-5 text-primary" />
           </div>
-          <div className="rounded-lg border border-neutral-300 px-3 py-2.5">
-            Linked list
+          <div className="rounded-lg border border-border px-3 py-2.5">
+            <span>Explain it clearly</span>
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-xs text-neutral-500">
-            Hash maps · your weakest topic
+          <span className="text-xs text-muted-foreground">
+            Your next move · made visible
           </span>
-          <span className="rounded-full bg-neutral-950 px-4 py-2 text-center text-sm text-white">
+          <span className="rounded-full bg-foreground px-4 py-2 text-center text-sm text-background">
             Next
           </span>
         </div>
@@ -101,10 +103,10 @@ function LearningPreviewCard({
   prompt: string;
 }) {
   return (
-    <div className="border border-neutral-300 bg-white p-5 text-neutral-900 shadow-[10px_10px_0_#c7e86b] sm:p-7">
+    <div className="border border-border bg-card p-5 text-card-foreground shadow-[10px_10px_0_oklch(0.64_0.2_25_/_0.24)] sm:p-7">
       <div className="space-y-5">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-blue-600">
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-primary">
             {preview.templateId} · v{preview.templateVersion}
           </p>
           <h2 className="mt-2 text-xl font-bold tracking-tight">
@@ -112,30 +114,30 @@ function LearningPreviewCard({
           </h2>
         </div>
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
             Your first outcomes
           </p>
           <ul className="space-y-2 text-sm leading-5">
             {preview.objectives.map((objective) => (
               <li key={objective.statement} className="flex gap-2">
-                <Check className="mt-0.5 size-4 shrink-0 text-lime-700" />
+                <Check className="mt-0.5 size-4 shrink-0 text-primary" />
                 <span>{objective.statement}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-lg bg-neutral-100 p-3 text-sm">
+        <div className="rounded-lg bg-muted p-3 text-sm">
           <p className="font-semibold">
             First step: {preview.firstActivity.title}
           </p>
-          <p className="mt-1 text-neutral-600">
+          <p className="mt-1 text-muted-foreground">
             {preview.firstActivity.purpose} · about{" "}
             {preview.firstActivity.estimatedMinutes} minutes
           </p>
         </div>
         <Button
           asChild
-          className="w-full rounded-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+          className="w-full rounded-full bg-primary font-bold text-primary-foreground hover:bg-primary/90"
         >
           <Link href={`/start?prompt=${encodeURIComponent(prompt)}`}>
             Start this journey
@@ -155,10 +157,10 @@ export default function LandingPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const signedIn = !!user;
-  const entryHref = signedIn ? "/explore" : "/login?tab=signup";
-  const entryLabel = signedIn ? "Open Explore" : "Sign up free";
-  const sampleHref = signedIn ? "/explore" : "#benefits";
-  const sampleLabel = signedIn ? "Open Explore" : "See how it works";
+  const entryHref = signedIn ? "/learning" : "/login?tab=signup";
+  const entryLabel = signedIn ? "Open learning desk" : "Sign up free";
+  const sampleHref = signedIn ? "/learning" : "#benefits";
+  const sampleLabel = signedIn ? "Open learning desk" : "See how it works";
 
   async function handlePreview(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -184,28 +186,19 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-7xl px-4 sm:px-8">
-        <header className="flex min-h-20 items-center justify-between gap-4 border-b border-neutral-300 dark:border-neutral-800">
+        <header className="flex min-h-20 items-center justify-between gap-4 border-b border-border">
           <Logo size={32} />
           <div className="flex items-center gap-2 sm:gap-6">
-            <nav className="hidden items-center gap-6 text-sm text-neutral-700 dark:text-neutral-300 sm:flex">
-              <a
-                className="transition hover:text-neutral-950 dark:hover:text-white"
-                href="#benefits"
-              >
+            <nav className="hidden items-center gap-6 text-sm text-muted-foreground sm:flex">
+              <a className="transition hover:text-primary" href="#benefits">
                 Features
               </a>
-              <a
-                className="transition hover:text-neutral-950 dark:hover:text-white"
-                href="#agents"
-              >
+              <a className="transition hover:text-primary" href="#agents">
                 For agents
               </a>
-              <a
-                className="transition hover:text-neutral-950 dark:hover:text-white"
-                href="#faq"
-              >
+              <a className="transition hover:text-primary" href="#faq">
                 FAQ
               </a>
             </nav>
@@ -213,7 +206,7 @@ export default function LandingPage() {
               type="button"
               aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
               onClick={toggle}
-              className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 outline-none transition hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-lime-500 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none transition hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               {mode === "dark" ? (
                 <Sun className="size-4" />
@@ -223,7 +216,7 @@ export default function LandingPage() {
             </button>
             <Button
               asChild
-              className="rounded-full bg-neutral-950 px-5 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
+              className="rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             >
               <Link href={entryHref}>{entryLabel}</Link>
             </Button>
@@ -231,18 +224,18 @@ export default function LandingPage() {
         </header>
 
         <main>
-          <section className="relative overflow-hidden border border-neutral-700 bg-neutral-950 px-6 py-14 text-white shadow-[0_24px_70px_rgba(0,0,0,0.16)] sm:px-10 md:px-14 md:py-20">
-            <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-neutral-700 bg-neutral-950 md:block" />
+          <section className="relative overflow-hidden border border-primary/30 bg-[var(--ame-ink)] px-6 py-14 text-[var(--ame-sugar)] shadow-[0_24px_70px_rgba(90,45,100,0.22)] sm:px-10 md:px-14 md:py-20">
+            <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-primary/30 bg-[var(--ame-ink)] md:block" />
             <div className="relative grid items-start gap-12 md:grid-cols-[0.85fr_1.15fr] md:gap-20">
               <div className="space-y-8">
-                <span className="inline-flex border-l-2 border-lime-400 pl-3 font-mono text-[11px] tracking-[0.14em] text-lime-300">
+                <span className="inline-flex border-l-2 border-primary pl-3 font-mono text-[11px] tracking-[0.14em] text-primary">
                   AME / LEARNING DESK
                 </span>
                 <h1 className="max-w-xl text-[42px] font-extrabold leading-[0.96] tracking-[-0.06em] sm:text-6xl md:text-[72px]">
                   Study what you don&apos;t know yet.
                 </h1>
-                <p className="max-w-xl text-[17px] leading-7 text-neutral-300 sm:text-[19px]">
-                  Tell AME what you want to learn. It turns your intent into a
+                <p className="max-w-xl text-[17px] leading-7 text-[var(--ame-sugar)]/75 sm:text-[19px]">
+                  Tell ame what you want to learn. It turns your intent into a
                   focused first journey, then gives you one clear next step.
                 </p>
                 <form onSubmit={handlePreview} className="max-w-xl space-y-2">
@@ -254,13 +247,13 @@ export default function LandingPage() {
                       id="learning-intent"
                       value={prompt}
                       onChange={(event) => setPrompt(event.target.value)}
-                      placeholder="I'd like to learn music theory"
-                      className="min-h-11 flex-1 rounded-full border border-neutral-600 bg-neutral-900 px-5 text-sm text-white outline-none placeholder:text-neutral-400 focus:border-lime-400 focus:ring-2 focus:ring-lime-400/30"
+                      placeholder="I'd like to learn a new subject"
+                      className="min-h-11 flex-1 rounded-full border border-primary/40 bg-black/20 px-5 text-sm text-[var(--ame-sugar)] outline-none placeholder:text-[var(--ame-sugar)]/60 focus:border-primary focus:ring-2 focus:ring-primary/30"
                     />
                     <Button
                       type="submit"
                       disabled={previewLoading || !prompt.trim()}
-                      className="min-h-11 rounded-full bg-lime-400 px-5 font-bold text-neutral-950 hover:bg-lime-300"
+                      className="min-h-11 rounded-full bg-primary px-5 font-bold text-primary-foreground hover:bg-primary/90"
                     >
                       {previewLoading ? "Preparing…" : "See my plan"}
                       <ArrowRight className="size-4" />
@@ -272,10 +265,10 @@ export default function LandingPage() {
                     </p>
                   )}
                 </form>
-                <div className="flex flex-col gap-3 border-t border-neutral-700 pt-5 sm:flex-row">
+                <div className="flex flex-col gap-3 border-t border-primary/30 pt-5 sm:flex-row">
                   <Button
                     asChild
-                    className="rounded-full bg-lime-400 px-6 py-3 font-bold text-neutral-950 hover:bg-lime-300"
+                    className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90"
                   >
                     <Link href={entryHref}>
                       {entryLabel}
@@ -285,14 +278,14 @@ export default function LandingPage() {
                   <Button
                     asChild
                     variant="outline"
-                    className="rounded-full border-neutral-500 bg-transparent px-6 py-3 text-white hover:border-white hover:bg-white/10 hover:text-white"
+                    className="rounded-full border-primary/50 bg-transparent px-6 py-3 text-[var(--ame-sugar)] hover:border-primary hover:bg-primary/10 hover:text-[var(--ame-sugar)]"
                   >
                     <Link href={sampleHref}>{sampleLabel}</Link>
                   </Button>
                 </div>
               </div>
               <div className="space-y-4 md:pt-8">
-                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-neutral-500">
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ame-sugar)]/60">
                   01 / Start with intent
                 </p>
                 {preview ? (
@@ -300,8 +293,8 @@ export default function LandingPage() {
                 ) : (
                   <QuizPreview />
                 )}
-                <p className="max-w-md text-xs leading-5 text-neutral-400">
-                  A first signal is enough. AME turns it into a small, useful
+                <p className="max-w-md text-xs leading-5 text-[var(--ame-sugar)]/65">
+                  A first signal is enough. ame turns it into a small, useful
                   beginning and leaves the next decision visible.
                 </p>
               </div>
@@ -310,32 +303,34 @@ export default function LandingPage() {
 
           <section
             id="benefits"
-            className="grid gap-10 border-b border-neutral-200 px-2 py-16 sm:px-4 md:grid-cols-[0.7fr_1.3fr] md:py-24 dark:border-neutral-800"
+            className="grid gap-10 border-b border-border px-2 py-16 sm:px-4 md:grid-cols-[0.7fr_1.3fr] md:py-24"
           >
             <div>
-              <p className="mb-2 font-mono text-xs tracking-[0.14em] text-blue-600">
+              <p className="mb-2 font-mono text-xs tracking-[0.14em] text-primary">
                 02 / The desk
               </p>
               <h2 className="mb-8 max-w-3xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
                 Everything between{" "}
                 <span className="whitespace-nowrap">
-                  &quot;I should study&quot;
+                  &quot;I want to learn&quot;
                 </span>{" "}
                 and{" "}
-                <span className="whitespace-nowrap">&quot;I passed.&quot;</span>
+                <span className="whitespace-nowrap">
+                  &quot;I know what to do next.&quot;
+                </span>
               </h2>
             </div>
-            <div className="grid gap-0 border-t border-neutral-200 dark:border-neutral-800">
+            <div className="grid gap-0 border-t border-border">
               {benefits.map((benefit) => (
                 <article
                   key={benefit.number}
-                  className="grid gap-4 border-b border-neutral-200 py-5 sm:grid-cols-[60px_0.8fr_1.2fr] sm:items-start dark:border-neutral-800"
+                  className="grid gap-4 border-b border-border py-5 sm:grid-cols-[60px_0.8fr_1.2fr] sm:items-start"
                 >
-                  <span className="font-mono text-sm text-blue-600">
+                  <span className="font-mono text-sm text-primary">
                     {benefit.number}
                   </span>
                   <h3 className="text-lg font-bold">{benefit.title}</h3>
-                  <p className="leading-6 text-neutral-600 dark:text-neutral-400">
+                  <p className="leading-6 text-muted-foreground">
                     {benefit.body}
                   </p>
                 </article>
@@ -345,15 +340,15 @@ export default function LandingPage() {
 
           <section
             id="agents"
-            className="flex flex-col gap-5 border-b border-neutral-200 px-2 py-8 sm:px-4 md:flex-row md:items-center md:justify-between dark:border-neutral-800"
+            className="flex flex-col gap-5 border-b border-border px-2 py-8 sm:px-4 md:flex-row md:items-center md:justify-between"
           >
             <div className="flex gap-4">
-              <span className="font-mono text-xs text-blue-600">03</span>
+              <span className="font-mono text-xs text-primary">03</span>
               <div>
-                <h2 className="font-bold">Bring your AI assistant</h2>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  First-class agent API — connect an assistant to your
-                  assessments and study workflow.
+                <h2 className="font-bold">Bring your agent</h2>
+                <p className="text-sm text-muted-foreground">
+                  One learner API — an agent can start and continue the same
+                  journey you see in the web app.
                 </p>
               </div>
             </div>
@@ -364,7 +359,7 @@ export default function LandingPage() {
                   asChild
                   variant="outline"
                   size="sm"
-                  className="rounded-full border-neutral-300 font-mono text-xs font-normal dark:border-neutral-700"
+                  className="rounded-full border-border font-mono text-xs font-normal"
                 >
                   <Link href={href}>{href}</Link>
                 </Button>
@@ -380,28 +375,28 @@ export default function LandingPage() {
               <h2 className="mb-3 text-3xl font-extrabold tracking-[-0.04em]">
                 Questions?
               </h2>
-              <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+              <div className="divide-y divide-border">
                 {faqs.map((faq) => (
                   <div key={faq.question} className="py-5">
                     <h3 className="mb-2 font-bold">{faq.question}</h3>
-                    <p className="leading-6 text-neutral-600 dark:text-neutral-400">
+                    <p className="leading-6 text-muted-foreground">
                       {faq.answer}
                     </p>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="self-start rounded-xl border border-neutral-200 bg-neutral-50 p-7 dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="self-start rounded-xl border border-border bg-card p-7">
               <h2 className="mb-3 text-3xl font-extrabold leading-tight tracking-[-0.04em]">
-                Your next exam is already easier.
+                Your next step is already clearer.
               </h2>
-              <p className="mb-6 leading-6 text-neutral-600 dark:text-neutral-400">
-                Start with a few questions and turn your weakest topics into a
-                focused practice session.
+              <p className="mb-6 leading-6 text-muted-foreground">
+                Start with one honest prompt and let ame shape a focused first
+                learning moment.
               </p>
               <Button
                 asChild
-                className="rounded-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+                className="rounded-full bg-primary font-bold text-primary-foreground hover:bg-primary/90"
               >
                 <Link href={entryHref}>{entryLabel}</Link>
               </Button>
@@ -410,25 +405,22 @@ export default function LandingPage() {
         </main>
       </div>
 
-      <footer className="border-t border-neutral-200 px-4 py-6 text-sm text-neutral-500 dark:border-neutral-800">
+      <footer className="border-t border-border px-4 py-6 text-sm text-muted-foreground">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
           <span>© 2026 AME</span>
           <div className="flex gap-5">
-            <Link
-              href="/llms.txt"
-              className="transition hover:text-neutral-950 dark:hover:text-white"
-            >
+            <Link href="/llms.txt" className="transition hover:text-primary">
               Docs
             </Link>
             <a
               href="https://github.com/mikafans/ame"
-              className="transition hover:text-neutral-950 dark:hover:text-white"
+              className="transition hover:text-primary"
             >
               GitHub
             </a>
             <Link
               href="/self-hosting"
-              className="transition hover:text-neutral-950 dark:hover:text-white"
+              className="transition hover:text-primary"
             >
               Self-hosting
             </Link>
