@@ -60,6 +60,10 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await page.getByRole("button", { name: "Create my journey" }).click();
 
   await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+  const journeyId = page
+    .url()
+    .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
+  expect(journeyId).toBeTruthy();
   await expect(page.getByText(prompt, { exact: true })).toBeVisible();
   await expect(page.getByText("Your first activity is ready")).toBeVisible();
   await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
@@ -79,15 +83,36 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     page.getByText("Complete. Your next activity is now ready."),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: /Try a short first task for/ }).first(),
+    page
+      .getByRole("heading", {
+        name: `Build a clear starting model for ${prompt}`,
+      })
+      .first(),
+  ).toBeVisible();
+  const refreshedAfterStarter = await page.request.get(
+    `/api/v1/learning/journeys/${journeyId}`,
+  );
+  expect(refreshedAfterStarter.ok()).toBeTruthy();
+  const packageAfterStarter = await refreshedAfterStarter.json();
+  const explanation = packageAfterStarter.activities.find(
+    (activity: { kind: string }) => activity.kind === "explanation",
+  );
+  const workedExample = packageAfterStarter.activities.find(
+    (activity: { kind: string }) => activity.kind === "example",
+  );
+  expect(explanation.payload.content.type).toBe("explanation");
+  expect(explanation.payload.content.body).toContain(prompt);
+  expect(workedExample.payload.content.type).toBe("worked_example");
+  await page.getByRole("button", { name: "Begin" }).last().click();
+  await expect(
+    page.getByRole("heading", { name: `A clear model for ${prompt}` }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Begin by putting .* into your own words\./),
   ).toBeVisible();
   await expect(
     page.getByText("This objective has the weakest available evidence."),
   ).toBeVisible();
-  const journeyId = page
-    .url()
-    .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
-  expect(journeyId).toBeTruthy();
   await page.goto("/learning");
   await expect(page.getByText(/Recent:/)).toBeVisible();
   const journeyDetailResponse = await page.request.get(

@@ -783,6 +783,7 @@ mod tests {
         let repository = InMemoryLearningRepository::default();
         let service = OnboardingService::new(repository.clone());
         let plan = learner_topic_plan();
+        let expected_goal = plan.normalized_statement.clone();
 
         let first = service
             .bootstrap(plan.clone())
@@ -802,11 +803,20 @@ mod tests {
             .await
             .expect("starter activities exist");
         assert_eq!(objectives.len(), 3);
-        assert_eq!(activities.len(), 3);
+        assert_eq!(activities.len(), 5);
         assert_eq!(
             activities[0].status,
             crate::domain::learning::ActivityStatus::Ready
         );
+        assert_eq!(activities[1].kind, ActivityKind::Explanation);
+        assert_eq!(activities[2].kind, ActivityKind::Example);
+        assert_eq!(activities[3].kind, ActivityKind::Diagnostic);
+        assert_eq!(activities[1].payload["content"]["type"], "explanation");
+        assert_eq!(activities[2].payload["content"]["type"], "worked_example");
+        assert!(activities[1].payload["content"]["body"]
+            .as_str()
+            .expect("explanation body")
+            .contains(&expected_goal));
         assert!(
             activities
                 .iter()
