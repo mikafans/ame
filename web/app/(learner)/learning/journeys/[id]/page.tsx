@@ -42,6 +42,48 @@ type ActivityContent =
   | StarterContent
   | ExplanationContent
   | WorkedExampleContent;
+type ActivityPayload = {
+  content?: ActivityContent;
+  contentProvenance?: {
+    sourceReferences?: string[];
+  };
+};
+
+function ActivityProvenance({
+  sourceReferences,
+}: {
+  sourceReferences: string[];
+}) {
+  const safeSources = sourceReferences.filter((source) => {
+    try {
+      return new URL(source).protocol === "https:";
+    } catch {
+      return false;
+    }
+  });
+  if (safeSources.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-primary/20 bg-background/70 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+        Source-backed activity
+      </p>
+      <ul className="mt-2 space-y-1 text-sm">
+        {safeSources.map((source) => (
+          <li key={source}>
+            <a
+              href={source}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-4"
+            >
+              {source}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function LearningJourneyPage() {
   const params = useParams<{ id: string }>();
@@ -316,10 +358,11 @@ export default function LearningJourneyPage() {
   const activeActivity = session
     ? journey.activities.find((activity) => activity.id === session.activityId)
     : null;
-  const activeContent = activeActivity?.payload
-    ? ((activeActivity.payload as unknown as { content?: ActivityContent })
-        .content ?? null)
-    : null;
+  const activePayload = activeActivity?.payload as unknown as
+    | ActivityPayload
+    | undefined;
+  const activeContent = activePayload?.content ?? null;
+  const activeProvenance = activePayload?.contentProvenance ?? null;
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-6 sm:p-10 lg:grid-cols-[260px_1fr]">
@@ -598,6 +641,11 @@ export default function LearningJourneyPage() {
                   </p>
                 </div>
               )}
+            {activeProvenance?.sourceReferences && (
+              <ActivityProvenance
+                sourceReferences={activeProvenance.sourceReferences}
+              />
+            )}
             {session.status === "in_progress" && assessment && attempt ? (
               <Button
                 type="button"
