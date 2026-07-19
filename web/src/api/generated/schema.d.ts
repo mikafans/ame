@@ -622,6 +622,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/onboarding/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /v1/onboarding/start — create or resume a learner's first journey. */
+        post: operations["start_learning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/plans": {
         parameters: {
             query?: never;
@@ -1749,6 +1766,26 @@ export interface components {
             status: string;
             /** Format: int64 */
             totalAttempts: number;
+        };
+        StartLearningBody: {
+            displayName: string;
+            email: string;
+            idempotencyKey: string;
+            prompt: string;
+        };
+        StartLearningResponse: {
+            displayName: string;
+            email: string;
+            /** Format: uuid */
+            goalId: string;
+            /** Format: uuid */
+            journeyId: string;
+            templateId: string;
+            /** Format: int32 */
+            templateVersion: number;
+            token: string;
+            /** Format: uuid */
+            userId: string;
         };
         StudyPlan: {
             /** Format: date-time */
@@ -3635,6 +3672,51 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start_learning: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartLearningBody"];
+            };
+        };
+        responses: {
+            /** @description Learner and first journey created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartLearningResponse"];
+                };
+            };
+            /** @description Existing learner requires authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Email already belongs to a learner */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

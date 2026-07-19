@@ -1354,6 +1354,31 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
+  /v1/onboarding/start:
+    post:
+      tags:
+      - onboarding
+      summary: POST /v1/onboarding/start — create or resume a learner's first journey.
+      operationId: start_learning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartLearningBody'
+        required: true
+      responses:
+        '201':
+          description: Learner and first journey created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartLearningResponse'
+        '401':
+          description: Existing learner requires authentication
+        '409':
+          description: Email already belongs to a learner
+        '422':
+          description: Validation failed
   /v1/plans:
     post:
       tags:
@@ -4219,6 +4244,55 @@ components:
         totalAttempts:
           type: integer
           format: int64
+    StartLearningBody:
+      type: object
+      required:
+      - email
+      - displayName
+      - prompt
+      - idempotencyKey
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        idempotencyKey:
+          type: string
+        prompt:
+          type: string
+    StartLearningResponse:
+      type: object
+      required:
+      - token
+      - userId
+      - email
+      - displayName
+      - goalId
+      - journeyId
+      - templateId
+      - templateVersion
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        goalId:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        templateId:
+          type: string
+        templateVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        token:
+          type: string
+        userId:
+          type: string
+          format: uuid
     StudyPlan:
       type: object
       required:

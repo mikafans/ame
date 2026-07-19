@@ -9,6 +9,7 @@ use crate::domain::learning::{
     LearningRepositoryError,
 };
 use crate::templates::builtin_catalog;
+use async_trait::async_trait;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -66,6 +67,84 @@ pub struct StartLearningResult {
     pub bootstrap: BootstrapResult,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartLearningPromptRequest {
+    pub authenticated_user_id: Option<Uuid>,
+    pub email: String,
+    pub display_name: String,
+    pub raw_prompt: String,
+    pub idempotency_key: String,
+    pub registration_mode: RegistrationMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PromptInterpretation {
+    pub normalized_statement: String,
+    pub promise: String,
+    pub template_id: String,
+    pub template_version: u32,
+    pub template_version_id: Option<Uuid>,
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum PromptInterpretationError {
+    #[error("learning prompt must not be empty")]
+    EmptyPrompt,
+    #[error("built-in learning template catalog is invalid: {0}")]
+    InvalidTemplateCatalog(String),
+}
+
+#[async_trait]
+pub trait LearningPromptInterpreter: Send + Sync {
+    async fn interpret(
+        &self,
+        raw_prompt: &str,
+    ) -> Result<PromptInterpretation, PromptInterpretationError>;
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CatalogPromptInterpreter;
+
+#[async_trait]
+impl LearningPromptInterpreter for CatalogPromptInterpreter {
+    async fn interpret(
+        &self,
+        raw_prompt: &str,
+    ) -> Result<PromptInterpretation, PromptInterpretationError> {
+        let normalized_statement = raw_prompt.trim();
+        if normalized_statement.is_empty() {
+            return Err(PromptInterpretationError::EmptyPrompt);
+        }
+
+        let recommendation = crate::templates::recommend_builtin_template(normalized_statement);
+        let catalog =
+            builtin_catalog().map_err(PromptInterpretationError::InvalidTemplateCatalog)?;
+        let template = catalog
+            .templates
+            .iter()
+            .find(|template| template.id == recommendation.template_id)
+            .ok_or_else(|| {
+                PromptInterpretationError::InvalidTemplateCatalog(format!(
+                    "recommended template {} is missing",
+                    recommendation.template_id
+                ))
+            })?;
+        let promise = match template.id.as_str() {
+            "exam-prep" => "Build an exam-ready understanding through guided practice and review",
+            "build-a-project" => "Learn the concepts and produce a working first project",
+            _ => "Build a durable foundation through guided practice and review",
+        };
+
+        Ok(PromptInterpretation {
+            normalized_statement: normalized_statement.to_string(),
+            promise: promise.to_string(),
+            template_id: template.id.clone(),
+            template_version: template.version,
+            template_version_id: None,
+        })
+    }
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum StartLearningError {
     #[error("self-host onboarding only supports open registration")]
@@ -74,6 +153,8 @@ pub enum StartLearningError {
     Identity(#[from] IdentityRepositoryError),
     #[error(transparent)]
     Bootstrap(#[from] BootstrapError),
+    #[error(transparent)]
+    Prompt(#[from] PromptInterpretationError),
 }
 
 #[derive(Clone)]
@@ -189,6 +270,28 @@ where
 
         Ok(StartLearningResult { account, bootstrap })
     }
+
+    pub async fn start_from_prompt<P: LearningPromptInterpreter>(
+        &self,
+        request: StartLearningPromptRequest,
+        interpreter: &P,
+    ) -> Result<StartLearningResult, StartLearningError> {
+        let interpretation = interpreter.interpret(&request.raw_prompt).await?;
+        self.start_learning(StartLearningRequest {
+            authenticated_user_id: request.authenticated_user_id,
+            email: request.email,
+            display_name: request.display_name,
+            raw_intent: request.raw_prompt,
+            normalized_statement: interpretation.normalized_statement,
+            promise: interpretation.promise,
+            template_id: interpretation.template_id,
+            template_version: interpretation.template_version,
+            template_version_id: interpretation.template_version_id,
+            idempotency_key: request.idempotency_key,
+            registration_mode: request.registration_mode,
+        })
+        .await
+    }
 }
 
 fn validate_plan(plan: &BootstrapPlan) -> Result<(), BootstrapError> {
@@ -223,8 +326,9 @@ fn validate_template(plan: &BootstrapPlan) -> Result<(), BootstrapError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        BootstrapError, BootstrapPlan, OnboardingService, SelfHostOnboardingService,
-        StartLearningError, StartLearningRequest,
+        BootstrapError, BootstrapPlan, CatalogPromptInterpreter, OnboardingService,
+        SelfHostOnboardingService, StartLearningError, StartLearningPromptRequest,
+        StartLearningRequest,
     };
     use crate::domain::identity::RegistrationMode;
     use crate::domain::learning::LearningRepositoryError;
@@ -260,6 +364,35 @@ mod tests {
             idempotency_key: "onboarding/music-theory".to_string(),
             registration_mode: RegistrationMode::Open,
         }
+    }
+
+    fn start_learning_prompt_request() -> StartLearningPromptRequest {
+        StartLearningPromptRequest {
+            authenticated_user_id: None,
+            email: "prompt-learner@example.test".to_string(),
+            display_name: "Prompt Learner".to_string(),
+            raw_prompt: "I would like to learn music theory".to_string(),
+            idempotency_key: "onboarding/prompt-music-theory".to_string(),
+            registration_mode: RegistrationMode::Open,
+        }
+    }
+
+    #[tokio::test]
+    async fn start_from_prompt_uses_replaceable_interpreter_contract() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let result = service
+            .start_from_prompt(start_learning_prompt_request(), &CatalogPromptInterpreter)
+            .await
+            .expect("prompt onboarding succeeds");
+
+        assert_eq!(result.bootstrap.template_id, "learn-a-subject");
+        assert_eq!(
+            result.bootstrap.goal.raw_intent,
+            "I would like to learn music theory"
+        );
     }
 
     #[tokio::test]

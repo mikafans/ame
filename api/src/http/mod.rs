@@ -140,6 +140,7 @@ pub mod health;
 pub mod idempotency;
 pub mod me;
 pub mod messages;
+pub mod onboarding;
 pub mod openapi;
 pub mod plans;
 pub mod questions;
@@ -224,6 +225,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(questions::router(state.clone()))
         .merge(explore::router(state.clone()))
         .merge(openapi::router(state.clone()))
+        .merge(onboarding::router(state.clone()))
         .merge(stats::router(state.clone()))
         .merge(tags::router(state.clone()))
         .merge(agents::public_router(state.clone()))
