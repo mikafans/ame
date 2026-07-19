@@ -648,6 +648,8 @@ Deliverable: a new clean baseline for principals/sessions, goals/journeys,
 template versions, objectives/skills, activities, assessments/questions,
 attempts/evidence, recommendations, and agent runs/audit.
 
+Schema design checkpoint: [`2026-07-19-learning-baseline-schema.md`](../specs/2026-07-19-learning-baseline-schema.md).
+
 Acceptance: a clean volume creates it without compatibility tables, columns,
 backfills, or dual reads; ownership and actor/subject rules are explicit;
 version, idempotency, lifecycle, and objective-to-evidence linkage are
