@@ -183,6 +183,21 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         "reviewStatus": "approved",
         "sourceReferences": ["https://example.test/subject/intro"],
     }
+    worked_grounded = client.patch(
+        f"/api/v1/learning/activities/{worked_example['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": worked_example_content,
+            "sourceReferences": ["https://example.test/subject/example"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert worked_grounded.status_code == 200, worked_grounded.text
+    assert worked_grounded.json()["payload"]["content"] == worked_example_content
+    assert worked_grounded.json()["payload"]["contentProvenance"][
+        "sourceReferences"
+    ] == ["https://example.test/subject/example"]
 
     invalid_content = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",

@@ -158,6 +158,36 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(
     page.getByText("This objective has the weakest available evidence."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Mark activity complete" }).click();
+  await expect(
+    page.getByText("Complete. Your next activity is now ready."),
+  ).toBeVisible();
+  const workedExampleContent = {
+    type: "worked_example",
+    heading: "A grounded worked example",
+    prompt: "Apply one idea to one observable situation.",
+    steps: ["Name the situation.", "Apply the idea.", "Inspect the result."],
+    reflection: "What would you try next?",
+  };
+  const workedExampleResponse = await page.request.patch(
+    `/api/v1/learning/activities/${workedExample.id}/content`,
+    {
+      data: {
+        generationRunId: contentGenerationRunId,
+        content: workedExampleContent,
+        sourceReferences: ["https://example.test/subject/example"],
+        reviewStatus: "approved",
+      },
+    },
+  );
+  expect(workedExampleResponse.ok()).toBeTruthy();
+  await page.reload();
+  await page.getByRole("button", { name: "Begin" }).last().click();
+  await expect(
+    page.getByRole("heading", { name: workedExampleContent.heading }),
+  ).toBeVisible();
+  await expect(page.getByText(workedExampleContent.prompt)).toBeVisible();
+  await expect(page.getByText("Source-backed activity")).toBeVisible();
   await page.goto("/learning");
   await expect(page.getByText(/Recent:/)).toBeVisible();
   const journeyDetailResponse = await page.request.get(
