@@ -361,6 +361,21 @@ impl LearningRepository for InMemoryLearningRepository {
         if activity.status != ActivityStatus::Ready {
             return Err(LearningRepositoryError::ActivityNotReady);
         }
+        let goal_id = state
+            .journeys
+            .get(&input.journey_id)
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "journey",
+            })?
+            .goal_id;
+        state
+            .journeys
+            .get_mut(&input.journey_id)
+            .expect("journey exists")
+            .status = JourneyStatus::Active;
+        if let Some(goal) = state.goals.get_mut(&goal_id) {
+            goal.status = GoalStatus::Active;
+        }
         if let Some(existing) = state.sessions.values().find(|session| {
             session.activity_id == input.activity_id
                 && session.subject_user_id == input.subject_user_id
@@ -621,6 +636,22 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         .await
         .expect("learning session starts");
     assert_eq!(session.status, LearningSessionStatus::InProgress);
+    assert_eq!(
+        repository
+            .get_journey(subject, journey.id)
+            .await
+            .expect("active journey")
+            .status,
+        JourneyStatus::Active
+    );
+    assert_eq!(
+        repository
+            .get_goal(subject, goal.id)
+            .await
+            .expect("active goal")
+            .status,
+        GoalStatus::Active
+    );
     assert_eq!(
         repository
             .start_learning_session(session_input)

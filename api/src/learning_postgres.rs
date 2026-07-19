@@ -435,6 +435,22 @@ impl LearningRepository for PgLearningRepository {
         if activity.get::<String, _>("status") != "ready" {
             return Err(LearningRepositoryError::ActivityNotReady);
         }
+        sqlx::query(
+            "UPDATE tb_learning_journeys SET status = 'active', updated_at = now() WHERE id = $1 AND subject_user_id = $2",
+        )
+        .bind(journey.id)
+        .bind(input.subject_user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        sqlx::query(
+            "UPDATE tb_learning_goals SET status = 'active', updated_at = now() WHERE id = $1 AND subject_user_id = $2",
+        )
+        .bind(journey.goal_id)
+        .bind(input.subject_user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(storage_error)?;
 
         if let Some(row) = sqlx::query(
             r#"
