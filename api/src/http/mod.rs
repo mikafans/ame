@@ -7,6 +7,10 @@ use axum::{
 use axum_prometheus::PrometheusMetricLayer;
 use sqlx::PgPool;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::{
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
+    trace::TraceLayer,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -251,6 +255,41 @@ pub fn router(pool: PgPool) -> Router {
         .merge(api_routes)
         .route("/healthz", get(health::healthz))
         .route("/readyz", get(health::readyz))
+        .layer(PropagateRequestIdLayer::new(
+            axum::http::header::HeaderName::from_static("x-request-id"),
+        ))
+        .layer(SetRequestIdLayer::new(
+            axum::http::header::HeaderName::from_static("x-request-id"),
+            MakeRequestUuid,
+        ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &axum::http::Request<_>| {
+                    let request_id = request
+                        .extensions()
+                        .get::<RequestId>()
+                        .and_then(|id| id.header_value().to_str().ok())
+                        .unwrap_or("missing");
+                    tracing::info_span!(
+                        "http_request",
+                        method = %request.method(),
+                        uri = %request.uri(),
+                        request_id = %request_id,
+                    )
+                })
+                .on_response(
+                    |response: &axum::http::Response<_>,
+                     latency: std::time::Duration,
+                     span: &tracing::Span| {
+                        tracing::info!(
+                            parent: span,
+                            status = %response.status(),
+                            duration_ms = latency.as_secs_f64() * 1000.0,
+                            "http request completed"
+                        );
+                    },
+                ),
+        )
         .layer(cors)
         .layer(middleware::from_fn(security_headers_middleware))
         .with_state(state)

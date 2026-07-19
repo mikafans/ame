@@ -64,7 +64,14 @@ pub async fn start_learning(
     State(state): State<AppState>,
     authenticated: Option<Extension<AuthenticatedUser>>,
     Json(body): Json<StartLearningBody>,
-) -> Result<(StatusCode, Json<StartLearningResponse>), ApiError> {
+) -> Result<
+    (
+        StatusCode,
+        [(String, String); 1],
+        Json<StartLearningResponse>,
+    ),
+    ApiError,
+> {
     let identity = PgIdentityRepository::new(state.pool.clone());
     let onboarding = SelfHostOnboardingService::new(
         identity.clone(),
@@ -94,10 +101,14 @@ pub async fn start_learning(
         .await
         .map_err(map_session_error)?;
 
+    let token = issued.token;
+    let cookie = format_session_cookie(&token, state.config.server.production);
+
     Ok((
         StatusCode::CREATED,
+        [("set-cookie".to_string(), cookie)],
         Json(StartLearningResponse {
-            token: issued.token,
+            token,
             user_id: started.account.id,
             email: started.account.email,
             display_name: started.account.display_name,
@@ -107,6 +118,11 @@ pub async fn start_learning(
             template_version: started.bootstrap.template_version,
         }),
     ))
+}
+
+fn format_session_cookie(token: &str, secure: bool) -> String {
+    let secure_suffix = if secure { "; Secure" } else { "" };
+    format!("ame_token={token}; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=2592000")
 }
 
 fn map_start_learning_error(error: StartLearningError) -> ApiError {
