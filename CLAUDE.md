@@ -102,7 +102,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - `docs/public/llms.txt` is the canonical agent guide for the shared learner API.
 - Discovery: `GET /public/llms.txt` (public) → `GET /public/skill.json` (public manifest).
 - An agent calls `POST /public/v1/onboarding/start` with an email identifier and prompt, then uses the returned learner bearer token against `/api/v1/*`.
-- Journey reads and writes are direct calls to the endpoints advertised in `/skill.json`; there is no run-door or agent key.
+- Journey reads and writes are direct calls to the endpoints advertised in `/public/skill.json`; there is no run-door or agent key.
 
 ## Conventions
 
