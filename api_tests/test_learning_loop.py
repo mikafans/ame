@@ -68,6 +68,9 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     objective_id = journey_body["objectives"][0]["id"]
     activity = journey_body["activities"][0]
     activity_id = activity["id"]
+    initial_recommendation = journey_body["recommendation"]
+    assert initial_recommendation["objectiveId"] == objective_id
+    assert initial_recommendation["evidenceIds"] == []
 
     journeys = client.get("/api/v1/learning/journeys", headers=headers)
     assert journeys.status_code == 200, journeys.text
@@ -435,6 +438,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         f"/api/v1/learning/journeys/{journey_id}", headers=headers
     )
     assert resumed_journey.status_code == 200, resumed_journey.text
+    assert evidence_id in resumed_journey.json()["recommendation"]["evidenceIds"]
     next_activity = next(
         activity
         for activity in resumed_journey.json()["activities"]
