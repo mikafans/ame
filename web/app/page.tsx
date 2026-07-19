@@ -101,7 +101,7 @@ function LearningPreviewCard({
   prompt: string;
 }) {
   return (
-    <div className="rounded-xl bg-white p-5 text-neutral-900 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6">
+    <div className="border border-neutral-200 bg-white p-5 text-neutral-900 shadow-[10px_10px_0_#dbeafe] sm:p-7">
       <div className="space-y-5">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-blue-600">
@@ -184,9 +184,9 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <header className="flex min-h-16 items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#f5f5f0] text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
+      <div className="mx-auto max-w-7xl px-4 sm:px-8">
+        <header className="flex min-h-20 items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800">
           <Logo size={32} />
           <div className="flex items-center gap-2 sm:gap-6">
             <nav className="hidden items-center gap-6 text-sm text-neutral-600 dark:text-neutral-300 sm:flex">
@@ -231,13 +231,14 @@ export default function LandingPage() {
         </header>
 
         <main>
-          <section className="rounded-none bg-neutral-950 px-6 py-14 text-white sm:px-10 md:rounded-lg md:px-14 md:py-20">
-            <div className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
-              <div className="space-y-6">
-                <span className="inline-flex rounded-full border border-lime-700 px-3 py-1 font-mono text-[11px] tracking-[0.12em] text-lime-300">
-                  OPEN · SELF-HOSTABLE
+          <section className="relative overflow-hidden border-x border-b border-neutral-200 bg-neutral-950 px-6 py-14 text-white sm:px-10 md:px-14 md:py-20">
+            <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-neutral-800 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.04)_100%)] md:block" />
+            <div className="relative grid items-start gap-12 md:grid-cols-[0.85fr_1.15fr] md:gap-20">
+              <div className="space-y-8">
+                <span className="inline-flex border-l-2 border-lime-400 pl-3 font-mono text-[11px] tracking-[0.14em] text-lime-300">
+                  AME / LEARNING DESK
                 </span>
-                <h1 className="max-w-xl text-[42px] font-extrabold leading-[0.99] tracking-[-0.06em] sm:text-6xl md:text-[66px]">
+                <h1 className="max-w-xl text-[42px] font-extrabold leading-[0.96] tracking-[-0.06em] sm:text-6xl md:text-[72px]">
                   Study what you don&apos;t know yet.
                 </h1>
                 <p className="max-w-xl text-[17px] leading-7 text-neutral-400 sm:text-[19px]">
@@ -271,7 +272,7 @@ export default function LandingPage() {
                     </p>
                   )}
                 </form>
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex flex-col gap-3 border-t border-neutral-800 pt-5 sm:flex-row">
                   <Button
                     asChild
                     className="rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
@@ -290,36 +291,50 @@ export default function LandingPage() {
                   </Button>
                 </div>
               </div>
-              {preview ? (
-                <LearningPreviewCard preview={preview} prompt={prompt} />
-              ) : (
-                <QuizPreview />
-              )}
+              <div className="space-y-4 md:pt-8">
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-neutral-500">
+                  01 / Start with intent
+                </p>
+                {preview ? (
+                  <LearningPreviewCard preview={preview} prompt={prompt} />
+                ) : (
+                  <QuizPreview />
+                )}
+                <p className="max-w-md text-xs leading-5 text-neutral-500">
+                  A first signal is enough. AME turns it into a small, useful
+                  beginning and leaves the next decision visible.
+                </p>
+              </div>
             </div>
           </section>
 
-          <section id="benefits" className="px-2 py-16 sm:px-4 md:py-20">
-            <p className="mb-2 font-mono text-xs tracking-[0.14em] text-blue-600">
-              WHY AME
-            </p>
-            <h2 className="mb-8 max-w-3xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
-              Everything between{" "}
-              <span className="whitespace-nowrap">
-                &quot;I should study&quot;
-              </span>{" "}
-              and{" "}
-              <span className="whitespace-nowrap">&quot;I passed.&quot;</span>
-            </h2>
-            <div className="grid gap-4 md:grid-cols-3">
+          <section
+            id="benefits"
+            className="grid gap-10 border-b border-neutral-200 px-2 py-16 sm:px-4 md:grid-cols-[0.7fr_1.3fr] md:py-24 dark:border-neutral-800"
+          >
+            <div>
+              <p className="mb-2 font-mono text-xs tracking-[0.14em] text-blue-600">
+                02 / The desk
+              </p>
+              <h2 className="mb-8 max-w-3xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
+                Everything between{" "}
+                <span className="whitespace-nowrap">
+                  &quot;I should study&quot;
+                </span>{" "}
+                and{" "}
+                <span className="whitespace-nowrap">&quot;I passed.&quot;</span>
+              </h2>
+            </div>
+            <div className="grid gap-0 border-t border-neutral-200 dark:border-neutral-800">
               {benefits.map((benefit) => (
                 <article
                   key={benefit.number}
-                  className="rounded-xl border border-neutral-200 p-6 shadow-[0_4px_0_#f0f0f0] dark:border-neutral-800 dark:shadow-[0_4px_0_#171717]"
+                  className="grid gap-4 border-b border-neutral-200 py-5 sm:grid-cols-[60px_0.8fr_1.2fr] sm:items-start dark:border-neutral-800"
                 >
-                  <span className="mb-4 inline-flex size-9 items-center justify-center rounded-full bg-blue-100 font-mono text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  <span className="font-mono text-sm text-blue-600">
                     {benefit.number}
                   </span>
-                  <h3 className="mb-2 text-lg font-bold">{benefit.title}</h3>
+                  <h3 className="text-lg font-bold">{benefit.title}</h3>
                   <p className="leading-6 text-neutral-600 dark:text-neutral-400">
                     {benefit.body}
                   </p>
@@ -330,14 +345,17 @@ export default function LandingPage() {
 
           <section
             id="agents"
-            className="flex flex-col gap-4 bg-neutral-100 px-6 py-6 dark:bg-neutral-900 md:flex-row md:items-center md:justify-between"
+            className="flex flex-col gap-5 border-b border-neutral-200 px-2 py-8 sm:px-4 md:flex-row md:items-center md:justify-between dark:border-neutral-800"
           >
-            <div>
-              <h2 className="font-bold">Bring your AI assistant</h2>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                First-class agent API — connect an assistant to your assessments
-                and study workflow.
-              </p>
+            <div className="flex gap-4">
+              <span className="font-mono text-xs text-blue-600">03</span>
+              <div>
+                <h2 className="font-bold">Bring your AI assistant</h2>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  First-class agent API — connect an assistant to your
+                  assessments and study workflow.
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {["/llms.txt", "/skill.json", "/openapi.yaml"].map((href) => (
@@ -356,7 +374,7 @@ export default function LandingPage() {
 
           <section
             id="faq"
-            className="grid gap-12 px-2 py-16 sm:px-4 md:grid-cols-[1.4fr_1fr] md:py-20"
+            className="grid gap-12 px-2 py-16 sm:px-4 md:grid-cols-[1.4fr_1fr] md:py-24"
           >
             <div>
               <h2 className="mb-3 text-3xl font-extrabold tracking-[-0.04em]">

@@ -161,161 +161,164 @@ export default function LearningJourneyPage() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 p-6 sm:p-10">
-      <header className="space-y-3">
+    <div className="mx-auto grid w-full max-w-7xl gap-8 p-6 sm:p-10 lg:grid-cols-[260px_1fr]">
+      <aside className="space-y-6 border-b border-border pb-6 lg:border-b-0 lg:border-r lg:pr-8">
         <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
           {journey.status} journey
         </p>
-        <h1 className="text-3xl font-bold tracking-tight">{journey.promise}</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">{journey.promise}</h1>
+        <p className="text-sm leading-6 text-muted-foreground">
           {journey.goal.normalizedStatement}
         </p>
-      </header>
-
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold">What you will be able to do</h2>
-        <ul className="mt-4 space-y-3">
-          {journey.objectives.map((objective) => (
-            <li key={objective.id} className="flex gap-3 text-sm leading-6">
-              <Check className="mt-1 size-4 shrink-0 text-primary" />
-              <span>{objective.statement}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold">Your path</h2>
-          <p className="text-sm text-muted-foreground">
-            One focused step at a time.
-          </p>
-        </div>
-        <div className="space-y-3">
-          {journey.activities.map((activity) => (
-            <article
-              key={activity.id}
-              className="flex items-center justify-between gap-4 rounded-xl border border-border p-4"
-            >
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                  {activity.kind} · {activity.status}
-                </p>
-                <h3 className="mt-1 font-medium">{activity.title}</h3>
-              </div>
-              {activity.status === "ready" && (
-                <Button
-                  type="button"
-                  disabled={startingActivity !== null}
-                  onClick={() => startActivity(activity.id)}
-                  className="shrink-0 rounded-full"
-                >
-                  {startingActivity === activity.id ? "Starting…" : "Begin"}
-                  <ArrowRight className="size-4" />
-                </Button>
-              )}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {readyActivity && !session && (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock3 className="size-4" /> Your first activity is ready when you
-          are.
-        </p>
-      )}
-      {session && (
-        <section className="rounded-2xl border border-primary/30 bg-primary/10 p-6">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
-            Session started
-          </p>
-          <h2 className="mt-2 text-xl font-semibold">
-            {activeActivity?.title ?? "Your first activity"}
+        <div className="border-t border-border pt-5">
+          <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+            Outcomes
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {activeActivity?.payload &&
-            typeof activeActivity.payload === "object" &&
-            "purpose" in activeActivity.payload
-              ? String(activeActivity.payload.purpose)
-              : "Take this focused first step, then AME will open the next one."}
-          </p>
-          {session.status === "in_progress" &&
-            activeContent?.type === "starter_check" && (
-              <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
-                <p className="text-sm font-medium">
-                  {activeContent.instructions}
-                </p>
-                {activeContent.questions.map((question) => (
-                  <div key={question.id} className="space-y-2">
-                    <label
-                      htmlFor={`learning-${question.id}`}
-                      className="block text-sm font-medium"
-                    >
-                      {question.prompt}
-                    </label>
-                    {question.kind === "single_choice" ? (
-                      <div className="flex flex-wrap gap-2">
-                        {question.options?.map((option) => (
-                          <Button
-                            key={option}
-                            type="button"
-                            variant={
-                              responses[question.id] === option
-                                ? "default"
-                                : "outline"
-                            }
-                            onClick={() =>
-                              setResponses((current) => ({
-                                ...current,
-                                [question.id]: option,
-                              }))
-                            }
-                            className="rounded-full"
-                          >
-                            {option.replaceAll("_", " ")}
-                          </Button>
-                        ))}
-                      </div>
-                    ) : (
-                      <input
-                        id={`learning-${question.id}`}
-                        value={responses[question.id] ?? ""}
-                        onChange={(event) =>
-                          setResponses((current) => ({
-                            ...current,
-                            [question.id]: event.target.value,
-                          }))
-                        }
-                        className="h-11 w-full rounded-xl border border-input bg-background px-4 text-foreground outline-none focus:ring-2 focus:ring-ring"
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          {session.status === "in_progress" ? (
-            <Button
-              type="button"
-              disabled={finishing}
-              onClick={finishSession}
-              className="mt-5 rounded-full"
-            >
-              {finishing ? "Saving progress…" : "Mark activity complete"}
-              <Check className="size-4" />
-            </Button>
-          ) : (
-            <p className="mt-5 text-sm font-medium text-primary">
-              Complete. Your next activity is now ready.
+          <ul className="mt-4 space-y-3">
+            {journey.objectives.map((objective) => (
+              <li key={objective.id} className="flex gap-3 text-sm leading-6">
+                <Check className="mt-1 size-4 shrink-0 text-primary" />
+                <span>{objective.statement}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+
+      <main className="space-y-8">
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Your path</h2>
+            <p className="text-sm text-muted-foreground">
+              One focused step at a time.
             </p>
-          )}
+          </div>
+          <div className="space-y-3">
+            {journey.activities.map((activity) => (
+              <article
+                key={activity.id}
+                className="flex items-center justify-between gap-4 border-b border-border py-5 first:border-t"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                    {activity.kind} · {activity.status}
+                  </p>
+                  <h3 className="mt-1 font-medium">{activity.title}</h3>
+                </div>
+                {activity.status === "ready" && (
+                  <Button
+                    type="button"
+                    disabled={startingActivity !== null}
+                    onClick={() => startActivity(activity.id)}
+                    className="shrink-0 rounded-full"
+                  >
+                    {startingActivity === activity.id ? "Starting…" : "Begin"}
+                    <ArrowRight className="size-4" />
+                  </Button>
+                )}
+              </article>
+            ))}
+          </div>
         </section>
-      )}
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
+
+        {readyActivity && !session && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock3 className="size-4" /> Your first activity is ready when you
+            are.
+          </p>
+        )}
+        {session && (
+          <section className="border border-primary/30 bg-primary/10 p-6 shadow-[8px_8px_0_hsl(var(--primary)/0.12)]">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+              Session started
+            </p>
+            <h2 className="mt-2 text-xl font-semibold">
+              {activeActivity?.title ?? "Your first activity"}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {activeActivity?.payload &&
+              typeof activeActivity.payload === "object" &&
+              "purpose" in activeActivity.payload
+                ? String(activeActivity.payload.purpose)
+                : "Take this focused first step, then AME will open the next one."}
+            </p>
+            {session.status === "in_progress" &&
+              activeContent?.type === "starter_check" && (
+                <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
+                  <p className="text-sm font-medium">
+                    {activeContent.instructions}
+                  </p>
+                  {activeContent.questions.map((question) => (
+                    <div key={question.id} className="space-y-2">
+                      <label
+                        htmlFor={`learning-${question.id}`}
+                        className="block text-sm font-medium"
+                      >
+                        {question.prompt}
+                      </label>
+                      {question.kind === "single_choice" ? (
+                        <div className="flex flex-wrap gap-2">
+                          {question.options?.map((option) => (
+                            <Button
+                              key={option}
+                              type="button"
+                              variant={
+                                responses[question.id] === option
+                                  ? "default"
+                                  : "outline"
+                              }
+                              onClick={() =>
+                                setResponses((current) => ({
+                                  ...current,
+                                  [question.id]: option,
+                                }))
+                              }
+                              className="rounded-full"
+                            >
+                              {option.replaceAll("_", " ")}
+                            </Button>
+                          ))}
+                        </div>
+                      ) : (
+                        <input
+                          id={`learning-${question.id}`}
+                          value={responses[question.id] ?? ""}
+                          onChange={(event) =>
+                            setResponses((current) => ({
+                              ...current,
+                              [question.id]: event.target.value,
+                            }))
+                          }
+                          className="h-11 w-full rounded-xl border border-input bg-background px-4 text-foreground outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            {session.status === "in_progress" ? (
+              <Button
+                type="button"
+                disabled={finishing}
+                onClick={finishSession}
+                className="mt-5 rounded-full"
+              >
+                {finishing ? "Saving progress…" : "Mark activity complete"}
+                <Check className="size-4" />
+              </Button>
+            ) : (
+              <p className="mt-5 text-sm font-medium text-primary">
+                Complete. Your next activity is now ready.
+              </p>
+            )}
+          </section>
+        )}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+      </main>
     </div>
   );
 }
