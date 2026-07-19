@@ -113,6 +113,24 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     page,
     "learning.activity.content.compose",
   );
+  const kindMismatchResponse = await page.request.patch(
+    `/api/v1/learning/activities/${explanation.id}/content`,
+    {
+      data: {
+        generationRunId: contentGenerationRunId,
+        content: {
+          type: "worked_example",
+          heading: "Wrong activity kind",
+          prompt: "This must be rejected.",
+          steps: ["Do not store this."],
+          reflection: "Try the matching activity instead.",
+        },
+        sourceReferences: ["https://example.test/subject/intro"],
+        reviewStatus: "approved",
+      },
+    },
+  );
+  expect(kindMismatchResponse.status()).toBe(422);
   const groundedContent = {
     type: "explanation",
     heading: "A grounded starting model",

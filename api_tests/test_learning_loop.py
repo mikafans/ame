@@ -68,9 +68,98 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         for activity in activities
         if activity["payload"]["content"]["type"] == "explanation"
     )
+    worked_example = next(
+        activity
+        for activity in activities
+        if activity["payload"]["content"]["type"] == "worked_example"
+    )
     generation_run_id = _published_generation_run(
         client, headers, "learning.activity.content.compose"
     )
+    worked_example_content = {
+        "type": "worked_example",
+        "heading": "A bounded worked example",
+        "prompt": "Apply one idea to one observable situation.",
+        "steps": ["Name the situation.", "Apply the idea.", "Inspect the result."],
+        "reflection": "What would you try next?",
+    }
+    explanation_kind_mismatch = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": worked_example_content,
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert explanation_kind_mismatch.status_code == 422, explanation_kind_mismatch.text
+    worked_example_kind_mismatch = client.patch(
+        f"/api/v1/learning/activities/{worked_example['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": {
+                "type": "explanation",
+                "heading": "Wrong kind",
+                "body": "This belongs to an explanation activity.",
+                "key_points": ["It must not be stored here."],
+            },
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert worked_example_kind_mismatch.status_code == 422, (
+        worked_example_kind_mismatch.text
+    )
+    non_string_field = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": {
+                "type": "explanation",
+                "heading": "Invalid field",
+                "body": 42,
+                "key_points": ["This is not enough."],
+            },
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert non_string_field.status_code == 422, non_string_field.text
+    empty_list = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": {
+                "type": "explanation",
+                "heading": "Invalid list",
+                "body": "The list is empty.",
+                "key_points": [],
+            },
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert empty_list.status_code == 422, empty_list.text
+    unapproved = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": {
+                "type": "explanation",
+                "heading": "Unapproved",
+                "body": "This must not become learner-visible.",
+                "key_points": ["Review is mandatory."],
+            },
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "draft",
+        },
+    )
+    assert unapproved.status_code == 422, unapproved.text
     content = {
         "type": "explanation",
         "heading": "A grounded starting model",
