@@ -191,29 +191,17 @@ pub async fn rate_limit_middleware(
         let key = format!("ame:limiter:owner:{}", auth.owner_id);
         // Prefer the operator-tunable tiers resolved by the maintenance
         // middleware (stashed in extensions); fall back to config if absent.
-        let (free, premium) = req
+        let free = req
             .extensions()
             .get::<crate::settings::EffectiveSettings>()
-            .map(|s| {
-                (
-                    (s.ratelimit.free.burst, s.ratelimit.free.rate),
-                    (s.ratelimit.premium.burst, s.ratelimit.premium.rate),
-                )
-            })
+            .map(|s| (s.ratelimit.free.burst, s.ratelimit.free.rate))
             .unwrap_or((
-                (
-                    state.config.ratelimit.free.burst,
-                    state.config.ratelimit.free.rate,
-                ),
-                (
-                    state.config.ratelimit.premium.burst,
-                    state.config.ratelimit.premium.rate,
-                ),
+                state.config.ratelimit.free.burst,
+                state.config.ratelimit.free.rate,
             ));
-        let (burst, rate) = match auth.owner_plan.as_str() {
-            "premium" => (premium.0, premium.1 as f64),
-            _ => (free.0, free.1 as f64),
-        };
+        // The clean baseline has no account-plan column. Local policy is the
+        // single rate-limit authority for every actor.
+        let (burst, rate) = (free.0, free.1 as f64);
         let is_read = matches!(
             method,
             axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS

@@ -27,6 +27,7 @@ pub struct AuthenticatedPrincipal {
     pub role: PrincipalRole,
     pub email: Option<String>,
     pub display_name: String,
+    pub created_at: OffsetDateTime,
     pub scopes: Vec<Scope>,
     pub credential_id: Uuid,
     pub expires_at: OffsetDateTime,

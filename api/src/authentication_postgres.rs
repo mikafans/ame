@@ -34,7 +34,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
             r#"
             SELECT s.id, s.token_hash, s.revoked_at, s.expires_at,
                    u.id AS owner_user_id, u.email, u.display_name,
-                   u.role, u.status, i.status AS identity_status
+                   u.role, u.status, i.status AS identity_status, i.created_at
             FROM tb_login_sessions s
             JOIN tb_users u ON u.id = s.user_id
             JOIN tb_identities i ON i.id = u.id
@@ -63,6 +63,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
             role: parse_role(row.get("role"))?,
             email: row.get("email"),
             display_name: row.get("display_name"),
+            created_at: row.get("created_at"),
             scopes: Vec::new(),
             credential_id: row.get("id"),
             expires_at: row.get("expires_at"),
@@ -79,7 +80,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
             r#"
             SELECT t.id, t.token_hash, t.scopes, t.revoked_at, t.expires_at,
                    a.id AS actor_identity_id, a.revoked_at AS agent_revoked_at,
-                   i.status AS identity_status, i.label,
+                   i.status AS identity_status, i.label, i.created_at,
                    o.id AS owner_user_id, o.email, o.status AS owner_status,
                    o.role
             FROM tb_api_tokens t
@@ -127,6 +128,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
             role: parse_role(row.get("role"))?,
             email: row.get("email"),
             display_name: row.get("label"),
+            created_at: row.get("created_at"),
             scopes,
             credential_id: row.get("id"),
             expires_at: row.get("expires_at"),

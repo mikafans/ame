@@ -876,28 +876,16 @@ async fn run_assessment_batch_create(
         }]));
     }
 
-    let (burst, rate) = match auth.owner_plan.as_str() {
-        "premium" => (
-            state.config.ratelimit.premium.burst,
-            state.config.ratelimit.premium.rate as f64,
-        ),
-        _ => (
-            state.config.ratelimit.free.burst,
-            state.config.ratelimit.free.rate as f64,
-        ),
-    };
-
-    let max_batch = match auth.owner_plan.as_str() {
-        "premium" => state.config.batch.premium,
-        _ => state.config.batch.free,
-    };
+    let (burst, rate) = (
+        state.config.ratelimit.free.burst,
+        state.config.ratelimit.free.rate as f64,
+    );
+    let max_batch = state.config.batch.free;
     let n = batch.items.len();
     if n > max_batch {
         return Err(ApiError::Validation(vec![FieldError {
             field: "items".into(),
-            message: format!(
-                "batch size {n} exceeds the maximum of {max_batch} for your plan. Upgrade to Premium for larger batches."
-            ),
+            message: format!("batch size {n} exceeds the local maximum of {max_batch}"),
         }]));
     }
 
