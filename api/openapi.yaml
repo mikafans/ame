@@ -1080,6 +1080,9 @@ components:
         - LearningSessionResultConflict
       - type: string
         enum:
+        - ActivityContentConflict
+      - type: string
+        enum:
         - IdempotencyConflict
       - type: string
         enum:

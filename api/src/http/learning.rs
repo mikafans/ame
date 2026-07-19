@@ -7,7 +7,8 @@ use axum::{
     routing::get,
     routing::post,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use utoipa::ToSchema;
@@ -17,8 +18,9 @@ use crate::{
     auth::extractor::AuthenticatedUser,
     domain::{
         error::ApiError,
+        generation::{GenerationRepository, validate_content_run},
         learning::{
-            ActivityKind, ActivityStatus, CreateLearningSession,
+            ActivityKind, ActivityStatus, AuthorActivityContent, CreateLearningSession,
             FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyStatus,
             LearningActivity, LearningObjective, LearningRepository, LearningSession,
             LearningSessionStatus, ObjectiveStatus,
@@ -175,7 +177,21 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
             post(start_activity),
         )
+        .route(
+            "/v1/learning/activities/{activity_id}/content",
+            axum::routing::patch(author_activity_content),
+        )
         .with_state(state)
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorActivityContentBody {
+    pub generation_run_id: Uuid,
+    #[schema(value_type = Object)]
+    pub content: Value,
+    pub source_references: Vec<String>,
+    pub review_status: String,
 }
 
 /// GET /api/v1/learning/journeys — list the caller's learner-owned journeys.
@@ -226,6 +242,52 @@ pub async fn list_journeys(
         });
     }
     Ok(Json(response))
+}
+
+/// PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content.
+#[utoipa::path(
+    patch,
+    path = "/api/v1/learning/activities/{activity_id}/content",
+    params(("activity_id" = Uuid, Path, description = "Activity to ground")),
+    request_body = AuthorActivityContentBody,
+    responses(
+        (status = 200, description = "Grounded learner activity", body = LearningActivityResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Activity or generation run does not belong to this learner"),
+        (status = 409, description = "Generation is not published or activity content is immutable"),
+        (status = 422, description = "Content, provenance, or review status is invalid")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn author_activity_content(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(activity_id): Path<Uuid>,
+    Json(body): Json<AuthorActivityContentBody>,
+) -> Result<Json<LearningActivityResponse>, ApiError> {
+    let generation = crate::generation_postgres::PgGenerationRepository::new(state.pool.clone())
+        .get(auth.owner_id(), body.generation_run_id)
+        .await
+        .map_err(crate::http::generation::map_error)?;
+    validate_content_run(
+        &generation,
+        auth.owner_id(),
+        "learning.activity.content.compose",
+    )
+    .map_err(crate::http::generation::map_error)?;
+    let activity = PgLearningRepository::new(state.pool)
+        .author_activity_content(AuthorActivityContent {
+            subject_user_id: auth.owner_id(),
+            activity_id,
+            generation_run_id: body.generation_run_id,
+            content: body.content,
+            source_references: body.source_references,
+            review_status: body.review_status,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(activity_response(activity)))
 }
 
 /// GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey.
@@ -541,6 +603,21 @@ fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -
                 field: "activityId".to_string(),
                 message: "activity is not ready to start".to_string(),
             }])
+        }
+        crate::domain::learning::LearningRepositoryError::EmptyField { field } => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: field.into(),
+                message: "must not be empty".to_string(),
+            }])
+        }
+        crate::domain::learning::LearningRepositoryError::InvalidActivityContent => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "content".to_string(),
+                message: "does not match the activity content contract".to_string(),
+            }])
+        }
+        crate::domain::learning::LearningRepositoryError::ActivityContentCompleted => {
+            ApiError::ActivityContentConflict
         }
         crate::domain::learning::LearningRepositoryError::LearningSessionFinished => {
             ApiError::SessionFinished

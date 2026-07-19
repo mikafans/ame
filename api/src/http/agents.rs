@@ -61,6 +61,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["id","completed","responses"],"properties":{"id":{"type":"string","format":"uuid"},"completed":{"type":"boolean"},"responses":{"type":"array"}}}),
         ),
         endpoint(
+            "learning.activity.content.author",
+            "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
+            "PATCH",
+            "/api/v1/learning/activities/{activity_id}/content",
+            json!({"type":"object","required":["activityId","generationRunId","content","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"content":{"type":"object","required":["type"],"description":"Use type explanation with heading, body, key_points, or worked_example with heading, prompt, steps, reflection."},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved content is learner-visible."}}}),
+        ),
+        endpoint(
             "learning.question.create",
             "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
             "POST",

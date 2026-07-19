@@ -117,7 +117,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     type: "explanation",
     heading: "A grounded starting model",
     body: "This is the first source-backed model for the learner.",
-    keyPoints: ["Start with one observable mechanism."],
+    key_points: ["Start with one observable mechanism."],
   };
   const groundedContentResponse = await page.request.patch(
     `/api/v1/learning/activities/${explanation.id}/content`,

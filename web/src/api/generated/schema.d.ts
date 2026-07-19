@@ -633,7 +633,7 @@ export interface components {
             };
         } | {
             Validation: components["schemas"]["FieldError"][];
-        } | "SessionFinished" | "LearningSessionResultConflict" | "IdempotencyConflict" | "GenerationStateConflict" | "TooManyRequests" | "Maintenance" | {
+        } | "SessionFinished" | "LearningSessionResultConflict" | "ActivityContentConflict" | "IdempotencyConflict" | "GenerationStateConflict" | "TooManyRequests" | "Maintenance" | {
             Internal: string;
         };
         AssessmentActivityQuery: {

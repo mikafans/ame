@@ -165,6 +165,16 @@ pub struct LearningActivity {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct AuthorActivityContent {
+    pub subject_user_id: Uuid,
+    pub activity_id: Uuid,
+    pub generation_run_id: Uuid,
+    pub content: serde_json::Value,
+    pub source_references: Vec<String>,
+    pub review_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct CreateLearningSession {
     pub journey_id: Uuid,
     pub activity_id: Uuid,
@@ -211,6 +221,10 @@ pub enum LearningRepositoryError {
     OrderConflict { resource: &'static str },
     #[error("activity is not ready to start")]
     ActivityNotReady,
+    #[error("activity content is invalid")]
+    InvalidActivityContent,
+    #[error("completed activity content cannot be changed")]
+    ActivityContentCompleted,
     #[error("learning session is already finished")]
     LearningSessionFinished,
     #[error("learning session was finished with a different result")]
@@ -280,6 +294,11 @@ pub trait LearningRepository: Send + Sync {
         subject_user_id: Uuid,
         journey_id: Uuid,
     ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
+
+    async fn author_activity_content(
+        &self,
+        input: AuthorActivityContent,
+    ) -> Result<LearningActivity, LearningRepositoryError>;
 
     async fn start_learning_session(
         &self,
@@ -365,6 +384,60 @@ pub(crate) fn validate_activity(input: &CreateActivity) -> Result<(), LearningRe
         return Err(LearningRepositoryError::EmptyField {
             field: "payload_schema_version",
         });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_activity_content(
+    input: &AuthorActivityContent,
+) -> Result<(), LearningRepositoryError> {
+    if input.source_references.is_empty()
+        || input
+            .source_references
+            .iter()
+            .any(|reference| reference.trim().is_empty())
+    {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "source_references",
+        });
+    }
+    if input.review_status != "approved" {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "review_status",
+        });
+    }
+    let Some(object) = input.content.as_object() else {
+        return Err(LearningRepositoryError::InvalidActivityContent);
+    };
+    let Some(content_type) = object.get("type").and_then(serde_json::Value::as_str) else {
+        return Err(LearningRepositoryError::InvalidActivityContent);
+    };
+    let required_fields: &[&str] = match content_type {
+        "explanation" => &["heading", "body", "key_points"],
+        "worked_example" => &["heading", "prompt", "steps", "reflection"],
+        _ => return Err(LearningRepositoryError::InvalidActivityContent),
+    };
+    if required_fields.iter().any(|field| {
+        object.get(*field).is_none_or(|value| {
+            value.is_null() || value.as_str().is_some_and(|text| text.trim().is_empty())
+        })
+    }) {
+        return Err(LearningRepositoryError::InvalidActivityContent);
+    }
+    for field in required_fields
+        .iter()
+        .filter(|field| **field == "key_points" || **field == "steps")
+    {
+        let Some(items) = object.get(*field).and_then(serde_json::Value::as_array) else {
+            return Err(LearningRepositoryError::InvalidActivityContent);
+        };
+        if items.is_empty()
+            || items
+                .iter()
+                .any(|item| item.as_str().is_none_or(|text| text.trim().is_empty()))
+        {
+            return Err(LearningRepositoryError::InvalidActivityContent);
+        }
     }
     Ok(())
 }

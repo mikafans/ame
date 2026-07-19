@@ -1,11 +1,12 @@
 //! Learning repositories and their contract tests.
 
 use crate::domain::learning::{
-    ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateLearningSession,
-    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
-    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
-    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal,
-    validate_journey, validate_objective,
+    ActivityKind, ActivityStatus, AuthorActivityContent, CreateActivity, CreateGoal, CreateJourney,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
+    LearningActivity, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
+    LearningRepositoryError, LearningSession, LearningSessionStatus, ObjectiveStatus,
+    validate_activity, validate_activity_content, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -353,6 +354,49 @@ impl LearningRepository for InMemoryLearningRepository {
             .collect();
         activities.sort_by_key(|activity| activity.order_index);
         Ok(activities)
+    }
+
+    async fn author_activity_content(
+        &self,
+        input: AuthorActivityContent,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_content(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let activity = state.activities.get_mut(&input.activity_id).ok_or(
+            LearningRepositoryError::NotFound {
+                resource: "activity",
+            },
+        )?;
+        if activity.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if !matches!(
+            activity.kind,
+            ActivityKind::Explanation | ActivityKind::Example
+        ) {
+            return Err(LearningRepositoryError::InvalidActivityContent);
+        }
+        if activity.status == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        let payload = activity
+            .payload
+            .as_object_mut()
+            .ok_or(LearningRepositoryError::InvalidActivityContent)?;
+        payload.insert("content".into(), input.content);
+        payload.insert(
+            "contentProvenance".into(),
+            serde_json::json!({
+                "generationRunId": input.generation_run_id,
+                "reviewStatus": input.review_status,
+                "sourceReferences": input.source_references,
+            }),
+        );
+        activity.updated_at = OffsetDateTime::now_utc();
+        Ok(activity.clone())
     }
 
     async fn start_learning_session(

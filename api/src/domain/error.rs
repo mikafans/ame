@@ -22,6 +22,8 @@ pub enum ApiError {
     SessionFinished,
     #[error("learning session result conflicts with the completed result")]
     LearningSessionResultConflict,
+    #[error("learning activity content conflicts with the activity state")]
+    ActivityContentConflict,
     #[error("idempotency key conflict")]
     IdempotencyConflict,
     #[error("generation state transition conflicts with the current state")]
@@ -53,6 +55,7 @@ impl ApiError {
             ApiError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             ApiError::SessionFinished
             | ApiError::LearningSessionResultConflict
+            | ApiError::ActivityContentConflict
             | ApiError::IdempotencyConflict
             | ApiError::GenerationStateConflict => StatusCode::CONFLICT,
             ApiError::Maintenance => StatusCode::SERVICE_UNAVAILABLE,
@@ -94,6 +97,12 @@ impl IntoResponse for ApiError {
                 StatusCode::CONFLICT,
                 "session_result_conflict",
                 "the session was already finished with a different result".to_string(),
+                None,
+            ),
+            ApiError::ActivityContentConflict => (
+                StatusCode::CONFLICT,
+                "activity_content_conflict",
+                "the activity content cannot be changed in its current state".to_string(),
                 None,
             ),
             ApiError::IdempotencyConflict => (

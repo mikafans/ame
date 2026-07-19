@@ -145,7 +145,7 @@ fn default_content_version() -> u32 {
     1
 }
 
-fn map_error(error: GenerationError) -> ApiError {
+pub(crate) fn map_error(error: GenerationError) -> ApiError {
     match error {
         GenerationError::EmptyField { field } => {
             ApiError::Validation(vec![crate::domain::error::FieldError {

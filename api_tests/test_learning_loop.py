@@ -75,7 +75,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         "type": "explanation",
         "heading": "A grounded starting model",
         "body": "This explanation was authored from the learner's actual sources.",
-        "keyPoints": ["Start with one observable mechanism."],
+        "key_points": ["Start with one observable mechanism."],
     }
     grounded = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",

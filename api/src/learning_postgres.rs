@@ -1,11 +1,12 @@
 //! PostgreSQL implementation of the learning repository contract.
 
 use crate::domain::learning::{
-    ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateLearningSession,
-    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
-    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
-    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity, validate_goal,
-    validate_journey, validate_objective,
+    ActivityKind, ActivityStatus, AuthorActivityContent, CreateActivity, CreateGoal, CreateJourney,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
+    LearningActivity, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
+    LearningRepositoryError, LearningSession, LearningSessionStatus, ObjectiveStatus,
+    validate_activity, validate_activity_content, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -426,6 +427,71 @@ impl LearningRepository for PgLearningRepository {
                 activity_from_row(row, objective_ids)
             })
             .collect())
+    }
+
+    async fn author_activity_content(
+        &self,
+        input: AuthorActivityContent,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_content(&input)?;
+        let row = sqlx::query(
+            "SELECT journey_id, subject_user_id, kind, status FROM tb_activities WHERE id = $1",
+        )
+        .bind(input.activity_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(LearningRepositoryError::NotFound {
+            resource: "activity",
+        })?;
+        let subject_user_id: Uuid = row.get("subject_user_id");
+        if subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if !matches!(
+            activity_kind(row.get::<String, _>("kind").as_str()),
+            ActivityKind::Explanation | ActivityKind::Example
+        ) {
+            return Err(LearningRepositoryError::InvalidActivityContent);
+        }
+        if activity_status(row.get::<String, _>("status").as_str()) == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        let journey_id: Uuid = row.get("journey_id");
+        let mut activity = self
+            .list_activities(input.subject_user_id, journey_id)
+            .await?
+            .into_iter()
+            .find(|activity| activity.id == input.activity_id)
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "activity",
+            })?;
+        let payload = activity
+            .payload
+            .as_object_mut()
+            .ok_or(LearningRepositoryError::InvalidActivityContent)?;
+        payload.insert("content".into(), input.content);
+        payload.insert(
+            "contentProvenance".into(),
+            serde_json::json!({
+                "generationRunId": input.generation_run_id,
+                "reviewStatus": input.review_status,
+                "sourceReferences": input.source_references,
+            }),
+        );
+        let updated_at = sqlx::query(
+            "UPDATE tb_activities SET payload = $1, updated_at = now() WHERE id = $2 AND subject_user_id = $3 AND status <> 'completed' RETURNING updated_at",
+        )
+        .bind(&activity.payload)
+        .bind(input.activity_id)
+        .bind(input.subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(LearningRepositoryError::ActivityContentCompleted)?
+        .get("updated_at");
+        activity.updated_at = updated_at;
+        Ok(activity)
     }
 
     async fn start_learning_session(
