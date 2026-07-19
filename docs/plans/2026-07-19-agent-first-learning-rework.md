@@ -1,15 +1,16 @@
 # AME 0.3 — Agent-first learning platform
 
-Status: design certification pending implementation
+Status: implementation in progress; C1-C5 exercised PASS; C6 clean-volume certification pending
 
 This document is the canonical plan for the clean-slate AME 0.3 redesign. It
 defines the product promise, learner stories, domain model, API shape, TDD
 gates, implementation order, and release certification. It supersedes earlier
 plans and story sets for this rework.
 
-The complete learning loop below is a future implementation target. Until the
-certification gates pass, no existing route, table, fixture, or screen is
-treated as part of the 0.3 contract.
+The complete learning loop below is the 0.3 release target. Current proof is
+tracked in the [release evidence inventory](../audits/2026-07-20-0.3-release-inventory.md);
+an existing route, table, fixture, or screen is not release-complete merely
+because it exists.
 
 ## Product promise
 
