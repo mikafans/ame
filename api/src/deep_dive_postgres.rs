@@ -21,12 +21,65 @@ impl PgDeepDiveRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    async fn ensure_owned_evidence(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+        objective_id: Uuid,
+        evidence_id: Uuid,
+    ) -> Result<(), DeepDiveError> {
+        let owned = sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS (
+                    SELECT 1
+                      FROM tb_mastery_evidence e
+                      JOIN tb_learning_journeys j
+                        ON j.id = e.journey_id
+                       AND j.subject_user_id = e.subject_user_id
+                      JOIN tb_activities a
+                        ON a.id = e.activity_id
+                       AND a.journey_id = e.journey_id
+                       AND a.subject_user_id = e.subject_user_id
+                      JOIN tb_journey_objectives o
+                        ON o.id = e.objective_id
+                       AND o.journey_id = e.journey_id
+                       AND o.subject_user_id = e.subject_user_id
+                     WHERE e.id = $1
+                       AND e.subject_user_id = $2
+                       AND e.journey_id = $3
+                       AND e.activity_id = $4
+                       AND e.objective_id = $5
+                )"#,
+        )
+        .bind(evidence_id)
+        .bind(subject_user_id)
+        .bind(journey_id)
+        .bind(activity_id)
+        .bind(objective_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        if owned {
+            Ok(())
+        } else {
+            Err(DeepDiveError::SubjectMismatch)
+        }
+    }
 }
 
 #[async_trait]
 impl DeepDiveRepository for PgDeepDiveRepository {
     async fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError> {
         validate_deep_dive(&input)?;
+        self.ensure_owned_evidence(
+            input.subject_user_id,
+            input.journey_id,
+            input.activity_id,
+            input.objective_id,
+            input.triggering_evidence_id,
+        )
+        .await?;
         let body = json!({
             "title": input.title,
             "body": input.body,

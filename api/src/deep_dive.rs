@@ -3,7 +3,7 @@
 use crate::domain::deep_dive::{CreateDeepDive, DeepDive, DeepDiveError, validate_deep_dive};
 use async_trait::async_trait;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 use time::OffsetDateTime;
@@ -12,6 +12,7 @@ use uuid::Uuid;
 #[derive(Clone, Default)]
 pub struct InMemoryDeepDiveRepository {
     deep_dives: Arc<Mutex<HashMap<Uuid, DeepDive>>>,
+    verified_evidence: Arc<Mutex<HashSet<(Uuid, Uuid, Uuid, Uuid, Uuid)>>>,
 }
 
 #[async_trait]
@@ -26,8 +27,43 @@ pub trait DeepDiveRepository: Send + Sync {
 }
 
 impl InMemoryDeepDiveRepository {
+    pub fn register_evidence(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+        objective_id: Uuid,
+        evidence_id: Uuid,
+    ) -> Result<(), DeepDiveError> {
+        self.verified_evidence
+            .lock()
+            .map_err(|error| DeepDiveError::Storage(error.to_string()))?
+            .insert((
+                subject_user_id,
+                journey_id,
+                activity_id,
+                objective_id,
+                evidence_id,
+            ));
+        Ok(())
+    }
+
     pub fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError> {
         validate_deep_dive(&input)?;
+        let evidence_is_owned = self
+            .verified_evidence
+            .lock()
+            .map_err(|error| DeepDiveError::Storage(error.to_string()))?
+            .contains(&(
+                input.subject_user_id,
+                input.journey_id,
+                input.activity_id,
+                input.objective_id,
+                input.triggering_evidence_id,
+            ));
+        if !evidence_is_owned {
+            return Err(DeepDiveError::SubjectMismatch);
+        }
         let mut deep_dives = self
             .deep_dives
             .lock()
@@ -111,9 +147,17 @@ mod tests {
     fn deep_dive_is_linked_to_evidence_and_readable_by_owner() {
         let subject = Uuid::now_v7();
         let repository = InMemoryDeepDiveRepository::default();
-        let created = repository
-            .create(input(subject))
-            .expect("deep-dive creates");
+        let value = input(subject);
+        repository
+            .register_evidence(
+                value.subject_user_id,
+                value.journey_id,
+                value.activity_id,
+                value.objective_id,
+                value.triggering_evidence_id,
+            )
+            .expect("evidence registers");
+        let created = repository.create(value).expect("deep-dive creates");
         assert_eq!(created.content_version, 1);
         assert_eq!(
             repository
@@ -127,15 +171,27 @@ mod tests {
     fn unsupported_or_cross_subject_deep_dives_are_rejected() {
         let subject = Uuid::now_v7();
         let repository = InMemoryDeepDiveRepository::default();
+        assert_eq!(
+            repository.create(input(subject)),
+            Err(DeepDiveError::SubjectMismatch)
+        );
         let mut invalid = input(subject);
         invalid.source_references.clear();
         assert_eq!(
             repository.create(invalid),
             Err(DeepDiveError::MissingSource)
         );
-        let created = repository
-            .create(input(subject))
-            .expect("deep-dive creates");
+        let value = input(subject);
+        repository
+            .register_evidence(
+                value.subject_user_id,
+                value.journey_id,
+                value.activity_id,
+                value.objective_id,
+                value.triggering_evidence_id,
+            )
+            .expect("evidence registers");
+        let created = repository.create(value).expect("deep-dive creates");
         assert_eq!(
             repository.get(Uuid::now_v7(), created.id),
             Err(DeepDiveError::SubjectMismatch)
