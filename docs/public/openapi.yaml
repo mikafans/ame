@@ -6,7 +6,7 @@ info:
     name: ''
   version: 0.3.0
 paths:
-  /v1/admin/audit:
+  /api/v1/admin/audit:
     get:
       tags:
       - admin
@@ -55,7 +55,7 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/health:
+  /api/v1/admin/health:
     get:
       tags:
       - admin
@@ -73,7 +73,7 @@ paths:
           description: Administrator role required
       security:
       - bearer: []
-  /v1/admin/settings:
+  /api/v1/admin/settings:
     get:
       tags:
       - admin
@@ -121,7 +121,7 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/users:
+  /api/v1/admin/users:
     get:
       tags:
       - admin
@@ -158,7 +158,7 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/users/{id}:
+  /api/v1/admin/users/{id}:
     patch:
       tags:
       - admin
@@ -189,7 +189,7 @@ paths:
           description: User not found
       security:
       - bearer: []
-  /v1/assessments:
+  /api/v1/assessments:
     post:
       tags:
       - assessments
@@ -209,7 +209,7 @@ paths:
                 $ref: '#/components/schemas/AssessmentResponse'
       security:
       - bearer: []
-  /v1/assessments/{assessment_id}:
+  /api/v1/assessments/{assessment_id}:
     get:
       tags:
       - assessments
@@ -231,7 +231,7 @@ paths:
                 $ref: '#/components/schemas/AssessmentResponse'
       security:
       - bearer: []
-  /v1/assessments/{assessment_id}/attempts:
+  /api/v1/assessments/{assessment_id}/attempts:
     post:
       tags:
       - attempts
@@ -259,7 +259,7 @@ paths:
                 $ref: '#/components/schemas/AttemptResponse'
       security:
       - bearer: []
-  /v1/attempts/{attempt_id}:
+  /api/v1/attempts/{attempt_id}:
     get:
       tags:
       - attempts
@@ -281,7 +281,7 @@ paths:
                 $ref: '#/components/schemas/AttemptResponse'
       security:
       - bearer: []
-  /v1/attempts/{attempt_id}/answers:
+  /api/v1/attempts/{attempt_id}/answers:
     post:
       tags:
       - attempts
@@ -309,7 +309,7 @@ paths:
                 $ref: '#/components/schemas/AttemptResponse'
       security:
       - bearer: []
-  /v1/attempts/{attempt_id}/finish:
+  /api/v1/attempts/{attempt_id}/finish:
     post:
       tags:
       - attempts
@@ -331,58 +331,16 @@ paths:
                 $ref: '#/components/schemas/AttemptResponse'
       security:
       - bearer: []
-  /v1/auth/login:
+  /api/v1/auth/logout:
     post:
       tags:
       - auth
-      summary: POST /v1/auth/login — authenticate with email and password.
-      operationId: login
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginBody'
-        required: true
-      responses:
-        '200':
-          description: Logged in
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
-          description: Unauthorized
-  /v1/auth/logout:
-    post:
-      tags:
-      - auth
-      summary: POST /v1/auth/logout — clear the HttpOnly token cookie.
+      summary: POST /api/v1/auth/logout — clear the HttpOnly token cookie.
       operationId: logout
       responses:
         '200':
           description: Logged out
-  /v1/auth/register:
-    post:
-      tags:
-      - auth
-      summary: POST /v1/auth/register — register a new user with email and password.
-      operationId: register
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterBody'
-        required: true
-      responses:
-        '201':
-          description: User registered
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '422':
-          description: Validation failed
-  /v1/deep-dives:
+  /api/v1/deep-dives:
     post:
       tags:
       - deep-dives
@@ -402,7 +360,7 @@ paths:
                 $ref: '#/components/schemas/DeepDiveResponse'
       security:
       - bearer: []
-  /v1/deep-dives/{id}:
+  /api/v1/deep-dives/{id}:
     get:
       tags:
       - deep-dives
@@ -423,7 +381,7 @@ paths:
                 $ref: '#/components/schemas/DeepDiveResponse'
       security:
       - bearer: []
-  /v1/learning/journeys:
+  /api/v1/learning/journeys:
     get:
       tags:
       - learning
@@ -442,7 +400,7 @@ paths:
           description: Missing or invalid token
       security:
       - bearer_auth: []
-  /v1/learning/journeys/{id}:
+  /api/v1/learning/journeys/{id}:
     get:
       tags:
       - learning
@@ -469,7 +427,7 @@ paths:
           description: Journey does not exist for this learner
       security:
       - bearer_auth: []
-  /v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
+  /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
     post:
       tags:
       - learning
@@ -507,7 +465,7 @@ paths:
           description: Activity is not ready
       security:
       - bearer_auth: []
-  /v1/learning/sessions/{id}:
+  /api/v1/learning/sessions/{id}:
     get:
       tags:
       - learning
@@ -534,7 +492,7 @@ paths:
           description: Session does not exist for this learner
       security:
       - bearer_auth: []
-  /v1/learning/sessions/{id}/finish:
+  /api/v1/learning/sessions/{id}/finish:
     post:
       tags:
       - learning
@@ -571,7 +529,7 @@ paths:
           description: Session is already finished
       security:
       - bearer_auth: []
-  /v1/me:
+  /api/v1/me:
     get:
       tags:
       - me
@@ -588,53 +546,7 @@ paths:
           description: Unauthorized
       security:
       - bearer: []
-  /v1/onboarding/preview:
-    post:
-      tags:
-      - onboarding
-      summary: POST /v1/onboarding/preview — explain the first journey without creating state.
-      operationId: preview_learning
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PreviewLearningBody'
-        required: true
-      responses:
-        '200':
-          description: Preview of the first learning journey
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PreviewLearningResponse'
-        '422':
-          description: Validation failed
-  /v1/onboarding/start:
-    post:
-      tags:
-      - onboarding
-      summary: POST /v1/onboarding/start — create or resume a learner's first journey.
-      operationId: start_learning
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StartLearningBody'
-        required: true
-      responses:
-        '201':
-          description: Learner and first journey created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StartLearningResponse'
-        '401':
-          description: Existing learner requires authentication
-        '409':
-          description: Email already belongs to a learner
-        '422':
-          description: Validation failed
-  /v1/progress/evidence:
+  /api/v1/progress/evidence:
     post:
       tags:
       - progress
@@ -654,7 +566,7 @@ paths:
                 $ref: '#/components/schemas/EvidenceResponse'
       security:
       - bearer: []
-  /v1/progress/streaks:
+  /api/v1/progress/streaks:
     post:
       tags:
       - progress
@@ -674,7 +586,7 @@ paths:
                 $ref: '#/components/schemas/StreakResponse'
       security:
       - bearer: []
-  /v1/progress/{journey_id}/objectives/{objective_id}:
+  /api/v1/progress/{journey_id}/objectives/{objective_id}:
     get:
       tags:
       - progress
@@ -701,7 +613,7 @@ paths:
                 $ref: '#/components/schemas/SnapshotResponse'
       security:
       - bearer: []
-  /v1/progress/{journey_id}/recommendation:
+  /api/v1/progress/{journey_id}/recommendation:
     post:
       tags:
       - progress
@@ -728,7 +640,7 @@ paths:
                 $ref: '#/components/schemas/RecommendationResponse'
       security:
       - bearer: []
-  /v1/questions:
+  /api/v1/questions:
     post:
       tags:
       - questions
@@ -748,7 +660,7 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
-  /v1/questions/{question_id}/versions:
+  /api/v1/questions/{question_id}/versions:
     post:
       tags:
       - questions
@@ -776,7 +688,7 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
-  /v1/questions/{question_id}/versions/{version}:
+  /api/v1/questions/{question_id}/versions/{version}:
     get:
       tags:
       - questions
@@ -806,6 +718,94 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
+  /public/v1/auth/login:
+    post:
+      tags:
+      - auth
+      summary: POST /public/v1/auth/login — authenticate with email and password.
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginBody'
+        required: true
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Unauthorized
+  /public/v1/auth/register:
+    post:
+      tags:
+      - auth
+      summary: POST /public/v1/auth/register — register a new user with email and password.
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterBody'
+        required: true
+      responses:
+        '201':
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '422':
+          description: Validation failed
+  /public/v1/onboarding/preview:
+    post:
+      tags:
+      - onboarding
+      summary: POST /public/v1/onboarding/preview — explain the first journey without creating state.
+      operationId: preview_learning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewLearningBody'
+        required: true
+      responses:
+        '200':
+          description: Preview of the first learning journey
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewLearningResponse'
+        '422':
+          description: Validation failed
+  /public/v1/onboarding/start:
+    post:
+      tags:
+      - onboarding
+      summary: POST /public/v1/onboarding/start — create or resume a learner's first journey.
+      operationId: start_learning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartLearningBody'
+        required: true
+      responses:
+        '201':
+          description: Learner and first journey created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartLearningResponse'
+        '401':
+          description: Existing learner requires authentication
+        '409':
+          description: Email already belongs to a learner
+        '422':
+          description: Validation failed
 components:
   schemas:
     ActivityKind:

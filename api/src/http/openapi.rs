@@ -1,10 +1,8 @@
 //! OpenAPI 3 specification for the current learner contract.
 
-use axum::{Router, routing::get};
 use utoipa::OpenApi;
 
 use crate::http::{
-    AppState,
     admin::{
         AdminHealthResponse, AuditLogEntry, ListAuditLogsResponse, ListUsersResponse,
         PatchUserAdminBody, UpdateSettingsBody,
@@ -131,12 +129,6 @@ pub fn openapi_yaml() -> String {
     ApiDoc::openapi()
         .to_yaml()
         .expect("OpenAPI spec serializes to YAML")
-}
-
-pub fn router(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/openapi.yaml", get(|| async { openapi_yaml() }))
-        .with_state(state)
 }
 
 #[cfg(test)]

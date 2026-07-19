@@ -43,6 +43,7 @@ export default function LoginPage() {
     (typeof window !== "undefined"
       ? `http://${window.location.hostname}:28080`
       : "http://localhost:28080");
+  const publicApiUrl = `${apiUrl.replace(/\/$/, "")}/public`;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -55,7 +56,7 @@ export default function LoginPage() {
         tab === "signup"
           ? { email, name: fullName, password, role: "user" }
           : { email, password };
-      const response = await fetch(`${apiUrl}${endpoint}`, {
+      const response = await fetch(`${publicApiUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -120,7 +121,7 @@ export default function LoginPage() {
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
             For agents &amp; integrations
           </p>
-          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-primary">{`POST /v1/onboarding/start
+          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-primary">{`POST /public/v1/onboarding/start
 {"email":"learner@example.com","displayName":"Learner","prompt":"I'd like to learn a new subject","idempotencyKey":"first-journey"}`}</pre>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Returns the learner bearer token and the first journey. No agent

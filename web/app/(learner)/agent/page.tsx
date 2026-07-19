@@ -3,7 +3,7 @@ import { HighlightedCode } from "@/components/HighlightedCode";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 
-const startExample = `POST /v1/onboarding/start
+const startExample = `POST /public/v1/onboarding/start
 Content-Type: application/json
 
 {
@@ -13,10 +13,10 @@ Content-Type: application/json
   "idempotencyKey": "first-music-journey"
 }`;
 
-const loopExample = `GET /v1/learning/journeys
-GET /v1/learning/journeys/{id}
-POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start
-POST /v1/learning/sessions/{id}/finish`;
+const loopExample = `GET /api/v1/learning/journeys
+GET /api/v1/learning/journeys/{id}
+POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
+POST /api/v1/learning/sessions/{id}/finish`;
 
 export default function AgentPage() {
   return (
@@ -27,12 +27,12 @@ export default function AgentPage() {
       action={
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <a href="/skill.json" target="_blank" rel="noreferrer">
+            <a href="/public/skill.json" target="_blank" rel="noreferrer">
               Skill manifest <ExternalLink />
             </a>
           </Button>
           <Button variant="outline" asChild>
-            <a href="/openapi.yaml" target="_blank" rel="noreferrer">
+            <a href="/public/openapi.yaml" target="_blank" rel="noreferrer">
               OpenAPI <ExternalLink />
             </a>
           </Button>
@@ -100,7 +100,7 @@ export default function AgentPage() {
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button asChild>
-            <a href="/llms.txt" target="_blank" rel="noreferrer">
+            <a href="/public/llms.txt" target="_blank" rel="noreferrer">
               Read the agent guide <ExternalLink />
             </a>
           </Button>

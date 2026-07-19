@@ -62,7 +62,7 @@ pub fn router(state: AppState) -> Router<AppState> {
         .with_state(state)
 }
 
-#[utoipa::path(post, path = "/v1/deep-dives", request_body = CreateDeepDiveBody, responses((status = 200, body = DeepDiveResponse)), security(("bearer" = [])), tag = "deep-dives")]
+#[utoipa::path(post, path = "/api/v1/deep-dives", request_body = CreateDeepDiveBody, responses((status = 200, body = DeepDiveResponse)), security(("bearer" = [])), tag = "deep-dives")]
 pub async fn create(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
@@ -89,7 +89,7 @@ pub async fn create(
     Ok(Json(response(value)))
 }
 
-#[utoipa::path(get, path = "/v1/deep-dives/{id}", params(("id" = Uuid, Path)), responses((status = 200, body = DeepDiveResponse)), security(("bearer" = [])), tag = "deep-dives")]
+#[utoipa::path(get, path = "/api/v1/deep-dives/{id}", params(("id" = Uuid, Path)), responses((status = 200, body = DeepDiveResponse)), security(("bearer" = [])), tag = "deep-dives")]
 pub async fn get_one(
     State(state): State<AppState>,
     auth: AuthenticatedUser,

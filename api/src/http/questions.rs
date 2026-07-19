@@ -71,7 +71,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 
 #[utoipa::path(
     post,
-    path = "/v1/questions",
+    path = "/api/v1/questions",
     request_body = CreateQuestionBody,
     responses((status = 200, description = "Created question version", body = QuestionResponse)),
     security(("bearer" = [])),
@@ -104,7 +104,7 @@ pub async fn create_question(
 
 #[utoipa::path(
     post,
-    path = "/v1/questions/{question_id}/versions",
+    path = "/api/v1/questions/{question_id}/versions",
     params(("question_id" = Uuid, Path, description = "Question ID")),
     request_body = CreateQuestionBody,
     responses((status = 200, description = "Created question version", body = QuestionResponse)),
@@ -143,7 +143,7 @@ pub async fn create_question_version(
 
 #[utoipa::path(
     get,
-    path = "/v1/questions/{question_id}/versions/{version}",
+    path = "/api/v1/questions/{question_id}/versions/{version}",
     params(
         ("question_id" = Uuid, Path, description = "Question ID"),
         ("version" = u32, Path, description = "Question version")

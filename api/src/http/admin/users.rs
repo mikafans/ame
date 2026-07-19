@@ -10,13 +10,11 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::scope::RequireScope,
+    auth::admin::RequireAdmin,
     domain::error::{ApiError, FieldError},
     domain::user::User,
     http::AppState,
 };
-
-use super::AdminScope;
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -44,7 +42,7 @@ pub struct PatchUserAdminBody {
 /// GET /v1/admin/users — list all users
 #[utoipa::path(
     get,
-    path = "/v1/admin/users",
+    path = "/api/v1/admin/users",
     params(ListUsersQuery),
     responses(
         (status = 200, description = "User list successfully retrieved", body = ListUsersResponse),
@@ -56,7 +54,7 @@ pub struct PatchUserAdminBody {
 )]
 pub async fn list_users(
     State(state): State<AppState>,
-    _admin: RequireScope<AdminScope>,
+    _admin: RequireAdmin,
     Query(query): Query<ListUsersQuery>,
 ) -> Result<Json<ListUsersResponse>, ApiError> {
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
@@ -106,7 +104,6 @@ pub async fn list_users(
             let role_str: String = r.get("role");
             let role = match role_str.as_str() {
                 "admin" => crate::domain::user::Role::Admin,
-                "agent" => crate::domain::user::Role::Agent,
                 _ => crate::domain::user::Role::User,
             };
             User {
@@ -129,7 +126,7 @@ pub async fn list_users(
 /// PATCH /v1/admin/users/{id} — update learner/admin role or account status
 #[utoipa::path(
     patch,
-    path = "/v1/admin/users/{id}",
+    path = "/api/v1/admin/users/{id}",
     params(("id" = Uuid, Path, description = "User ID")),
     request_body = PatchUserAdminBody,
     responses(
@@ -143,7 +140,7 @@ pub async fn list_users(
 )]
 pub async fn patch_user_admin(
     State(state): State<AppState>,
-    admin: RequireScope<AdminScope>,
+    admin: RequireAdmin,
     Path(user_id): Path<Uuid>,
     Json(body): Json<PatchUserAdminBody>,
 ) -> Result<impl IntoResponse, ApiError> {

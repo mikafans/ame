@@ -7,9 +7,7 @@ use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{auth::scope::RequireScope, domain::error::ApiError, http::AppState};
-
-use super::AdminScope;
+use crate::{auth::admin::RequireAdmin, domain::error::ApiError, http::AppState};
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -50,7 +48,7 @@ pub struct ListAuditLogsQuery {
 /// GET /v1/admin/audit — retrieve append-only audit trail logs
 #[utoipa::path(
     get,
-    path = "/v1/admin/audit",
+    path = "/api/v1/admin/audit",
     params(ListAuditLogsQuery),
     responses(
         (status = 200, description = "Audit trail successfully retrieved", body = ListAuditLogsResponse),
@@ -62,7 +60,7 @@ pub struct ListAuditLogsQuery {
 )]
 pub async fn list_audit_logs(
     State(state): State<AppState>,
-    _admin: RequireScope<AdminScope>,
+    _admin: RequireAdmin,
     Query(query): Query<ListAuditLogsQuery>,
 ) -> Result<Json<ListAuditLogsResponse>, ApiError> {
     let limit = query.limit.unwrap_or(50).clamp(1, 200);

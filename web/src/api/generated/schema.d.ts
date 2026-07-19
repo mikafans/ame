@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/v1/admin/audit": {
+    "/api/v1/admin/audit": {
         parameters: {
             query?: never;
             header?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/health": {
+    "/api/v1/admin/health": {
         parameters: {
             query?: never;
             header?: never;
@@ -37,7 +37,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/settings": {
+    "/api/v1/admin/settings": {
         parameters: {
             query?: never;
             header?: never;
@@ -62,7 +62,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/users": {
+    "/api/v1/admin/users": {
         parameters: {
             query?: never;
             header?: never;
@@ -79,7 +79,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/users/{id}": {
+    "/api/v1/admin/users/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -96,7 +96,7 @@ export interface paths {
         patch: operations["patch_user_admin"];
         trace?: never;
     };
-    "/v1/assessments": {
+    "/api/v1/assessments": {
         parameters: {
             query?: never;
             header?: never;
@@ -112,7 +112,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/assessments/{assessment_id}": {
+    "/api/v1/assessments/{assessment_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -128,7 +128,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/assessments/{assessment_id}/attempts": {
+    "/api/v1/assessments/{assessment_id}/attempts": {
         parameters: {
             query?: never;
             header?: never;
@@ -144,7 +144,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/attempts/{attempt_id}": {
+    "/api/v1/attempts/{attempt_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -160,7 +160,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/attempts/{attempt_id}/answers": {
+    "/api/v1/attempts/{attempt_id}/answers": {
         parameters: {
             query?: never;
             header?: never;
@@ -176,7 +176,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/attempts/{attempt_id}/finish": {
+    "/api/v1/attempts/{attempt_id}/finish": {
         parameters: {
             query?: never;
             header?: never;
@@ -192,7 +192,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/login": {
+    "/api/v1/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -201,24 +201,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST /v1/auth/login — authenticate with email and password. */
-        post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/auth/logout — clear the HttpOnly token cookie. */
+        /** POST /api/v1/auth/logout — clear the HttpOnly token cookie. */
         post: operations["logout"];
         delete?: never;
         options?: never;
@@ -226,24 +209,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/register": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/auth/register — register a new user with email and password. */
-        post: operations["register"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/deep-dives": {
+    "/api/v1/deep-dives": {
         parameters: {
             query?: never;
             header?: never;
@@ -259,7 +225,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/deep-dives/{id}": {
+    "/api/v1/deep-dives/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -275,7 +241,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/learning/journeys": {
+    "/api/v1/learning/journeys": {
         parameters: {
             query?: never;
             header?: never;
@@ -292,7 +258,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/learning/journeys/{id}": {
+    "/api/v1/learning/journeys/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -309,7 +275,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start": {
+    "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -326,7 +292,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/learning/sessions/{id}": {
+    "/api/v1/learning/sessions/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -343,7 +309,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/learning/sessions/{id}/finish": {
+    "/api/v1/learning/sessions/{id}/finish": {
         parameters: {
             query?: never;
             header?: never;
@@ -360,7 +326,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me": {
+    "/api/v1/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -377,41 +343,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/onboarding/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/onboarding/preview — explain the first journey without creating state. */
-        post: operations["preview_learning"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/onboarding/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/onboarding/start — create or resume a learner's first journey. */
-        post: operations["start_learning"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/progress/evidence": {
+    "/api/v1/progress/evidence": {
         parameters: {
             query?: never;
             header?: never;
@@ -427,7 +359,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/progress/streaks": {
+    "/api/v1/progress/streaks": {
         parameters: {
             query?: never;
             header?: never;
@@ -443,7 +375,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/progress/{journey_id}/objectives/{objective_id}": {
+    "/api/v1/progress/{journey_id}/objectives/{objective_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -459,7 +391,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/progress/{journey_id}/recommendation": {
+    "/api/v1/progress/{journey_id}/recommendation": {
         parameters: {
             query?: never;
             header?: never;
@@ -475,7 +407,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/questions": {
+    "/api/v1/questions": {
         parameters: {
             query?: never;
             header?: never;
@@ -491,7 +423,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/questions/{question_id}/versions": {
+    "/api/v1/questions/{question_id}/versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -507,7 +439,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/questions/{question_id}/versions/{version}": {
+    "/api/v1/questions/{question_id}/versions/{version}": {
         parameters: {
             query?: never;
             header?: never;
@@ -517,6 +449,74 @@ export interface paths {
         get: operations["get_question_version"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /public/v1/auth/login — authenticate with email and password. */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /public/v1/auth/register — register a new user with email and password. */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/v1/onboarding/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /public/v1/onboarding/preview — explain the first journey without creating state. */
+        post: operations["preview_learning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/v1/onboarding/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /public/v1/onboarding/start — create or resume a learner's first journey. */
+        post: operations["start_learning"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1444,37 +1444,6 @@ export interface operations {
             };
         };
     };
-    login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginBody"];
-            };
-        };
-        responses: {
-            /** @description Logged in */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     logout: {
         parameters: {
             query?: never;
@@ -1486,37 +1455,6 @@ export interface operations {
         responses: {
             /** @description Logged out */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    register: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterBody"];
-            };
-        };
-        responses: {
-            /** @description User registered */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthResponse"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1804,82 +1742,6 @@ export interface operations {
             };
         };
     };
-    preview_learning: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PreviewLearningBody"];
-            };
-        };
-        responses: {
-            /** @description Preview of the first learning journey */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PreviewLearningResponse"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    start_learning: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartLearningBody"];
-            };
-        };
-        responses: {
-            /** @description Learner and first journey created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StartLearningResponse"];
-                };
-            };
-            /** @description Existing learner requires authentication */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Email already belongs to a learner */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     record_evidence: {
         parameters: {
             query?: never;
@@ -2046,6 +1908,144 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuestionResponse"];
                 };
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginBody"];
+            };
+        };
+        responses: {
+            /** @description Logged in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterBody"];
+            };
+        };
+        responses: {
+            /** @description User registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_learning: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewLearningBody"];
+            };
+        };
+        responses: {
+            /** @description Preview of the first learning journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewLearningResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    start_learning: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartLearningBody"];
+            };
+        };
+        responses: {
+            /** @description Learner and first journey created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartLearningResponse"];
+                };
+            };
+            /** @description Existing learner requires authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Email already belongs to a learner */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

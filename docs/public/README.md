@@ -6,8 +6,8 @@ users and external clients.
 - [`self-hosting.md`](self-hosting.md) — single-host Docker or Podman deployment.
 - [`deploy.md`](deploy.md) — supported deployment artifacts and production checklist.
 - [`k3s.md`](k3s.md) — k3s image build and release workflow.
-- [`llms.txt`](llms.txt) — agent discovery and API usage contract, served at `/llms.txt`.
-- [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/skill.json`.
+- [`llms.txt`](llms.txt) — agent discovery and API usage contract, served at `/public/llms.txt`.
+- [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/public/skill.json`.
 
 Build and runtime projections must consume these files; do not create parallel
 copies under `api/`, `deploy/`, or `web/`. The public origin serves the three

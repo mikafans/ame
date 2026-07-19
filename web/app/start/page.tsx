@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { api } from "@/api/client";
+import { publicApi } from "@/api/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,19 +11,44 @@ import { useAuth } from "@/hooks/useAuth";
 function StartLearningForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refresh } = useAuth();
-  const [prompt, setPrompt] = useState(searchParams.get("prompt") ?? "");
+  const { refresh, user } = useAuth();
+  const routePrompt = searchParams.get("prompt") ?? "";
+  const [prompt, setPrompt] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (routePrompt) {
+      setPrompt(routePrompt);
+    }
+  }, [routePrompt]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const { data, response } = await api.POST("/v1/onboarding/start", {
+      let onboardingToken: string | undefined;
+      if (!user) {
+        const registration = await publicApi.POST("/v1/auth/register", {
+          body: { email, name: displayName, password },
+        });
+        if (!registration.response.ok || !registration.data) {
+          throw new Error(
+            registration.response.status === 422
+              ? "This email is already registered, or the password is invalid"
+              : "Could not create your learner account",
+          );
+        }
+        onboardingToken = registration.data.token;
+      }
+      const { data, response } = await publicApi.POST("/v1/onboarding/start", {
+        headers: onboardingToken
+          ? { Authorization: `Bearer ${onboardingToken}` }
+          : undefined,
         body: {
           displayName,
           email,
@@ -110,6 +135,28 @@ function StartLearningForm() {
             />
           </div>
         </div>
+        {!user && (
+          <div>
+            <label
+              htmlFor="start-password"
+              className="mb-2 block text-sm font-medium"
+            >
+              Password
+            </label>
+            <input
+              id="start-password"
+              required
+              minLength={8}
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Stored locally for signing in again. AME does not send email.
+            </p>
+          </div>
+        )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}

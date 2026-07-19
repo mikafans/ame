@@ -109,7 +109,7 @@ pub fn router(state: AppState) -> Router<AppState> {
         .with_state(state)
 }
 
-#[utoipa::path(post, path = "/v1/progress/evidence", request_body = EvidenceBody, responses((status = 200, body = EvidenceResponse)), security(("bearer" = [])), tag = "progress")]
+#[utoipa::path(post, path = "/api/v1/progress/evidence", request_body = EvidenceBody, responses((status = 200, body = EvidenceResponse)), security(("bearer" = [])), tag = "progress")]
 pub async fn record_evidence(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
@@ -138,7 +138,7 @@ pub async fn record_evidence(
     }))
 }
 
-#[utoipa::path(get, path = "/v1/progress/{journey_id}/objectives/{objective_id}", params(("journey_id" = Uuid, Path), ("objective_id" = Uuid, Path)), responses((status = 200, body = SnapshotResponse)), security(("bearer" = [])), tag = "progress")]
+#[utoipa::path(get, path = "/api/v1/progress/{journey_id}/objectives/{objective_id}", params(("journey_id" = Uuid, Path), ("objective_id" = Uuid, Path)), responses((status = 200, body = SnapshotResponse)), security(("bearer" = [])), tag = "progress")]
 pub async fn snapshot(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
@@ -161,7 +161,7 @@ pub async fn snapshot(
     }))
 }
 
-#[utoipa::path(post, path = "/v1/progress/{journey_id}/recommendation", params(("journey_id" = Uuid, Path)), request_body = RecommendationBody, responses((status = 200, body = RecommendationResponse)), security(("bearer" = [])), tag = "progress")]
+#[utoipa::path(post, path = "/api/v1/progress/{journey_id}/recommendation", params(("journey_id" = Uuid, Path)), request_body = RecommendationBody, responses((status = 200, body = RecommendationResponse)), security(("bearer" = [])), tag = "progress")]
 pub async fn recommend(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
@@ -186,7 +186,7 @@ pub async fn recommend(
     }))
 }
 
-#[utoipa::path(post, path = "/v1/progress/streaks", request_body = StreakBody, responses((status = 200, body = StreakResponse)), security(("bearer" = [])), tag = "progress")]
+#[utoipa::path(post, path = "/api/v1/progress/streaks", request_body = StreakBody, responses((status = 200, body = StreakResponse)), security(("bearer" = [])), tag = "progress")]
 pub async fn record_streak(
     State(state): State<AppState>,
     auth: AuthenticatedUser,

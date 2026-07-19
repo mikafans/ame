@@ -77,6 +77,7 @@ services:
       - "28800:80"
     volumes:
       - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./docs:/srv/docs:ro
     depends_on:
       api:
         condition: service_healthy

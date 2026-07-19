@@ -1,11 +1,11 @@
 {
   "auth": {
     "format": "ame_token",
-    "registration": "POST /v1/onboarding/start returns a learner bearer token; no separate integration identity is required.",
+    "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required.",
     "type": "bearer"
   },
   "description": "ame — study, sweetened. An agent-friendly learning API with one owner-scoped learner model.",
-  "entrypoint": "/llms.txt",
+  "entrypoint": "/public/llms.txt",
   "name": "ame",
   "principles": [
     "Agents and people use the same authenticated learner API.",
@@ -30,7 +30,7 @@
       },
       "method": "POST",
       "name": "learning.preview",
-      "path": "/v1/onboarding/preview"
+      "path": "/public/v1/onboarding/preview"
     },
     {
       "description": "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
@@ -60,7 +60,7 @@
       },
       "method": "POST",
       "name": "learning.start",
-      "path": "/v1/onboarding/start"
+      "path": "/public/v1/onboarding/start"
     },
     {
       "description": "List the authenticated learner's journeys and the next activity for each.",
@@ -70,7 +70,7 @@
       },
       "method": "GET",
       "name": "learning.journey.list",
-      "path": "/v1/learning/journeys"
+      "path": "/api/v1/learning/journeys"
     },
     {
       "description": "Read one authenticated learner's intent, objectives, activities, and evidence.",
@@ -88,7 +88,7 @@
       },
       "method": "GET",
       "name": "learning.journey.get",
-      "path": "/v1/learning/journeys/{id}"
+      "path": "/api/v1/learning/journeys/{id}"
     },
     {
       "description": "Start an activity in an owned journey.",
@@ -111,7 +111,7 @@
       },
       "method": "POST",
       "name": "learning.activity.start",
-      "path": "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"
+      "path": "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"
     },
     {
       "description": "Finish a learning session and persist the learner's evidence and responses.",
@@ -137,7 +137,7 @@
       },
       "method": "POST",
       "name": "learning.session.finish",
-      "path": "/v1/learning/sessions/{id}/finish"
+      "path": "/api/v1/learning/sessions/{id}/finish"
     },
     {
       "description": "Create a learner-owned versioned question with explanation and provenance metadata.",
@@ -194,7 +194,7 @@
       },
       "method": "POST",
       "name": "learning.question.create",
-      "path": "/v1/questions"
+      "path": "/api/v1/questions"
     },
     {
       "description": "Read one exact learner-owned question version for reproducible assessment history.",
@@ -217,7 +217,7 @@
       },
       "method": "GET",
       "name": "learning.question.get",
-      "path": "/v1/questions/{question_id}/versions/{version}"
+      "path": "/api/v1/questions/{question_id}/versions/{version}"
     },
     {
       "description": "Create the next immutable version of a learner-owned question.",
@@ -243,7 +243,7 @@
       },
       "method": "POST",
       "name": "learning.question.revise",
-      "path": "/v1/questions/{question_id}/versions"
+      "path": "/api/v1/questions/{question_id}/versions"
     },
     {
       "description": "Compose approved question versions into a learner-owned practice or graded assessment.",
@@ -276,7 +276,7 @@
       },
       "method": "POST",
       "name": "learning.assessment.create",
-      "path": "/v1/assessments"
+      "path": "/api/v1/assessments"
     },
     {
       "description": "Read one learner-owned assessment and its exact question-version membership.",
@@ -294,7 +294,7 @@
       },
       "method": "GET",
       "name": "learning.assessment.get",
-      "path": "/v1/assessments/{assessment_id}"
+      "path": "/api/v1/assessments/{assessment_id}"
     },
     {
       "description": "Start or resume an attempt against one immutable assessment version.",
@@ -317,7 +317,7 @@
       },
       "method": "POST",
       "name": "learning.attempt.start",
-      "path": "/v1/assessments/{assessment_id}/attempts"
+      "path": "/api/v1/assessments/{assessment_id}/attempts"
     },
     {
       "description": "Save one answer while preserving assessment item and question version identity.",
@@ -349,7 +349,7 @@
       },
       "method": "POST",
       "name": "learning.attempt.answer",
-      "path": "/v1/attempts/{attempt_id}/answers"
+      "path": "/api/v1/attempts/{attempt_id}/answers"
     },
     {
       "description": "Finish an attempt, grade deterministic items, and return manual-review state when needed.",
@@ -367,7 +367,7 @@
       },
       "method": "POST",
       "name": "learning.attempt.finish",
-      "path": "/v1/attempts/{attempt_id}/finish"
+      "path": "/api/v1/attempts/{attempt_id}/finish"
     },
     {
       "description": "Read an owned attempt and its saved responses/result.",
@@ -385,7 +385,7 @@
       },
       "method": "GET",
       "name": "learning.attempt.get",
-      "path": "/v1/attempts/{attempt_id}"
+      "path": "/api/v1/attempts/{attempt_id}"
     },
     {
       "description": "Record rebuildable mastery evidence linked to a learner activity or attempt.",
@@ -428,7 +428,7 @@
       },
       "method": "POST",
       "name": "learning.progress.evidence",
-      "path": "/v1/progress/evidence"
+      "path": "/api/v1/progress/evidence"
     },
     {
       "description": "Read evidence-derived mastery and confidence for one objective.",
@@ -451,7 +451,7 @@
       },
       "method": "GET",
       "name": "learning.progress.snapshot",
-      "path": "/v1/progress/{journey_id}/objectives/{objective_id}"
+      "path": "/api/v1/progress/{journey_id}/objectives/{objective_id}"
     },
     {
       "description": "Select the weakest objective from an explicit journey objective set.",
@@ -473,7 +473,7 @@
       },
       "method": "POST",
       "name": "learning.progress.recommend",
-      "path": "/v1/progress/{journey_id}/recommendation"
+      "path": "/api/v1/progress/{journey_id}/recommendation"
     },
     {
       "description": "Create a source-backed explanatory deep dive linked to evidence.",
@@ -526,7 +526,7 @@
       },
       "method": "POST",
       "name": "learning.deep_dive.create",
-      "path": "/v1/deep-dives"
+      "path": "/api/v1/deep-dives"
     },
     {
       "description": "Read one source-backed deep dive owned by the learner.",
@@ -544,7 +544,7 @@
       },
       "method": "GET",
       "name": "learning.deep_dive.get",
-      "path": "/v1/deep-dives/{id}"
+      "path": "/api/v1/deep-dives/{id}"
     }
   ]
 }

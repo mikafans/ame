@@ -1,40 +1,8 @@
 # Self-hosting AME
 
 This is the operator guide for running AME on one host with Docker or Podman
-Compose. It is separate from the agent guide:
-`llms.txt` describes the public HTTP agent interface for AI clients; it is not a
-deployment manifest or an installation guide.
-
-## Recommended local stack
-
-Use the repository's complete local stack first. It includes the same topology
-used by the browser-facing deployment: Caddy, Next.js, the Rust API, Postgres,
-and Valkey.
-
-```bash
-make local-up
-make local-uiux
-```
-
-Open `http://localhost:28800`. The stack provides:
-
-```text
-localhost:28800 -> ame-caddy -> ame-web:3000
-                           \-> ame-api:8080 -> ame-postgres:5432
-                                           \-> ame-valkey:6379
-```
-
-The local Caddy container owns the public origin and routes `/v1/*`, health
-checks, and public documents consistently. Do not add a system-level Caddy to
-test this stack. Stop it with:
-
-```bash
-make local-down
-```
-
-If you need a completely fresh clean-slate database during the rework, remove
-the local `ame-local-postgres` volume deliberately; normal restarts preserve
-data.
+Compose. The same learner API serves the web app and agents; `llms.txt` is the
+machine-facing entry guide for that shared contract.
 
 ## Production architecture
 
@@ -44,11 +12,11 @@ Internet -> Caddy/nginx -> web:3000
                                      \-> valkey:6379
 ```
 
-Use one public origin for the browser and API. Caddy sends `/v1/*`, `/healthz`,
-and `/readyz` to the API; all other paths go to Next.js. The canonical public
-documents (`/llms.txt`, `/skill.json`, and `/openapi.yaml`) are served by the
-frontend from `docs/public`. The API also exposes compatibility routes for
-clients connecting directly to its port.
+Use one public origin for the browser and API. Caddy serves the canonical
+documents `/public/llms.txt`, `/public/skill.json`, and `/public/openapi.yaml`
+directly from `docs/public`; it proxies `/api/*` and `/public/v1/*` to the API,
+and keeps `/healthz`, `/readyz`, and `/metrics` as root operational endpoints.
+All other paths go to Next.js.
 
 ## Requirements
 
@@ -137,20 +105,21 @@ Do not use repository demo passwords on an internet-facing instance.
 After the public origin is live, AI clients can discover AME at:
 
 ```text
-https://ame.example.com/llms.txt
-https://ame.example.com/skill.json
-https://ame.example.com/openapi.yaml
+https://ame.example.com/public/llms.txt
+https://ame.example.com/public/skill.json
+https://ame.example.com/public/openapi.yaml
 ```
 
 `llms.txt` is an agent discovery contract, not a self-hosting mechanism. These
-routes advertise the agent surface but do not grant access. An owner must create
-an agent key through the authenticated application flow; keys are bearer
-credentials and must be stored as secrets.
+routes advertise the shared learner API. An agent can start onboarding with an
+email identifier and receive the learner bearer token; no separate integration
+identity is needed.
 
 ## Upgrade and backup checklist
 
 1. Back up Postgres with `make db-backup BACKUP_FILE=...`.
-2. Pull the new revision and review migration changes.
+2. Pull the new revision and verify the release's clean baseline before using it
+   with a new empty database.
 3. Rebuild with `docker compose -f docker-compose.prod.yml up --build -d`.
 4. Check `/readyz`, logs, and the public discovery routes.
 5. Keep the previous image available until smoke checks pass.

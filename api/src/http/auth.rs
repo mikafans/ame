@@ -72,10 +72,10 @@ fn registration_error(error: sqlx::Error) -> ApiError {
     }
 }
 
-/// POST /v1/auth/register — register a new user with email and password.
+/// POST /public/v1/auth/register — register a new user with email and password.
 #[utoipa::path(
     post,
-    path = "/v1/auth/register",
+    path = "/public/v1/auth/register",
     request_body = RegisterBody,
     responses(
         (status = 201, description = "User registered", body = AuthResponse),
@@ -175,10 +175,10 @@ pub async fn register(
     ))
 }
 
-/// POST /v1/auth/login — authenticate with email and password.
+/// POST /public/v1/auth/login — authenticate with email and password.
 #[utoipa::path(
     post,
-    path = "/v1/auth/login",
+    path = "/public/v1/auth/login",
     request_body = LoginBody,
     responses(
         (status = 200, description = "Logged in", body = AuthResponse),
@@ -327,10 +327,10 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
         .is_ok()
 }
 
-/// POST /v1/auth/logout — clear the HttpOnly token cookie.
+/// POST /api/v1/auth/logout — clear the HttpOnly token cookie.
 #[utoipa::path(
     post,
-    path = "/v1/auth/logout",
+    path = "/api/v1/auth/logout",
     responses(
         (status = 200, description = "Logged out")
     ),
@@ -358,22 +358,12 @@ pub async fn logout(
                 })
                 .and_then(|v| crate::auth::token::parse_token_value(&v))
         })
+        && parsed.kind == crate::auth::token::TokenKind::Login
     {
-        match parsed.kind {
-            crate::auth::token::TokenKind::Login => {
-                let _ =
-                    sqlx::query("UPDATE tb_login_sessions SET revoked_at = NOW() WHERE id = $1")
-                        .bind(parsed.id)
-                        .execute(&state.pool)
-                        .await;
-            }
-            crate::auth::token::TokenKind::Agent => {
-                let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
-                    .bind(parsed.id)
-                    .execute(&state.pool)
-                    .await;
-            }
-        }
+        let _ = sqlx::query("UPDATE tb_login_sessions SET revoked_at = NOW() WHERE id = $1")
+            .bind(parsed.id)
+            .execute(&state.pool)
+            .await;
     }
 
     (

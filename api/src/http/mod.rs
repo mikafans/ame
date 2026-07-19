@@ -60,10 +60,8 @@ pub async fn maintenance_mode_middleware(
 
     if settings.maintenance_mode {
         let path = req.uri().path();
-        let exempt = matches!(
-            path,
-            "/v1/auth/login" | "/llms.txt" | "/skill.json" | "/openapi.yaml" | "/metrics"
-        );
+        let exempt =
+            matches!(path, "/healthz" | "/readyz" | "/metrics") || path.starts_with("/public/");
         let is_admin = req
             .extensions()
             .get::<AuthenticatedUser>()
@@ -156,18 +154,30 @@ pub fn router(pool: PgPool) -> Router {
             idempotency::idempotency_middleware,
         ));
 
+    let public_routes = Router::new()
+        .merge(onboarding::router(state.clone()))
+        .route("/v1/auth/register", post(auth::register))
+        .route("/v1/auth/login", post(auth::login))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::ratelimit::rate_limit_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            maintenance_mode_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_extract_middleware,
+        ));
+
     let api_routes = Router::new()
         .merge(admin::router(state.clone()))
-        .merge(openapi::router(state.clone()))
-        .merge(onboarding::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(assessments::router(state.clone()))
         .merge(attempts::router(state.clone()))
         .merge(progress::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
-        .merge(agents::public_router(state.clone()))
-        .route("/v1/auth/register", post(auth::register))
-        .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/logout", post(auth::logout))
         .merge(logged_router)
         .layer(middleware::from_fn_with_state(
@@ -184,7 +194,8 @@ pub fn router(pool: PgPool) -> Router {
         ));
 
     Router::new()
-        .merge(api_routes)
+        .nest("/api", api_routes)
+        .nest("/public", public_routes)
         .route("/healthz", get(health::healthz))
         .route("/readyz", get(health::readyz))
         .layer(PropagateRequestIdLayer::new(

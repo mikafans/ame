@@ -66,7 +66,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 
 #[utoipa::path(
     post,
-    path = "/v1/assessments/{assessment_id}/attempts",
+    path = "/api/v1/assessments/{assessment_id}/attempts",
     params(("assessment_id" = Uuid, Path, description = "Assessment ID")),
     request_body = StartAttemptBody,
     responses((status = 200, description = "Started or resumed attempt", body = AttemptResponse)),
@@ -101,7 +101,7 @@ pub async fn start_attempt(
 
 #[utoipa::path(
     get,
-    path = "/v1/attempts/{attempt_id}",
+    path = "/api/v1/attempts/{attempt_id}",
     params(("attempt_id" = Uuid, Path, description = "Attempt ID")),
     responses((status = 200, description = "Attempt", body = AttemptResponse)),
     security(("bearer" = [])),
@@ -121,7 +121,7 @@ pub async fn get_attempt(
 
 #[utoipa::path(
     post,
-    path = "/v1/attempts/{attempt_id}/answers",
+    path = "/api/v1/attempts/{attempt_id}/answers",
     params(("attempt_id" = Uuid, Path, description = "Attempt ID")),
     request_body = SaveAnswerBody,
     responses((status = 200, description = "Saved answer", body = AttemptResponse)),
@@ -149,7 +149,7 @@ pub async fn save_answer(
 
 #[utoipa::path(
     post,
-    path = "/v1/attempts/{attempt_id}/finish",
+    path = "/api/v1/attempts/{attempt_id}/finish",
     params(("attempt_id" = Uuid, Path, description = "Attempt ID")),
     responses((status = 200, description = "Finished attempt", body = AttemptResponse)),
     security(("bearer" = [])),

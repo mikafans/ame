@@ -2,9 +2,7 @@ use axum::{Json, extract::State, response::IntoResponse};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::{auth::scope::RequireScope, domain::error::ApiError, http::AppState};
-
-use super::AdminScope;
+use crate::{auth::admin::RequireAdmin, domain::error::ApiError, http::AppState};
 
 /// Partial update for platform settings — any omitted field is left unchanged.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -12,14 +10,13 @@ use super::AdminScope;
 pub struct UpdateSettingsBody {
     pub maintenance_mode: Option<bool>,
     pub ratelimit: Option<crate::settings::RateLimitSettings>,
-    pub quota: Option<crate::settings::QuotaSettings>,
 }
 
 /// GET /v1/admin/settings — current effective platform settings (config
 /// defaults overlaid with any tb_settings overrides).
 #[utoipa::path(
     get,
-    path = "/v1/admin/settings",
+    path = "/api/v1/admin/settings",
     responses(
         (status = 200, description = "Effective platform settings", body = crate::settings::EffectiveSettings),
         (status = 401, description = "Unauthorized"),
@@ -30,7 +27,7 @@ pub struct UpdateSettingsBody {
 )]
 pub async fn get_settings(
     State(state): State<AppState>,
-    _admin: RequireScope<AdminScope>,
+    _admin: RequireAdmin,
 ) -> Result<impl IntoResponse, ApiError> {
     let settings = crate::settings::get_effective(&state.pool, &state.valkey, &state.config).await;
     Ok(Json(settings))
@@ -41,7 +38,7 @@ pub async fn get_settings(
 /// row is emitted. Returns the new effective settings.
 #[utoipa::path(
     put,
-    path = "/v1/admin/settings",
+    path = "/api/v1/admin/settings",
     request_body = UpdateSettingsBody,
     responses(
         (status = 200, description = "Updated effective platform settings", body = crate::settings::EffectiveSettings),
@@ -53,7 +50,7 @@ pub async fn get_settings(
 )]
 pub async fn put_settings(
     State(state): State<AppState>,
-    admin: RequireScope<AdminScope>,
+    admin: RequireAdmin,
     Json(body): Json<UpdateSettingsBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     let actor = admin.0.user.id;
@@ -66,12 +63,6 @@ pub async fn put_settings(
         changed.push((
             "ratelimit",
             serde_json::to_value(rl).map_err(|e| ApiError::Internal(e.into()))?,
-        ));
-    }
-    if let Some(q) = body.quota {
-        changed.push((
-            "quota",
-            serde_json::to_value(q).map_err(|e| ApiError::Internal(e.into()))?,
         ));
     }
 

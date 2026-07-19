@@ -70,7 +70,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 
 #[utoipa::path(
     post,
-    path = "/v1/assessments",
+    path = "/api/v1/assessments",
     request_body = CreateAssessmentBody,
     responses((status = 200, description = "Created assessment", body = AssessmentResponse)),
     security(("bearer" = [])),
@@ -116,7 +116,7 @@ pub async fn create_assessment(
 
 #[utoipa::path(
     get,
-    path = "/v1/assessments/{assessment_id}",
+    path = "/api/v1/assessments/{assessment_id}",
     params(("assessment_id" = Uuid, Path, description = "Assessment ID")),
     responses((status = 200, description = "Assessment", body = AssessmentResponse)),
     security(("bearer" = [])),

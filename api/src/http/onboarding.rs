@@ -84,10 +84,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         .with_state(state)
 }
 
-/// POST /v1/onboarding/preview — explain the first journey without creating state.
+/// POST /public/v1/onboarding/preview — explain the first journey without creating state.
 #[utoipa::path(
     post,
-    path = "/v1/onboarding/preview",
+    path = "/public/v1/onboarding/preview",
     request_body = PreviewLearningBody,
     responses(
         (status = 200, description = "Preview of the first learning journey", body = PreviewLearningResponse),
@@ -109,10 +109,10 @@ pub async fn preview_learning(
     Ok(Json(preview_response(preview)))
 }
 
-/// POST /v1/onboarding/start — create or resume a learner's first journey.
+/// POST /public/v1/onboarding/start — create or resume a learner's first journey.
 #[utoipa::path(
     post,
-    path = "/v1/onboarding/start",
+    path = "/public/v1/onboarding/start",
     request_body = StartLearningBody,
     responses(
         (status = 201, description = "Learner and first journey created", body = StartLearningResponse),

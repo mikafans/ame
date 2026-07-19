@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/api/client";
+import { publicApi } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
 
 type LearningPreview = components["schemas"]["PreviewLearningResponse"];
@@ -167,7 +167,7 @@ export default function LandingPage() {
     setPreviewError(null);
     setPreviewLoading(true);
     try {
-      const { data, error, response } = await api.POST(
+      const { data, error, response } = await publicApi.POST(
         "/v1/onboarding/preview",
         { body: { prompt } },
       );
@@ -353,7 +353,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {["/llms.txt", "/skill.json", "/openapi.yaml"].map((href) => (
+              {["/public/llms.txt", "/public/skill.json", "/public/openapi.yaml"].map((href) => (
                 <Button
                   key={href}
                   asChild
@@ -409,7 +409,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
           <span>© 2026 AME</span>
           <div className="flex gap-5">
-            <Link href="/llms.txt" className="transition hover:text-primary">
+            <Link href="/public/llms.txt" className="transition hover:text-primary">
               Docs
             </Link>
             <a

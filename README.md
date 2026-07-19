@@ -1,6 +1,6 @@
 # ame — study, sweetened
 
-Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
+Agent-friendly learning platform with one owner-scoped journey API. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
 
 **Stack**: Rust 2024 · Axum 0.8 · sqlx · Next.js 16 · React 19 · Bun · TypeScript · Tailwind CSS · Postgres 18
 
@@ -11,17 +11,17 @@ Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.
 ```bash
 make init-env       # mise install + sqlx-cli + web deps + Playwright
 make db-up          # start Postgres in Docker or Podman
-make db-migrate     # apply pending migrations
 make dev            # API on :28080, frontend on :23000
-make db-seed        # seed demo users, assessments, questions (requires API running)
+make db-seed        # seed the current learner journey fixture (requires API running)
 ```
 
-Demo credentials after seeding: `ada@example.com / password123` (primary user), `mira@example.com / password123` (second user), `admin@example.com / password123` (admin).
+Demo credentials after seeding: `haru@example.com / password123` (learner),
+`admin@example.com / password123` (admin).
 
 ### Admin users
 
 Registration only ever grants the `user` role — there is no API path to self-register
-as an admin (`POST /v1/auth/register` rejects `role: admin`). Admins are granted
+as an admin (`POST /public/v1/auth/register` rejects `role: admin`). Admins are granted
 **directly in the database**:
 
 ```bash
@@ -29,10 +29,9 @@ make db-admin                                  # create/grant admin@example.com 
 make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
 ```
 
-`db-seed` depends on `db-admin`, so the demo admin exists before seeding runs (the
-seed needs an admin to upgrade the primary user, Ada, to premium, which in turn
-unlocks the agent-creation quota used by `make db-bulk`). After being promoted, log
-out and back in — token scopes are fixed at login.
+`db-seed` depends on `db-admin`, so the local admin exists before the current
+learner fixture runs. After being promoted, log
+out and back in to refresh the session.
 
 Copy `.env.example` to `.env` if you need to override defaults.
 
@@ -79,7 +78,7 @@ needed.
 
 For a single-host self-hosted installation, follow
 [`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
-`docs/public/llms.txt` route is the agent discovery contract, not deployment
+`/public/llms.txt` route is the agent discovery contract, not deployment
 documentation.
 
 ```bash

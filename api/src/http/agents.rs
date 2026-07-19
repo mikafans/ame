@@ -3,17 +3,15 @@
 //! Agents do not have a separate resource model. They use the same learner
 //! bearer session and owner-scoped REST endpoints as the web application.
 
-use axum::{Json, Router, response::IntoResponse, routing::get};
+use axum::{Json, response::IntoResponse};
 use serde_json::{Value, json};
 
-use crate::http::AppState;
-
-/// GET /skill.json — machine-readable public contract.
+/// GET /public/skill.json — machine-readable public contract.
 pub async fn skill_manifest() -> Json<Value> {
     Json(build_skill_manifest())
 }
 
-/// GET /llms.txt — concise agent entry document.
+/// GET /public/llms.txt — concise agent entry document.
 pub async fn llms_txt() -> impl IntoResponse {
     (
         [(
@@ -41,140 +39,140 @@ pub fn build_skill_manifest() -> Value {
             "learning.preview",
             "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
             "POST",
-            "/v1/onboarding/preview",
+            "/public/v1/onboarding/preview",
             json!({"type":"object","required":["prompt"],"properties":{"prompt":{"type":"string"}}}),
         ),
         endpoint(
             "learning.start",
             "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
             "POST",
-            "/v1/onboarding/start",
+            "/public/v1/onboarding/start",
             json!({"type":"object","required":["email","displayName","prompt","idempotencyKey"],"properties":{"email":{"type":"string","format":"email"},"displayName":{"type":"string"},"prompt":{"type":"string"},"idempotencyKey":{"type":"string"}}}),
         ),
         endpoint(
             "learning.journey.list",
             "List the authenticated learner's journeys and the next activity for each.",
             "GET",
-            "/v1/learning/journeys",
+            "/api/v1/learning/journeys",
             empty.clone(),
         ),
         endpoint(
             "learning.journey.get",
             "Read one authenticated learner's intent, objectives, activities, and evidence.",
             "GET",
-            "/v1/learning/journeys/{id}",
+            "/api/v1/learning/journeys/{id}",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.activity.start",
             "Start an activity in an owned journey.",
             "POST",
-            "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
+            "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
             json!({"type":"object","required":["journeyId","activityId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.session.finish",
             "Finish a learning session and persist the learner's evidence and responses.",
             "POST",
-            "/v1/learning/sessions/{id}/finish",
+            "/api/v1/learning/sessions/{id}/finish",
             json!({"type":"object","required":["id","completed","responses"],"properties":{"id":{"type":"string","format":"uuid"},"completed":{"type":"boolean"},"responses":{"type":"array"}}}),
         ),
         endpoint(
             "learning.question.create",
             "Create a learner-owned versioned question with explanation and provenance metadata.",
             "POST",
-            "/v1/questions",
+            "/api/v1/questions",
             json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
         ),
         endpoint(
             "learning.question.get",
             "Read one exact learner-owned question version for reproducible assessment history.",
             "GET",
-            "/v1/questions/{question_id}/versions/{version}",
+            "/api/v1/questions/{question_id}/versions/{version}",
             json!({"type":"object","required":["questionId","version"],"properties":{"questionId":{"type":"string","format":"uuid"},"version":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.question.revise",
             "Create the next immutable version of a learner-owned question.",
             "POST",
-            "/v1/questions/{question_id}/versions",
+            "/api/v1/questions/{question_id}/versions",
             json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string"},"prompt":{"type":"string"},"points":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.assessment.create",
             "Compose approved question versions into a learner-owned practice or graded assessment.",
             "POST",
-            "/v1/assessments",
+            "/api/v1/assessments",
             json!({"type":"object","required":["activityId","mode","items"],"properties":{"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array"},"status":{"type":"string"}}}),
         ),
         endpoint(
             "learning.assessment.get",
             "Read one learner-owned assessment and its exact question-version membership.",
             "GET",
-            "/v1/assessments/{assessment_id}",
+            "/api/v1/assessments/{assessment_id}",
             json!({"type":"object","required":["assessmentId"],"properties":{"assessmentId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.attempt.start",
             "Start or resume an attempt against one immutable assessment version.",
             "POST",
-            "/v1/assessments/{assessment_id}/attempts",
+            "/api/v1/assessments/{assessment_id}/attempts",
             json!({"type":"object","required":["assessmentId","learningSessionId"],"properties":{"assessmentId":{"type":"string","format":"uuid"},"learningSessionId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.attempt.answer",
             "Save one answer while preserving assessment item and question version identity.",
             "POST",
-            "/v1/attempts/{attempt_id}/answers",
+            "/api/v1/attempts/{attempt_id}/answers",
             json!({"type":"object","required":["attemptId","assessmentItemId","questionVersionId","response"],"properties":{"attemptId":{"type":"string","format":"uuid"},"assessmentItemId":{"type":"string","format":"uuid"},"questionVersionId":{"type":"string","format":"uuid"},"response":{"type":"object"}}}),
         ),
         endpoint(
             "learning.attempt.finish",
             "Finish an attempt, grade deterministic items, and return manual-review state when needed.",
             "POST",
-            "/v1/attempts/{attempt_id}/finish",
+            "/api/v1/attempts/{attempt_id}/finish",
             json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.attempt.get",
             "Read an owned attempt and its saved responses/result.",
             "GET",
-            "/v1/attempts/{attempt_id}",
+            "/api/v1/attempts/{attempt_id}",
             json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.progress.evidence",
             "Record rebuildable mastery evidence linked to a learner activity or attempt.",
             "POST",
-            "/v1/progress/evidence",
+            "/api/v1/progress/evidence",
             json!({"type":"object","required":["journeyId","objectiveId","activityId","value","derivationVersion"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"attemptId":{"type":"string","format":"uuid"},"value":{"type":"number","minimum":0,"maximum":1},"derivationVersion":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.progress.snapshot",
             "Read evidence-derived mastery and confidence for one objective.",
             "GET",
-            "/v1/progress/{journey_id}/objectives/{objective_id}",
+            "/api/v1/progress/{journey_id}/objectives/{objective_id}",
             json!({"type":"object","required":["journeyId","objectiveId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.progress.recommend",
             "Select the weakest objective from an explicit journey objective set.",
             "POST",
-            "/v1/progress/{journey_id}/recommendation",
+            "/api/v1/progress/{journey_id}/recommendation",
             json!({"type":"object","required":["journeyId","objectives"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectives":{"type":"array"}}}),
         ),
         endpoint(
             "learning.deep_dive.create",
             "Create a source-backed explanatory deep dive linked to evidence.",
             "POST",
-            "/v1/deep-dives",
+            "/api/v1/deep-dives",
             json!({"type":"object","required":["journeyId","activityId","objectiveId","triggeringEvidenceId","title","body","example","sourceReferences","applicationTask"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"triggeringEvidenceId":{"type":"string","format":"uuid"},"title":{"type":"string"},"body":{"type":"string"},"example":{"type":"string"},"sourceReferences":{"type":"array"},"applicationTask":{"type":"string"}}}),
         ),
         endpoint(
             "learning.deep_dive.get",
             "Read one source-backed deep dive owned by the learner.",
             "GET",
-            "/v1/deep-dives/{id}",
+            "/api/v1/deep-dives/{id}",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
         ),
     ];
@@ -186,9 +184,9 @@ pub fn build_skill_manifest() -> Value {
         "auth": {
             "type": "bearer",
             "format": "ame_token",
-            "registration": "POST /v1/onboarding/start returns a learner bearer token; no separate integration identity is required."
+            "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required."
         },
-        "entrypoint": "/llms.txt",
+        "entrypoint": "/public/llms.txt",
         "tools": tools,
         "principles": [
             "Agents and people use the same authenticated learner API.",
@@ -197,11 +195,4 @@ pub fn build_skill_manifest() -> Value {
             "Use idempotencyKey when starting a journey."
         ]
     })
-}
-
-pub fn public_router(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/llms.txt", get(llms_txt))
-        .route("/skill.json", get(skill_manifest))
-        .with_state(state)
 }

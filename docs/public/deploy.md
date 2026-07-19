@@ -30,8 +30,10 @@ make docker-up      # bring the stack up (-d)
 make docker-down
 ```
 
-The API runs embedded SQLx migrations during startup, waits for healthy Postgres
-and Valkey, then serves the web application and API.
+The API bootstraps the current clean baseline on an empty Postgres database,
+waits for healthy Postgres and Valkey, then serves the web application and API.
+This rework does not provide an upgrade path for the retired schema; preserve
+old data separately and start the new deployment with a fresh database.
 
 ## Production checklist
 
@@ -43,8 +45,8 @@ Before pointing real users at a deployment:
 - [ ] `AME_CORS_ORIGINS` is set to your frontend origin(s), comma-separated. It
       defaults to `http://localhost:3000`; setting it to `*` re-enables permissive
       CORS (credentials are then disallowed per the CORS spec).
-- [ ] Add a rate limiter in front of `/v1/auth/login`, `/v1/auth/register`, and
-      `/v1/agents/register` (the latter is unauthenticated by design).
+- [ ] Add a rate limiter in front of `/public/v1/auth/login`,
+      `/public/v1/auth/register`, and `/public/v1/onboarding/start`.
 - [ ] Configure log shipping — the API logs structured tracing to stdout.
 - [ ] Back up `pgdata` volume on a schedule.
 - [ ] Set `NEXT_PUBLIC_API_URL` to the **public** URL the browser will hit,

@@ -177,7 +177,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 /// GET /v1/learning/journeys — list the caller's learner-owned journeys.
 #[utoipa::path(
     get,
-    path = "/v1/learning/journeys",
+    path = "/api/v1/learning/journeys",
     responses(
         (status = 200, description = "Learner journeys", body = [LearningJourneySummaryResponse]),
         (status = 401, description = "Missing or invalid token")
@@ -227,7 +227,7 @@ pub async fn list_journeys(
 /// GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey.
 #[utoipa::path(
     get,
-    path = "/v1/learning/journeys/{id}",
+    path = "/api/v1/learning/journeys/{id}",
     params(("id" = Uuid, Path, description = "Learning journey ID")),
     responses(
         (status = 200, description = "Learning journey and its goal", body = LearningJourneyResponse),
@@ -293,7 +293,7 @@ pub async fn get_journey(
 /// POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
 #[utoipa::path(
     post,
-    path = "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
+    path = "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
     params(
         ("journey_id" = Uuid, Path, description = "Learning journey ID"),
         ("activity_id" = Uuid, Path, description = "Learning activity ID")
@@ -330,7 +330,7 @@ pub async fn start_activity(
 /// GET /v1/learning/sessions/{id} — retrieve a learner's resumable session.
 #[utoipa::path(
     get,
-    path = "/v1/learning/sessions/{id}",
+    path = "/api/v1/learning/sessions/{id}",
     params(("id" = Uuid, Path, description = "Learning session ID")),
     responses(
         (status = 200, description = "Learning session", body = LearningSessionResponse),
@@ -356,7 +356,7 @@ pub async fn get_learning_session(
 /// POST /v1/learning/sessions/{id}/finish — finish the current learning activity.
 #[utoipa::path(
     post,
-    path = "/v1/learning/sessions/{id}/finish",
+    path = "/api/v1/learning/sessions/{id}/finish",
     params(("id" = Uuid, Path, description = "Learning session ID")),
     request_body = FinishLearningSessionBody,
     responses(

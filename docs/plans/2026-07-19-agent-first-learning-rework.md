@@ -315,20 +315,30 @@ needed; replace the clean baseline before API implementation depends on it.
 The API is organized around learner resources, not callers:
 
 ```text
-POST   /v1/onboarding
-GET    /v1/me
-GET    /v1/journeys
-GET    /v1/journeys/:id
-POST   /v1/journeys/:id/preview
-POST   /v1/journeys/:id/activities
-GET    /v1/activities/:id
-POST   /v1/activities/:id/sessions
-POST   /v1/sessions/:id/answers
-POST   /v1/sessions/:id/finish
-GET    /v1/sessions/:id/results
-GET    /v1/journeys/:id/progress
-POST   /v1/journeys/:id/deep-dives
-GET    /v1/journeys/:id/recommendations
+POST   /public/v1/auth/register
+POST   /public/v1/auth/login
+POST   /public/v1/onboarding/preview
+POST   /public/v1/onboarding/start
+GET    /api/v1/me
+GET    /api/v1/learning/journeys
+GET    /api/v1/learning/journeys/:id
+POST   /api/v1/learning/journeys/:id/activities/:activity_id/start
+GET    /api/v1/learning/sessions/:id
+POST   /api/v1/learning/sessions/:id/finish
+POST   /api/v1/questions
+POST   /api/v1/assessments
+POST   /api/v1/assessments/:id/attempts
+POST   /api/v1/attempts/:id/answers
+POST   /api/v1/attempts/:id/finish
+GET    /api/v1/progress/:journey_id/objectives/:objective_id
+POST   /api/v1/deep-dives
+
+GET    /public/llms.txt
+GET    /public/skill.json
+GET    /public/openapi.yaml
+GET    /healthz
+GET    /readyz
+GET    /metrics
 ```
 
 These are design-shaped resources, not approved final route names. TDD

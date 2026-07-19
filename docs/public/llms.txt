@@ -9,7 +9,7 @@ prompt, one email identifier, and one bearer session.
 Preview without creating data:
 
 ```http
-POST /v1/onboarding/preview
+POST /public/v1/onboarding/preview
 Content-Type: application/json
 
 {"prompt":"I'd like to learn the topic I name"}
@@ -18,7 +18,7 @@ Content-Type: application/json
 Create or resume the learner and bootstrap a first journey:
 
 ```http
-POST /v1/onboarding/start
+POST /public/v1/onboarding/start
 Content-Type: application/json
 
 {
@@ -38,15 +38,15 @@ response returns a bearer token and the new journey id. Store the token as
 With the learner token:
 
 ```http
-GET /v1/learning/journeys
-GET /v1/learning/journeys/{id}
-POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start
-POST /v1/learning/sessions/{id}/finish
-POST /v1/questions
-GET /v1/questions/{question_id}/versions/{version}
-POST /v1/questions/{question_id}/versions
-POST /v1/assessments
-GET /v1/assessments/{assessment_id}
+GET /api/v1/learning/journeys
+GET /api/v1/learning/journeys/{id}
+POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
+POST /api/v1/learning/sessions/{id}/finish
+POST /api/v1/questions
+GET /api/v1/questions/{question_id}/versions/{version}
+POST /api/v1/questions/{question_id}/versions
+POST /api/v1/assessments
+GET /api/v1/assessments/{assessment_id}
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,
@@ -55,8 +55,8 @@ result; the web app presents the same state.
 
 ## Discovery
 
-- `GET /skill.json` — machine-readable endpoint descriptions.
-- `GET /openapi.yaml` — complete current HTTP contract.
+- `GET /public/skill.json` — machine-readable endpoint descriptions.
+- `GET /public/openapi.yaml` — complete current HTTP contract.
 - `GET /self-hosting` — operator documentation.
 
 ## Rules
