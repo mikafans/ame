@@ -552,6 +552,27 @@ impl LearningRepository for PgLearningRepository {
         .execute(&mut *transaction)
         .await
         .map_err(storage_error)?;
+        sqlx::query(
+            r#"
+            UPDATE tb_activities
+            SET status = 'ready', updated_at = now()
+            WHERE id = (
+                SELECT next_activity.id
+                FROM tb_activities next_activity
+                JOIN tb_activities completed_activity
+                  ON completed_activity.id = $1
+                WHERE next_activity.journey_id = completed_activity.journey_id
+                  AND next_activity.order_index > completed_activity.order_index
+                  AND next_activity.status = 'proposed'
+                ORDER BY next_activity.order_index ASC
+                LIMIT 1
+            )
+            "#,
+        )
+        .bind(session.activity_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(storage_error)?;
         transaction.commit().await.map_err(storage_error)?;
         Ok(session)
     }

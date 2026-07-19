@@ -428,8 +428,33 @@ impl LearningRepository for InMemoryLearningRepository {
             session.finished_at = Some(OffsetDateTime::now_utc());
             (activity_id, session.clone())
         };
+        let (journey_id, order_index) = state
+            .activities
+            .get(&activity_id)
+            .map(|activity| (activity.journey_id, activity.order_index))
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "activity",
+            })?;
         if let Some(activity) = state.activities.get_mut(&activity_id) {
             activity.status = ActivityStatus::Completed;
+            activity.updated_at = OffsetDateTime::now_utc();
+        }
+        let next_order = state
+            .activities
+            .values()
+            .filter(|activity| {
+                activity.journey_id == journey_id
+                    && activity.order_index > order_index
+                    && activity.status == ActivityStatus::Proposed
+            })
+            .map(|activity| activity.order_index)
+            .min();
+        if let Some(next_order) = next_order
+            && let Some(activity) = state.activities.values_mut().find(|activity| {
+                activity.journey_id == journey_id && activity.order_index == next_order
+            })
+        {
+            activity.status = ActivityStatus::Ready;
             activity.updated_at = OffsetDateTime::now_utc();
         }
         Ok(finished_session)
@@ -557,12 +582,28 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         })
         .await
         .expect("activity creates");
+    let next_activity = repository
+        .create_activity(CreateActivity {
+            journey_id: journey.id,
+            subject_user_id: subject,
+            source_actor_id: actor,
+            source_run_id: None,
+            kind: crate::domain::learning::ActivityKind::Practice,
+            title: "Interval practice".to_string(),
+            order_index: 1,
+            payload_schema_version: 1,
+            payload: serde_json::json!({"count": 5}),
+            objective_ids: vec![objective.id],
+            status: ActivityStatus::Proposed,
+        })
+        .await
+        .expect("next activity creates");
     assert_eq!(
         repository
             .list_activities(subject, journey.id)
             .await
             .expect("activities list"),
-        vec![activity.clone()]
+        vec![activity.clone(), next_activity]
     );
     assert_eq!(
         repository.list_activities(other_subject, journey.id).await,
@@ -602,6 +643,14 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         .await
         .expect("learning session finishes");
     assert_eq!(finished.status, LearningSessionStatus::Finished);
+    assert_eq!(
+        repository
+            .list_activities(subject, journey.id)
+            .await
+            .expect("activities after finish")[1]
+            .status,
+        ActivityStatus::Ready
+    );
     assert_eq!(
         repository
             .finish_learning_session(FinishLearningSession {
