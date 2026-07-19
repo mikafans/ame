@@ -298,6 +298,33 @@ struct StarterActivity {
     status: ActivityStatus,
 }
 
+const GOAL_PLACEHOLDER: &str = "{{goal}}";
+
+fn render_goal_text(template: &str, goal: &str) -> String {
+    template.replace(GOAL_PLACEHOLDER, goal)
+}
+
+fn render_goal_value(value: serde_json::Value, goal: &str) -> serde_json::Value {
+    match value {
+        serde_json::Value::String(value) => {
+            serde_json::Value::String(render_goal_text(&value, goal))
+        }
+        serde_json::Value::Array(values) => serde_json::Value::Array(
+            values
+                .into_iter()
+                .map(|value| render_goal_value(value, goal))
+                .collect(),
+        ),
+        serde_json::Value::Object(values) => serde_json::Value::Object(
+            values
+                .into_iter()
+                .map(|(key, value)| (key, render_goal_value(value, goal)))
+                .collect(),
+        ),
+        value => value,
+    }
+}
+
 fn starter_blueprint(
     plan: &BootstrapPlan,
     journey_id: Uuid,
@@ -319,7 +346,7 @@ fn starter_blueprint(
         .map(|objective| {
             (
                 objective.verb.as_str(),
-                objective.statement.as_str(),
+                render_goal_text(&objective.statement, &plan.normalized_statement),
                 objective.success_criteria.as_str(),
             )
         })
@@ -332,33 +359,38 @@ fn starter_blueprint(
                 journey_id,
                 subject_user_id: subject,
                 verb: verb.to_string(),
-                statement: format!("{statement}: {}", plan.normalized_statement),
+                statement,
                 success_criteria: success_criteria.to_string(),
                 order_index: order_index as i32,
             },
         )
         .collect();
+    let goal = plan.normalized_statement.as_str();
+    let first_activity = &topic.first_activity;
     let first_payload = serde_json::json!({
-        "purpose": topic.first_activity.purpose,
-        "intent": plan.normalized_statement,
-        "estimated_minutes": topic.first_activity.estimated_minutes,
+        "purpose": render_goal_text(&first_activity.purpose, goal),
+        "intent": goal,
+        "estimated_minutes": first_activity.estimated_minutes,
         "content": {
             "type": "starter_check",
-            "context": topic.first_activity.context,
-            "instructions": topic.first_activity.instructions,
-            "questions": topic.first_activity.questions,
+            "context": render_goal_text(&first_activity.context, goal),
+            "instructions": render_goal_text(&first_activity.instructions, goal),
+            "questions": render_goal_value(
+                serde_json::Value::Array(first_activity.questions.clone()),
+                goal,
+            ),
         }
     });
-    let first_kind = serde_json::from_value(serde_json::Value::String(topic.first_activity.kind))
+    let first_kind = serde_json::from_value(serde_json::Value::String(first_activity.kind.clone()))
         .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
     let first_status =
-        serde_json::from_value(serde_json::Value::String(topic.first_activity.status))
+        serde_json::from_value(serde_json::Value::String(first_activity.status.clone()))
             .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
     let mut activities = vec![StarterActivity {
         kind: first_kind,
-        title: topic.first_activity.title,
+        title: render_goal_text(&first_activity.title, goal),
         order_index: 0,
-        objective_orders: topic.first_activity.objective_orders,
+        objective_orders: first_activity.objective_orders.clone(),
         payload: first_payload,
         status: first_status,
     }];
@@ -369,10 +401,10 @@ fn starter_blueprint(
             .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
         activities.push(StarterActivity {
             kind,
-            title: activity.title,
+            title: render_goal_text(&activity.title, goal),
             order_index: activities.len() as i32,
             objective_orders: activity.objective_orders,
-            payload: activity.payload,
+            payload: render_goal_value(activity.payload, goal),
             status,
         });
     }

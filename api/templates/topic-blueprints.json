@@ -4,27 +4,27 @@
     "template_id": "understand-a-subject",
     "aliases": [],
     "objectives": [
-      {"verb": "identify", "statement": "Identify the core concepts", "success_criteria": "Name the essential ideas and how they relate"},
-      {"verb": "explain", "statement": "Explain one concept clearly", "success_criteria": "Give an accurate explanation with a useful example"},
-      {"verb": "apply", "statement": "Apply the ideas in practice", "success_criteria": "Use the ideas in a new but bounded situation"}
+      {"verb": "identify", "statement": "Identify the core concepts of {{goal}}", "success_criteria": "Name the essential ideas and how they relate"},
+      {"verb": "explain", "statement": "Explain one concept from {{goal}} clearly", "success_criteria": "Give an accurate explanation with a useful example"},
+      {"verb": "apply", "statement": "Apply {{goal}} in practice", "success_criteria": "Use the ideas in a new but bounded situation"}
     ],
     "first_activity": {
       "kind": "explanation",
-      "title": "Get oriented and see what you already know",
+      "title": "Get oriented on {{goal}}",
       "purpose": "orientation",
       "estimated_minutes": 5,
-      "context": "Start with a small signal about your current understanding and the outcome you want. AME will use it to choose a useful next step.",
-      "instructions": "Give AME a quick starting signal so the next step can fit you.",
+      "context": "Start with a small signal about your current understanding of {{goal}} and the outcome you want. AME will use it to choose a useful next step.",
+      "instructions": "Give AME a quick starting signal about {{goal}} so the next step can fit you.",
       "questions": [
-        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with this topic?", "options": ["new_to_me", "some_exposure", "comfortable"]},
-        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to be able to do first?"}
+        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with {{goal}}?", "options": ["new_to_me", "some_exposure", "comfortable"]},
+        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to be able to do with {{goal}} first?"}
       ],
       "objective_orders": [0],
       "status": "ready"
     },
     "follow_up_activities": [
-      {"kind": "diagnostic", "title": "Try a short first task", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
-      {"kind": "recommendation", "title": "Review your result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
+      {"kind": "diagnostic", "title": "Try a short first task for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
+      {"kind": "recommendation", "title": "Review your {{goal}} result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
     ]
   },
   {
@@ -32,27 +32,27 @@
     "template_id": "prepare-for-an-exam",
     "aliases": [],
     "objectives": [
-      {"verb": "map", "statement": "Map the target syllabus", "success_criteria": "Name the main domains and their expected weight"},
-      {"verb": "solve", "statement": "Solve representative problems", "success_criteria": "Complete a bounded set with explained reasoning"},
-      {"verb": "review", "statement": "Review the weakest domain", "success_criteria": "Choose one evidence-backed review target"}
+      {"verb": "map", "statement": "Map the target syllabus for {{goal}}", "success_criteria": "Name the main domains and their expected weight"},
+      {"verb": "solve", "statement": "Solve representative {{goal}} problems", "success_criteria": "Complete a bounded set with explained reasoning"},
+      {"verb": "review", "statement": "Review the weakest {{goal}} domain", "success_criteria": "Choose one evidence-backed review target"}
     ],
     "first_activity": {
       "kind": "explanation",
-      "title": "Orient on the target and estimate your starting point",
+      "title": "Orient on {{goal}} and estimate your starting point",
       "purpose": "exam_orientation",
       "estimated_minutes": 5,
-      "context": "Begin by identifying the target and your current confidence. This keeps the first practice step bounded and relevant.",
-      "instructions": "Give AME a quick starting signal so the first practice step can fit your target.",
+      "context": "Begin by identifying your target in {{goal}} and your current confidence. This keeps the first practice step bounded and relevant.",
+      "instructions": "Give AME a quick starting signal about {{goal}} so the first practice step can fit your target.",
       "questions": [
-        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with this exam target?", "options": ["new_to_me", "some_exposure", "comfortable"]},
-        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to be able to solve first?"}
+        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with {{goal}}?", "options": ["new_to_me", "some_exposure", "comfortable"]},
+        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to be able to solve in {{goal}} first?"}
       ],
       "objective_orders": [0],
       "status": "ready"
     },
     "follow_up_activities": [
-      {"kind": "timed_practice", "title": "Try a short first task", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
-      {"kind": "recommendation", "title": "Review your result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
+      {"kind": "timed_practice", "title": "Try a short first task for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
+      {"kind": "recommendation", "title": "Review your {{goal}} result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
     ]
   },
   {
@@ -60,27 +60,27 @@
     "template_id": "build-a-project",
     "aliases": [],
     "objectives": [
-      {"verb": "define", "statement": "Define the first artifact", "success_criteria": "Describe a small usable result and its constraints"},
-      {"verb": "apply", "statement": "Apply the core concept", "success_criteria": "Use the concept in a concrete implementation step"},
-      {"verb": "ship", "statement": "Complete the first milestone", "success_criteria": "Produce and inspect a small working increment"}
+      {"verb": "define", "statement": "Define the first {{goal}} artifact", "success_criteria": "Describe a small usable result and its constraints"},
+      {"verb": "apply", "statement": "Apply the core concept in {{goal}}", "success_criteria": "Use the concept in a concrete implementation step"},
+      {"verb": "ship", "statement": "Complete the first {{goal}} milestone", "success_criteria": "Produce and inspect a small working increment"}
     ],
     "first_activity": {
       "kind": "explanation",
-      "title": "Define the smallest useful first milestone",
+      "title": "Define the smallest useful {{goal}} milestone",
       "purpose": "project_orientation",
       "estimated_minutes": 5,
-      "context": "Start by making the desired artifact concrete enough to attempt. A small milestone gives AME evidence for the next implementation step.",
-      "instructions": "Give AME a quick starting signal about the artifact and the first result you want to produce.",
+      "context": "Start by making the desired {{goal}} artifact concrete enough to attempt. A small milestone gives AME evidence for the next implementation step.",
+      "instructions": "Give AME a quick starting signal about the {{goal}} artifact and the first result you want to produce.",
       "questions": [
-        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with this project?", "options": ["new_to_me", "some_exposure", "comfortable"]},
-        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to build first?"}
+        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with building {{goal}}?", "options": ["new_to_me", "some_exposure", "comfortable"]},
+        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to build for {{goal}} first?"}
       ],
       "objective_orders": [0],
       "status": "ready"
     },
     "follow_up_activities": [
-      {"kind": "application", "title": "Try a short first task", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
-      {"kind": "recommendation", "title": "Review your result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
+      {"kind": "application", "title": "Try a short first task for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
+      {"kind": "recommendation", "title": "Review your {{goal}} result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
     ]
   }
 ]
