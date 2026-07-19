@@ -1,23 +1,26 @@
 # Run Caddy on the host and point it at the loopback ports published by
 # docker-compose.prod.yml. Replace the hostname with your public DNS name.
 ame.example.com {
-    # Point this at the checked-out AME repository's docs directory. The
-    # public contract files are static; /public/v1/* remains API-backed.
-    handle /public/llms.txt {
+    # Point this at the checked-out AME repository's docs directory. Files
+    # under /public/* map directly to docs/public/*; /public/v1/* remains
+    # API-backed and is therefore matched before this static handler.
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle /public/v1/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+    handle /public/* {
         root * /path/to/ame/docs
         file_server
     }
-    handle /public/skill.json {
-        root * /path/to/ame/docs
-        file_server
+    handle /healthz {
+        reverse_proxy 127.0.0.1:8080
     }
-    handle /public/openapi.yaml {
-        root * /path/to/ame/docs
-        file_server
+    handle /readyz {
+        reverse_proxy 127.0.0.1:8080
     }
-    reverse_proxy /api/* 127.0.0.1:8080
-    reverse_proxy /public/v1/* 127.0.0.1:8080
-    reverse_proxy /healthz 127.0.0.1:8080
-    reverse_proxy /readyz 127.0.0.1:8080
-    reverse_proxy 127.0.0.1:3000
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
 }
