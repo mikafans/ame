@@ -47,10 +47,22 @@ pub struct AttemptResponse {
     pub assessment_version: u32,
     pub status: String,
     pub responses: std::collections::HashMap<Uuid, Value>,
+    pub items: Vec<AttemptItemResponse>,
     pub score: Option<f32>,
     pub awarded_points: Option<f32>,
     pub max_points: Option<f32>,
     pub submitted_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AttemptItemResponse {
+    pub assessment_item_id: Uuid,
+    pub question_version_id: Uuid,
+    pub response: Value,
+    pub correctness: Option<f32>,
+    pub awarded_points: Option<f32>,
+    pub evaluation_status: String,
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
@@ -195,6 +207,16 @@ pub async fn finish_attempt(
 
 fn attempt_response(attempt: Attempt) -> AttemptResponse {
     let grade = attempt.grade;
+    let answer_results = attempt.answer_results;
+    let awarded_points = grade
+        .as_ref()
+        .map(|value| value.awarded_points)
+        .or_else(|| {
+            answer_results
+                .iter()
+                .map(|item| item.awarded_points.unwrap_or_default())
+                .reduce(|total, points| total + points)
+        });
     AttemptResponse {
         id: attempt.id,
         assessment_id: attempt.input.assessment_id,
@@ -207,9 +229,26 @@ fn attempt_response(attempt: Attempt) -> AttemptResponse {
         }
         .into(),
         responses: attempt.responses,
-        score: grade.as_ref().and_then(|value| value.score),
-        awarded_points: grade.as_ref().map(|value| value.awarded_points),
-        max_points: grade.as_ref().map(|value| value.max_points),
+        items: answer_results
+            .into_iter()
+            .map(|item| AttemptItemResponse {
+                assessment_item_id: item.assessment_item_id,
+                question_version_id: item.question_version_id,
+                response: item.response,
+                correctness: item.correctness,
+                awarded_points: item.awarded_points,
+                evaluation_status: item.evaluation_status,
+            })
+            .collect(),
+        score: grade
+            .as_ref()
+            .and_then(|value| value.score)
+            .or(attempt.stored_score),
+        awarded_points,
+        max_points: grade
+            .as_ref()
+            .map(|value| value.max_points)
+            .or(attempt.stored_max_points),
         submitted_at: attempt.submitted_at.map(|value| {
             value
                 .format(&time::format_description::well_known::Rfc3339)

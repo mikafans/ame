@@ -605,6 +605,18 @@ export interface components {
         };
         /** @enum {string} */
         AssessmentStatus: "draft" | "published" | "retired";
+        AttemptItemResponse: {
+            /** Format: uuid */
+            assessmentItemId: string;
+            /** Format: float */
+            awardedPoints?: number | null;
+            /** Format: float */
+            correctness?: number | null;
+            evaluationStatus: string;
+            /** Format: uuid */
+            questionVersionId: string;
+            response: unknown;
+        };
         AttemptResponse: {
             /** Format: uuid */
             assessmentId: string;
@@ -614,6 +626,7 @@ export interface components {
             awardedPoints?: number | null;
             /** Format: uuid */
             id: string;
+            items: components["schemas"]["AttemptItemResponse"][];
             /** Format: float */
             maxPoints?: number | null;
             responses: {

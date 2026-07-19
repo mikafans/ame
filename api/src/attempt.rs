@@ -4,7 +4,7 @@ use crate::{
     assessment::grade_assessment,
     domain::{
         assessment::Assessment,
-        attempt::{Attempt, AttemptError, AttemptStatus, StartAttempt},
+        attempt::{Attempt, AttemptAnswer, AttemptError, AttemptStatus, StartAttempt},
         question::QuestionVersion,
     },
 };
@@ -80,6 +80,9 @@ impl AttemptRepository for InMemoryAttemptRepository {
                 .iter()
                 .map(|item| (item.id, item.question_version_id))
                 .collect(),
+            answer_results: Vec::new(),
+            stored_score: None,
+            stored_max_points: None,
             grade: None,
             created_at: OffsetDateTime::now_utc(),
             submitted_at: None,
@@ -131,6 +134,30 @@ impl AttemptRepository for InMemoryAttemptRepository {
         attempt
             .responses
             .insert(*expected_question_version, response);
+        let answer_response = attempt
+            .responses
+            .get(expected_question_version)
+            .cloned()
+            .unwrap_or_default();
+        if let Some(answer) = attempt
+            .answer_results
+            .iter_mut()
+            .find(|answer| answer.assessment_item_id == item_id)
+        {
+            answer.response = answer_response;
+            answer.evaluation_status = "pending".into();
+            answer.correctness = None;
+            answer.awarded_points = None;
+        } else {
+            attempt.answer_results.push(AttemptAnswer {
+                assessment_item_id: item_id,
+                question_version_id,
+                response: answer_response,
+                correctness: None,
+                awarded_points: None,
+                evaluation_status: "pending".into(),
+            });
+        }
         Ok(attempt.clone())
     }
 
@@ -165,6 +192,29 @@ impl AttemptRepository for InMemoryAttemptRepository {
         }
         let grade = grade_assessment(assessment, questions, &attempt.responses)
             .map_err(|error| AttemptError::Storage(error.to_string()))?;
+        attempt.answer_results = assessment
+            .items
+            .iter()
+            .zip(&grade.item_grades)
+            .map(|(item, item_grade)| AttemptAnswer {
+                assessment_item_id: item.id,
+                question_version_id: item.question_version_id,
+                response: attempt
+                    .responses
+                    .get(&item.question_version_id)
+                    .cloned()
+                    .unwrap_or_default(),
+                correctness: item_grade.correctness,
+                awarded_points: Some(item_grade.awarded_points),
+                evaluation_status: match item_grade.status {
+                    crate::question::AnswerEvaluationStatus::Correct => "correct",
+                    crate::question::AnswerEvaluationStatus::Incorrect => "incorrect",
+                    crate::question::AnswerEvaluationStatus::Partial => "partial",
+                    crate::question::AnswerEvaluationStatus::ManualReview => "manual_review",
+                }
+                .into(),
+            })
+            .collect();
         attempt.status = if grade.pending_manual_review {
             AttemptStatus::Submitted
         } else {

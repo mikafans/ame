@@ -168,6 +168,14 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert finished.status_code == 200, finished.text
     assert finished.json()["score"] == 1
+    assert finished.json()["items"][0]["evaluationStatus"] == "correct"
+    assert finished.json()["items"][0]["awardedPoints"] == 1
+    persisted_attempt = client.get(
+        f"/api/v1/attempts/{attempt['id']}", headers=headers
+    )
+    assert persisted_attempt.status_code == 200, persisted_attempt.text
+    assert persisted_attempt.json()["score"] == 1
+    assert persisted_attempt.json()["items"][0]["evaluationStatus"] == "correct"
     repeated_finish = client.post(
         f"/api/v1/attempts/{attempt['id']}/finish", headers=headers
     )

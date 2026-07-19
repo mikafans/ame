@@ -1072,6 +1072,33 @@ components:
       - draft
       - published
       - retired
+    AttemptItemResponse:
+      type: object
+      required:
+      - assessmentItemId
+      - questionVersionId
+      - response
+      - evaluationStatus
+      properties:
+        assessmentItemId:
+          type: string
+          format: uuid
+        awardedPoints:
+          type:
+          - number
+          - 'null'
+          format: float
+        correctness:
+          type:
+          - number
+          - 'null'
+          format: float
+        evaluationStatus:
+          type: string
+        questionVersionId:
+          type: string
+          format: uuid
+        response: {}
     AttemptResponse:
       type: object
       required:
@@ -1080,6 +1107,7 @@ components:
       - assessmentVersion
       - status
       - responses
+      - items
       properties:
         assessmentId:
           type: string
@@ -1096,6 +1124,10 @@ components:
         id:
           type: string
           format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttemptItemResponse'
         maxPoints:
           type:
           - number

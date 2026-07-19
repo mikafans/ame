@@ -11,7 +11,7 @@ use crate::http::{
         AssessmentActivityQuery, AssessmentItemBody, AssessmentOptionResponse,
         AssessmentQuestionResponse, AssessmentResponse, CreateAssessmentBody,
     },
-    attempts::{AttemptResponse, SaveAnswerBody, StartAttemptBody},
+    attempts::{AttemptItemResponse, AttemptResponse, SaveAnswerBody, StartAttemptBody},
     auth::{AuthResponse, LoginBody, RegisterBody, UserInfo},
     deep_dives::{CreateDeepDiveBody, DeepDiveActivityQuery, DeepDiveResponse},
     learning::{
@@ -105,6 +105,7 @@ use crate::http::{
         StartAttemptBody,
         SaveAnswerBody,
         AttemptResponse,
+        AttemptItemResponse,
         EvidenceBody,
         EvidenceResponse,
         ObjectiveActivityBody,

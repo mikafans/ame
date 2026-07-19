@@ -5,7 +5,7 @@ use crate::{
     attempt::AttemptRepository,
     domain::{
         assessment::Assessment,
-        attempt::{Attempt, AttemptError, AttemptStatus, StartAttempt},
+        attempt::{Attempt, AttemptAnswer, AttemptError, AttemptStatus, StartAttempt},
         question::QuestionVersion,
     },
     question::AnswerEvaluationStatus,
@@ -180,7 +180,7 @@ impl PgAttemptRepository {
         input: StartAttempt,
     ) -> Result<Attempt, AttemptError> {
         let row =
-            sqlx::query("SELECT status, created_at, submitted_at FROM tb_attempts WHERE id = $1")
+            sqlx::query("SELECT status, created_at, submitted_at, score::float4 AS score, max_score::float4 AS max_score FROM tb_attempts WHERE id = $1")
                 .bind(attempt_id)
                 .fetch_optional(&self.pool)
                 .await
@@ -188,10 +188,11 @@ impl PgAttemptRepository {
                 .ok_or(AttemptError::NotFound)?;
         let items = sqlx::query("SELECT id, question_version_id FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index")
             .bind(input.assessment_id).fetch_all(&self.pool).await.map_err(storage_error)?;
-        let answers = sqlx::query("SELECT assessment_item_id, question_version_id, response FROM tb_attempt_answers WHERE attempt_id = $1")
+        let answers = sqlx::query("SELECT assessment_item_id, question_version_id, response, correctness::float4 AS correctness, awarded_points::float4 AS awarded_points, evaluation_status FROM tb_attempt_answers WHERE attempt_id = $1")
             .bind(attempt_id).fetch_all(&self.pool).await.map_err(storage_error)?;
         let mut responses = HashMap::new();
         let mut item_question_versions = HashMap::new();
+        let mut answer_results = Vec::new();
         for item in items {
             item_question_versions.insert(item.get("id"), item.get("question_version_id"));
         }
@@ -199,7 +200,16 @@ impl PgAttemptRepository {
             let item_id: Uuid = answer.get("assessment_item_id");
             let version_id: Uuid = answer.get("question_version_id");
             item_question_versions.insert(item_id, version_id);
-            responses.insert(version_id, answer.get("response"));
+            let response: serde_json::Value = answer.get("response");
+            responses.insert(version_id, response.clone());
+            answer_results.push(AttemptAnswer {
+                assessment_item_id: item_id,
+                question_version_id: version_id,
+                response,
+                correctness: answer.get("correctness"),
+                awarded_points: answer.get("awarded_points"),
+                evaluation_status: answer.get("evaluation_status"),
+            });
         }
         Ok(Attempt {
             id: attempt_id,
@@ -207,6 +217,9 @@ impl PgAttemptRepository {
             status: parse_status(row.get("status"))?,
             responses,
             item_question_versions,
+            answer_results,
+            stored_score: row.get("score"),
+            stored_max_points: row.get("max_score"),
             grade: None,
             created_at: row.get("created_at"),
             submitted_at: row.get("submitted_at"),
