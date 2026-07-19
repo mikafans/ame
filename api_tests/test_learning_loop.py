@@ -202,6 +202,8 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert attempt_response.status_code == 200, attempt_response.text
     attempt = attempt_response.json()
+    assert attempt["assessmentMode"] == "practice"
+    assert attempt["reviewStatus"] == "not_required"
     item_id = assessment["items"][0]["id"]
     version_id = assessment["items"][0]["questionVersionId"]
 
@@ -246,6 +248,8 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert finished.status_code == 200, finished.text
     assert finished.json()["score"] == 1
+    assert finished.json()["assessmentMode"] == "practice"
+    assert finished.json()["reviewStatus"] == "complete"
     assert finished.json()["items"][0]["evaluationStatus"] == "correct"
     assert finished.json()["items"][0]["awardedPoints"] == 1
     persisted_attempt = client.get(
@@ -253,6 +257,8 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert persisted_attempt.status_code == 200, persisted_attempt.text
     assert persisted_attempt.json()["score"] == 1
+    assert persisted_attempt.json()["assessmentMode"] == "practice"
+    assert persisted_attempt.json()["reviewStatus"] == "complete"
     assert persisted_attempt.json()["items"][0]["evaluationStatus"] == "correct"
     attempt_history = client.get(
         f"/api/v1/learning/journeys/{journey_id}/attempts", headers=headers
