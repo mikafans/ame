@@ -1260,6 +1260,8 @@ components:
       - assessmentId
       - assessmentVersion
       - status
+      - assessmentMode
+      - reviewStatus
       - responses
       - items
       - createdAt
@@ -1267,6 +1269,8 @@ components:
         assessmentId:
           type: string
           format: uuid
+        assessmentMode:
+          $ref: '#/components/schemas/AssessmentMode'
         assessmentVersion:
           type: integer
           format: int32
@@ -1296,6 +1300,8 @@ components:
           propertyNames:
             type: string
             format: uuid
+        reviewStatus:
+          $ref: '#/components/schemas/AttemptReviewStatus'
         score:
           type:
           - number
@@ -1307,6 +1313,12 @@ components:
           type:
           - string
           - 'null'
+    AttemptReviewStatus:
+      type: string
+      enum:
+      - not_required
+      - pending
+      - complete
     AuditLogEntry:
       type: object
       required:

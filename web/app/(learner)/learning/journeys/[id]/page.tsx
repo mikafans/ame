@@ -406,7 +406,7 @@ export default function LearningJourneyPage() {
               <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
-                    {assessment.mode === "graded"
+                    {attempt.assessmentMode === "graded"
                       ? "Graded assessment"
                       : "Practice assessment"}
                   </p>

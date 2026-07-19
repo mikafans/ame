@@ -118,7 +118,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.attempt.finish",
-            "Finish an attempt, grade deterministic items, and return manual-review state when needed.",
+            "Finish an attempt, grade deterministic items, and return assessmentMode plus reviewStatus (complete or pending) so practice results cannot be mistaken for an exam result.",
             "POST",
             "/api/v1/attempts/{attempt_id}/finish",
             json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),

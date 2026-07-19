@@ -334,6 +334,8 @@ mod tests {
             .start(input.clone(), &assessment)
             .await
             .expect("attempt starts");
+        assert_eq!(first.assessment_mode, AssessmentMode::Practice);
+        assert_eq!(first.review_status, AttemptReviewStatus::NotRequired);
         assert_eq!(
             repository
                 .start(input, &assessment)
@@ -361,6 +363,7 @@ mod tests {
             finished.grade.as_ref().and_then(|grade| grade.score),
             Some(1.0)
         );
+        assert_eq!(finished.review_status, AttemptReviewStatus::Complete);
         assert_eq!(
             repository
                 .finish(subject, finished.id, &assessment, &[])

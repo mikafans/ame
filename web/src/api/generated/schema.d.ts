@@ -705,6 +705,7 @@ export interface components {
         AttemptResponse: {
             /** Format: uuid */
             assessmentId: string;
+            assessmentMode: components["schemas"]["AssessmentMode"];
             /** Format: int32 */
             assessmentVersion: number;
             /** Format: float */
@@ -718,11 +719,14 @@ export interface components {
             responses: {
                 [key: string]: unknown;
             };
+            reviewStatus: components["schemas"]["AttemptReviewStatus"];
             /** Format: float */
             score?: number | null;
             status: string;
             submittedAt?: string | null;
         };
+        /** @enum {string} */
+        AttemptReviewStatus: "not_required" | "pending" | "complete";
         AuditLogEntry: {
             action: string;
             actorEmail?: string | null;

@@ -337,4 +337,52 @@ mod tests {
         assert!(grade.pending_manual_review);
         assert_eq!(grade.score, None);
     }
+
+    #[test]
+    fn mixed_assessment_preserves_objective_grade_and_pending_review() {
+        let objective_id = Uuid::now_v7();
+        let multiple_choice = question(Uuid::now_v7());
+        let mut essay = question(Uuid::now_v7());
+        essay.kind = QuestionKind::Essay;
+        essay.options.clear();
+        let assessment = Assessment {
+            id: Uuid::now_v7(),
+            subject_user_id: Uuid::now_v7(),
+            source_actor_id: Uuid::now_v7(),
+            activity_id: Uuid::now_v7(),
+            version: 1,
+            mode: AssessmentMode::Graded,
+            items: vec![
+                AssessmentItemInput {
+                    id: Uuid::now_v7(),
+                    objective_id,
+                    question_version_id: multiple_choice.id,
+                    order_index: 0,
+                    points: 1,
+                },
+                AssessmentItemInput {
+                    id: Uuid::now_v7(),
+                    objective_id,
+                    question_version_id: essay.id,
+                    order_index: 1,
+                    points: 2,
+                },
+            ],
+            status: AssessmentStatus::Published,
+            created_at: OffsetDateTime::now_utc(),
+        };
+        let mut responses = HashMap::new();
+        responses.insert(multiple_choice.id, serde_json::json!({"option_id": "a"}));
+        let grade = grade_assessment(&assessment, &[multiple_choice, essay], &responses)
+            .expect("mixed assessment grades");
+        assert_eq!(grade.item_grades[0].status, AnswerEvaluationStatus::Correct);
+        assert_eq!(
+            grade.item_grades[1].status,
+            AnswerEvaluationStatus::ManualReview
+        );
+        assert_eq!(grade.awarded_points, 1.0);
+        assert_eq!(grade.max_points, 3.0);
+        assert!(grade.pending_manual_review);
+        assert_eq!(grade.score, None);
+    }
 }

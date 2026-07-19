@@ -87,6 +87,12 @@ Provider generation runs are owner-scoped and retryable. Reusing the same
 through `requested`, `running`, `review_required`, `published`, or `failed`;
 failed runs require an error and cannot be published without a new retry key.
 
+Attempt responses include `assessmentMode` (`practice` or `graded`) and
+`reviewStatus` (`not_required`, `complete`, or `pending`). Deterministic
+practice and exam attempts return a score with `complete`; an attempt containing
+essay or code work returns `submitted`, a null score, and `pending` until manual
+review. Do not treat a practice score as an exam result.
+
 ## Discovery
 
 - `GET /public/skill.json` — machine-readable endpoint descriptions.

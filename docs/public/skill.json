@@ -416,7 +416,7 @@
       "path": "/api/v1/attempts/{attempt_id}/answers"
     },
     {
-      "description": "Finish an attempt, grade deterministic items, and return manual-review state when needed.",
+      "description": "Finish an attempt, grade deterministic items, and return assessmentMode plus reviewStatus (complete or pending) so practice results cannot be mistaken for an exam result.",
       "input_schema": {
         "properties": {
           "attemptId": {
