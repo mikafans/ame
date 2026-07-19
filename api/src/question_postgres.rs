@@ -1,8 +1,8 @@
 //! PostgreSQL implementation of the versioned question contract.
 
 use crate::domain::question::{
-    ContentReviewStatus, CreateQuestion, Question, QuestionKind,
-    QuestionRepositoryError, QuestionVersion, validate_question,
+    ContentReviewStatus, CreateQuestion, Question, QuestionKind, QuestionRepositoryError,
+    QuestionVersion, validate_question,
 };
 use crate::question::QuestionRepository;
 use async_trait::async_trait;
