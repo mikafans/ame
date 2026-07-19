@@ -6,6 +6,7 @@ pub mod assess;
 pub mod audit;
 pub mod auth;
 pub mod authentication;
+pub mod authentication_postgres;
 pub mod bank;
 pub mod config;
 pub mod domain;
