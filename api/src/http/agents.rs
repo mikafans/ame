@@ -3,24 +3,7 @@
 //! Agents do not have a separate resource model. They use the same learner
 //! bearer session and owner-scoped REST endpoints as the web application.
 
-use axum::{Json, response::IntoResponse};
 use serde_json::{Value, json};
-
-/// GET /public/skill.json — machine-readable public contract.
-pub async fn skill_manifest() -> Json<Value> {
-    Json(build_skill_manifest())
-}
-
-/// GET /public/llms.txt — concise agent entry document.
-pub async fn llms_txt() -> impl IntoResponse {
-    (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/plain; charset=utf-8",
-        )],
-        include_str!("../../../docs/public/llms.txt"),
-    )
-}
 
 fn endpoint(name: &str, description: &str, method: &str, path: &str, input_schema: Value) -> Value {
     json!({
