@@ -57,7 +57,6 @@ use crate::{
             CreateQuestionsBody, CreateQuestionsResponse, ListQuestionsResponse,
             QuestionDeepenResponse,
         },
-        quota::Plan as QuotaPlan,
         sessions::{
             AnswerSessionBody, AnswerSessionResponse, CreateSessionBody, CreateSessionResponse,
             FinishSessionResponse, GetSessionQuestion, GetSessionResponse, ListMySessionsResponse,
@@ -225,7 +224,6 @@ use crate::{
         AssessmentStatsResponse,
         ListAttemptsResponse,
         CohortStatsResponse,
-        QuotaPlan,
         UpdateSettingsBody,
         crate::settings::EffectiveSettings,
         crate::settings::RateLimitSettings,

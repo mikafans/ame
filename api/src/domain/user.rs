@@ -33,14 +33,17 @@ pub struct User {
     pub email: Option<String>,
     pub display_name: String,
     pub role: Role,
-    pub plan: String,
-    pub owner_user_id: Option<Uuid>,
+    pub status: UserStatus,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
-    #[serde(default, with = "time::serde::rfc3339::option")]
-    #[schema(value_type = Option<String>, format = DateTime)]
-    pub deactivated_at: Option<OffsetDateTime>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UserStatus {
+    Active,
+    Deactivated,
 }
 
 /// Token scope as enforced by the `api_tokens.scopes` CHECK constraint.

@@ -366,7 +366,7 @@ paths:
     patch:
       tags:
       - admin
-      summary: PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user
+      summary: PATCH /v1/admin/users/{id} — update learner/admin role or account status
       operationId: patch_user_admin
       parameters:
       - name: id
@@ -3648,15 +3648,11 @@ components:
     PatchUserAdminBody:
       type: object
       properties:
-        disabled:
-          type:
-          - boolean
-          - 'null'
-        plan:
+        role:
           type:
           - string
           - 'null'
-        role:
+        status:
           type:
           - string
           - 'null'
@@ -3701,11 +3697,6 @@ components:
         user_id:
           type: string
           format: uuid
-    Plan:
-      type: string
-      enum:
-      - free
-      - premium
     PlanItem:
       type: object
       required:
@@ -4522,16 +4513,11 @@ components:
       - id
       - displayName
       - role
-      - plan
+      - status
       - createdAt
       properties:
         createdAt:
           type: string
-          format: date-time
-        deactivatedAt:
-          type:
-          - string
-          - 'null'
           format: date-time
         displayName:
           type: string
@@ -4542,15 +4528,10 @@ components:
         id:
           type: string
           format: uuid
-        ownerUserId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        plan:
-          type: string
         role:
           $ref: '#/components/schemas/Role'
+        status:
+          $ref: '#/components/schemas/UserStatus'
     UserInfo:
       type: object
       required:
@@ -4568,6 +4549,11 @@ components:
           type: string
         role:
           type: string
+    UserStatus:
+      type: string
+      enum:
+      - active
+      - deactivated
     UserTagRating:
       type: object
       required:

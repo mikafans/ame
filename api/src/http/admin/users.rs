@@ -37,8 +37,7 @@ pub struct ListUsersQuery {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PatchUserAdminBody {
-    pub plan: Option<String>,
-    pub disabled: Option<bool>,
+    pub status: Option<String>,
     pub role: Option<String>,
 }
 
@@ -81,7 +80,7 @@ pub async fn list_users(
 
     // 2. Get paginated users
     let mut users_qb = sqlx::QueryBuilder::new(
-        "SELECT u.id, NULL::uuid AS owner_user_id, u.email, u.display_name, u.role, u.plan, u.created_at, u.deactivated_at FROM tb_users u",
+        "SELECT u.id, u.email_canonical AS email, u.display_name, u.role, u.status, u.created_at FROM tb_users u",
     );
     if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
         let search_pat = format!("%{}%", search.trim());
@@ -112,13 +111,14 @@ pub async fn list_users(
             };
             User {
                 id: r.get("id"),
-                owner_user_id: r.get("owner_user_id"),
                 email: r.get("email"),
                 display_name: r.get("display_name"),
                 role,
-                plan: r.get("plan"),
+                status: match r.get::<String, _>("status").as_str() {
+                    "deactivated" => crate::domain::user::UserStatus::Deactivated,
+                    _ => crate::domain::user::UserStatus::Active,
+                },
                 created_at: r.get("created_at"),
-                deactivated_at: r.get("deactivated_at"),
             }
         })
         .collect();
@@ -126,7 +126,7 @@ pub async fn list_users(
     Ok(Json(ListUsersResponse { users, total }))
 }
 
-/// PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user
+/// PATCH /v1/admin/users/{id} — update learner/admin role or account status
 #[utoipa::path(
     patch,
     path = "/v1/admin/users/{id}",
@@ -147,16 +147,15 @@ pub async fn patch_user_admin(
     Path(user_id): Path<Uuid>,
     Json(body): Json<PatchUserAdminBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // 1. Verify user exists and fetch current role/status
-    let current_user: Option<(String, bool)> = sqlx::query_as(
-        "SELECT role, (deactivated_at IS NOT NULL) as disabled FROM tb_users WHERE id = $1",
-    )
-    .bind(user_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    // 1. Verify user exists and fetch current clean role/status.
+    let current_user: Option<(String, String)> =
+        sqlx::query_as("SELECT role, status FROM tb_users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
-    let (current_role, current_disabled) = match current_user {
+    let (current_role, current_status) = match current_user {
         Some(u) => u,
         None => return Err(ApiError::NotFound { resource: "user" }),
     };
@@ -180,7 +179,7 @@ pub async fn patch_user_admin(
     }
 
     // B. Check self-disable
-    if target_is_self && body.disabled.unwrap_or(false) {
+    if target_is_self && body.status.as_deref() == Some("deactivated") {
         crate::audit::audit(
             state.pool.clone(),
             Some(admin.0.user.id),
@@ -190,27 +189,27 @@ pub async fn patch_user_admin(
             serde_json::json!({ "reason": "self_disable_forbidden" }),
         );
         return Err(ApiError::Validation(vec![FieldError {
-            field: "disabled".into(),
-            message: "cannot disable your own account".into(),
+            field: "status".into(),
+            message: "cannot deactivate your own account".into(),
         }]));
     }
 
     // C. Check last active admin protection
-    let is_active_admin = current_role == "admin" && !current_disabled;
+    let is_active_admin = current_role == "admin" && current_status == "active";
     let changing_to_non_admin = body.role.as_ref().map(|r| r != "admin").unwrap_or(false);
-    let changing_to_disabled = body.disabled.unwrap_or(false);
+    let changing_to_deactivated = body.status.as_deref() == Some("deactivated");
 
-    if is_active_admin && (changing_to_non_admin || changing_to_disabled) {
+    if is_active_admin && (changing_to_non_admin || changing_to_deactivated) {
         let active_admin_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_users WHERE role = 'admin' AND deactivated_at IS NULL",
+            "SELECT COUNT(*) FROM tb_users WHERE role = 'admin' AND status = 'active'",
         )
         .fetch_one(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
         if active_admin_count <= 1 {
-            let field = if changing_to_disabled {
-                "disabled"
+            let field = if changing_to_deactivated {
+                "status"
             } else {
                 "role"
             };
@@ -229,81 +228,37 @@ pub async fn patch_user_admin(
         }
     }
 
-    // 2. Perform plan updates if requested
-    if let Some(plan) = &body.plan {
-        let normalized = plan.to_lowercase();
-        if normalized != "free" && normalized != "premium" {
+    // 2. Perform status update if requested.
+    if let Some(status) = &body.status {
+        if !["active", "deactivated"].contains(&status.as_str()) {
             return Err(ApiError::Validation(vec![FieldError {
-                field: "plan".into(),
-                message: "must be 'free' or 'premium'".into(),
+                field: "status".into(),
+                message: "must be 'active' or 'deactivated'".into(),
             }]));
         }
-
-        sqlx::query("UPDATE tb_users SET plan = $1 WHERE id = $2")
-            .bind(&normalized)
+        sqlx::query("UPDATE tb_users SET status = $1 WHERE id = $2")
+            .bind(status)
             .bind(user_id)
             .execute(&state.pool)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
-
         crate::audit::audit(
             state.pool.clone(),
             Some(admin.0.user.id),
-            "user.update_plan",
+            "user.update_status",
             Some("user"),
             Some(user_id),
-            serde_json::json!({
-                "plan": normalized,
-            }),
+            serde_json::json!({ "status": status }),
         );
     }
 
-    // 3. Perform disable/enable if requested
-    if let Some(disabled) = body.disabled {
-        if disabled {
-            sqlx::query("UPDATE tb_users SET deactivated_at = now() WHERE id = $1")
-                .bind(user_id)
-                .execute(&state.pool)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-
-            crate::audit::audit(
-                state.pool.clone(),
-                Some(admin.0.user.id),
-                "user.disable",
-                Some("user"),
-                Some(user_id),
-                serde_json::json!({
-                    "disabled": true,
-                }),
-            );
-        } else {
-            sqlx::query("UPDATE tb_users SET deactivated_at = NULL WHERE id = $1")
-                .bind(user_id)
-                .execute(&state.pool)
-                .await
-                .map_err(|e| ApiError::Internal(e.into()))?;
-
-            crate::audit::audit(
-                state.pool.clone(),
-                Some(admin.0.user.id),
-                "user.enable",
-                Some("user"),
-                Some(user_id),
-                serde_json::json!({
-                    "disabled": false,
-                }),
-            );
-        }
-    }
-
-    // 4. Perform role updates if requested
+    // 3. Perform role updates if requested.
     if let Some(role) = &body.role {
-        let valid_roles = ["user", "admin"];
+        let valid_roles = ["learner", "admin"];
         if !valid_roles.contains(&role.as_str()) {
             return Err(ApiError::Validation(vec![FieldError {
                 field: "role".into(),
-                message: "must be 'user' or 'admin'".into(),
+                message: "must be 'learner' or 'admin'".into(),
             }]));
         }
 
@@ -326,12 +281,10 @@ pub async fn patch_user_admin(
         );
     }
 
-    // Invalidate caches: if role or disabled status changed, force re-login (delete sessions);
-    // otherwise (plan-only change), just bust the cache to pick up the new plan on next load.
-    if body.role.is_some() || body.disabled.is_some() {
+    // Role/status changes revoke active sessions so the clean principal is
+    // re-evaluated on the next request.
+    if body.role.is_some() || body.status.is_some() {
         crate::auth::extractor::invalidate_user_tokens(&state.pool, &state.valkey, user_id).await;
-    } else {
-        crate::auth::extractor::invalidate_user_caches(&state.pool, &state.valkey, user_id).await;
     }
 
     Ok(StatusCode::NO_CONTENT)

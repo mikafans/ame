@@ -179,7 +179,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user */
+        /** PATCH /v1/admin/users/{id} — update learner/admin role or account status */
         patch: operations["patch_user_admin"];
         trace?: never;
     };
@@ -1534,9 +1534,8 @@ export interface components {
             status: components["schemas"]["SessionStatus"];
         };
         PatchUserAdminBody: {
-            disabled?: boolean | null;
-            plan?: string | null;
             role?: string | null;
+            status?: string | null;
         };
         PendingAttemptRow: {
             /** Format: uuid */
@@ -1556,8 +1555,6 @@ export interface components {
             /** Format: uuid */
             user_id: string;
         };
-        /** @enum {string} */
-        Plan: "free" | "premium";
         PlanItem: {
             option_order?: number[] | null;
             /** Format: uuid */
@@ -1876,16 +1873,12 @@ export interface components {
         User: {
             /** Format: date-time */
             createdAt: string;
-            /** Format: date-time */
-            deactivatedAt?: string | null;
             displayName: string;
             email?: string | null;
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            ownerUserId?: string | null;
-            plan: string;
             role: components["schemas"]["Role"];
+            status: components["schemas"]["UserStatus"];
         };
         UserInfo: {
             email: string;
@@ -1894,6 +1887,8 @@ export interface components {
             name: string;
             role: string;
         };
+        /** @enum {string} */
+        UserStatus: "active" | "deactivated";
         UserTagRating: {
             /** Format: int32 */
             attempts_count: number;

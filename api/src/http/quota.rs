@@ -1,61 +1,13 @@
-/// Quota and plan management.
-use crate::domain::{error::ApiError, user::Scope};
-use serde::{Deserialize, Serialize};
+/// Local quota management.
+use crate::domain::error::ApiError;
 use sqlx::PgPool;
-use utoipa::ToSchema;
 use uuid::Uuid;
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Plan {
-    Free,
-    Premium,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuotaKind {
     AgentCreation,
     Assessment,
     Question,
-}
-
-pub async fn resolve_plan(pool: &PgPool, owner_id: Uuid) -> Result<Plan, ApiError> {
-    let plan_str: String = sqlx::query_scalar("SELECT plan FROM tb_users WHERE id = $1")
-        .bind(owner_id)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    Ok(match plan_str.as_str() {
-        "premium" => Plan::Premium,
-        _ => Plan::Free,
-    })
-}
-
-/// Returns the maximum set of scopes permitted for an agent under a given plan.
-pub fn plan_scope_ceiling(plan: Plan) -> Vec<Scope> {
-    match plan {
-        Plan::Premium => vec![
-            Scope::AssessmentRead,
-            Scope::AssessmentWrite,
-            Scope::AttemptRead,
-            Scope::AttemptWrite,
-            Scope::StatsRead,
-            Scope::FeedbackWrite,
-            Scope::PlanRead,
-            Scope::PlanWrite,
-        ],
-        Plan::Free => vec![
-            Scope::AssessmentRead,
-            Scope::AssessmentWrite,
-            Scope::AttemptRead,
-            Scope::AttemptWrite,
-            Scope::StatsRead,
-            Scope::FeedbackWrite,
-            Scope::PlanRead,
-            Scope::PlanWrite,
-        ],
-    }
 }
 
 /// Checks if the owner has quota available for the given kind of action.
@@ -67,22 +19,16 @@ pub async fn check_quota(
     kind: QuotaKind,
     add_count: i64,
 ) -> Result<(), ApiError> {
-    // 1. Resolve owner plan
-    let plan = resolve_plan(pool, owner_id).await?;
-
-    // 2. Define quota limits from the effective settings (operator overrides in
-    //    tb_settings overlaid on config; fail-open to config if Valkey is absent).
+    // Define quota limits from the effective settings. The clean baseline has
+    // no subscription column, so every actor uses the local free-policy tier.
     let quota = match valkey {
         Some(vk) => crate::settings::get_effective(pool, vk, config).await.quota,
         None => crate::settings::EffectiveSettings::from_config(config).quota,
     };
-    let limit = match (plan, kind) {
-        (Plan::Premium, QuotaKind::AgentCreation) => quota.agents.premium,
-        (Plan::Free, QuotaKind::AgentCreation) => quota.agents.free,
-        (Plan::Premium, QuotaKind::Assessment) => quota.assessments.premium,
-        (Plan::Free, QuotaKind::Assessment) => quota.assessments.free,
-        (Plan::Premium, QuotaKind::Question) => quota.questions.premium,
-        (Plan::Free, QuotaKind::Question) => quota.questions.free,
+    let limit = match kind {
+        QuotaKind::AgentCreation => quota.agents.free,
+        QuotaKind::Assessment => quota.assessments.free,
+        QuotaKind::Question => quota.questions.free,
     };
 
     // 3. Count current usage
@@ -94,7 +40,7 @@ pub async fn check_quota(
 
     let usage: i64 = match kind {
         QuotaKind::AgentCreation => sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND deactivated_at IS NULL",
+            "SELECT COUNT(*) FROM tb_agents WHERE owner_user_id = $1 AND revoked_at IS NULL",
         )
         .bind(owner_id)
         .fetch_one(&mut *conn)

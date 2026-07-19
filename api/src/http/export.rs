@@ -18,17 +18,16 @@ pub struct ExportResponse {
     pub tag_ratings: serde_json::Value,
 }
 
-/// GET /v1/me/export — export premium-only owner data bundle
+/// GET /v1/me/export — export the owner's data bundle
 ///
 /// Returns assessments, questions, sessions, attempts, and tag ratings owned by this user
-/// and any of their agents. Premium plan required, throttled via governor, audited.
+/// and any of their agents. Throttled via governor and audited.
 #[utoipa::path(
     get,
     path = "/v1/me/export",
     responses(
         (status = 200, description = "Owner data successfully exported", body = ExportResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden (Premium required)"),
         (status = 429, description = "Too Many Requests (Throttled)"),
     ),
     security(("bearer" = [])),
@@ -39,14 +38,6 @@ pub async fn export_data(
     auth: AuthenticatedUser,
     mut db: DbConn,
 ) -> Result<Json<ExportResponse>, ApiError> {
-    // 1. Premium plan gating (Premium-only)
-    let plan = crate::http::quota::resolve_plan(&state.pool, auth.owner_id()).await?;
-    if plan != crate::http::quota::Plan::Premium {
-        return Err(ApiError::ScopeRequired(std::borrow::Cow::Borrowed(
-            "premium",
-        )));
-    }
-
     let pool = &state.pool;
     let owner_id = auth.owner_id();
 
