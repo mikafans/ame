@@ -1,11 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/api/client";
+import type { components } from "@/api/generated/schema.d.ts";
+
+type LearningPreview = components["schemas"]["PreviewLearningResponse"];
 
 const benefits = [
   {
@@ -88,14 +93,80 @@ function QuizPreview() {
   );
 }
 
+function LearningPreviewCard({ preview }: { preview: LearningPreview }) {
+  return (
+    <div className="rounded-xl bg-white p-5 text-neutral-900 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6">
+      <div className="space-y-5">
+        <div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-blue-600">
+            {preview.templateId} · v{preview.templateVersion}
+          </p>
+          <h2 className="mt-2 text-xl font-bold tracking-tight">
+            {preview.promise}
+          </h2>
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-neutral-500">
+            Your first outcomes
+          </p>
+          <ul className="space-y-2 text-sm leading-5">
+            {preview.objectives.map((objective) => (
+              <li key={objective.statement} className="flex gap-2">
+                <Check className="mt-0.5 size-4 shrink-0 text-lime-700" />
+                <span>{objective.statement}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-lg bg-neutral-100 p-3 text-sm">
+          <p className="font-semibold">
+            First step: {preview.firstActivity.title}
+          </p>
+          <p className="mt-1 text-neutral-600">
+            {preview.firstActivity.purpose} · about{" "}
+            {preview.firstActivity.estimatedMinutes} minutes
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const { user } = useAuth();
   const { mode, toggle } = useColorMode();
+  const [prompt, setPrompt] = useState("");
+  const [preview, setPreview] = useState<LearningPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const signedIn = !!user;
   const entryHref = signedIn ? "/explore" : "/login?tab=signup";
   const entryLabel = signedIn ? "Open Explore" : "Sign up free";
   const sampleHref = signedIn ? "/explore" : "#benefits";
   const sampleLabel = signedIn ? "Open Explore" : "See how it works";
+
+  async function handlePreview(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const { data, error, response } = await api.POST(
+        "/v1/onboarding/preview",
+        { body: { prompt } },
+      );
+      if (!response.ok || !data) {
+        void error;
+        throw new Error("Could not prepare a learning preview");
+      }
+      setPreview(data);
+    } catch (error) {
+      setPreviewError(
+        error instanceof Error ? error.message : "Could not reach AME",
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
@@ -155,10 +226,36 @@ export default function LandingPage() {
                   Study what you don&apos;t know yet.
                 </h1>
                 <p className="max-w-xl text-[17px] leading-7 text-neutral-400 sm:text-[19px]">
-                  AME builds question banks, tracks every answer, and adapts
-                  each session to your weakest topics — so no minute of studying
-                  is wasted.
+                  Tell AME what you want to learn. It turns your intent into a
+                  focused first journey, then gives you one clear next step.
                 </p>
+                <form onSubmit={handlePreview} className="max-w-xl space-y-2">
+                  <label htmlFor="learning-intent" className="sr-only">
+                    What would you like to learn?
+                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      id="learning-intent"
+                      value={prompt}
+                      onChange={(event) => setPrompt(event.target.value)}
+                      placeholder="I'd like to learn music theory"
+                      className="min-h-11 flex-1 rounded-full border border-neutral-700 bg-neutral-900 px-5 text-sm text-white outline-none placeholder:text-neutral-500 focus:border-lime-400 focus:ring-2 focus:ring-lime-400/30"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={previewLoading || !prompt.trim()}
+                      className="min-h-11 rounded-full bg-lime-400 px-5 font-bold text-neutral-950 hover:bg-lime-300"
+                    >
+                      {previewLoading ? "Preparing…" : "See my plan"}
+                      <ArrowRight className="size-4" />
+                    </Button>
+                  </div>
+                  {previewError && (
+                    <p role="alert" className="text-sm text-red-300">
+                      {previewError}
+                    </p>
+                  )}
+                </form>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     asChild
@@ -178,7 +275,11 @@ export default function LandingPage() {
                   </Button>
                 </div>
               </div>
-              <QuizPreview />
+              {preview ? (
+                <LearningPreviewCard preview={preview} />
+              ) : (
+                <QuizPreview />
+              )}
             </div>
           </section>
 

@@ -10,3 +10,45 @@ test("sign up CTA opens the account creation form", async ({ page }) => {
   ).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Full name")).toBeVisible();
 });
+
+test("visitor can preview a first learning journey from an intent", async ({
+  page,
+}) => {
+  await page.route("**/v1/onboarding/preview", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        normalizedStatement: "Learn music theory",
+        promise:
+          "Build a durable foundation through guided practice and review",
+        templateId: "learn-a-subject",
+        templateVersion: 1,
+        objectives: [
+          {
+            verb: "identify",
+            statement: "Identify the core concepts: music theory",
+            successCriteria: "Name the essential ideas and how they relate",
+          },
+        ],
+        firstActivity: {
+          kind: "explanation",
+          title: "Get oriented and see what you already know",
+          purpose: "orientation",
+          estimatedMinutes: 5,
+        },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page
+    .getByLabel("What would you like to learn?")
+    .fill("I would like to learn music theory");
+  await page.getByRole("button", { name: "See my plan" }).click();
+
+  await expect(page.getByText("Build a durable foundation")).toBeVisible();
+  await expect(
+    page.getByText("Get oriented and see what you already know"),
+  ).toBeVisible();
+});
