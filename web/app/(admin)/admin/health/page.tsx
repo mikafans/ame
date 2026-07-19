@@ -19,12 +19,10 @@ interface HealthData {
   database: string;
   valkey: string;
   usersCount: number;
-  agentsCount: number;
-  assessmentsCount: number;
+  journeysCount: number;
+  activitiesCount: number;
   sessionsCount: number;
-  questionsCount: number;
   auditLogCount: number;
-  quotaRejectionsTotal: number;
 }
 export default function SystemHealthPage() {
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -35,7 +33,10 @@ export default function SystemHealthPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: apiError } = await api.GET("/v1/admin/health");
+      const { data, error: apiError } = await api.GET(
+        "/api/v1/admin/health",
+        {},
+      );
       if (apiError)
         setError(
           "Failed to fetch system status: " +
@@ -73,10 +74,10 @@ export default function SystemHealthPage() {
   };
   const metrics = [
     ["Total Users", health?.usersCount ?? 0, Users],
-    ["Total Agents", health?.agentsCount ?? 0, Activity],
-    ["Assessments", health?.assessmentsCount ?? 0, List],
+    ["Journeys", health?.journeysCount ?? 0, Activity],
+    ["Activities", health?.activitiesCount ?? 0, List],
     ["Sessions", health?.sessionsCount ?? 0, Play],
-    ["Questions", health?.questionsCount ?? 0, Database],
+    ["Audit events", health?.auditLogCount ?? 0, Database],
   ] as const;
   return (
     <main className="px-6 py-12 sm:px-12">
@@ -141,14 +142,6 @@ export default function SystemHealthPage() {
           value={health?.auditLogCount ?? 0}
         >
           Append-only log total size.
-        </Metric>
-        <Metric
-          icon={Shield}
-          title="Rate-Limit Quota Rejections"
-          value={health?.quotaRejectionsTotal ?? 0}
-          warning={(health?.quotaRejectionsTotal ?? 0) > 0}
-        >
-          Recent client quota requests rejected by Valkey.
         </Metric>
       </div>
     </main>

@@ -32,7 +32,7 @@ export default function LearningHomePage() {
   useEffect(() => {
     void (async () => {
       const { data, response } = await api.GET(
-        "/v1/learning/journeys" as never,
+        "/api/v1/learning/journeys" as never,
       );
       if (response.ok && data) {
         const nextJourneys = data as JourneySummary[];
@@ -48,7 +48,7 @@ export default function LearningHomePage() {
       const results = await Promise.all(
         journeys.slice(0, 3).map(async (journey) => {
           const { data, response } = await api.GET(
-            "/v1/learning/journeys/{id}",
+            "/api/v1/learning/journeys/{id}",
             { params: { path: { id: journey.id } } },
           );
           const objective = (
@@ -56,7 +56,7 @@ export default function LearningHomePage() {
           )?.objectives?.[0];
           if (!response.ok || !objective) return null;
           const snapshot = await api.GET(
-            "/v1/progress/{journey_id}/objectives/{objective_id}",
+            "/api/v1/progress/{journey_id}/objectives/{objective_id}",
             {
               params: {
                 path: { journey_id: journey.id, objective_id: objective.id },

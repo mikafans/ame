@@ -33,7 +33,7 @@ function StartLearningForm() {
     try {
       let onboardingToken: string | undefined;
       if (!user) {
-        const registration = await publicApi.POST("/v1/auth/register", {
+        const registration = await publicApi.POST("/public/v1/auth/register", {
           body: { email, name: displayName, password },
         });
         if (!registration.response.ok || !registration.data) {
@@ -45,17 +45,20 @@ function StartLearningForm() {
         }
         onboardingToken = registration.data.token;
       }
-      const { data, response } = await publicApi.POST("/v1/onboarding/start", {
-        headers: onboardingToken
-          ? { Authorization: `Bearer ${onboardingToken}` }
-          : undefined,
-        body: {
-          displayName,
-          email,
-          idempotencyKey: crypto.randomUUID(),
-          prompt,
+      const { data, response } = await publicApi.POST(
+        "/public/v1/onboarding/start",
+        {
+          headers: onboardingToken
+            ? { Authorization: `Bearer ${onboardingToken}` }
+            : undefined,
+          body: {
+            displayName,
+            email,
+            idempotencyKey: crypto.randomUUID(),
+            prompt,
+          },
         },
-      });
+      );
       if (!response.ok || !data) {
         throw new Error("Could not start your learning journey");
       }

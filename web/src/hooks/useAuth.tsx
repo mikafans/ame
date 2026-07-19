@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUser = useCallback(async () => {
     try {
-      const r = await fetch(`${API_URL}/v1/me`, {
+      const r = await fetch(`${API_URL}/api/v1/me`, {
         credentials: "include",
       });
       if (!r.ok) {
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch(`${API_URL}/v1/auth/logout`, {
+      await fetch(`${API_URL}/api/v1/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
@@ -95,7 +95,7 @@ export function useAuth() {
  */
 export async function logout() {
   try {
-    await fetch(`${API_URL}/v1/auth/logout`, {
+    await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: "POST",
       credentials: "include",
     });

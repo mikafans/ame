@@ -36,7 +36,7 @@ def learner_token(api: str, email: str, password: str, name: str) -> str:
     status, response = request(
         api,
         "POST",
-        "/v1/auth/register",
+        "/public/v1/auth/register",
         {"email": email, "name": name, "password": password},
     )
     if status == 201:
@@ -47,7 +47,7 @@ def learner_token(api: str, email: str, password: str, name: str) -> str:
     status, response = request(
         api,
         "POST",
-        "/v1/auth/login",
+        "/public/v1/auth/login",
         {"email": email, "password": password},
     )
     if status != 200:
@@ -71,7 +71,7 @@ def main() -> int:
     status, response = request(
         args.api,
         "POST",
-        "/v1/onboarding/start",
+        "/public/v1/onboarding/start",
         {
             "email": args.email,
             "displayName": args.name,

@@ -43,7 +43,7 @@ export default function LoginPage() {
     (typeof window !== "undefined"
       ? `http://${window.location.hostname}:28080`
       : "http://localhost:28080");
-  const publicApiUrl = `${apiUrl.replace(/\/$/, "")}/public`;
+  const publicApiUrl = apiUrl.replace(/\/$/, "");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -51,7 +51,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const endpoint =
-        tab === "signup" ? "/v1/auth/register" : "/v1/auth/login";
+        tab === "signup" ? "/public/v1/auth/register" : "/public/v1/auth/login";
       const body =
         tab === "signup"
           ? { email, name: fullName, password, role: "user" }

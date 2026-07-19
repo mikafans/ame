@@ -34,7 +34,7 @@ export default function AuditLogsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await api.GET("/v1/admin/audit", {
+      const { data, error } = await api.GET("/api/v1/admin/audit", {
         params: {
           query: {
             limit: rows,

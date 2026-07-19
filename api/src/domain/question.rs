@@ -16,20 +16,15 @@ pub enum QuestionKind {
     Code,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentReviewStatus {
+    #[default]
     Draft,
     Review,
     Approved,
     Rejected,
     Retired,
-}
-
-impl Default for ContentReviewStatus {
-    fn default() -> Self {
-        Self::Draft
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

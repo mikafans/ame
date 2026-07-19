@@ -14,18 +14,13 @@ pub enum AssessmentMode {
     Graded,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AssessmentStatus {
+    #[default]
     Draft,
     Published,
     Retired,
-}
-
-impl Default for AssessmentStatus {
-    fn default() -> Self {
-        Self::Draft
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

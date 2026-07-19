@@ -163,9 +163,9 @@ pub async fn rate_limit_middleware(
     let path = req.uri().path();
     if path == "/healthz"
         || path == "/metrics"
-        || path == "/skill.json"
-        || path == "/llms.txt"
-        || path == "/openapi.yaml"
+        || path == "/public/skill.json"
+        || path == "/public/llms.txt"
+        || path == "/public/openapi.yaml"
     {
         return Ok(next.run(req).await);
     }
@@ -239,19 +239,16 @@ fn public_rate_limit_key(path: &str, ip: &str) -> String {
 
 fn public_bucket(path: &str) -> &'static str {
     match path {
-        "/v1/auth/login" => "auth-login",
-        "/v1/auth/register" => "auth-register",
-        "/v1/onboarding/start" => "onboarding",
+        "/public/v1/auth/login" => "auth-login",
+        "/public/v1/auth/register" => "auth-register",
+        "/public/v1/onboarding/preview" | "/public/v1/onboarding/start" => "onboarding",
         _ => "api",
     }
 }
 
 fn authenticated_request_cost(path: &str, base_cost: u32) -> u32 {
-    if path == "/v1/agents/run" {
-        base_cost.saturating_mul(2).max(1)
-    } else {
-        base_cost.max(1)
-    }
+    let _ = path;
+    base_cost.max(1)
 }
 
 fn get_client_ip(req: &axum::extract::Request, trusted_proxies: usize) -> String {
@@ -347,20 +344,21 @@ mod tests {
 
     #[test]
     fn public_routes_use_separate_rate_limit_buckets() {
-        assert_eq!(public_bucket("/v1/auth/login"), "auth-login");
-        assert_eq!(public_bucket("/v1/auth/register"), "auth-register");
-        assert_eq!(public_bucket("/v1/onboarding/start"), "onboarding");
-        assert_eq!(public_bucket("/v1/explore"), "api");
+        assert_eq!(public_bucket("/public/v1/auth/login"), "auth-login");
+        assert_eq!(public_bucket("/public/v1/auth/register"), "auth-register");
+        assert_eq!(public_bucket("/public/v1/onboarding/start"), "onboarding");
+        assert_eq!(public_bucket("/public/v1/onboarding/preview"), "onboarding");
+        assert_eq!(public_bucket("/api/v1/explore"), "api");
         assert_eq!(
-            public_rate_limit_key("/v1/onboarding/start", "192.0.2.10"),
+            public_rate_limit_key("/public/v1/onboarding/start", "192.0.2.10"),
             "ame:limiter:public:onboarding:192.0.2.10"
         );
     }
 
     #[test]
-    fn agent_execution_costs_more_than_regular_writes() {
-        assert_eq!(authenticated_request_cost("/v1/agents/run", 5), 10);
-        assert_eq!(authenticated_request_cost("/v1/assessments", 5), 5);
-        assert_eq!(authenticated_request_cost("/v1/agents/run", 0), 1);
+    fn all_authenticated_requests_use_the_same_cost_policy() {
+        assert_eq!(authenticated_request_cost("/v1/learning/journeys", 5), 5);
+        assert_eq!(authenticated_request_cost("/v1/learning/sessions", 5), 5);
+        assert_eq!(authenticated_request_cost("/v1/learning/journeys", 0), 1);
     }
 }

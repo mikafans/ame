@@ -6,18 +6,13 @@ use std::fmt::Display;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RegistrationMode {
+    #[default]
     Open,
     Invite,
     Password,
-}
-
-impl Default for RegistrationMode {
-    fn default() -> Self {
-        Self::Open
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

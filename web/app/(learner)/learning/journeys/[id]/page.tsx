@@ -17,6 +17,7 @@ type StarterQuestion = {
 };
 type StarterContent = {
   type: "starter_check";
+  context?: string;
   instructions: string;
   questions: StarterQuestion[];
 };
@@ -33,7 +34,7 @@ export default function LearningJourneyPage() {
   useEffect(() => {
     let cancelled = false;
     api
-      .GET("/v1/learning/journeys/{id}", {
+      .GET("/api/v1/learning/journeys/{id}", {
         params: { path: { id: params.id } },
       })
       .then(({ data, response }) => {
@@ -45,7 +46,7 @@ export default function LearningJourneyPage() {
           `ame-learning-session:${params.id}`,
         );
         if (storedSessionId) {
-          return api.GET("/v1/learning/sessions/{id}", {
+          return api.GET("/api/v1/learning/sessions/{id}", {
             params: { path: { id: storedSessionId } },
           });
         }
@@ -82,7 +83,7 @@ export default function LearningJourneyPage() {
     setError(null);
     try {
       const { data, response } = await api.POST(
-        "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
+        "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
         {
           params: { path: { journey_id: params.id, activity_id: activityId } },
         },
@@ -109,7 +110,7 @@ export default function LearningJourneyPage() {
     setError(null);
     try {
       const { data, response } = await api.POST(
-        "/v1/learning/sessions/{id}/finish",
+        "/api/v1/learning/sessions/{id}/finish",
         {
           params: { path: { id: session.id } },
           body: {
@@ -125,7 +126,7 @@ export default function LearningJourneyPage() {
         throw new Error("Could not finish this activity");
       setSession(data);
       window.localStorage.removeItem(`ame-learning-session:${params.id}`);
-      const refreshed = await api.GET("/v1/learning/journeys/{id}", {
+      const refreshed = await api.GET("/api/v1/learning/journeys/{id}", {
         params: { path: { id: params.id } },
       });
       if (refreshed.response.ok && refreshed.data) setJourney(refreshed.data);
@@ -258,6 +259,11 @@ export default function LearningJourneyPage() {
             {session.status === "in_progress" &&
               activeContent?.type === "starter_check" && (
                 <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
+                  {activeContent.context && (
+                    <p className="rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6 text-foreground">
+                      {activeContent.context}
+                    </p>
+                  )}
                   <p className="text-sm font-medium">
                     {activeContent.instructions}
                   </p>

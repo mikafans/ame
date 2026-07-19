@@ -9,7 +9,7 @@ interface UserType {
   id: string;
   email?: string | null;
   displayName: string;
-  role: "admin" | "agent" | "user";
+  role: "admin" | "user";
   status: "active" | "deactivated";
   createdAt: string;
 }
@@ -32,7 +32,7 @@ export default function ManageUsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await api.GET("/v1/admin/users", {
+      const { data, error } = await api.GET("/api/v1/admin/users", {
         params: {
           query: { limit: rows, offset: page * rows, q: query || undefined },
         },
@@ -69,7 +69,7 @@ export default function ManageUsersPage() {
         dialog === "role"
           ? { role: targetRole }
           : { status: selected.status === "active" ? "deactivated" : "active" };
-      const { error } = await api.PATCH("/v1/admin/users/{id}", {
+      const { error } = await api.PATCH("/api/v1/admin/users/{id}", {
         params: { path: { id: selected.id } },
         body,
       });

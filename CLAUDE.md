@@ -69,13 +69,13 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - MC question options are **bare strings** (`Vec<String>`) — never `{text: "..."}` objects. The grader and frontend both expect this format.
 - Scheduled exams are not supported — no `opens_at`/`closes_at` fields in the API or DB.
 - SSO/SAML is not implemented — login supports email + password only.
-- Assessment lifecycle: draft → active (publish auto-promotes draft questions to live). Quizzes and exams are unified into the `Assessment` entity (modes: `practice` vs `graded`); endpoints consolidated under `/v1/assessments`, governed by `assessment.read`/`assessment.write` scopes.
+- Learning lifecycle: onboarding creates an owner-scoped goal, journey, objectives, and starter activities. The web app and agents use the same learner endpoints; there are no per-client capability scopes.
 - **Env vars** use the `AME_` prefix (`AME_DATABASE_URL`, `AME_PORT`, `AME_LOG_FORMAT`, …).
 - **Timestamps**: API timestamps are RFC3339, converted to JST (UTC+9) in the HTTP layer.
 - **MC feedback**: results show both the selected and correct option text with their labels (e.g. `"D: O(log n)"`).
 - **Code questions**: fall back to `pending_manual` grading unless `payload.exemplar` is set; exemplar match is exact (whitespace-trimmed).
-- **First admin is DB-granted; further admins can be granted in-app by an existing admin.** Registration always creates `role: user` (`POST /v1/auth/register` rejects `role: admin`) — no user can self-escalate. The *root* admin is seeded via `make db-admin` (a direct SQL write — `make db-admin ADMIN_EMAIL=...` to promote a specific account, preserving its password). Once an admin exists, they may promote/demote other users via `PATCH /v1/admin/users/{id}` (`role`); the endpoint blocks self-demotion, self-disable, and demoting/disabling the last remaining active admin (no lockout). `db-seed` depends on `db-admin` because seeding needs an admin to upgrade the primary user (Ada) to premium (premium unlocks the agent-creation quota that `make db-bulk` relies on). Re-login after a role/scope change — token scopes are fixed at login.
-- Sharing/public-visibility was removed — no `visibility` field or `public.publish` scope anywhere. Cross-account access is owner-scoped (sub-accounts), not public sharing.
+- **First admin is DB-granted; further admins can be granted in-app by an existing admin.** Registration always creates a learner (`POST /public/v1/auth/register`) — no user can self-escalate. The *root* admin is seeded via `make db-admin` (a direct SQL write — `make db-admin ADMIN_EMAIL=...` to promote a specific account, preserving its password). Once an admin exists, they may promote/demote other users via `PATCH /api/v1/admin/users/{id}` (`role`); the endpoint blocks self-demotion, self-disable, and demoting/disabling the last remaining active admin (no lockout).
+- Sharing/public-visibility is not part of the current baseline. Cross-account access is not exposed.
 
 ## Shell Habits
 
@@ -94,15 +94,15 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - Full suite: `E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:23000 bunx @playwright/test test --project=chromium`.
 - Interactive audit uses `@playwright/cli` (**not** `playwright-cli` — that 404s). Run from `.tmp/` (gitignored) so snapshots land there.
 - **Auth pattern**: cookies don't survive `goto` — re-set on each new page: `bunx @playwright/cli cookie-set ame_token "<token>" --domain=localhost` → `reload` → `sleep 3` (async `useAuth`; screenshotting too early catches the Loading state).
-- Mint a learner token: `curl -s -X POST http://localhost:28080/v1/auth/login -H "Content-Type: application/json" -d '{"email":"ada@example.com","password":"password123"}' | jq -r .token`.
+- Mint a learner token: `curl -s -X POST http://localhost:28080/public/v1/auth/login -H "Content-Type: application/json" -d '{"email":"ada@example.com","password":"password123"}' | jq -r .token`.
 - **fish + jq**: a multi-line variable piped into `jq` breaks — write to a temp file first (`curl -s <url> -o /tmp/out.json && jq '.field' /tmp/out.json`).
 
 ## Agent Surface
 
-- `docs/public/llms.txt` is the canonical agent guide (served entry doc with the worked playbooks); reference client at `agents/client.py`.
-- Discovery: `GET /llms.txt` (public) → `GET /skill.json` (public manifest).
-- Mint a key: an authenticated human owner calls `POST /v1/me/agents` (token-only sub-account; `apiKey` shown once). The old `POST /v1/agents/register` faucet was removed.
-- Write tools run via `POST /v1/agents/run`; read tools are called directly at their advertised method/path.
+- `docs/public/llms.txt` is the canonical agent guide for the shared learner API.
+- Discovery: `GET /public/llms.txt` (public) → `GET /public/skill.json` (public manifest).
+- An agent calls `POST /public/v1/onboarding/start` with an email identifier and prompt, then uses the returned learner bearer token against `/api/v1/*`.
+- Journey reads and writes are direct calls to the endpoints advertised in `/skill.json`; there is no run-door or agent key.
 
 ## Conventions
 

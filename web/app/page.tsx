@@ -168,7 +168,7 @@ export default function LandingPage() {
     setPreviewLoading(true);
     try {
       const { data, error, response } = await publicApi.POST(
-        "/v1/onboarding/preview",
+        "/public/v1/onboarding/preview",
         { body: { prompt } },
       );
       if (!response.ok || !data) {
@@ -353,7 +353,11 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {["/public/llms.txt", "/public/skill.json", "/public/openapi.yaml"].map((href) => (
+              {[
+                "/public/llms.txt",
+                "/public/skill.json",
+                "/public/openapi.yaml",
+              ].map((href) => (
                 <Button
                   key={href}
                   asChild
@@ -409,7 +413,10 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
           <span>© 2026 AME</span>
           <div className="flex gap-5">
-            <Link href="/public/llms.txt" className="transition hover:text-primary">
+            <Link
+              href="/public/llms.txt"
+              className="transition hover:text-primary"
+            >
               Docs
             </Link>
             <a
