@@ -285,7 +285,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     unverified_streak = client.post(
         "/api/v1/progress/streaks", headers=headers, json=unverified_streak_body
     )
-    assert unverified_streak.status_code == 404, unverified_streak.text
+    assert unverified_streak.status_code == 422, unverified_streak.text
     cross_owner_streak = client.post(
         "/api/v1/progress/streaks", headers=other_headers, json=streak_body
     )
