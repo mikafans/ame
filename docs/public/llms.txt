@@ -52,6 +52,7 @@ GET /api/v1/attempts/{attempt_id}
 POST /api/v1/attempts/{attempt_id}/answers
 POST /api/v1/attempts/{attempt_id}/finish
 GET /api/v1/progress/{journey_id}/streaks
+GET /api/v1/progress/{journey_id}/timeline
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,

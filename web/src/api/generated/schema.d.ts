@@ -439,6 +439,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/progress/{journey_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_timeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/questions": {
         parameters: {
             query?: never;
@@ -1104,6 +1120,16 @@ export interface components {
             burst: number;
             /** Format: int32 */
             rate: number;
+        };
+        TimelineEventResponse: {
+            /** Format: uuid */
+            activityId?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: date-time */
+            occurredAt: string;
+            title: string;
         };
         /** @description Partial update for platform settings — any omitted field is left unchanged. */
         UpdateSettingsBody: {
@@ -2004,6 +2030,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StreakResponse"][];
+                };
+            };
+        };
+    };
+    list_timeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineEventResponse"][];
                 };
             };
         };

@@ -602,6 +602,24 @@
       "path": "/api/v1/progress/{journey_id}/streaks"
     },
     {
+      "description": "Read the ordered activity, assessment, evidence, deep-dive, and streak history for one owned journey.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.progress.timeline",
+      "path": "/api/v1/progress/{journey_id}/timeline"
+    },
+    {
       "description": "Create a source-backed explanatory deep dive linked to evidence.",
       "input_schema": {
         "properties": {

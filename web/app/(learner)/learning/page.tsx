@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Compass,
   Flame,
+  History,
   Sparkles,
 } from "lucide-react";
 import { api } from "@/api/client";
@@ -25,12 +26,20 @@ type JourneySummary = {
 
 type Snapshot = { mastery: number; confidence: number; evidenceCount: number };
 type StreakEvent = { qualifyingDay: string };
+type TimelineEvent = {
+  kind: string;
+  title: string;
+  occurredAt: string;
+};
 
 export default function LearningHomePage() {
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<Record<string, Snapshot>>({});
   const [streaks, setStreaks] = useState<Record<string, number>>({});
+  const [timelines, setTimelines] = useState<Record<string, TimelineEvent[]>>(
+    {},
+  );
 
   useEffect(() => {
     void (async () => {
@@ -58,6 +67,10 @@ export default function LearningHomePage() {
             "/api/v1/progress/{journey_id}/streaks",
             { params: { path: { journey_id: journey.id } } },
           );
+          const timelineResponse = await api.GET(
+            "/api/v1/progress/{journey_id}/timeline",
+            { params: { path: { journey_id: journey.id } } },
+          );
           const streakDays = new Set(
             streakResponse.response.ok && streakResponse.data
               ? (streakResponse.data as StreakEvent[]).map(
@@ -70,7 +83,15 @@ export default function LearningHomePage() {
           )?.objectives?.[0];
           if (!response.ok) return null;
           if (!objective) {
-            return { journeyId: journey.id, snapshot: null, streakDays };
+            return {
+              journeyId: journey.id,
+              snapshot: null,
+              streakDays,
+              timeline:
+                timelineResponse.response.ok && timelineResponse.data
+                  ? (timelineResponse.data as TimelineEvent[])
+                  : [],
+            };
           }
           const snapshot = await api.GET(
             "/api/v1/progress/{journey_id}/objectives/{objective_id}",
@@ -87,6 +108,10 @@ export default function LearningHomePage() {
                 ? (snapshot.data as Snapshot)
                 : null,
             streakDays,
+            timeline:
+              timelineResponse.response.ok && timelineResponse.data
+                ? (timelineResponse.data as TimelineEvent[])
+                : [],
           };
         }),
       );
@@ -110,6 +135,15 @@ export default function LearningHomePage() {
               (value): value is NonNullable<typeof value> => value !== null,
             )
             .map((value) => [value.journeyId, value.streakDays.size]),
+        ),
+      );
+      setTimelines(
+        Object.fromEntries(
+          results
+            .filter(
+              (value): value is NonNullable<typeof value> => value !== null,
+            )
+            .map((value) => [value.journeyId, value.timeline]),
         ),
       );
     })();
@@ -187,6 +221,18 @@ export default function LearningHomePage() {
                           {streaks[journey.id] === 1 ? "day" : "days"}
                         </span>
                       )}
+                    </div>
+                  )}
+                  {timelines[journey.id]?.length > 0 && (
+                    <div className="mt-4 flex items-start gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+                      <History className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <span>
+                        Recent:{" "}
+                        {timelines[journey.id]
+                          .slice(-3)
+                          .map((event) => event.title)
+                          .join(" · ")}
+                      </span>
                     </div>
                   )}
                 </div>

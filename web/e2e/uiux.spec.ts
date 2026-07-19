@@ -60,6 +60,8 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(
     page.getByText("Your latest activity produced evidence."),
   ).toBeVisible();
+  await page.goto("/learning");
+  await expect(page.getByText(/Recent:/)).toBeVisible();
 });
 
 test("a returning learner resumes from the learning desk", async ({ page }) => {

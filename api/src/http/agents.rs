@@ -173,6 +173,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["journeyId"],"properties":{"journeyId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.progress.timeline",
+            "Read the ordered activity, assessment, evidence, deep-dive, and streak history for one owned journey.",
+            "GET",
+            "/api/v1/progress/{journey_id}/timeline",
+            json!({"type":"object","required":["journeyId"],"properties":{"journeyId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.deep_dive.create",
             "Create a source-backed explanatory deep dive linked to evidence.",
             "POST",

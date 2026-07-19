@@ -731,6 +731,29 @@ paths:
                   $ref: '#/components/schemas/StreakResponse'
       security:
       - bearer: []
+  /api/v1/progress/{journey_id}/timeline:
+    get:
+      tags:
+      - progress
+      operationId: list_timeline
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimelineEventResponse'
+      security:
+      - bearer: []
   /api/v1/questions:
     post:
       tags:
@@ -2286,6 +2309,29 @@ components:
           type: integer
           format: int32
           minimum: 0
+    TimelineEventResponse:
+      type: object
+      required:
+      - id
+      - kind
+      - title
+      - occurredAt
+      properties:
+        activityId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        title:
+          type: string
     UpdateSettingsBody:
       type: object
       description: Partial update for platform settings — any omitted field is left unchanged.

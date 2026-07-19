@@ -279,6 +279,21 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         json={"completed": True, "responses": [{"id": "q1", "value": "right"}]},
     )
     assert finished_session.status_code == 200, finished_session.text
+    timeline = client.get(
+        f"/api/v1/progress/{journey_id}/timeline", headers=headers
+    )
+    assert timeline.status_code == 200, timeline.text
+    timeline_body = timeline.json()
+    timeline_kinds = [event["kind"] for event in timeline_body]
+    assert "activity_started" in timeline_kinds
+    assert "activity_completed" in timeline_kinds
+    assert "assessment_submitted" in timeline_kinds
+    assert "evidence_recorded" in timeline_kinds
+    assert "deep_dive_created" in timeline_kinds
+    assert "streak_recorded" in timeline_kinds
+    assert [event["occurredAt"] for event in timeline_body] == sorted(
+        event["occurredAt"] for event in timeline_body
+    )
 
     _, other_headers = _start_learner(client, "I want to learn a different subject")
     other_streaks = client.get(
@@ -289,6 +304,10 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         f"/api/v1/learning/journeys/{journey_id}/attempts", headers=other_headers
     )
     assert other_attempt_history.status_code == 404, other_attempt_history.text
+    other_timeline = client.get(
+        f"/api/v1/progress/{journey_id}/timeline", headers=other_headers
+    )
+    assert other_timeline.status_code == 404, other_timeline.text
     forbidden_journey = client.get(
         f"/api/v1/learning/journeys/{journey_id}", headers=other_headers
     )

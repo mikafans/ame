@@ -27,6 +27,7 @@ use crate::http::{
     progress::{
         EvidenceBody, EvidenceResponse, ObjectiveActivityBody, RecommendationBody,
         RecommendationResponse, SnapshotResponse, StreakBody, StreakResponse,
+        TimelineEventResponse,
     },
     questions::{CreateQuestionBody, QuestionResponse},
 };
@@ -60,6 +61,7 @@ use crate::http::{
         crate::http::progress::recommend,
         crate::http::progress::record_streak,
         crate::http::progress::list_streaks,
+        crate::http::progress::list_timeline,
         crate::http::deep_dives::create,
         crate::http::deep_dives::get_for_activity,
         crate::http::deep_dives::get_one,
@@ -116,6 +118,7 @@ use crate::http::{
         SnapshotResponse,
         StreakBody,
         StreakResponse,
+        TimelineEventResponse,
         CreateDeepDiveBody,
         DeepDiveResponse,
         DeepDiveActivityQuery,

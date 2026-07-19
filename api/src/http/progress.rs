@@ -15,11 +15,13 @@ use crate::{
         error::{ApiError, FieldError},
         learning::LearningRepository,
         progress::{MasteryEvidenceInput, ProgressError, StreakEventInput},
+        timeline::TimelineRepository,
     },
     http::AppState,
     learning_postgres::PgLearningRepository,
     progress::ProgressRepository,
     progress_postgres::PgProgressRepository,
+    timeline_postgres::PgTimelineRepository,
 };
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -99,6 +101,18 @@ pub struct StreakResponse {
     pub qualifying_day: String,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEventResponse {
+    pub id: Uuid,
+    pub activity_id: Option<Uuid>,
+    pub kind: String,
+    pub title: String,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub occurred_at: time::OffsetDateTime,
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/progress/evidence", post(record_evidence))
@@ -107,6 +121,7 @@ pub fn router(state: AppState) -> Router<AppState> {
             get(snapshot),
         )
         .route("/v1/progress/{journey_id}/streaks", get(list_streaks))
+        .route("/v1/progress/{journey_id}/timeline", get(list_timeline))
         .route("/v1/progress/{journey_id}/recommendation", post(recommend))
         .route("/v1/progress/streaks", post(record_streak))
         .with_state(state)
@@ -202,6 +217,49 @@ pub async fn list_streaks(
                 activity_id: event.input.activity_id,
                 qualifying_event_key: event.input.qualifying_event_key,
                 qualifying_day: event.input.qualifying_day.to_string(),
+            })
+            .collect(),
+    ))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/progress/{journey_id}/timeline",
+    params(("journey_id" = Uuid, Path)),
+    responses((status = 200, body = [TimelineEventResponse])),
+    security(("bearer" = [])),
+    tag = "progress"
+)]
+pub async fn list_timeline(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<Vec<TimelineEventResponse>>, ApiError> {
+    PgLearningRepository::new(state.pool.clone())
+        .get_journey(auth.owner_id(), journey_id)
+        .await
+        .map_err(|error| match error {
+            crate::domain::learning::LearningRepositoryError::NotFound { .. }
+            | crate::domain::learning::LearningRepositoryError::SubjectMismatch => {
+                ApiError::NotFound {
+                    resource: "journey",
+                }
+            }
+            other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
+        })?;
+    let events = PgTimelineRepository::new(state.pool)
+        .list_events(auth.owner_id(), journey_id)
+        .await
+        .map_err(|error| ApiError::Internal(anyhow::anyhow!(format!("{error:?}"))))?;
+    Ok(Json(
+        events
+            .into_iter()
+            .map(|event| TimelineEventResponse {
+                id: event.id,
+                activity_id: event.activity_id,
+                kind: event.kind.as_str().to_string(),
+                title: event.title,
+                occurred_at: event.occurred_at,
             })
             .collect(),
     ))
