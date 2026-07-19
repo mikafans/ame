@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     auth::extractor::AuthenticatedUser,
-    domain::{error::ApiError, identity::RegistrationMode},
+    domain::error::ApiError,
     http::AppState,
     identity_postgres::PgIdentityRepository,
     learning_postgres::PgLearningRepository,
@@ -148,7 +148,7 @@ pub async fn start_learning(
                 display_name: body.display_name,
                 raw_prompt: body.prompt,
                 idempotency_key: body.idempotency_key,
-                registration_mode: RegistrationMode::Open,
+                registration_mode: state.config.registration.mode,
             },
             &CatalogPromptInterpreter,
         )
@@ -206,9 +206,7 @@ fn map_start_learning_error(error: StartLearningError) -> ApiError {
             }])
         }
         StartLearningError::Prompt(error) => ApiError::Internal(error.into()),
-        StartLearningError::UnsupportedRegistrationMode => ApiError::Internal(anyhow::anyhow!(
-            "unsupported registration mode reached public onboarding route"
-        )),
+        StartLearningError::AuthenticationRequired => ApiError::Unauthorized,
         StartLearningError::Bootstrap(error) => ApiError::Internal(error.into()),
     }
 }

@@ -14,6 +14,12 @@ pub enum RegistrationMode {
     Password,
 }
 
+impl Default for RegistrationMode {
+    fn default() -> Self {
+        Self::Open
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateLearner {
     pub email: String,

@@ -8,7 +8,7 @@ use crate::domain::learning::{
     ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective,
     LearningGoal, LearningJourney, LearningRepository, LearningRepositoryError,
 };
-use crate::templates::builtin_catalog;
+use crate::templates::{builtin_catalog, find_template_blueprint, find_topic_blueprint};
 use async_trait::async_trait;
 use thiserror::Error;
 use uuid::Uuid;
@@ -42,6 +42,8 @@ pub enum BootstrapError {
     UnknownTemplate { template_id: String, version: u32 },
     #[error("built-in learning template catalog is invalid: {0}")]
     InvalidTemplateCatalog(String),
+    #[error("topic blueprint catalog is invalid: {0}")]
+    InvalidTopicBlueprint(String),
     #[error(transparent)]
     Repository(#[from] LearningRepositoryError),
 }
@@ -151,15 +153,9 @@ impl LearningPromptInterpreter for CatalogPromptInterpreter {
                     recommendation.template_id
                 ))
             })?;
-        let promise = match template.id.as_str() {
-            "exam-prep" => "Build an exam-ready understanding through guided practice and review",
-            "build-a-project" => "Learn the concepts and produce a working first project",
-            _ => "Build a durable foundation through guided practice and review",
-        };
-
         Ok(PromptInterpretation {
             normalized_statement: normalized_statement.to_string(),
-            promise: promise.to_string(),
+            promise: template.promise.clone(),
             template_id: template.id.clone(),
             template_version: template.version,
             template_version_id: None,
@@ -169,8 +165,8 @@ impl LearningPromptInterpreter for CatalogPromptInterpreter {
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum StartLearningError {
-    #[error("self-host onboarding only supports open registration")]
-    UnsupportedRegistrationMode,
+    #[error("registration mode requires an authenticated learner session")]
+    AuthenticationRequired,
     #[error(transparent)]
     Identity(#[from] IdentityRepositoryError),
     #[error(transparent)]
@@ -217,7 +213,7 @@ where
             })
             .await?;
 
-        let blueprint = starter_blueprint(&plan, journey.id);
+        let blueprint = starter_blueprint(&plan, journey.id)?;
         let mut objectives = self
             .repository
             .list_objectives(journey.subject_user_id, journey.id)
@@ -264,7 +260,6 @@ where
                     journey_id: journey.id,
                     subject_user_id: journey.subject_user_id,
                     source_actor_id: plan.source_actor_id,
-                    source_run_id: None,
                     kind: activity.kind,
                     title: activity.title,
                     order_index: activity.order_index,
@@ -303,61 +298,32 @@ struct StarterActivity {
     status: ActivityStatus,
 }
 
-fn starter_blueprint(plan: &BootstrapPlan, journey_id: Uuid) -> StarterBlueprint {
+fn starter_blueprint(
+    plan: &BootstrapPlan,
+    journey_id: Uuid,
+) -> Result<StarterBlueprint, BootstrapError> {
     let subject = plan.subject_user_id;
-    let objectives = match plan.template_id.as_str() {
-        "exam-prep" => vec![
+    let topic = find_topic_blueprint(&plan.normalized_statement)
+        .map_err(BootstrapError::InvalidTopicBlueprint)?
+        .or(find_template_blueprint(&plan.template_id)
+            .map_err(BootstrapError::InvalidTopicBlueprint)?);
+    let topic = topic.ok_or_else(|| {
+        BootstrapError::InvalidTemplateCatalog(format!(
+            "starter blueprint is missing for template {}",
+            plan.template_id
+        ))
+    })?;
+    let objectives = topic
+        .objectives
+        .iter()
+        .map(|objective| {
             (
-                "map",
-                "Map the target syllabus",
-                "Name the main domains and their expected weight",
-            ),
-            (
-                "solve",
-                "Solve representative problems",
-                "Complete a bounded set with explained reasoning",
-            ),
-            (
-                "review",
-                "Review the weakest domain",
-                "Choose one evidence-backed review target",
-            ),
-        ],
-        "build-a-project" => vec![
-            (
-                "define",
-                "Define the first artifact",
-                "Describe a small usable result and its constraints",
-            ),
-            (
-                "apply",
-                "Apply the core concept",
-                "Use the concept in a concrete implementation step",
-            ),
-            (
-                "ship",
-                "Complete the first milestone",
-                "Produce and inspect a small working increment",
-            ),
-        ],
-        _ => vec![
-            (
-                "identify",
-                "Identify the core concepts",
-                "Name the essential ideas and how they relate",
-            ),
-            (
-                "explain",
-                "Explain one concept clearly",
-                "Give an accurate explanation with a useful example",
-            ),
-            (
-                "apply",
-                "Apply the ideas in practice",
-                "Use the ideas in a new but bounded situation",
-            ),
-        ],
-    };
+                objective.verb.as_str(),
+                objective.statement.as_str(),
+                objective.success_criteria.as_str(),
+            )
+        })
+        .collect::<Vec<_>>();
     let objectives = objectives
         .into_iter()
         .enumerate()
@@ -372,72 +338,48 @@ fn starter_blueprint(plan: &BootstrapPlan, journey_id: Uuid) -> StarterBlueprint
             },
         )
         .collect();
-    let first_title = match plan.template_id.as_str() {
-        "exam-prep" => "Orient on the target and estimate your starting point",
-        "build-a-project" => "Define the smallest useful first milestone",
-        _ => "Get oriented and see what you already know",
-    };
-    let second_kind = if plan.template_id == "build-a-project" {
-        ActivityKind::Application
-    } else {
-        ActivityKind::Diagnostic
-    };
-    StarterBlueprint {
-        objectives,
-        activities: vec![
-            StarterActivity {
-                kind: ActivityKind::Explanation,
-                title: first_title.to_string(),
-                order_index: 0,
-                objective_orders: vec![0],
-                payload: serde_json::json!({
-                    "purpose": "orientation",
-                    "intent": plan.normalized_statement,
-                    "estimated_minutes": 5
-                    ,"content": {
-                        "type": "starter_check",
-                        "instructions": "Give AME a quick starting signal so the next step can fit you.",
-                        "questions": [
-                            {
-                                "id": "familiarity",
-                                "kind": "single_choice",
-                                "prompt": "How familiar are you with this topic?",
-                                "options": ["new_to_me", "some_exposure", "comfortable"]
-                            },
-                            {
-                                "id": "outcome",
-                                "kind": "short_text",
-                                "prompt": "What would you like to be able to do first?"
-                            }
-                        ]
-                    }
-                }),
-                status: ActivityStatus::Ready,
-            },
-            StarterActivity {
-                kind: second_kind,
-                title: "Try a short first task".to_string(),
-                order_index: 1,
-                objective_orders: vec![0, 1],
-                payload: serde_json::json!({
-                    "purpose": "diagnose_starting_point",
-                    "estimated_minutes": 10
-                }),
-                status: ActivityStatus::Proposed,
-            },
-            StarterActivity {
-                kind: ActivityKind::Recommendation,
-                title: "Review your result and choose the next step".to_string(),
-                order_index: 2,
-                objective_orders: vec![2],
-                payload: serde_json::json!({
-                    "purpose": "next_action",
-                    "estimated_minutes": 5
-                }),
-                status: ActivityStatus::Proposed,
-            },
-        ],
+    let first_payload = serde_json::json!({
+        "purpose": topic.first_activity.purpose,
+        "intent": plan.normalized_statement,
+        "estimated_minutes": topic.first_activity.estimated_minutes,
+        "content": {
+            "type": "starter_check",
+            "context": topic.first_activity.context,
+            "instructions": topic.first_activity.instructions,
+            "questions": topic.first_activity.questions,
+        }
+    });
+    let first_kind = serde_json::from_value(serde_json::Value::String(topic.first_activity.kind))
+        .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
+    let first_status =
+        serde_json::from_value(serde_json::Value::String(topic.first_activity.status))
+            .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
+    let mut activities = vec![StarterActivity {
+        kind: first_kind,
+        title: topic.first_activity.title,
+        order_index: 0,
+        objective_orders: topic.first_activity.objective_orders,
+        payload: first_payload,
+        status: first_status,
+    }];
+    for activity in topic.follow_up_activities {
+        let kind = serde_json::from_value(serde_json::Value::String(activity.kind))
+            .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
+        let status = serde_json::from_value(serde_json::Value::String(activity.status))
+            .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
+        activities.push(StarterActivity {
+            kind,
+            title: activity.title,
+            order_index: activities.len() as i32,
+            objective_orders: activity.objective_orders,
+            payload: activity.payload,
+            status,
+        });
     }
+    Ok(StarterBlueprint {
+        objectives,
+        activities,
+    })
 }
 
 #[derive(Clone)]
@@ -477,7 +419,8 @@ where
                 idempotency_key: "preview".to_string(),
             },
             Uuid::nil(),
-        );
+        )
+        .map_err(|error| PromptInterpretationError::InvalidTemplateCatalog(error.to_string()))?;
         let first_activity = blueprint
             .activities
             .first()
@@ -518,17 +461,13 @@ where
         &self,
         request: StartLearningRequest,
     ) -> Result<StartLearningResult, StartLearningError> {
-        if request.registration_mode != RegistrationMode::Open {
-            return Err(StartLearningError::UnsupportedRegistrationMode);
-        }
-
         let account = if let Some(user_id) = request.authenticated_user_id {
             let account = self.identity.get_learner(user_id).await?;
             if crate::auth::token::canonical_email(&request.email) != account.email {
                 return Err(IdentityRepositoryError::AccountEmailMismatch.into());
             }
             account
-        } else {
+        } else if request.registration_mode == RegistrationMode::Open {
             match self.identity.find_learner_by_email(&request.email).await? {
                 Some(_) => return Err(IdentityRepositoryError::AccountAlreadyExists.into()),
                 None => {
@@ -540,6 +479,8 @@ where
                         .await?
                 }
             }
+        } else {
+            return Err(StartLearningError::AuthenticationRequired);
         };
         if account.status != AccountStatus::Active {
             return Err(IdentityRepositoryError::AccountNotFound.into());
@@ -628,17 +569,17 @@ mod tests {
     use crate::learning::InMemoryLearningRepository;
     use uuid::Uuid;
 
-    fn music_theory_plan() -> BootstrapPlan {
+    fn learner_topic_plan() -> BootstrapPlan {
         BootstrapPlan {
             subject_user_id: Uuid::now_v7(),
             source_actor_id: Uuid::now_v7(),
-            raw_intent: "I would like to learn music theory".to_string(),
-            normalized_statement: "Understand foundational music theory".to_string(),
-            promise: "Identify notes, intervals, and basic chords".to_string(),
+            raw_intent: "I would like to learn a learner-selected topic".to_string(),
+            normalized_statement: "Understand the learner-selected topic".to_string(),
+            promise: "Explain and apply the learner-selected topic".to_string(),
             template_id: "learn-a-subject".to_string(),
             template_version: 1,
             template_version_id: None,
-            idempotency_key: "onboarding/music-theory".to_string(),
+            idempotency_key: "onboarding/learner-selected-topic".to_string(),
         }
     }
 
@@ -647,13 +588,13 @@ mod tests {
             authenticated_user_id: None,
             email: "learner@example.test".to_string(),
             display_name: "Learner".to_string(),
-            raw_intent: "I would like to learn music theory".to_string(),
-            normalized_statement: "Understand foundational music theory".to_string(),
-            promise: "Identify notes, intervals, and basic chords".to_string(),
+            raw_intent: "I would like to learn a learner-selected topic".to_string(),
+            normalized_statement: "Understand the learner-selected topic".to_string(),
+            promise: "Explain and apply the learner-selected topic".to_string(),
             template_id: "learn-a-subject".to_string(),
             template_version: 1,
             template_version_id: None,
-            idempotency_key: "onboarding/music-theory".to_string(),
+            idempotency_key: "onboarding/learner-selected-topic".to_string(),
             registration_mode: RegistrationMode::Open,
         }
     }
@@ -663,8 +604,8 @@ mod tests {
             authenticated_user_id: None,
             email: "prompt-learner@example.test".to_string(),
             display_name: "Prompt Learner".to_string(),
-            raw_prompt: "I would like to learn music theory".to_string(),
-            idempotency_key: "onboarding/prompt-music-theory".to_string(),
+            raw_prompt: "I would like to learn a learner-selected topic".to_string(),
+            idempotency_key: "onboarding/prompt-learner-selected-topic".to_string(),
             registration_mode: RegistrationMode::Open,
         }
     }
@@ -683,7 +624,7 @@ mod tests {
         assert_eq!(result.bootstrap.template_id, "learn-a-subject");
         assert_eq!(
             result.bootstrap.goal.raw_intent,
-            "I would like to learn music theory"
+            "I would like to learn a learner-selected topic"
         );
     }
 
@@ -695,7 +636,7 @@ mod tests {
         );
         let preview = service
             .preview_from_prompt(
-                "I would like to learn music theory",
+                "I would like to learn a learner-selected topic",
                 &CatalogPromptInterpreter,
             )
             .await
@@ -752,7 +693,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn self_host_start_learning_does_not_accept_password_mode_yet() {
+    async fn self_host_start_learning_requires_authentication_for_restricted_modes() {
         let service = SelfHostOnboardingService::new(
             InMemoryIdentityRepository::default(),
             InMemoryLearningRepository::default(),
@@ -762,7 +703,7 @@ mod tests {
 
         assert_eq!(
             service.start_learning(request).await,
-            Err(StartLearningError::UnsupportedRegistrationMode)
+            Err(StartLearningError::AuthenticationRequired)
         );
     }
 
@@ -770,7 +711,7 @@ mod tests {
     async fn bootstrap_creates_and_retries_the_same_journey() {
         let repository = InMemoryLearningRepository::default();
         let service = OnboardingService::new(repository.clone());
-        let plan = music_theory_plan();
+        let plan = learner_topic_plan();
 
         let first = service
             .bootstrap(plan.clone())
@@ -805,7 +746,7 @@ mod tests {
     #[tokio::test]
     async fn bootstrap_rejects_unknown_template_before_writing() {
         let service = OnboardingService::new(InMemoryLearningRepository::default());
-        let mut plan = music_theory_plan();
+        let mut plan = learner_topic_plan();
         plan.template_id = "invented-template".to_string();
 
         assert_eq!(
@@ -820,7 +761,7 @@ mod tests {
     #[tokio::test]
     async fn bootstrap_rejects_empty_idempotency_key() {
         let service = OnboardingService::new(InMemoryLearningRepository::default());
-        let mut plan = music_theory_plan();
+        let mut plan = learner_topic_plan();
         plan.idempotency_key = " ".to_string();
 
         assert_eq!(

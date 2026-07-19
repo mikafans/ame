@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::path::Path;
 
+use crate::domain::identity::RegistrationMode;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ServerConfig {
     pub port: u16,
@@ -52,21 +54,22 @@ pub struct BatchConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct TierQuotaConfig {
-    pub free: i64,
-    pub premium: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct QuotaConfig {
-    pub agents: TierQuotaConfig,
-    pub assessments: TierQuotaConfig,
-    pub questions: TierQuotaConfig,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct LoginConfig {
     pub ttl_seconds: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RegistrationConfig {
+    #[serde(default)]
+    pub mode: RegistrationMode,
+}
+
+impl Default for RegistrationConfig {
+    fn default() -> Self {
+        Self {
+            mode: RegistrationMode::Open,
+        }
+    }
 }
 
 impl Default for LoginConfig {
@@ -79,10 +82,11 @@ impl Default for LoginConfig {
 pub struct Config {
     pub server: ServerConfig,
     pub ratelimit: RateLimitConfig,
-    pub quota: QuotaConfig,
     pub batch: BatchConfig,
     #[serde(default)]
     pub login: LoginConfig,
+    #[serde(default)]
+    pub registration: RegistrationConfig,
 }
 
 impl Config {
@@ -186,18 +190,6 @@ write = 5
 free = 50
 premium = 500
 
-[quota.agents]
-free = 1
-premium = 100
-
-[quota.assessments]
-free = 50
-premium = 5000
-
-[quota.questions]
-free = 50
-premium = 5000
-
 [login]
 ttl_seconds = 60
 "#;
@@ -239,17 +231,6 @@ write = 5
 free = 50
 premium = 500
 
-[quota.agents]
-free = 1
-premium = 100
-
-[quota.assessments]
-free = 50
-premium = 5000
-
-[quota.questions]
-free = 50
-premium = 5000
 "#;
         let config: Config = toml::from_str(toml_str).expect("Failed to parse TOML");
         assert_eq!(config.login.ttl_seconds, 10800);
