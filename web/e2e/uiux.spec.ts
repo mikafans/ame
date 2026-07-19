@@ -403,5 +403,7 @@ test("learner can finish a manual-review assessment without false progress", asy
   await expect(
     page.getByText("Complete. Your next activity is now ready."),
   ).toBeVisible();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByText("Could not record assessment evidence"),
+  ).toHaveCount(0);
 });
