@@ -109,13 +109,33 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   expect(explanation.payload.content.type).toBe("explanation");
   expect(explanation.payload.content.body).toContain(prompt);
   expect(workedExample.payload.content.type).toBe("worked_example");
+  const contentGenerationRunId = await publishedGenerationRun(
+    page,
+    "learning.activity.content.compose",
+  );
+  const groundedContent = {
+    type: "explanation",
+    heading: "A grounded starting model",
+    body: "This is the first source-backed model for the learner.",
+    keyPoints: ["Start with one observable mechanism."],
+  };
+  const groundedContentResponse = await page.request.patch(
+    `/api/v1/learning/activities/${explanation.id}/content`,
+    {
+      data: {
+        generationRunId: contentGenerationRunId,
+        content: groundedContent,
+        sourceReferences: ["https://example.test/subject/intro"],
+        reviewStatus: "approved",
+      },
+    },
+  );
+  expect(groundedContentResponse.ok()).toBeTruthy();
   await page.getByRole("button", { name: "Begin" }).last().click();
   await expect(
-    page.getByRole("heading", { name: `A clear model for ${prompt}` }),
+    page.getByRole("heading", { name: groundedContent.heading }),
   ).toBeVisible();
-  await expect(
-    page.getByText(/Begin by putting .* into your own words\./),
-  ).toBeVisible();
+  await expect(page.getByText(groundedContent.body)).toBeVisible();
   await expect(
     page.getByText("This objective has the weakest available evidence."),
   ).toBeVisible();

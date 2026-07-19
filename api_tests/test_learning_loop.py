@@ -57,6 +57,155 @@ def _recommendation_candidates(journey_body):
     ]
 
 
+def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    journey_id = started["journeyId"]
+    journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
+    assert journey.status_code == 200, journey.text
+    activities = journey.json()["activities"]
+    explanation = next(
+        activity
+        for activity in activities
+        if activity["payload"]["content"]["type"] == "explanation"
+    )
+    generation_run_id = _published_generation_run(
+        client, headers, "learning.activity.content.compose"
+    )
+    content = {
+        "type": "explanation",
+        "heading": "A grounded starting model",
+        "body": "This explanation was authored from the learner's actual sources.",
+        "keyPoints": ["Start with one observable mechanism."],
+    }
+    grounded = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": content,
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert grounded.status_code == 200, grounded.text
+    assert grounded.json()["payload"]["content"] == content
+    assert grounded.json()["payload"]["contentProvenance"] == {
+        "generationRunId": generation_run_id,
+        "reviewStatus": "approved",
+        "sourceReferences": ["https://example.test/subject/intro"],
+    }
+
+    invalid_content = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": {"type": "worked_example", "heading": "wrong"},
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert invalid_content.status_code == 422, invalid_content.text
+
+    missing_sources = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": content,
+            "sourceReferences": [],
+            "reviewStatus": "approved",
+        },
+    )
+    assert missing_sources.status_code == 422, missing_sources.text
+
+    unpublished_run_response = client.post(
+        "/api/v1/generation-runs",
+        headers=headers,
+        json={
+            "operation": "learning.activity.content.compose",
+            "provider": "test-provider",
+            "retryKey": f"unpublished-{uuid.uuid4()}",
+            "contentVersion": 1,
+        },
+    )
+    assert unpublished_run_response.status_code == 201
+    unpublished = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": unpublished_run_response.json()["id"],
+            "content": content,
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert unpublished.status_code == 409, unpublished.text
+
+    wrong_operation_run_id = _published_generation_run(
+        client, headers, "question.compose"
+    )
+    wrong_operation = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": wrong_operation_run_id,
+            "content": content,
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert wrong_operation.status_code == 422, wrong_operation.text
+
+    _, other_headers = _start_learner(client, "I want a different subject")
+    cross_owner = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=other_headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": content,
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert cross_owner.status_code == 404, cross_owner.text
+
+    starter = activities[0]
+    starter_session = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{starter['id']}/start",
+        headers=headers,
+    )
+    assert starter_session.status_code == 201, starter_session.text
+    finish_starter = client.post(
+        f"/api/v1/learning/sessions/{starter_session.json()['id']}/finish",
+        headers=headers,
+        json={"completed": True, "responses": []},
+    )
+    assert finish_starter.status_code == 200, finish_starter.text
+    explanation_session = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{explanation['id']}/start",
+        headers=headers,
+    )
+    assert explanation_session.status_code == 201, explanation_session.text
+    finish_explanation = client.post(
+        f"/api/v1/learning/sessions/{explanation_session.json()['id']}/finish",
+        headers=headers,
+        json={"completed": True, "responses": []},
+    )
+    assert finish_explanation.status_code == 200, finish_explanation.text
+    completed = client.patch(
+        f"/api/v1/learning/activities/{explanation['id']}/content",
+        headers=headers,
+        json={
+            "generationRunId": generation_run_id,
+            "content": content,
+            "sourceReferences": ["https://example.test/subject/intro"],
+            "reviewStatus": "approved",
+        },
+    )
+    assert completed.status_code == 409, completed.text
+
+
 def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     prompt = "I want to understand stream processing and deploy a Flink operator"
 
@@ -86,15 +235,18 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert initial_progress_recommendation.status_code == 200, (
         initial_progress_recommendation.text
     )
-    assert initial_recommendation["objectiveId"] == initial_progress_recommendation.json()[
-        "objectiveId"
-    ]
-    assert initial_recommendation["activityId"] == initial_progress_recommendation.json()[
-        "activityId"
-    ]
-    assert initial_recommendation["evidenceIds"] == initial_progress_recommendation.json()[
-        "evidenceIds"
-    ]
+    assert (
+        initial_recommendation["objectiveId"]
+        == initial_progress_recommendation.json()["objectiveId"]
+    )
+    assert (
+        initial_recommendation["activityId"]
+        == initial_progress_recommendation.json()["activityId"]
+    )
+    assert (
+        initial_recommendation["evidenceIds"]
+        == initial_progress_recommendation.json()["evidenceIds"]
+    )
 
     journeys = client.get("/api/v1/learning/journeys", headers=headers)
     assert journeys.status_code == 200, journeys.text
@@ -191,9 +343,12 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert projected_question["difficulty"] == "introductory"
     assert projected_question["options"]
     assert "is_correct" not in projected_question["options"][0]
-    assert client.get(
-        f"/api/v1/assessments/{assessment['id']}", headers=headers
-    ).status_code == 200
+    assert (
+        client.get(
+            f"/api/v1/assessments/{assessment['id']}", headers=headers
+        ).status_code
+        == 200
+    )
 
     attempt_response = client.post(
         f"/api/v1/assessments/{assessment['id']}/attempts",
@@ -243,18 +398,14 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert answer.status_code == 200, answer.text
 
-    finished = client.post(
-        f"/api/v1/attempts/{attempt['id']}/finish", headers=headers
-    )
+    finished = client.post(f"/api/v1/attempts/{attempt['id']}/finish", headers=headers)
     assert finished.status_code == 200, finished.text
     assert finished.json()["score"] == 1
     assert finished.json()["assessmentMode"] == "practice"
     assert finished.json()["reviewStatus"] == "complete"
     assert finished.json()["items"][0]["evaluationStatus"] == "correct"
     assert finished.json()["items"][0]["awardedPoints"] == 1
-    persisted_attempt = client.get(
-        f"/api/v1/attempts/{attempt['id']}", headers=headers
-    )
+    persisted_attempt = client.get(f"/api/v1/attempts/{attempt['id']}", headers=headers)
     assert persisted_attempt.status_code == 200, persisted_attempt.text
     assert persisted_attempt.json()["score"] == 1
     assert persisted_attempt.json()["assessmentMode"] == "practice"
@@ -298,7 +449,9 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert evidence_response.status_code == 200, evidence_response.text
     evidence_id = evidence_response.json()["id"]
 
-    _, other_headers = _start_learner(client, "I want to understand a different subject")
+    _, other_headers = _start_learner(
+        client, "I want to understand a different subject"
+    )
     cross_owner_evidence = client.post(
         "/api/v1/progress/evidence",
         headers=other_headers,
@@ -317,7 +470,9 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         headers=other_headers,
         json={"objectives": [{"objectiveId": objective_id, "activityId": activity_id}]},
     )
-    assert cross_owner_recommendation.status_code == 404, cross_owner_recommendation.text
+    assert cross_owner_recommendation.status_code == 404, (
+        cross_owner_recommendation.text
+    )
 
     snapshot = client.get(
         f"/api/v1/progress/{journey_id}/objectives/{objective_id}", headers=headers
@@ -333,11 +488,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     recommendation = client.post(
         f"/api/v1/progress/{journey_id}/recommendation",
         headers=headers,
-        json={
-            "objectives": [
-                {"objectiveId": objective_id, "activityId": activity_id}
-            ]
-        },
+        json={"objectives": [{"objectiveId": objective_id, "activityId": activity_id}]},
     )
     assert recommendation.status_code == 200, recommendation.text
 
@@ -373,18 +524,14 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         "/api/v1/progress/streaks", headers=other_headers, json=streak_body
     )
     assert cross_owner_streak.status_code == 404, cross_owner_streak.text
-    streak = client.post(
-        "/api/v1/progress/streaks", headers=headers, json=streak_body
-    )
+    streak = client.post("/api/v1/progress/streaks", headers=headers, json=streak_body)
     assert streak.status_code == 200, streak.text
     duplicate_streak = client.post(
         "/api/v1/progress/streaks", headers=headers, json=streak_body
     )
     assert duplicate_streak.status_code == 200, duplicate_streak.text
     assert duplicate_streak.json()["id"] == streak.json()["id"]
-    streaks = client.get(
-        f"/api/v1/progress/{journey_id}/streaks", headers=headers
-    )
+    streaks = client.get(f"/api/v1/progress/{journey_id}/streaks", headers=headers)
     assert streaks.status_code == 200, streaks.text
     assert len(streaks.json()) == 1
 
@@ -403,7 +550,9 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "title": "Flink operator scheduling",
             "body": "The JobManager coordinates the deployment lifecycle.",
             "example": "Inspect the JobManager and TaskManager roles.",
-            "caveats": ["Deployment behavior depends on the configured operator version."],
+            "caveats": [
+                "Deployment behavior depends on the configured operator version."
+            ],
             "sourceReferences": ["https://nightlies.apache.org/flink/"],
             "applicationTask": "Explain the scheduling path in your own words.",
             "reviewStatus": "approved",
@@ -448,9 +597,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         json={"completed": True, "responses": [{"id": "q1", "value": "right"}]},
     )
     assert finished_session.status_code == 200, finished_session.text
-    timeline = client.get(
-        f"/api/v1/progress/{journey_id}/timeline", headers=headers
-    )
+    timeline = client.get(f"/api/v1/progress/{journey_id}/timeline", headers=headers)
     assert timeline.status_code == 200, timeline.text
     timeline_body = timeline.json()
     timeline_kinds = [event["kind"] for event in timeline_body]
@@ -507,11 +654,14 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         f"/api/v1/learning/journeys/{journey_id}", headers=headers
     )
     assert after_abandon.status_code == 200, after_abandon.text
-    assert next(
-        activity
-        for activity in after_abandon.json()["activities"]
-        if activity["id"] == next_activity["id"]
-    )["status"] == "ready"
+    assert (
+        next(
+            activity
+            for activity in after_abandon.json()["activities"]
+            if activity["id"] == next_activity["id"]
+        )["status"]
+        == "ready"
+    )
 
     other_started, other_headers = _start_learner(
         client, "I want to learn a different subject"
@@ -604,11 +754,11 @@ def test_generation_runs_are_retryable_failure_safe_and_owner_scoped(client):
     )
     assert false_publish.status_code == 409, false_publish.text
 
-    other, other_headers = _start_learner(client, "I want to understand another provider")
-    assert other["userId"] != started["userId"]
-    cross_owner = client.get(
-        f"/api/v1/generation-runs/{run_id}", headers=other_headers
+    other, other_headers = _start_learner(
+        client, "I want to understand another provider"
     )
+    assert other["userId"] != started["userId"]
+    cross_owner = client.get(f"/api/v1/generation-runs/{run_id}", headers=other_headers)
     assert cross_owner.status_code == 404, cross_owner.text
 
 
@@ -643,16 +793,22 @@ def test_generated_content_requires_successful_owner_generation_run(client):
     )
     assert failed_run.status_code == 201, failed_run.text
     failed_run_id = failed_run.json()["id"]
-    assert client.patch(
-        f"/api/v1/generation-runs/{failed_run_id}",
-        headers=headers,
-        json={"status": "running"},
-    ).status_code == 200
-    assert client.patch(
-        f"/api/v1/generation-runs/{failed_run_id}",
-        headers=headers,
-        json={"status": "failed", "error": {"code": "provider_unavailable"}},
-    ).status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/generation-runs/{failed_run_id}",
+            headers=headers,
+            json={"status": "running"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/api/v1/generation-runs/{failed_run_id}",
+            headers=headers,
+            json={"status": "failed", "error": {"code": "provider_unavailable"}},
+        ).status_code
+        == 200
+    )
     failed_content = client.post(
         "/api/v1/questions",
         headers=headers,
