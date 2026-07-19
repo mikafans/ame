@@ -281,6 +281,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         "learnerTimezone": "Asia/Tokyo",
         "qualifyingDay": "2026-07-19",
     }
+    unverified_streak_body = {**streak_body, "qualifyingEventKey": "agent-asserted"}
+    unverified_streak = client.post(
+        "/api/v1/progress/streaks", headers=headers, json=unverified_streak_body
+    )
+    assert unverified_streak.status_code == 404, unverified_streak.text
     cross_owner_streak = client.post(
         "/api/v1/progress/streaks", headers=other_headers, json=streak_body
     )
