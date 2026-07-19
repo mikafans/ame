@@ -70,7 +70,7 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/learning$/);
   await expect(
-    page.getByRole("heading", { name: "Continue with the next useful thing." }),
+    page.getByRole("heading", { name: "Your learning, with a next move." }),
   ).toBeVisible();
   await expect(
     page.getByText("I would like to learn a new subject", { exact: true }),
