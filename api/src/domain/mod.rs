@@ -5,5 +5,6 @@ pub mod auth;
 pub mod error;
 pub mod identity;
 pub mod learning;
+pub mod progress;
 pub mod question;
 pub mod user;

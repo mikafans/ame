@@ -16,6 +16,7 @@ pub mod identity_postgres;
 pub mod learning;
 pub mod learning_postgres;
 pub mod onboarding;
+pub mod progress;
 pub mod question;
 pub mod question_postgres;
 pub mod ratelimit;

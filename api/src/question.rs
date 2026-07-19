@@ -246,6 +246,7 @@ pub fn grade_answer(question: &QuestionVersion, response: &serde_json::Value) ->
 #[cfg(test)]
 mod contract_tests {
     use super::*;
+    use crate::domain::question::{ContentReviewStatus, QuestionOption};
 
     fn multiple_choice() -> CreateQuestion {
         CreateQuestion {
