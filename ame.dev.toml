@@ -22,10 +22,6 @@ rate = 1000000
 burst = 1000000
 period_secs = 2
 
-[ratelimit.export]
-burst = 1
-period_secs = 60
-
 [ratelimit.cost]
 read = 1
 write = 5

@@ -174,20 +174,7 @@ pub async fn rate_limit_middleware(
     let method = req.method().clone();
     let trusted_proxies = state.config.ratelimit.trusted_proxies.unwrap_or(1);
 
-    let (key, burst, refill_rate, cost) = if path == "/v1/me/export" {
-        if let Some(auth) = auth {
-            let key = format!("ame:limiter:export:{}", auth.owner_id);
-            let burst = state.config.ratelimit.export.burst;
-            let refill_rate = 1.0 / (state.config.ratelimit.export.period_secs as f64);
-            (key, burst, refill_rate, 1)
-        } else {
-            let ip = get_client_ip(&req, trusted_proxies);
-            let key = format!("ame:limiter:ip:{ip}");
-            let burst = state.config.ratelimit.public.burst;
-            let refill_rate = 1.0 / (state.config.ratelimit.public.period_secs as f64);
-            (key, burst, refill_rate, 1)
-        }
-    } else if let Some(auth) = auth {
+    let (key, burst, refill_rate, cost) = if let Some(auth) = auth {
         let key = format!("ame:limiter:owner:{}", auth.owner_id);
         // Prefer the operator-tunable tiers resolved by the maintenance
         // middleware (stashed in extensions); fall back to config if absent.

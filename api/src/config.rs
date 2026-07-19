@@ -18,7 +18,6 @@ pub struct RateLimitConfig {
     pub free: TierConfig,
     pub premium: TierConfig,
     pub public: PublicConfig,
-    pub export: ExportConfig,
     pub cost: CostConfig,
     pub trusted_proxies: Option<usize>,
 }
@@ -31,12 +30,6 @@ pub struct TierConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PublicConfig {
-    pub burst: u32,
-    pub period_secs: u64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ExportConfig {
     pub burst: u32,
     pub period_secs: u64,
 }
@@ -178,10 +171,6 @@ rate = 10
 burst = 10
 period_secs = 2
 
-[ratelimit.export]
-burst = 1
-period_secs = 60
-
 [ratelimit.cost]
 read = 1
 write = 5
@@ -218,10 +207,6 @@ rate = 10
 [ratelimit.public]
 burst = 10
 period_secs = 2
-
-[ratelimit.export]
-burst = 1
-period_secs = 60
 
 [ratelimit.cost]
 read = 1

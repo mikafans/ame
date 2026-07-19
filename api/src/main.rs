@@ -25,10 +25,6 @@ async fn main() -> anyhow::Result<()> {
                     burst: 10,
                     period_secs: 2,
                 },
-                export: ame_api::config::ExportConfig {
-                    burst: 1,
-                    period_secs: 60,
-                },
                 cost: ame_api::config::CostConfig { read: 1, write: 5 },
                 trusted_proxies: Some(1),
             },
