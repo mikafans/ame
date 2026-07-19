@@ -95,11 +95,16 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   expect(refreshedAfterStarter.ok()).toBeTruthy();
   const packageAfterStarter = await refreshedAfterStarter.json();
   const explanation = packageAfterStarter.activities.find(
-    (activity: { kind: string }) => activity.kind === "explanation",
+    (activity: { payload?: { content?: { type?: string } } }) =>
+      activity.payload?.content?.type === "explanation",
   );
   const workedExample = packageAfterStarter.activities.find(
-    (activity: { kind: string }) => activity.kind === "example",
+    (activity: { payload?: { content?: { type?: string } } }) =>
+      activity.payload?.content?.type === "worked_example",
   );
+  expect(explanation).toBeTruthy();
+  expect(workedExample).toBeTruthy();
+  if (!explanation || !workedExample) throw new Error("first package is incomplete");
   expect(explanation.payload.content.type).toBe("explanation");
   expect(explanation.payload.content.body).toContain(prompt);
   expect(workedExample.payload.content.type).toBe("worked_example");
