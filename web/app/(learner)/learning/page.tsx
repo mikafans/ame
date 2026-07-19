@@ -7,6 +7,7 @@ import {
   BarChart3,
   CheckCircle2,
   Compass,
+  Flame,
   Sparkles,
 } from "lucide-react";
 import { api } from "@/api/client";
@@ -23,11 +24,13 @@ type JourneySummary = {
 };
 
 type Snapshot = { mastery: number; confidence: number; evidenceCount: number };
+type StreakEvent = { qualifyingDay: string };
 
 export default function LearningHomePage() {
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<Record<string, Snapshot>>({});
+  const [streaks, setStreaks] = useState<Record<string, number>>({});
 
   useEffect(() => {
     void (async () => {
@@ -51,10 +54,24 @@ export default function LearningHomePage() {
             "/api/v1/learning/journeys/{id}",
             { params: { path: { id: journey.id } } },
           );
+          const streakResponse = await api.GET(
+            "/api/v1/progress/{journey_id}/streaks",
+            { params: { path: { journey_id: journey.id } } },
+          );
+          const streakDays = new Set(
+            streakResponse.response.ok && streakResponse.data
+              ? (streakResponse.data as StreakEvent[]).map(
+                  (event) => event.qualifyingDay,
+                )
+              : [],
+          );
           const objective = (
             data as { objectives?: { id: string }[] } | undefined
           )?.objectives?.[0];
-          if (!response.ok || !objective) return null;
+          if (!response.ok) return null;
+          if (!objective) {
+            return { journeyId: journey.id, snapshot: null, streakDays };
+          }
           const snapshot = await api.GET(
             "/api/v1/progress/{journey_id}/objectives/{objective_id}",
             {
@@ -63,15 +80,36 @@ export default function LearningHomePage() {
               },
             },
           );
-          if (!snapshot.response.ok || !snapshot.data) return null;
-          return [journey.id, snapshot.data as Snapshot] as const;
+          return {
+            journeyId: journey.id,
+            snapshot:
+              snapshot.response.ok && snapshot.data
+                ? (snapshot.data as Snapshot)
+                : null,
+            streakDays,
+          };
         }),
       );
       setSnapshots(
         Object.fromEntries(
-          results.filter(
-            (value): value is readonly [string, Snapshot] => value !== null,
-          ),
+          results
+            .filter(
+              (value): value is NonNullable<typeof value> => value !== null,
+            )
+            .filter(
+              (value): value is typeof value & { snapshot: Snapshot } =>
+                value.snapshot !== null,
+            )
+            .map((value) => [value.journeyId, value.snapshot]),
+        ),
+      );
+      setStreaks(
+        Object.fromEntries(
+          results
+            .filter(
+              (value): value is NonNullable<typeof value> => value !== null,
+            )
+            .map((value) => [value.journeyId, value.streakDays.size]),
         ),
       );
     })();
@@ -131,13 +169,24 @@ export default function LearningHomePage() {
                       ? `Next: ${journey.nextActivityTitle}`
                       : journey.promise}
                   </p>
-                  {snapshots[journey.id] && (
-                    <div className="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
-                      <BarChart3 className="size-4 text-primary" />
-                      <span>
-                        {Math.round(snapshots[journey.id].mastery * 100)}%
-                        signal · {snapshots[journey.id].evidenceCount} evidence
-                      </span>
+                  {(snapshots[journey.id] ||
+                    streaks[journey.id] !== undefined) && (
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                      {snapshots[journey.id] && (
+                        <span className="inline-flex items-center gap-2">
+                          <BarChart3 className="size-4 text-primary" />
+                          {Math.round(snapshots[journey.id].mastery * 100)}%
+                          signal · {snapshots[journey.id].evidenceCount}{" "}
+                          evidence
+                        </span>
+                      )}
+                      {streaks[journey.id] !== undefined && (
+                        <span className="inline-flex items-center gap-2">
+                          <Flame className="size-4 text-primary" />
+                          {streaks[journey.id]} qualifying{" "}
+                          {streaks[journey.id] === 1 ? "day" : "days"}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

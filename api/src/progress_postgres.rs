@@ -195,6 +195,35 @@ impl ProgressRepository for PgProgressRepository {
             Err(ProgressError::DuplicateStreakEvent)
         }
     }
+
+    async fn list_streak_events(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<StreakEvent>, ProgressError> {
+        Ok(sqlx::query(
+            "SELECT id, subject_user_id, journey_id, activity_id, qualifying_event_key, learner_timezone, qualifying_day, created_at FROM tb_streak_events WHERE subject_user_id = $1 AND journey_id = $2 ORDER BY qualifying_day, created_at",
+        )
+        .bind(subject_user_id)
+        .bind(journey_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .into_iter()
+        .map(|row| StreakEvent {
+            id: row.get("id"),
+            input: StreakEventInput {
+                subject_user_id: row.get("subject_user_id"),
+                journey_id: row.get("journey_id"),
+                activity_id: row.get("activity_id"),
+                qualifying_event_key: row.get("qualifying_event_key"),
+                learner_timezone: row.get("learner_timezone"),
+                qualifying_day: row.get("qualifying_day"),
+            },
+            created_at: row.get("created_at"),
+        })
+        .collect())
+    }
 }
 
 fn storage_error(error: impl std::fmt::Display) -> ProgressError {

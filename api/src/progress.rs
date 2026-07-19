@@ -48,6 +48,12 @@ pub trait ProgressRepository: Send + Sync {
         &self,
         input: StreakEventInput,
     ) -> Result<StreakEvent, ProgressError>;
+
+    async fn list_streak_events(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<StreakEvent>, ProgressError>;
 }
 
 impl InMemoryProgressRepository {
@@ -200,6 +206,27 @@ impl InMemoryProgressRepository {
             .cloned()
             .collect())
     }
+
+    pub fn streak_events_for_journey(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<StreakEvent>, ProgressError> {
+        let mut events = self
+            .state
+            .lock()
+            .map_err(|error| ProgressError::Storage(error.to_string()))?
+            .streak_events
+            .values()
+            .filter(|event| {
+                event.input.subject_user_id == subject_user_id
+                    && event.input.journey_id == journey_id
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        events.sort_by_key(|event| (event.input.qualifying_day, event.created_at));
+        Ok(events)
+    }
 }
 
 #[async_trait]
@@ -234,6 +261,14 @@ impl ProgressRepository for InMemoryProgressRepository {
         input: StreakEventInput,
     ) -> Result<StreakEvent, ProgressError> {
         self.record_streak_event(input)
+    }
+
+    async fn list_streak_events(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<StreakEvent>, ProgressError> {
+        self.streak_events_for_journey(subject_user_id, journey_id)
     }
 }
 

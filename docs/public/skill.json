@@ -494,6 +494,60 @@
       "path": "/api/v1/progress/{journey_id}/recommendation"
     },
     {
+      "description": "Record an idempotent qualifying learning day for a journey.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "learnerTimezone": {
+            "type": "string"
+          },
+          "qualifyingDay": {
+            "format": "date",
+            "type": "string"
+          },
+          "qualifyingEventKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "activityId",
+          "qualifyingEventKey",
+          "learnerTimezone",
+          "qualifyingDay"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.progress.streak.record",
+      "path": "/api/v1/progress/streaks"
+    },
+    {
+      "description": "Read qualifying learning days for one owned journey.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.progress.streak.list",
+      "path": "/api/v1/progress/{journey_id}/streaks"
+    },
+    {
       "description": "Create a source-backed explanatory deep dive linked to evidence.",
       "input_schema": {
         "properties": {

@@ -104,6 +104,7 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/progress/{journey_id}/objectives/{objective_id}",
             get(snapshot),
         )
+        .route("/v1/progress/{journey_id}/streaks", get(list_streaks))
         .route("/v1/progress/{journey_id}/recommendation", post(recommend))
         .route("/v1/progress/streaks", post(record_streak))
         .with_state(state)
@@ -159,6 +160,37 @@ pub async fn snapshot(
             .format(&time::format_description::well_known::Rfc3339)
             .unwrap_or_default(),
     }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/progress/{journey_id}/streaks",
+    params(("journey_id" = Uuid, Path)),
+    responses((status = 200, body = [StreakResponse])),
+    security(("bearer" = [])),
+    tag = "progress"
+)]
+pub async fn list_streaks(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<Vec<StreakResponse>>, ApiError> {
+    let events = PgProgressRepository::new(state.pool)
+        .list_streak_events(auth.owner_id(), journey_id)
+        .await
+        .map_err(map_progress_error)?;
+    Ok(Json(
+        events
+            .into_iter()
+            .map(|event| StreakResponse {
+                id: event.id,
+                journey_id: event.input.journey_id,
+                activity_id: event.input.activity_id,
+                qualifying_event_key: event.input.qualifying_event_key,
+                qualifying_day: event.input.qualifying_day.to_string(),
+            })
+            .collect(),
+    ))
 }
 
 #[utoipa::path(post, path = "/api/v1/progress/{journey_id}/recommendation", params(("journey_id" = Uuid, Path)), request_body = RecommendationBody, responses((status = 200, body = RecommendationResponse)), security(("bearer" = [])), tag = "progress")]

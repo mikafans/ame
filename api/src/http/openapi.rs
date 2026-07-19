@@ -58,6 +58,7 @@ use crate::http::{
         crate::http::progress::snapshot,
         crate::http::progress::recommend,
         crate::http::progress::record_streak,
+        crate::http::progress::list_streaks,
         crate::http::deep_dives::create,
         crate::http::deep_dives::get_for_activity,
         crate::http::deep_dives::get_one,

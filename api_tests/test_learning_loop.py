@@ -229,6 +229,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert duplicate_streak.status_code == 200, duplicate_streak.text
     assert duplicate_streak.json()["id"] == streak.json()["id"]
+    streaks = client.get(
+        f"/api/v1/progress/{journey_id}/streaks", headers=headers
+    )
+    assert streaks.status_code == 200, streaks.text
+    assert len(streaks.json()) == 1
 
     deep_dive_response = client.post(
         "/api/v1/deep-dives",
@@ -267,6 +272,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert finished_session.status_code == 200, finished_session.text
 
     _, other_headers = _start_learner(client, "I want to learn a different subject")
+    other_streaks = client.get(
+        f"/api/v1/progress/{journey_id}/streaks", headers=other_headers
+    )
+    assert other_streaks.status_code == 200, other_streaks.text
+    assert other_streaks.json() == []
     forbidden_journey = client.get(
         f"/api/v1/learning/journeys/{journey_id}", headers=other_headers
     )

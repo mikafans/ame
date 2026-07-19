@@ -152,6 +152,20 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["journeyId","objectives"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectives":{"type":"array"}}}),
         ),
         endpoint(
+            "learning.progress.streak.record",
+            "Record an idempotent qualifying learning day for a journey.",
+            "POST",
+            "/api/v1/progress/streaks",
+            json!({"type":"object","required":["journeyId","activityId","qualifyingEventKey","learnerTimezone","qualifyingDay"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"qualifyingEventKey":{"type":"string"},"learnerTimezone":{"type":"string"},"qualifyingDay":{"type":"string","format":"date"}}}),
+        ),
+        endpoint(
+            "learning.progress.streak.list",
+            "Read qualifying learning days for one owned journey.",
+            "GET",
+            "/api/v1/progress/{journey_id}/streaks",
+            json!({"type":"object","required":["journeyId"],"properties":{"journeyId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.deep_dive.create",
             "Create a source-backed explanatory deep dive linked to evidence.",
             "POST",

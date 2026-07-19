@@ -684,6 +684,29 @@ paths:
                 $ref: '#/components/schemas/RecommendationResponse'
       security:
       - bearer: []
+  /api/v1/progress/{journey_id}/streaks:
+    get:
+      tags:
+      - progress
+      operationId: list_streaks
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreakResponse'
+      security:
+      - bearer: []
   /api/v1/questions:
     post:
       tags:
