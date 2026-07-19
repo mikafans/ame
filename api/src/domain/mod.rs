@@ -2,6 +2,7 @@
 
 pub mod assessment;
 pub mod attempt;
+pub mod auth;
 pub mod error;
 pub mod identity;
 pub mod learning;
