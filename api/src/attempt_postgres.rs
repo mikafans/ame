@@ -5,7 +5,10 @@ use crate::{
     attempt::AttemptRepository,
     domain::{
         assessment::Assessment,
-        attempt::{Attempt, AttemptAnswer, AttemptError, AttemptStatus, StartAttempt},
+        assessment::AssessmentMode,
+        attempt::{
+            Attempt, AttemptAnswer, AttemptError, AttemptReviewStatus, AttemptStatus, StartAttempt,
+        },
         question::QuestionVersion,
     },
     question::AnswerEvaluationStatus,
@@ -207,7 +210,7 @@ impl PgAttemptRepository {
         input: StartAttempt,
     ) -> Result<Attempt, AttemptError> {
         let row =
-            sqlx::query("SELECT status, created_at, submitted_at, score::float4 AS score, max_score::float4 AS max_score FROM tb_attempts WHERE id = $1")
+            sqlx::query("SELECT at.status, at.created_at, at.submitted_at, at.score::float4 AS score, at.max_score::float4 AS max_score, at.review_status, a.mode AS assessment_mode FROM tb_attempts at JOIN tb_assessments a ON a.id = at.assessment_id WHERE at.id = $1")
                 .bind(attempt_id)
                 .fetch_optional(&self.pool)
                 .await
@@ -242,6 +245,8 @@ impl PgAttemptRepository {
             id: attempt_id,
             input,
             status: parse_status(row.get("status"))?,
+            assessment_mode: parse_assessment_mode(row.get("assessment_mode"))?,
+            review_status: parse_review_status(row.get("review_status"))?,
             responses,
             item_question_versions,
             answer_results,
@@ -251,6 +256,27 @@ impl PgAttemptRepository {
             created_at: row.get("created_at"),
             submitted_at: row.get("submitted_at"),
         })
+    }
+}
+
+fn parse_assessment_mode(value: &str) -> Result<AssessmentMode, AttemptError> {
+    match value {
+        "practice" => Ok(AssessmentMode::Practice),
+        "graded" => Ok(AssessmentMode::Graded),
+        other => Err(AttemptError::Storage(format!(
+            "unknown assessment mode {other}"
+        ))),
+    }
+}
+
+fn parse_review_status(value: &str) -> Result<AttemptReviewStatus, AttemptError> {
+    match value {
+        "not_required" => Ok(AttemptReviewStatus::NotRequired),
+        "pending" => Ok(AttemptReviewStatus::Pending),
+        "complete" => Ok(AttemptReviewStatus::Complete),
+        other => Err(AttemptError::Storage(format!(
+            "unknown attempt review status {other}"
+        ))),
     }
 }
 

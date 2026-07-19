@@ -48,6 +48,8 @@ pub struct AttemptResponse {
     pub assessment_id: Uuid,
     pub assessment_version: u32,
     pub status: String,
+    pub assessment_mode: crate::domain::assessment::AssessmentMode,
+    pub review_status: crate::domain::attempt::AttemptReviewStatus,
     pub responses: std::collections::HashMap<Uuid, Value>,
     pub items: Vec<AttemptItemResponse>,
     pub score: Option<f32>,
@@ -275,6 +277,8 @@ fn attempt_response(attempt: Attempt) -> AttemptResponse {
             crate::domain::attempt::AttemptStatus::Abandoned => "abandoned",
         }
         .into(),
+        assessment_mode: attempt.assessment_mode,
+        review_status: attempt.review_status,
         responses: attempt.responses,
         items: answer_results
             .into_iter()

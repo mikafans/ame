@@ -4,7 +4,9 @@ use crate::{
     assessment::grade_assessment,
     domain::{
         assessment::Assessment,
-        attempt::{Attempt, AttemptAnswer, AttemptError, AttemptStatus, StartAttempt},
+        attempt::{
+            Attempt, AttemptAnswer, AttemptError, AttemptReviewStatus, AttemptStatus, StartAttempt,
+        },
         question::QuestionVersion,
     },
 };
@@ -79,6 +81,8 @@ impl AttemptRepository for InMemoryAttemptRepository {
             id: Uuid::now_v7(),
             input,
             status: AttemptStatus::InProgress,
+            assessment_mode: assessment.mode,
+            review_status: AttemptReviewStatus::NotRequired,
             responses: HashMap::new(),
             item_question_versions: assessment
                 .items
@@ -244,6 +248,11 @@ impl AttemptRepository for InMemoryAttemptRepository {
             AttemptStatus::Submitted
         } else {
             AttemptStatus::Graded
+        };
+        attempt.review_status = if grade.pending_manual_review {
+            AttemptReviewStatus::Pending
+        } else {
+            AttemptReviewStatus::Complete
         };
         attempt.grade = Some(grade);
         attempt.submitted_at = Some(OffsetDateTime::now_utc());

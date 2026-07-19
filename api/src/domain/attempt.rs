@@ -1,9 +1,10 @@
 //! Domain contract for resumable assessment attempts.
 
-use crate::assessment::AssessmentGrade;
+use crate::{assessment::AssessmentGrade, domain::assessment::AssessmentMode};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use time::OffsetDateTime;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -13,6 +14,14 @@ pub enum AttemptStatus {
     Submitted,
     Graded,
     Abandoned,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AttemptReviewStatus {
+    NotRequired,
+    Pending,
+    Complete,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +48,8 @@ pub struct Attempt {
     pub id: Uuid,
     pub input: StartAttempt,
     pub status: AttemptStatus,
+    pub assessment_mode: AssessmentMode,
+    pub review_status: AttemptReviewStatus,
     pub responses: std::collections::HashMap<Uuid, serde_json::Value>,
     pub item_question_versions: std::collections::HashMap<Uuid, Uuid>,
     pub answer_results: Vec<AttemptAnswer>,
