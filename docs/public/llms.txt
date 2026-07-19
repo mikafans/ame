@@ -60,8 +60,10 @@ PATCH /api/v1/generation-runs/{id}
 
 The journey contains the learner's intent, promise, objectives, activities,
 and persisted evidence. Agents choose the next useful activity and record the
-result; the web app presents the same state. Evidence must reference a graded
-attempt, and streak events use `attempt:<completed-attempt-id>` as their
+result; the web app presents the same state. Every evidence request requires an
+`attemptId` and must reference a graded attempt owned by the learner; an
+evidence record without attempt provenance is invalid. Streak events use
+`attempt:<completed-attempt-id>` as their
 qualifying event key. The submitted `qualifyingDay` must match that attempt's
 graded timestamp in the supplied IANA `learnerTimezone`; arbitrary historical
 or future days are rejected. A deep dive must reference existing evidence
