@@ -204,6 +204,20 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert evidence_response.status_code == 200, evidence_response.text
     evidence_id = evidence_response.json()["id"]
 
+    _, other_headers = _start_learner(client, "I want to understand a different subject")
+    cross_owner_evidence = client.post(
+        "/api/v1/progress/evidence",
+        headers=other_headers,
+        json={
+            "journeyId": journey_id,
+            "objectiveId": objective_id,
+            "activityId": activity_id,
+            "value": 0.25,
+            "derivationVersion": 1,
+        },
+    )
+    assert cross_owner_evidence.status_code == 404, cross_owner_evidence.text
+
     snapshot = client.get(
         f"/api/v1/progress/{journey_id}/objectives/{objective_id}", headers=headers
     )
