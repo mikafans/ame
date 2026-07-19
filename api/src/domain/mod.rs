@@ -9,4 +9,5 @@ pub mod identity;
 pub mod learning;
 pub mod progress;
 pub mod question;
+pub mod timeline;
 pub mod user;
