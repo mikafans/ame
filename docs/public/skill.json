@@ -140,7 +140,7 @@
       "path": "/api/v1/learning/sessions/{id}/finish"
     },
     {
-      "description": "Create a learner-owned versioned question with explanation and provenance metadata.",
+      "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
       "input_schema": {
         "properties": {
           "acceptedAnswers": {
@@ -153,6 +153,10 @@
             "type": "string"
           },
           "explanation": {
+            "type": "string"
+          },
+          "generationRunId": {
+            "format": "uuid",
             "type": "string"
           },
           "kind": {
@@ -189,6 +193,7 @@
           }
         },
         "required": [
+          "generationRunId",
           "kind",
           "prompt",
           "points"
@@ -223,10 +228,14 @@
       "path": "/api/v1/questions/{question_id}/versions/{version}"
     },
     {
-      "description": "Create the next immutable version of a learner-owned question.",
+      "description": "Create the next immutable question version from a published question.compose generation run.",
       "input_schema": {
         "properties": {
           "difficulty": {
+            "type": "string"
+          },
+          "generationRunId": {
+            "format": "uuid",
             "type": "string"
           },
           "kind": {
@@ -241,6 +250,7 @@
           }
         },
         "required": [
+          "generationRunId",
           "kind",
           "prompt",
           "points"
@@ -621,7 +631,7 @@
       "path": "/api/v1/progress/{journey_id}/timeline"
     },
     {
-      "description": "Create a source-backed explanatory deep dive linked to existing evidence owned by the learner and matching the same journey, objective, and activity.",
+      "description": "Create a source-backed deep dive from a published deep_dive.create generation run, linked to matching owned evidence.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -635,6 +645,10 @@
             "type": "string"
           },
           "example": {
+            "type": "string"
+          },
+          "generationRunId": {
+            "format": "uuid",
             "type": "string"
           },
           "journeyId": {
@@ -657,6 +671,7 @@
           }
         },
         "required": [
+          "generationRunId",
           "journeyId",
           "activityId",
           "objectiveId",

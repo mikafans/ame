@@ -761,6 +761,8 @@ export interface components {
             caveats: string[];
             example: string;
             /** Format: uuid */
+            generationRunId: string;
+            /** Format: uuid */
             journeyId: string;
             /** Format: uuid */
             objectiveId: string;
@@ -774,6 +776,8 @@ export interface components {
             acceptedAnswers?: string[];
             difficulty?: string | null;
             explanation?: string | null;
+            /** Format: uuid */
+            generationRunId: string;
             kind: components["schemas"]["QuestionKind"];
             options?: components["schemas"]["QuestionOption"][];
             /** Format: int32 */
@@ -796,6 +800,8 @@ export interface components {
             /** Format: int32 */
             contentVersion: number;
             example: string;
+            /** Format: uuid */
+            generationRunId: string;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -1062,6 +1068,8 @@ export interface components {
             acceptedAnswers: string[];
             difficulty?: string | null;
             explanation?: string | null;
+            /** Format: uuid */
+            generationRunId: string;
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["QuestionKind"];

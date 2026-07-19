@@ -42,6 +42,9 @@ GET /api/v1/learning/journeys
 GET /api/v1/learning/journeys/{id}
 POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
 POST /api/v1/learning/sessions/{id}/finish
+POST /api/v1/generation-runs
+GET /api/v1/generation-runs/{id}
+PATCH /api/v1/generation-runs/{id}
 POST /api/v1/questions
 GET /api/v1/questions/{question_id}/versions/{version}
 POST /api/v1/questions/{question_id}/versions
@@ -53,9 +56,6 @@ POST /api/v1/attempts/{attempt_id}/answers
 POST /api/v1/attempts/{attempt_id}/finish
 GET /api/v1/progress/{journey_id}/streaks
 GET /api/v1/progress/{journey_id}/timeline
-POST /api/v1/generation-runs
-GET /api/v1/generation-runs/{id}
-PATCH /api/v1/generation-runs/{id}
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,
@@ -66,9 +66,14 @@ evidence record without attempt provenance is invalid. Streak events use
 `attempt:<completed-attempt-id>` as their
 qualifying event key. The submitted `qualifyingDay` must match that attempt's
 graded timestamp in the supplied IANA `learnerTimezone`; arbitrary historical
-or future days are rejected. A deep dive must reference existing evidence
-owned by the same learner and matching its journey, objective, and activity;
-include at least one source reference.
+or future days are rejected. Before creating generated content, start a
+generation run with the matching operation (`question.compose` or
+`deep_dive.create`), transition it to `published`, and send its
+`generationRunId`. Questions, immutable question versions, and deep dives
+reject missing, failed, cross-owner, and operation-mismatched provenance. A
+deep dive must also reference existing evidence owned by the same learner and
+matching its journey, objective, and activity; include at least one source
+reference.
 
 Provider generation runs are owner-scoped and retryable. Reusing the same
 `retryKey` for the same operation returns the existing run. A run may move

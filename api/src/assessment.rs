@@ -191,6 +191,7 @@ mod tests {
         QuestionVersion {
             id: Uuid::now_v7(),
             question_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
             version: 1,
             kind: QuestionKind::MultipleChoice,
             difficulty: None,

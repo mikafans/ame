@@ -263,6 +263,7 @@ mod tests {
         let question = QuestionVersion {
             id: question_id,
             question_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
             version: 1,
             kind: QuestionKind::MultipleChoice,
             difficulty: None,

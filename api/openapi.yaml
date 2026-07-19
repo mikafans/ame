@@ -1393,6 +1393,7 @@ components:
     CreateDeepDiveBody:
       type: object
       required:
+      - generationRunId
       - journeyId
       - activityId
       - objectiveId
@@ -1417,6 +1418,9 @@ components:
             type: string
         example:
           type: string
+        generationRunId:
+          type: string
+          format: uuid
         journeyId:
           type: string
           format: uuid
@@ -1437,6 +1441,7 @@ components:
     CreateQuestionBody:
       type: object
       required:
+      - generationRunId
       - kind
       - prompt
       - points
@@ -1453,6 +1458,9 @@ components:
           type:
           - string
           - 'null'
+        generationRunId:
+          type: string
+          format: uuid
         kind:
           $ref: '#/components/schemas/QuestionKind'
         options:
@@ -1487,6 +1495,7 @@ components:
       type: object
       required:
       - id
+      - generationRunId
       - journeyId
       - activityId
       - objectiveId
@@ -1516,6 +1525,9 @@ components:
           minimum: 0
         example:
           type: string
+        generationRunId:
+          type: string
+          format: uuid
         id:
           type: string
           format: uuid
@@ -2153,6 +2165,7 @@ components:
       - id
       - questionId
       - version
+      - generationRunId
       - kind
       - prompt
       - options
@@ -2173,6 +2186,9 @@ components:
           type:
           - string
           - 'null'
+        generationRunId:
+          type: string
+          format: uuid
         id:
           type: string
           format: uuid

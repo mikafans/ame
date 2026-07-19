@@ -62,10 +62,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.question.create",
-            "Create a learner-owned versioned question with explanation and provenance metadata.",
+            "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
             "POST",
             "/api/v1/questions",
-            json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
+            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
         ),
         endpoint(
             "learning.question.get",
@@ -76,10 +76,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.question.revise",
-            "Create the next immutable version of a learner-owned question.",
+            "Create the next immutable question version from a published question.compose generation run.",
             "POST",
             "/api/v1/questions/{question_id}/versions",
-            json!({"type":"object","required":["kind","prompt","points"],"properties":{"kind":{"type":"string"},"prompt":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1}}}),
+            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string"},"prompt":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.assessment.create",
@@ -181,10 +181,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.deep_dive.create",
-            "Create a source-backed explanatory deep dive linked to existing evidence owned by the learner and matching the same journey, objective, and activity.",
+            "Create a source-backed deep dive from a published deep_dive.create generation run, linked to matching owned evidence.",
             "POST",
             "/api/v1/deep-dives",
-            json!({"type":"object","required":["journeyId","activityId","objectiveId","triggeringEvidenceId","title","body","example","sourceReferences","applicationTask"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"triggeringEvidenceId":{"type":"string","format":"uuid"},"title":{"type":"string"},"body":{"type":"string"},"example":{"type":"string"},"sourceReferences":{"type":"array"},"applicationTask":{"type":"string"}}}),
+            json!({"type":"object","required":["generationRunId","journeyId","activityId","objectiveId","triggeringEvidenceId","title","body","example","sourceReferences","applicationTask"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"triggeringEvidenceId":{"type":"string","format":"uuid"},"title":{"type":"string"},"body":{"type":"string"},"example":{"type":"string"},"sourceReferences":{"type":"array"},"applicationTask":{"type":"string"}}}),
         ),
         endpoint(
             "learning.deep_dive.get_for_activity",
