@@ -1,5 +1,9 @@
 //! Application service for the first learner bootstrap.
 
+use crate::domain::identity::{
+    AccountStatus, CreateLearner, IdentityRepository, IdentityRepositoryError, LearnerAccount,
+    RegistrationMode,
+};
 use crate::domain::learning::{
     CreateGoal, CreateJourney, LearningGoal, LearningJourney, LearningRepository,
     LearningRepositoryError,
@@ -39,6 +43,36 @@ pub enum BootstrapError {
     InvalidTemplateCatalog(String),
     #[error(transparent)]
     Repository(#[from] LearningRepositoryError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartLearningRequest {
+    pub email: String,
+    pub display_name: String,
+    pub raw_intent: String,
+    pub normalized_statement: String,
+    pub promise: String,
+    pub template_id: String,
+    pub template_version: u32,
+    pub template_version_id: Option<Uuid>,
+    pub idempotency_key: String,
+    pub registration_mode: RegistrationMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartLearningResult {
+    pub account: LearnerAccount,
+    pub bootstrap: BootstrapResult,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum StartLearningError {
+    #[error("self-host onboarding only supports open registration")]
+    UnsupportedRegistrationMode,
+    #[error(transparent)]
+    Identity(#[from] IdentityRepositoryError),
+    #[error(transparent)]
+    Bootstrap(#[from] BootstrapError),
 }
 
 #[derive(Clone)]
@@ -88,6 +122,78 @@ where
     }
 }
 
+#[derive(Clone)]
+pub struct SelfHostOnboardingService<I, L> {
+    identity: I,
+    learning: OnboardingService<L>,
+}
+
+impl<I, L> SelfHostOnboardingService<I, L>
+where
+    I: IdentityRepository,
+    L: LearningRepository,
+{
+    pub fn new(identity: I, learning: L) -> Self {
+        Self {
+            identity,
+            learning: OnboardingService::new(learning),
+        }
+    }
+
+    pub async fn start_learning(
+        &self,
+        request: StartLearningRequest,
+    ) -> Result<StartLearningResult, StartLearningError> {
+        if request.registration_mode != RegistrationMode::Open {
+            return Err(StartLearningError::UnsupportedRegistrationMode);
+        }
+
+        let account = match self.identity.find_learner_by_email(&request.email).await? {
+            Some(account) => account,
+            None => match self
+                .identity
+                .create_learner(CreateLearner {
+                    email: request.email.clone(),
+                    display_name: request.display_name.clone(),
+                })
+                .await
+            {
+                Ok(account) => account,
+                Err(IdentityRepositoryError::AccountAlreadyExists) => self
+                    .identity
+                    .find_learner_by_email(&request.email)
+                    .await?
+                    .ok_or_else(|| {
+                        IdentityRepositoryError::storage(
+                            "learner account disappeared after duplicate registration",
+                        )
+                    })?,
+                Err(error) => return Err(error.into()),
+            },
+        };
+        if account.status != AccountStatus::Active {
+            return Err(IdentityRepositoryError::AccountNotFound.into());
+        }
+
+        let bootstrap = self
+            .learning
+            .bootstrap(BootstrapPlan {
+                subject_user_id: account.id,
+                source_actor_id: account.id,
+                raw_intent: request.raw_intent,
+                normalized_statement: request.normalized_statement,
+                promise: request.promise,
+                template_id: request.template_id,
+                template_version: request.template_version,
+                template_version_id: request.template_version_id,
+                idempotency_key: request.idempotency_key,
+            })
+            .await?;
+
+        Ok(StartLearningResult { account, bootstrap })
+    }
+}
+
 fn validate_plan(plan: &BootstrapPlan) -> Result<(), BootstrapError> {
     for (field, value) in [
         ("raw_intent", plan.raw_intent.as_str()),
@@ -119,8 +225,13 @@ fn validate_template(plan: &BootstrapPlan) -> Result<(), BootstrapError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BootstrapError, BootstrapPlan, OnboardingService};
+    use super::{
+        BootstrapError, BootstrapPlan, OnboardingService, SelfHostOnboardingService,
+        StartLearningError, StartLearningRequest,
+    };
+    use crate::domain::identity::RegistrationMode;
     use crate::domain::learning::LearningRepositoryError;
+    use crate::identity::InMemoryIdentityRepository;
     use crate::learning::InMemoryLearningRepository;
     use uuid::Uuid;
 
@@ -136,6 +247,58 @@ mod tests {
             template_version_id: None,
             idempotency_key: "onboarding/music-theory".to_string(),
         }
+    }
+
+    fn start_learning_request() -> StartLearningRequest {
+        StartLearningRequest {
+            email: "learner@example.test".to_string(),
+            display_name: "Learner".to_string(),
+            raw_intent: "I would like to learn music theory".to_string(),
+            normalized_statement: "Understand foundational music theory".to_string(),
+            promise: "Identify notes, intervals, and basic chords".to_string(),
+            template_id: "learn-a-subject".to_string(),
+            template_version: 1,
+            template_version_id: None,
+            idempotency_key: "onboarding/music-theory".to_string(),
+            registration_mode: RegistrationMode::Open,
+        }
+    }
+
+    #[tokio::test]
+    async fn self_host_start_learning_creates_account_and_is_retryable() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let request = start_learning_request();
+
+        let first = service
+            .start_learning(request.clone())
+            .await
+            .expect("first learning start succeeds");
+        let retry = service
+            .start_learning(request)
+            .await
+            .expect("retry learning start succeeds");
+
+        assert_eq!(first, retry);
+        assert_eq!(first.bootstrap.goal.subject_user_id, first.account.id);
+        assert_eq!(first.bootstrap.goal.source_actor_id, first.account.id);
+    }
+
+    #[tokio::test]
+    async fn self_host_start_learning_does_not_accept_password_mode_yet() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let mut request = start_learning_request();
+        request.registration_mode = RegistrationMode::Password;
+
+        assert_eq!(
+            service.start_learning(request).await,
+            Err(StartLearningError::UnsupportedRegistrationMode)
+        );
     }
 
     #[tokio::test]
