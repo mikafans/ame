@@ -93,7 +93,13 @@ function QuizPreview() {
   );
 }
 
-function LearningPreviewCard({ preview }: { preview: LearningPreview }) {
+function LearningPreviewCard({
+  preview,
+  prompt,
+}: {
+  preview: LearningPreview;
+  prompt: string;
+}) {
   return (
     <div className="rounded-xl bg-white p-5 text-neutral-900 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6">
       <div className="space-y-5">
@@ -127,6 +133,15 @@ function LearningPreviewCard({ preview }: { preview: LearningPreview }) {
             {preview.firstActivity.estimatedMinutes} minutes
           </p>
         </div>
+        <Button
+          asChild
+          className="w-full rounded-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+        >
+          <Link href={`/start?prompt=${encodeURIComponent(prompt)}`}>
+            Start this journey
+            <ArrowRight className="size-4" />
+          </Link>
+        </Button>
       </div>
     </div>
   );
@@ -276,7 +291,7 @@ export default function LandingPage() {
                 </div>
               </div>
               {preview ? (
-                <LearningPreviewCard preview={preview} />
+                <LearningPreviewCard preview={preview} prompt={prompt} />
               ) : (
                 <QuizPreview />
               )}

@@ -51,4 +51,7 @@ test("visitor can preview a first learning journey from an intent", async ({
   await expect(
     page.getByText("Get oriented and see what you already know"),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Start this journey" }),
+  ).toHaveAttribute("href", /\/start\?prompt=/);
 });
