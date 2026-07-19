@@ -144,6 +144,20 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     item_id = assessment["items"][0]["id"]
     version_id = assessment["items"][0]["questionVersionId"]
 
+    unfinished_evidence = client.post(
+        "/api/v1/progress/evidence",
+        headers=headers,
+        json={
+            "journeyId": journey_id,
+            "objectiveId": objective_id,
+            "activityId": activity_id,
+            "attemptId": attempt["id"],
+            "value": 1,
+            "derivationVersion": 1,
+        },
+    )
+    assert unfinished_evidence.status_code == 404, unfinished_evidence.text
+
     stale_answer = client.post(
         f"/api/v1/attempts/{attempt['id']}/answers",
         headers=headers,
@@ -225,6 +239,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "journeyId": journey_id,
             "objectiveId": objective_id,
             "activityId": activity_id,
+            "attemptId": attempt["id"],
             "value": 0.25,
             "derivationVersion": 1,
         },
