@@ -34,7 +34,7 @@ COPY api/src ./api/src
 # compiling, even for --bin ame-api — so the benches dir must be present.
 COPY api/benches ./api/benches
 # include_str! at compile time.
-COPY api/llms.txt ./api/llms.txt
+COPY docs/public ./docs/public
 # sqlx::migrate! embeds these (resolved as ../db/migrations from the crate).
 COPY db/migrations ./db/migrations
 

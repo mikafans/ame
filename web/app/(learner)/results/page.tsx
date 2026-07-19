@@ -1,59 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatDateTime } from "@/utils/format";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TablePagination from "@mui/material/TablePagination";
-import Paper from "@mui/material/Paper";
-import Chip from "@mui/material/Chip";
-import Skeleton from "@mui/material/Skeleton";
-import CircularProgress from "@mui/material/CircularProgress";
-import Alert from "@mui/material/Alert";
-import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
-import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
-import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import { tagColor } from "@/lib/tagColor";
-import { useColorMode } from "@/components/ThemeRegistry";
+import { formatDateTime } from "@/utils/format";
 import { PageShell } from "@/components/PageShell";
+import { Button } from "@/components/ui/button";
+import { CalendarDays, ExternalLink, History } from "lucide-react";
 
 interface SessionSummary {
   id: string;
   kind: "quiz" | "exam" | "practice";
   status: string;
-  assessmentId?: string | null;
   assessmentTitle?: string | null;
   pointsAwarded?: number | null;
   maxPoints?: number | null;
-  startedAt: string;
   finishedAt?: string | null;
   attemptNumber: number;
   totalAttempts: number;
 }
 
+const toneClasses = {
+  neutral: "border-border text-muted-foreground",
+  success: "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
+  warning: "border-amber-500/40 text-amber-600 dark:text-amber-400",
+  error: "border-red-500/40 text-red-600 dark:text-red-400",
+};
+
 export default function ResultsHistoryPage() {
   const router = useRouter();
-  const { mode: colorMode } = useColorMode();
-  const isDark = colorMode === "dark";
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [total, setTotal] = useState(0);
-
-  const paginatedSessions = sessions;
 
   useEffect(() => {
     setLoading(true);
@@ -61,19 +42,13 @@ export default function ResultsHistoryPage() {
       .GET(
         "/v1/sessions" as never,
         {
-          params: {
-            query: {
-              limit: rowsPerPage,
-              offset: page * rowsPerPage,
-            },
-          },
+          params: { query: { limit: rowsPerPage, offset: page * rowsPerPage } },
         } as never,
       )
       .then(({ data, error }) => {
         if (error) {
-          if ((error as any).status !== 401) {
+          if ((error as any).status !== 401)
             setError("Failed to load attempt history.");
-          }
         } else if (data) {
           setSessions((data as any).sessions || []);
           setTotal((data as any).total || 0);
@@ -86,20 +61,12 @@ export default function ResultsHistoryPage() {
       .finally(() => setLoading(false));
   }, [page, rowsPerPage]);
 
-  if (loading) {
+  if (loading)
     return (
-      <Box
-        sx={{
-          minHeight: "80vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <CircularProgress size={36} />
-      </Box>
+      <div className="flex min-h-[80vh] items-center justify-center">
+        <span className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
     );
-  }
 
   return (
     <PageShell
@@ -108,228 +75,143 @@ export default function ResultsHistoryPage() {
       subtitle="Review your recent practice sessions, quiz attempts, and exam results."
     >
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      {sessions.length === 0 ? (
-        <Paper
-          variant="outlined"
-          sx={{
-            py: 8,
-            px: 4,
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 2,
-            bgcolor: "transparent",
-            borderColor: "divider",
-          }}
+        <div
+          role="alert"
+          className="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 56,
-              height: 56,
-              borderRadius: "50%",
-              bgcolor: "action.hover",
-              color: "text.secondary",
-            }}
-          >
-            <HistoryOutlinedIcon sx={{ fontSize: 28 }} />
-          </Box>
-          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-            No recent attempts found
-          </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ maxWidth: 400, mb: 1 }}
-          >
-            It looks like you haven't taken any quizzes or exams yet. Once you
-            complete an assessment, your scores and logs will show up here.
-          </Typography>
-          <Button variant="contained" onClick={() => router.push("/explore")}>
-            Go to Explore
-          </Button>
-        </Paper>
+          {error}
+        </div>
+      )}
+      {sessions.length === 0 ? (
+        <div className="flex flex-col items-center rounded-lg border border-border px-4 py-20 text-center">
+          <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <History size={28} />
+          </div>
+          <h2 className="text-lg font-medium">No recent attempts found</h2>
+          <p className="mb-5 mt-2 max-w-[400px] text-sm text-muted-foreground">
+            It looks like you haven&apos;t taken any quizzes or exams yet. Once
+            you complete an assessment, your scores and logs will show up here.
+          </p>
+          <Button onClick={() => router.push("/explore")}>Go to Explore</Button>
+        </div>
       ) : (
-        <Box sx={{ overflowX: "auto", mb: 3 }}>
-          <TableContainer>
-            <Table stickyHeader sx={{ minWidth: 620 }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Assessment</TableCell>
-                  <TableCell>Mode</TableCell>
-                  <TableCell>Attempt</TableCell>
-                  <TableCell align="right">Score</TableCell>
-                  <TableCell align="right">Completed</TableCell>
-                  <TableCell align="center">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading
-                  ? Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Skeleton variant="text" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton variant="text" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton variant="text" />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Skeleton variant="text" />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Skeleton variant="text" />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Skeleton variant="text" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  : paginatedSessions.map((s) => {
-                      const percentage =
-                        s.pointsAwarded != null && s.maxPoints
-                          ? (s.pointsAwarded / s.maxPoints) * 100
-                          : null;
-
-                      const scoreColor =
-                        percentage == null
-                          ? "default"
-                          : percentage >= 80
-                            ? "success"
-                            : percentage >= 60
-                              ? "warning"
-                              : "error";
-
-                      const dateStr = s.finishedAt
-                        ? formatDateTime(s.finishedAt)
-                        : "—";
-
-                      const modeLabel = s.kind === "exam" ? "Exam" : "Practice";
-                      const modeColors = tagColor(modeLabel, isDark);
-
-                      return (
-                        <TableRow key={s.id} hover>
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 500 }}
-                            >
-                              {s.assessmentTitle || "Untitled Assessment"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={modeLabel}
-                              size="small"
-                              variant="outlined"
-                              sx={modeColors}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {s.attemptNumber} of {s.totalAttempts}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            {s.pointsAwarded != null && s.maxPoints != null ? (
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                sx={{
-                                  justifyContent: "flex-end",
-                                  alignItems: "center",
-                                }}
-                              >
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 500 }}
-                                >
-                                  {s.pointsAwarded} / {s.maxPoints} pts
-                                </Typography>
-                                <Chip
-                                  label={`${Math.round(percentage || 0)}%`}
-                                  size="small"
-                                  color={scoreColor}
-                                  variant="outlined"
-                                  sx={{ height: 20, fontSize: "0.75rem" }}
-                                />
-                              </Stack>
-                            ) : (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                {s.pointsAwarded != null
-                                  ? `${s.pointsAwarded} pts`
-                                  : "—"}
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell align="right">
-                            <Stack
-                              direction="row"
-                              spacing={0.75}
-                              sx={{
-                                justifyContent: "flex-end",
-                                alignItems: "center",
-                                color: "text.secondary",
-                              }}
-                            >
-                              <CalendarMonthOutlinedIcon
-                                sx={{ fontSize: 16 }}
-                              />
-                              <Typography variant="caption">
-                                {dateStr}
-                              </Typography>
-                            </Stack>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              endIcon={
-                                <OpenInNewOutlinedIcon sx={{ fontSize: 14 }} />
-                              }
-                              onClick={() =>
-                                router.push(`/sessions/${s.id}/results`)
-                              }
-                            >
-                              Review
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            component="div"
-            count={total}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            onRowsPerPageChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
-              setPage(0);
-            }}
-            sx={{ borderTop: 1, borderColor: "divider" }}
-          />
-        </Box>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Assessment</th>
+                <th className="px-4 py-3 font-medium">Mode</th>
+                <th className="px-4 py-3 font-medium">Attempt</th>
+                <th className="px-4 py-3 text-right font-medium">Score</th>
+                <th className="px-4 py-3 text-right font-medium">Completed</th>
+                <th className="px-4 py-3 text-center font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {sessions.map((s) => {
+                const percentage =
+                  s.pointsAwarded != null && s.maxPoints
+                    ? (s.pointsAwarded / s.maxPoints) * 100
+                    : null;
+                const tone =
+                  percentage == null
+                    ? "neutral"
+                    : percentage >= 80
+                      ? "success"
+                      : percentage >= 60
+                        ? "warning"
+                        : "error";
+                const modeLabel = s.kind === "exam" ? "Exam" : "Practice";
+                return (
+                  <tr key={s.id} className="hover:bg-muted/30">
+                    <td className="px-4 py-4 font-medium">
+                      {s.assessmentTitle || "Untitled Assessment"}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="rounded-full border px-2 py-0.5 text-xs">
+                        {modeLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-muted-foreground">
+                      {s.attemptNumber} of {s.totalAttempts}
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      {s.pointsAwarded != null && s.maxPoints != null ? (
+                        <span className="inline-flex items-center gap-2">
+                          {s.pointsAwarded} / {s.maxPoints} pts{" "}
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-xs ${toneClasses[tone]}`}
+                          >
+                            {Math.round(percentage || 0)}%
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {s.pointsAwarded != null
+                            ? `${s.pointsAwarded} pts`
+                            : "—"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-right text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarDays size={15} />
+                        {s.finishedAt ? formatDateTime(s.finishedAt) : "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push(`/sessions/${s.id}/results`)}
+                      >
+                        Review <ExternalLink size={14} />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="flex items-center justify-end gap-4 border-t border-border px-4 py-3 text-sm text-muted-foreground">
+            <label>
+              Rows{" "}
+              <select
+                className="ml-2 rounded border border-input bg-background px-2 py-1"
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setPage(0);
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <span>
+              {total === 0 ? 0 : page * rowsPerPage + 1}–
+              {Math.min((page + 1) * rowsPerPage, total)} of {total}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={(page + 1) * rowsPerPage >= total}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
     </PageShell>
   );

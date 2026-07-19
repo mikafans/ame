@@ -52,18 +52,9 @@ test.describe("brand v0 smoke", () => {
     await expect(mascot).toHaveAttribute("src", /ame-icon-dark\.svg$/);
   });
 
-  test("freezes mascot animation when reduced motion is requested", async ({
-    page,
-  }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
+  test("serves a crisp static mark for the favicon", async ({ page }) => {
     await page.goto("/ame-icon-light.svg");
-    const animatedElementIds = await page.evaluate(() =>
-      ["tailL", "tailR", "fig", "eyes"].filter((id) => {
-        const el = document.getElementById(id);
-        return el && el.getAnimations().length > 0;
-      }),
-    );
-
-    expect(animatedElementIds).toEqual([]);
+    await expect(page.locator('svg[aria-label="ame"]')).toBeVisible();
+    await expect(page.locator("circle")).toHaveCount(1);
   });
 });

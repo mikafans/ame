@@ -1,94 +1,58 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardActionArea from "@mui/material/CardActionArea";
-import CardContent from "@mui/material/CardContent";
-import Chip from "@mui/material/Chip";
-import CircularProgress from "@mui/material/CircularProgress";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogActions from "@mui/material/DialogActions";
-import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { PageShell } from "@/components/PageShell";
-
+import { Button } from "@/components/ui/button";
+import { Plus, Trash2 } from "lucide-react";
 interface Assessment {
   id: string;
   title: string;
   status: string;
   course?: string;
-  updated_at?: string;
   questionCount?: number;
 }
-
 export default function AuthorIndexPage() {
-  const { user } = useAuth();
   const router = useRouter();
   const [drafts, setDrafts] = useState<Assessment[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [confirmAssessment, setConfirmAssessment] = useState<Assessment | null>(
-    null,
-  );
-
-  useEffect(() => {
+  const [confirm, setConfirm] = useState<Assessment | null>(null);
+  const load = () =>
     api
       .GET("/v1/assessments", { params: { query: { status: "draft" } } })
       .then(({ data }) => {
-        if (data) {
-          const list = "assessments" in data ? (data as any).assessments : data;
-          const mappedDrafts = (list as any[]).map((d: any) => ({
+        const list = data
+          ? "assessments" in data
+            ? (data as any).assessments
+            : data
+          : [];
+        setDrafts(
+          (list as any[]).map((d) => ({
             id: d.id,
             title: d.title,
             status: d.status,
             course: d.course ?? undefined,
             questionCount: d.questionCount,
-          }));
-          setDrafts(mappedDrafts as any);
-        }
+          })),
+        );
       })
       .catch(() => setDrafts([]));
+  useEffect(() => {
+    load();
   }, []);
-
-  async function discardDraft(id: string) {
-    setConfirmAssessment(null);
+  async function discard(id: string) {
+    setConfirm(null);
     setDeleting(id);
     setDrafts((d) => d?.filter((q) => q.id !== id) ?? d);
     try {
       await api.DELETE("/v1/assessments/{id}", { params: { path: { id } } });
     } catch {
-      api
-        .GET("/v1/assessments", { params: { query: { status: "draft" } } })
-        .then(({ data }) => {
-          if (data) {
-            const list =
-              "assessments" in data ? (data as any).assessments : data;
-            const mappedDrafts = (list as any[]).map((d: any) => ({
-              id: d.id,
-              title: d.title,
-              status: d.status,
-              course: d.course ?? undefined,
-              questionCount: d.questionCount,
-            }));
-            setDrafts(mappedDrafts as any);
-          }
-        })
-        .catch(() => {});
+      load();
     } finally {
       setDeleting(null);
     }
   }
-
   async function createNew() {
     setCreating(true);
     try {
@@ -112,132 +76,89 @@ export default function AuthorIndexPage() {
       setCreating(false);
     }
   }
-
   return (
     <PageShell
       kicker="Teach"
       title="Author studio"
       action={
-        <Button
-          variant="contained"
-          startIcon={<AddOutlinedIcon />}
-          onClick={createNew}
-          disabled={creating}
-        >
+        <Button onClick={createNew} disabled={creating}>
+          <Plus size={16} />
           {creating ? "Creating…" : "New assessment"}
         </Button>
       }
     >
       {drafts === null ? (
-        <Box sx={{ display: "flex", justifyContent: "center", pt: 6 }}>
-          <CircularProgress />
-        </Box>
+        <div className="flex justify-center py-12">
+          <span className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
       ) : drafts.length === 0 ? (
-        <Typography color="text.secondary" variant="body2">
+        <p className="text-sm text-muted-foreground">
           No drafts yet — create a new assessment to get started.
-        </Typography>
+        </p>
       ) : (
-        <Stack spacing={1.5}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontFamily: "monospace" }}
-          >
+        <div className="space-y-3">
+          <p className="font-mono text-xs text-muted-foreground">
             {drafts.length} draft{drafts.length !== 1 ? "s" : ""}
-          </Typography>
+          </p>
           {drafts.map((q) => (
-            <Card key={q.id} variant="outlined">
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <CardActionArea
-                  onClick={() => router.push(`/author/${q.id}`)}
-                  sx={{ flex: 1 }}
-                >
-                  <CardContent
-                    sx={{
-                      display: "flex",
-                      flexDirection: { xs: "column", sm: "row" },
-                      gap: { xs: 1.5, sm: 0 },
-                      justifyContent: "space-between",
-                      alignItems: { xs: "flex-start", sm: "center" },
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
-                        {q.title}
-                      </Typography>
-                      {q.course && (
-                        <Typography variant="caption" color="text.secondary">
-                          {q.course}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      {q.questionCount != null && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ fontFamily: "monospace" }}
-                        >
-                          {q.questionCount} q
-                        </Typography>
-                      )}
-                      <Chip label="draft" size="small" variant="outlined" />
-                    </Stack>
-                  </CardContent>
-                </CardActionArea>
-                <Box
-                  component="button"
-                  onClick={() => setConfirmAssessment(q)}
-                  disabled={deleting === q.id}
-                  title="Discard draft"
-                  sx={{
-                    px: 1.5,
-                    alignSelf: "stretch",
-                    border: "none",
-                    borderLeft: 1,
-                    borderColor: "divider",
-                    bgcolor: "transparent",
-                    cursor: "pointer",
-                    color: "text.disabled",
-                    display: "flex",
-                    alignItems: "center",
-                    "&:hover": { color: "error.main", bgcolor: "error.50" },
-                  }}
-                >
-                  <DeleteOutlineIcon sx={{ fontSize: 18 }} />
-                </Box>
-              </Box>
-            </Card>
+            <div
+              key={q.id}
+              className="flex items-stretch overflow-hidden rounded-lg border border-border"
+            >
+              <button
+                className="flex flex-1 items-center justify-between gap-4 px-5 py-4 text-left hover:bg-muted/40"
+                onClick={() => router.push(`/author/${q.id}`)}
+              >
+                <div>
+                  <p className="text-sm font-medium">{q.title}</p>
+                  {q.course && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {q.course}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  {q.questionCount != null && (
+                    <span className="font-mono">{q.questionCount} q</span>
+                  )}
+                  <span className="rounded-full border px-2 py-0.5">draft</span>
+                </div>
+              </button>
+              <button
+                className="border-l border-border px-4 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                onClick={() => setConfirm(q)}
+                disabled={deleting === q.id}
+                title="Discard draft"
+              >
+                <Trash2 size={17} />
+              </button>
+            </div>
           ))}
-        </Stack>
+        </div>
+      )}{" "}
+      {confirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 className="text-lg font-semibold">Discard draft?</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              <strong>&ldquo;{confirm.title}&rdquo;</strong> and all its
+              questions will be permanently deleted. This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirm(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => discard(confirm.id)}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
-
-      <Dialog
-        open={confirmAssessment !== null}
-        onClose={() => setConfirmAssessment(null)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Discard draft?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            <strong>&ldquo;{confirmAssessment?.title}&rdquo;</strong> and all
-            its questions will be permanently deleted. This cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmAssessment(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() =>
-              confirmAssessment && discardDraft(confirmAssessment.id)
-            }
-          >
-            Discard
-          </Button>
-        </DialogActions>
-      </Dialog>
     </PageShell>
   );
 }

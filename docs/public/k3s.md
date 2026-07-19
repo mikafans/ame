@@ -27,14 +27,14 @@ docker.io` as `azusachino`.
 # 1. Bump the package version first (the script derives TAG from it):
 #      api/Cargo.toml  +  web/package.json
 # 2. Build + push (x64 by default; TAG defaults to the api/Cargo.toml version):
-deploy/k3s/build-images.sh
+../../deploy/k3s/build-images.sh
 #    For the arm64 harus-pi edge image:
-PLATFORM=linux/arm64 deploy/k3s/build-images.sh
+PLATFORM=linux/arm64 ../../deploy/k3s/build-images.sh
 # 3. In harus-k3s, bump image: tags in 06-edge/ame/{api,web}.yaml to the new TAG,
 #    then:  make apply-edge && kubectl -n ame rollout status deploy/ame-api deploy/ame-web
 ```
 
-`TAG=0.2.1 deploy/k3s/build-images.sh` pins explicitly (e.g. to re-push). The web
+`TAG=0.2.1 ../../deploy/k3s/build-images.sh` pins explicitly (e.g. to re-push). The web
 image bakes `NEXT_PUBLIC_API_URL=""` (relative API calls) so it's served
 same-origin behind the `ame-platform` front door — see the k3s repo README for
 topology, secrets, and the bootstrap-admin Job.

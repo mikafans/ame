@@ -20,6 +20,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /build/node_modules ./node_modules
 COPY web/ ./
+COPY docs/public ./docs/public
 # Generated OpenAPI types live in src/api/generated/schema.d.ts; if missing,
 # rebuild from the spec that ships at the repo root.
 COPY api/openapi.yaml /tmp/openapi.yaml
@@ -52,6 +53,7 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder --chown=node:node /build/.next/standalone ./
 COPY --from=builder --chown=node:node /build/.next/static ./.next/static
 COPY --from=builder --chown=node:node /build/public ./public
+COPY --from=builder --chown=node:node /build/docs/public ./docs/public
 
 USER node
 EXPOSE 3000

@@ -32,13 +32,9 @@ test.describe("mobile UI (seeded account)", () => {
   }) => {
     await page.goto("/explore");
 
-    // The Sidebar renders its content in TWO drawers: a permanent one
-    // (display:none at this width, class .MuiDrawer-docked) and a temporary
-    // one (keepMounted, class .MuiDrawer-modal). Both contain the identity and
-    // nav labels, so unscoped getByText would resolve to 2 elements and trip
-    // Playwright strict mode. Scope all drawer-content queries to the mobile
-    // (temporary) drawer.
-    const mobileDrawer = page.locator(".MuiDrawer-modal");
+    // Scope queries to the Radix mobile navigation dialog so the desktop and
+    // mobile copies of the navigation cannot collide.
+    const mobileDrawer = page.getByRole("dialog");
 
     // Assert the hamburger is visible (it lives in the AppBar, so it's unique)
     await expect(

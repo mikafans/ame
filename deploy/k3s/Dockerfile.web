@@ -23,6 +23,7 @@ WORKDIR /build
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /build/node_modules ./node_modules
 COPY web/ ./
+COPY docs/public ./docs/public
 COPY api/openapi.yaml /tmp/openapi.yaml
 RUN if [ ! -f src/api/generated/schema.d.ts ]; then \
       bunx openapi-typescript /tmp/openapi.yaml -o src/api/generated/schema.d.ts; \
@@ -42,6 +43,7 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder --chown=node:node /build/.next/standalone ./
 COPY --from=builder --chown=node:node /build/.next/static ./.next/static
 COPY --from=builder --chown=node:node /build/public ./public
+COPY --from=builder --chown=node:node /build/docs/public ./docs/public
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

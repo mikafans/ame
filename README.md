@@ -2,7 +2,7 @@
 
 Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
 
-**Stack**: Rust 2024 · Axum 0.8 · sqlx · Next.js 16 · React 19 · Bun · TypeScript · MUI 7 · Postgres 18
+**Stack**: Rust 2024 · Axum 0.8 · sqlx · Next.js 16 · React 19 · Bun · TypeScript · Tailwind CSS · Postgres 18
 
 **License**: [GPL-3.0](./LICENSE)
 
@@ -36,6 +36,20 @@ out and back in — token scopes are fixed at login.
 
 Copy `.env.example` to `.env` if you need to override defaults.
 
+### Containerized local stack
+
+Use the debug stack when you want the complete local topology behind Caddy:
+
+```bash
+make local-up       # Caddy + web + API + Postgres + Valkey at :28800
+make local-uiux     # run the focused browser smoke test through Caddy
+make local-down     # stop services; keep the named Postgres volume
+```
+
+The web service bind-mounts `web/` and runs Next.js in development mode with
+polling enabled, so edits on macOS/Podman trigger hot reload without rebuilding
+the image. API source changes use the same bind-mounted development workflow.
+
 ## Common tasks
 
 ```bash
@@ -58,10 +72,15 @@ For interactive visual audits use `bunx @playwright/cli` — see `CLAUDE.md` for
 
 ## Deploy
 
-`docker-compose.prod.yml` is a production-shaped stack (Postgres + API + web) for
+`docker-compose.prod.yml` is a production-shaped stack (Postgres + Valkey + API + web) for
 smoke deploys, demos, and CI integration testing — not a substitute for the k8s
 manifests. The API runs its migrations on boot, so no separate migration step is
 needed.
+
+For a single-host self-hosted installation, follow
+[`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
+`docs/public/llms.txt` route is the agent discovery contract, not deployment
+documentation.
 
 ```bash
 cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
@@ -84,19 +103,21 @@ make db-down
 ## Layout
 
 - `api/` — Rust backend (Axum, sqlx).
-- `web/` — Next.js frontend (App Router, MUI).
+- `web/` — Next.js frontend (App Router, Tailwind CSS and local shadcn-style primitives).
 - `db/` — `docker-compose.yml` + sqlx migrations.
 - `design/source/src/*.jsx` — pixel-faithful UI design source of truth.
 - `docs/specs/` — design specs (`2026-05-20-harus-platform-design.md` is canonical).
 - `docs/plans/` — implementation plans.
+- `docs/public/` — canonical public-facing operator, deployment, and agent docs.
 - `docs/ROADMAP.md` — versioned roadmap toward v1.1 "Admin Console GA".
 - `.tmp/` — gitignored scratch space for screenshots and Playwright artifacts.
 
 ## Roadmap
 
 [`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the path to **v1.1 "Admin Console GA"**.
-Current: **v0.1** (platform + admin foundation). Next: **v0.2** operational control
-plane — Token Audit (shipped) and Settings & Feature Flags (next up).
+Current: **v0.3.0** — learner landing refresh, frontend foundation migration, and
+self-hosting documentation. The next roadmap milestone is the v0.3 content and
+data-hygiene track.
 
 ## Contributing
 

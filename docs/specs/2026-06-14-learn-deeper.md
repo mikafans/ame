@@ -102,7 +102,7 @@ the data once, serve it both ways.
   `deep_dive`; that is correct *post-attempt* and already gated by the existing
   in-progress/pending session rule (correct answers hidden until submit).
 - **Advertise it.** Add the endpoint + a worked "dive deeper on a hard question"
-  playbook to `api/llms.txt` and `skill.json`, or agents won't discover it.
+  playbook to `docs/public/llms.txt` and `skill.json`, or agents won't discover it.
 
 **A1 testing (test-first, rule #2):**
 - API integration: deep-dive round-trips through insert→patch→publish→version;

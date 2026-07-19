@@ -23,8 +23,8 @@ const extraConnectSrc = allowedDevOrigins
 // We keep the policy tight: no inline scripts beyond what Next.js needs,
 // connect only to the API origin we know about.
 //
-// `'unsafe-inline'` for styles is required by MUI/Emotion in dev. Drop it once
-// nonce-based styles are wired (see https://mui.com/material-ui/guides/content-security-policy/).
+// The development server and Tailwind-generated styles require inline styles
+// during local development.
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -56,22 +56,6 @@ const nextConfig = {
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/llms.txt",
-        destination: `${apiOrigin}/llms.txt`,
-      },
-      {
-        source: "/skill.json",
-        destination: `${apiOrigin}/skill.json`,
-      },
-      {
-        source: "/openapi.yaml",
-        destination: `${apiOrigin}/openapi.yaml`,
-      },
-    ];
   },
   ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
 };

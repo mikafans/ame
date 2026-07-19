@@ -1,803 +1,206 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import Chip from "@mui/material/Chip";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import TextField from "@mui/material/TextField";
-import CircularProgress from "@mui/material/CircularProgress";
-import Alert from "@mui/material/Alert";
-import Divider from "@mui/material/Divider";
-import { useColorMode } from "@/components/ThemeRegistry";
 import { LearningObjectives } from "@/components/LearningObjectives";
-import { tagColor } from "@/lib/tagColor";
-
-interface ExamSection {
-  id: string;
-  title: string;
-  weight: number;
-  itemsCount: number;
-  mix?: string;
-}
-
+import { Button } from "@/components/ui/button";
 interface Exam {
   id: string;
   name: string;
   description?: string;
   status: string;
-  method: string;
-  composedBy?: string;
-  compositionTrace?: unknown;
   durationMin?: number;
   passingPoints?: number;
   objectives: string[];
-  sections: ExamSection[] | null;
   totalPoints: number;
   course?: string;
-  tags?: string[];
   completed?: boolean;
   lastSessionId?: string | null;
+  sections:
+    | {
+        id: string;
+        title: string;
+        weight: number;
+        itemsCount: number;
+        mix?: string;
+      }[]
+    | null;
 }
-
-type TabId = "all" | "published" | "draft";
-
-interface AvailableQuestion {
-  id: string;
-  kind: string;
-  prompt: string;
-  points: number;
-}
-
-interface SectionDraft {
-  title: string;
-  weight: number;
-  selectedIds: Set<string>;
-}
-
+type Tab = "all" | "published" | "draft";
 export default function ExamsPage() {
   const router = useRouter();
-  const { mode } = useColorMode();
-  const isDark = mode === "dark";
   const [exams, setExams] = useState<Exam[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabId>("all");
+  const [selected, setSelected] = useState<Exam | null>(null);
+  const [tab, setTab] = useState<Tab>("all");
   const [loading, setLoading] = useState(true);
-  const [showCompose, setShowCompose] = useState(false);
-  const [composeName, setComposeName] = useState("");
-  const [composeDesc, setComposeDesc] = useState("");
-  const [composeDuration, setComposeDuration] = useState(60);
-  const [composePassing, setComposePassing] = useState<number | "">("");
-  const [sections, setSections] = useState<SectionDraft[]>([
-    { title: "", weight: 60, selectedIds: new Set() },
-  ]);
-  const [availableQuestions, setAvailableQuestions] = useState<
-    AvailableQuestion[]
-  >([]);
-  const [composeError, setComposeError] = useState<string | null>(null);
-  const [composing, setComposing] = useState(false);
-
   const [starting, setStarting] = useState(false);
-  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
-
-  function load() {
-    setLoading(true);
+  useEffect(() => {
     api
-      .GET("/v1/assessments", {
-        params: { query: { mode: "graded" } },
-      })
+      .GET("/v1/assessments", { params: { query: { mode: "graded" } } })
       .then(({ data }) => {
-        if (data) {
-          const list = "assessments" in data ? (data as any).assessments : data;
-          const mappedExams = (list as any[]).map((d: any) => ({
+        const list = data
+          ? "assessments" in data
+            ? (data as any).assessments
+            : data
+          : [];
+        setExams(
+          (list as any[]).map((d) => ({
             id: d.id,
             name: d.title,
-            description: d.description ?? undefined,
+            description: d.description,
             status: d.status === "active" ? "published" : d.status,
-            method: "manual",
-            durationMin: d.durationMin ?? undefined,
-            objectives: d.objectives,
-            totalPoints: d.totalPoints,
-            course: d.course ?? undefined,
-            sections: null,
+            durationMin: d.durationMin,
+            passingPoints: d.passingPoints,
+            objectives: d.objectives ?? [],
+            totalPoints: d.totalPoints ?? 0,
+            course: d.course,
             completed: d.completed,
             lastSessionId: d.lastSessionId,
-          }));
-          setExams(mappedExams as any);
-          if (!selected && mappedExams.length) setSelected(mappedExams[0].id);
-        }
+            sections: null,
+          })),
+        );
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!selected) {
-      setSelectedExam(null);
-      return;
-    }
-    api
-      .GET("/v1/assessments/{id}", {
-        params: { path: { id: selected } },
-      })
-      .then(({ data }) => {
-        if (data) {
-          const mappedExam: Exam = {
-            id: data.id,
-            name: data.title,
-            description: data.description ?? undefined,
-            status: data.status === "active" ? "published" : data.status,
-            method: data.method,
-            durationMin: data.durationMin ?? undefined,
-            passingPoints: data.passingPoints ?? undefined,
-            objectives: data.objectives,
-            totalPoints: data.totalPoints,
-            course: data.course ?? undefined,
-            completed: exams.find((e) => e.id === selected)?.completed,
-            lastSessionId: exams.find((e) => e.id === selected)?.lastSessionId,
-            sections: data.sections.map((s) => ({
-              id: s.id,
-              title: s.title,
-              weight: s.weight * 100,
-              itemsCount: s.itemsCount,
-              mix: s.mix ? JSON.stringify(s.mix) : undefined,
-            })),
-          };
-          setSelectedExam(mappedExam);
-        }
-      })
-      .catch(console.error);
-  }, [selected]);
-
-  const tabs: { id: TabId; label: string }[] = [
-    { id: "all", label: "All" },
-    { id: "published", label: "Active" },
-    { id: "draft", label: "Drafts" },
-  ];
-
   const filtered =
     tab === "all" ? exams : exams.filter((e) => e.status === tab);
-  const exam = selectedExam;
-  const examQuestionCount =
-    exam?.sections && exam.sections.length > 0
-      ? exam.sections.reduce((sum, s) => sum + (s.itemsCount ?? 0), 0)
-      : null;
-
-  async function startExam() {
+  const start = async () => {
     if (!selected) return;
     setStarting(true);
     try {
-      const { data } = await api.POST("/v1/sessions", {
-        body: { assessmentId: selected },
+      const { data } = await (api as any).POST("/v1/sessions", {
+        body: { assessmentId: selected.id },
       });
-      if (data?.sessionId) router.push(`/sessions/${data.sessionId}`);
-    } catch (err) {
-      console.error(err);
+      const id = data?.sessionId ?? data?.session_id;
+      if (id) router.push(`/sessions/${id}`);
     } finally {
       setStarting(false);
     }
-  }
-
-  function openCompose() {
-    setShowCompose(true);
-    api
-      .GET("/v1/questions", {
-        params: { query: { status: "live", limit: 200 } },
-      })
-      .then(({ data }) => {
-        setAvailableQuestions(data?.questions ?? []);
-      })
-      .catch(console.error);
-  }
-
-  async function handleCompose() {
-    setComposing(true);
-    setComposeError(null);
-    try {
-      // Create the graded assessment (the unified "exam") …
-      const { data: created, error } = await api.POST("/v1/assessments", {
-        body: {
-          title: composeName,
-          description: composeDesc || undefined,
-          mode: "graded",
-          method: "manual",
-          objectives: [],
-          durationMin: composeDuration,
-          passingPoints: composePassing === "" ? undefined : composePassing,
-        },
-      });
-      if (error || !created) {
-        setComposeError("Failed to compose exam. Check the fields and retry.");
-        return;
-      }
-
-      // … then attach the selected questions to it.
-      const questionIds = sections.flatMap((s) => Array.from(s.selectedIds));
-      for (const questionId of questionIds) {
-        await api.POST("/v1/assessments/{id}/questions", {
-          params: { path: { id: created.id } },
-          body: { questionId },
-        });
-      }
-
-      setShowCompose(false);
-      load();
-      setSelected(created.id);
-    } catch {
-      setComposeError("Could not reach the API.");
-    } finally {
-      setComposing(false);
-    }
-  }
-
-  async function handlePublish(id: string) {
-    await api.PATCH("/v1/assessments/{id}", {
-      params: { path: { id } },
-      body: { status: "active" },
-    });
-    load();
-  }
-
+  };
+  if (loading)
+    return <div className="p-12 text-muted-foreground">Loading exams…</div>;
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: { xs: "column", md: "row" },
-        height: { xs: "auto", md: "100vh" },
-        overflow: { xs: "visible", md: "hidden" },
-      }}
-    >
-      {/* Left: exam list */}
-      <Box
-        sx={{
-          width: { xs: "100%", md: 320 },
-          borderRight: { xs: 0, md: 1 },
-          borderBottom: { xs: 1, md: 0 },
-          borderColor: "divider",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <Box sx={{ p: 2.5, borderBottom: 1, borderColor: "divider" }}>
-          <Typography variant="h6" sx={{ fontWeight: 500 }}>
-            Exams
-          </Typography>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mt: 1 }}>
-            {tabs.map((t) => (
-              <Tab
-                key={t.id}
-                value={t.id}
-                label={t.label}
-                sx={{ textTransform: "none", minWidth: 0, fontSize: 12 }}
-              />
-            ))}
-          </Tabs>
-        </Box>
-
-        <Box
-          sx={{
-            flex: { xs: "none", md: 1 },
-            maxHeight: { xs: 320, md: "none" },
-            overflowY: "auto",
-            p: 1,
-          }}
-        >
-          {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : filtered.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              No exams.
-            </Typography>
-          ) : (
-            filtered.map((e) => (
-              <Card
-                key={e.id}
-                variant="outlined"
-                onClick={() => setSelected(e.id)}
-                sx={{
-                  mb: 1,
-                  cursor: "pointer",
-                  ...(selected === e.id && { borderColor: "primary.main" }),
-                }}
-              >
-                <CardContent sx={{ pb: "12px !important" }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
-                    {e.name}
-                  </Typography>
-                  <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }}>
-                    <Chip label={e.status} size="small" variant="outlined" />
-                    {e.durationMin && (
-                      <Chip
-                        label={`${e.durationMin}m`}
-                        size="small"
-                        variant="outlined"
-                      />
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </Box>
-
-        <Box sx={{ p: 1.5, borderTop: 1, borderColor: "divider" }}>
-          <Button fullWidth variant="outlined" onClick={openCompose}>
-            Compose exam
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Right: exam detail */}
-      <Box
-        sx={{
-          flex: 1,
-          overflowY: { xs: "visible", md: "auto" },
-          p: { xs: 2, md: 3 },
-        }}
-      >
-        {!exam ? (
-          <Typography color="text.secondary">Select an exam.</Typography>
-        ) : (
-          <Stack spacing={3} sx={{ maxWidth: 820 }}>
-            <Box>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ mb: 1, flexWrap: "wrap", alignItems: "center" }}
-              >
-                <Chip
-                  label={exam.status === "published" ? "Active" : exam.status}
-                  size="small"
-                  color={exam.status === "published" ? "success" : "default"}
-                  variant="outlined"
-                />
-                {exam.course && (
-                  <Chip
-                    label={exam.course}
-                    size="small"
-                    variant="outlined"
-                    sx={tagColor(exam.course, isDark)}
-                  />
-                )}
-                {exam.method && (
-                  <Chip
-                    label={`Composed: ${exam.method}`}
-                    size="small"
-                    variant="outlined"
-                  />
-                )}
-              </Stack>
-              <Typography variant="h4" sx={{ fontWeight: 500 }}>
-                {exam.name}
-              </Typography>
-              {exam.description && (
-                <Typography
-                  variant="body1"
-                  color="text.secondary"
-                  sx={{ mt: 1, lineHeight: 1.6 }}
-                >
-                  {exam.description}
-                </Typography>
-              )}
-            </Box>
-
-            {/* At-a-glance metrics */}
-            <Card variant="outlined">
-              <CardContent>
-                <Stack
-                  direction="row"
-                  divider={<Divider orientation="vertical" flexItem />}
-                  spacing={3}
-                  sx={{ flexWrap: "wrap", rowGap: 2 }}
-                >
-                  {[
-                    {
-                      label: "Questions",
-                      value:
-                        examQuestionCount != null ? examQuestionCount : "—",
-                    },
-                    {
-                      label: "Duration",
-                      value: exam.durationMin ? `${exam.durationMin} min` : "—",
-                    },
-                    {
-                      label: "Total points",
-                      value: exam.totalPoints || "—",
-                    },
-                    {
-                      label: "Pass mark",
-                      value:
-                        exam.passingPoints != null
-                          ? `${exam.passingPoints} pts`
-                          : "—",
-                    },
-                    {
-                      label: "Sections",
-                      value: exam.sections?.length ?? "—",
-                    },
-                  ].map((m) => (
-                    <Box key={m.label} sx={{ minWidth: 84 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {m.label}
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {m.value}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
-
-            {exam.objectives.length > 0 && (
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                  What you&apos;ll be assessed on
-                </Typography>
-                <LearningObjectives items={exam.objectives} />
-              </Box>
-            )}
-
-            {exam.sections && exam.sections.length > 0 && (
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                  Exam format
-                </Typography>
-                <Stack spacing={1.25}>
-                  {exam.sections.map((s, i) => (
-                    <Card key={s.id} variant="outlined">
-                      <CardContent sx={{ pb: "16px !important" }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "baseline",
-                            mb: 1,
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {i + 1}. {s.title}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {s.itemsCount} questions
-                            {s.mix ? ` · ${s.mix}` : ""} ·{" "}
-                            {Math.round(s.weight * 100)}%
-                          </Typography>
-                        </Box>
-                        {/* Weight bar */}
-                        <Box
-                          sx={{
-                            height: 6,
-                            borderRadius: 3,
-                            bgcolor: "action.hover",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: `${Math.round(s.weight * 100)}%`,
-                              height: "100%",
-                              bgcolor: "primary.main",
-                            }}
-                          />
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              </Box>
-            )}
-
-            {exam.tags && exam.tags.length > 0 && (
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                {exam.tags.map((t) => (
-                  <Chip key={t} label={t} size="small" variant="outlined" />
-                ))}
-              </Stack>
-            )}
-
-            {exam.status === "published" && (
-              <Alert severity="info" variant="outlined">
-                {exam.durationMin
-                  ? `This is a timed exam — once you start, you have ${exam.durationMin} minutes to complete all sections.`
-                  : "Once you start, complete all sections in one sitting."}
-              </Alert>
-            )}
-
-            {(exam.status === "published" || exam.status !== "published") && (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: 1,
-                  pt: 2,
-                  borderTop: 1,
-                  borderColor: "divider",
-                }}
-              >
-                {exam.status === "published" && (
-                  <>
-                    {exam.completed && exam.lastSessionId && (
-                      <Button
-                        variant="outlined"
-                        size="large"
-                        onClick={() =>
-                          router.push(`/sessions/${exam.lastSessionId}/results`)
-                        }
-                      >
-                        Last result
-                      </Button>
-                    )}
-                    <Button
-                      variant="contained"
-                      size="large"
-                      disabled={starting}
-                      onClick={startExam}
-                    >
-                      {starting
-                        ? "Starting…"
-                        : exam.completed
-                          ? "Retake exam"
-                          : "Start exam"}
-                    </Button>
-                  </>
-                )}
-                {exam.status !== "published" && (
-                  <Button
-                    variant="outlined"
-                    onClick={() => handlePublish(exam.id)}
-                  >
-                    Publish
-                  </Button>
-                )}
-              </Box>
-            )}
-          </Stack>
+    <main className="grid gap-6 px-6 py-12 lg:grid-cols-[320px_1fr] sm:px-12">
+      <section>
+        <header className="mb-6">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">
+            Assessments
+          </p>
+          <h1 className="mt-2 text-3xl font-medium">Exams</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Take graded assessments and track your results.
+          </p>
+        </header>
+        <div className="mb-4 flex rounded-md border border-border">
+          {(["all", "published", "draft"] as Tab[]).map((value) => (
+            <button
+              key={value}
+              className={`flex-1 px-3 py-2 text-xs capitalize ${tab === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              onClick={() => setTab(value)}
+            >
+              {value === "published"
+                ? "Active"
+                : value === "draft"
+                  ? "Drafts"
+                  : "All"}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-2">
+          {filtered.map((exam) => (
+            <button
+              key={exam.id}
+              className={`w-full rounded-lg border p-4 text-left ${selected?.id === exam.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"}`}
+              onClick={() => setSelected(exam)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{exam.name}</span>
+                <span className="rounded-full border px-2 py-0.5 text-xs">
+                  {exam.status}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {exam.course || "General"} · {exam.totalPoints} pts
+              </p>
+            </button>
+          ))}
+        </div>
+        {filtered.length === 0 && (
+          <p className="text-sm text-muted-foreground">No exams found.</p>
         )}
-      </Box>
-
-      {showCompose && (
-        <Box
-          sx={{
-            position: "fixed",
-            inset: 0,
-            bgcolor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1300,
-          }}
-        >
-          <Card
-            sx={{
-              width: { xs: "95vw", sm: 480 },
-              maxHeight: "80vh",
-              overflowY: "auto",
-            }}
-          >
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Compose exam
-              </Typography>
-              <Stack spacing={2}>
-                <TextField
-                  label="Name"
-                  value={composeName}
-                  onChange={(e) => setComposeName(e.target.value)}
-                  fullWidth
-                  size="small"
-                />
-                <TextField
-                  label="Description"
-                  value={composeDesc}
-                  onChange={(e) => setComposeDesc(e.target.value)}
-                  fullWidth
-                  size="small"
-                  multiline
-                  rows={2}
-                />
-                <TextField
-                  label="Duration (min)"
-                  type="number"
-                  value={composeDuration}
-                  onChange={(e) => setComposeDuration(Number(e.target.value))}
-                  fullWidth
-                  size="small"
-                />
-                <TextField
-                  label="Passing points (optional)"
-                  type="number"
-                  value={composePassing}
-                  onChange={(e) =>
-                    setComposePassing(
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    )
-                  }
-                  fullWidth
-                  size="small"
-                  helperText="Minimum points to pass. Leave blank for none."
-                />
-                <Divider />
-                <Typography variant="subtitle2">Sections</Typography>
-                {sections.map((s, i) => (
-                  <Box
-                    key={i}
-                    sx={{
-                      border: 1,
-                      borderColor: "divider",
-                      borderRadius: 1,
-                      p: 1.5,
-                    }}
-                  >
-                    <Stack spacing={1.5}>
-                      <Stack direction="row" spacing={1}>
-                        <TextField
-                          label="Section title"
-                          value={s.title}
-                          onChange={(e) => {
-                            const ns = [...sections];
-                            ns[i] = { ...ns[i], title: e.target.value };
-                            setSections(ns);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                        <TextField
-                          label="Weight %"
-                          type="number"
-                          value={s.weight}
-                          onChange={(e) => {
-                            const ns = [...sections];
-                            ns[i] = {
-                              ...ns[i],
-                              weight: Number(e.target.value),
-                            };
-                            setSections(ns);
-                          }}
-                          size="small"
-                          sx={{ width: 100 }}
-                          slotProps={{ htmlInput: { min: 1, max: 100 } }}
-                        />
-                      </Stack>
-                      <Box>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block", mb: 0.75 }}
-                        >
-                          Questions ({s.selectedIds.size} selected)
-                        </Typography>
-                        <Box
-                          sx={{
-                            maxHeight: 180,
-                            overflowY: "auto",
-                            border: 1,
-                            borderColor: "divider",
-                            borderRadius: 1,
-                          }}
-                        >
-                          {availableQuestions.length === 0 ? (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ p: 1.5, display: "block" }}
-                            >
-                              No live questions available.
-                            </Typography>
-                          ) : (
-                            availableQuestions.map((q) => {
-                              const checked = s.selectedIds.has(q.id);
-                              return (
-                                <Box
-                                  key={q.id}
-                                  onClick={() => {
-                                    const ns = [...sections];
-                                    const ids = new Set(ns[i].selectedIds);
-                                    checked ? ids.delete(q.id) : ids.add(q.id);
-                                    ns[i] = { ...ns[i], selectedIds: ids };
-                                    setSections(ns);
-                                  }}
-                                  sx={{
-                                    px: 1.5,
-                                    py: 0.75,
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    gap: 1,
-                                    alignItems: "flex-start",
-                                    borderBottom: 1,
-                                    borderColor: "divider",
-                                    bgcolor: checked
-                                      ? "action.selected"
-                                      : "transparent",
-                                    "&:last-child": { borderBottom: 0 },
-                                    "&:hover": {
-                                      bgcolor: checked
-                                        ? "action.selected"
-                                        : "action.hover",
-                                    },
-                                  }}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      fontFamily: "monospace",
-                                      pt: 0.1,
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {q.kind.toUpperCase()}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{ flex: 1, lineHeight: 1.4 }}
-                                  >
-                                    {q.prompt.length > 80
-                                      ? q.prompt.slice(0, 80) + "…"
-                                      : q.prompt}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ flexShrink: 0 }}
-                                  >
-                                    {q.points}pt
-                                  </Typography>
-                                </Box>
-                              );
-                            })
-                          )}
-                        </Box>
-                      </Box>
-                    </Stack>
-                  </Box>
-                ))}
-                <Button
-                  onClick={() =>
-                    setSections([
-                      ...sections,
-                      { title: "", weight: 40, selectedIds: new Set() },
-                    ])
-                  }
-                  variant="outlined"
-                  size="small"
+      </section>
+      {selected ? (
+        <article className="rounded-lg border border-border p-6 sm:p-8">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
+                {selected.course || "Graded assessment"}
+              </p>
+              <h2 className="text-2xl font-medium">{selected.name}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {selected.description || "No description provided."}
+              </p>
+            </div>
+            <span className="rounded-full border px-2 py-1 text-xs uppercase">
+              {selected.status}
+            </span>
+          </div>
+          <div className="mb-6 flex gap-4 font-mono text-xs text-muted-foreground">
+            <span>{selected.totalPoints} points</span>
+            {selected.durationMin && (
+              <span>{selected.durationMin} minutes</span>
+            )}
+            {selected.passingPoints && (
+              <span>Pass: {selected.passingPoints}</span>
+            )}
+          </div>
+          <LearningObjectives items={selected.objectives} compact />
+          {selected.sections?.length ? (
+            <div className="mt-6 space-y-2">
+              {selected.sections.map((section) => (
+                <div
+                  key={section.id}
+                  className="flex justify-between rounded border border-border p-3 text-sm"
                 >
-                  Add section
-                </Button>
-                {composeError && <Alert severity="error">{composeError}</Alert>}
-              </Stack>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ justifyContent: "flex-end", mt: 2 }}
+                  <span>{section.title}</span>
+                  <span className="text-muted-foreground">
+                    {section.itemsCount} questions
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button
+              onClick={start}
+              disabled={starting || selected.status === "draft"}
+            >
+              {starting
+                ? "Starting…"
+                : selected.status === "draft"
+                  ? "Draft cannot start"
+                  : selected.completed
+                    ? "Retake exam"
+                    : "Start exam"}
+            </Button>
+            {selected.lastSessionId && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push(`/sessions/${selected.lastSessionId}/results`)
+                }
               >
-                <Button onClick={() => setShowCompose(false)}>Cancel</Button>
-                <Button
-                  variant="contained"
-                  disabled={composing}
-                  onClick={handleCompose}
-                >
-                  {composing ? "Composing…" : "Compose"}
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
+                View last result
+              </Button>
+            )}
+          </div>
+        </article>
+      ) : (
+        <div className="flex min-h-96 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+          Select an exam to view details.
+        </div>
       )}
-    </Box>
+    </main>
   );
 }

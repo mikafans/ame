@@ -1,6 +1,5 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import ThemeRegistry from "@/components/ThemeRegistry";
 import { AuthProvider } from "@/hooks/useAuth";
 
@@ -45,11 +44,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AppRouterCacheProvider options={{ key: "mui" }}>
-          <ThemeRegistry>
-            <AuthProvider>{children}</AuthProvider>
-          </ThemeRegistry>
-        </AppRouterCacheProvider>
+        <ThemeRegistry>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeRegistry>
       </body>
     </html>
   );

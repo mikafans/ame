@@ -56,9 +56,8 @@ A scope mismatch returns `403`; a malformed `params` returns `422`.
 ## Discovery
 
 `GET /skill.json` is the machine-readable tool list. Each tool carries an
-`input_schema`, along with its direct REST `method` and `path` when `?strict=1`
-is not set. `GET /openapi.yaml` is the full OpenAPI schema for all routes on the
-platform.
+`input_schema`, along with its direct REST `method`, `path`, and required scope.
+`GET /openapi.yaml` is the full OpenAPI schema for all routes on the platform.
 
 ## Tools
 
@@ -218,4 +217,3 @@ Evolve requested questions into categorized, study-ready deep dive entries.
 3. Determine a high-level `category` (e.g. "Database Systems", "Algorithms", "Network Protocols").
 4. `deepDive.publish` `{ id, bodyMarkdown, category, status: "published" }` publishes the explanation. This creates the first revision snapshot.
 5. If the user updates their notes or requests revisions, re-publish via `deepDive.publish` to update the explanation body, generating sequential revision snapshots.
-

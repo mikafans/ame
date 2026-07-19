@@ -1072,6 +1072,7 @@ export interface components {
             prompt: string;
             source?: string | null;
             status: string;
+            tags: string[];
         };
         AssessmentSectionDetail: {
             /** Format: uuid */

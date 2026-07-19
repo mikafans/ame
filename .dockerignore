@@ -1,0 +1,13 @@
+.git
+.tmp
+.venv
+db/data
+web/node_modules
+web/.next
+api/target
+node_modules
+target
+*.pdf
+*.dump
+__pycache__
+*.pyc

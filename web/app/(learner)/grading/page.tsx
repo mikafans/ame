@@ -2,13 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatDate } from "@/utils/format";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import TextField from "@mui/material/TextField";
-import CircularProgress from "@mui/material/CircularProgress";
+import { Button } from "@/components/ui/button";
 
 interface PendingAttempt {
   attempt_id: string;
@@ -22,7 +16,6 @@ interface PendingAttempt {
   response_word_count: number;
   created_at: string;
 }
-
 interface GradeState {
   score: string;
   notes: string;
@@ -34,7 +27,6 @@ export default function GradingPage() {
   const [attempts, setAttempts] = useState<PendingAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [grades, setGrades] = useState<Record<string, GradeState>>({});
-
   useEffect(() => {
     const apiUrl =
       process.env.NEXT_PUBLIC_API_URL ??
@@ -47,23 +39,20 @@ export default function GradingPage() {
         return r.json();
       })
       .then((data: PendingAttempt[]) => {
-        const attemptsArray = Array.isArray(data) ? data : [];
-        setAttempts(attemptsArray);
-        const initial: Record<string, GradeState> = {};
-        for (const a of attemptsArray) {
-          initial[a.attempt_id] = {
-            score: "",
-            notes: "",
-            submitting: false,
-            done: false,
-          };
-        }
-        setGrades(initial);
+        const list = Array.isArray(data) ? data : [];
+        setAttempts(list);
+        setGrades(
+          Object.fromEntries(
+            list.map((a) => [
+              a.attempt_id,
+              { score: "", notes: "", submitting: false, done: false },
+            ]),
+          ),
+        );
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
-
   const handleGrade = async (attemptId: string) => {
     const g = grades[attemptId];
     if (!g) return;
@@ -81,27 +70,17 @@ export default function GradingPage() {
     try {
       const res = await fetch(`${apiUrl}/v1/attempts/${attemptId}/grade`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          score: scoreNum / 100,
-          notes: g.notes || null,
-        }),
+        body: JSON.stringify({ score: scoreNum / 100, notes: g.notes || null }),
       });
       if (res.ok) {
-        setGrades((prev) => ({
-          ...prev,
-          [attemptId]: { ...prev[attemptId], submitting: false, done: true },
-        }));
         setAttempts((prev) => prev.filter((a) => a.attempt_id !== attemptId));
-      } else {
-        setGrades((prev) => ({
-          ...prev,
-          [attemptId]: { ...prev[attemptId], submitting: false },
-        }));
       }
+      setGrades((prev) => ({
+        ...prev,
+        [attemptId]: { ...prev[attemptId], submitting: false, done: res.ok },
+      }));
     } catch {
       setGrades((prev) => ({
         ...prev,
@@ -109,54 +88,30 @@ export default function GradingPage() {
       }));
     }
   };
-
-  if (loading) {
+  if (loading)
     return (
-      <Box
-        sx={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <CircularProgress size={24} />
-      </Box>
+      <div className="flex min-h-screen items-center justify-center">
+        <span className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
     );
-  }
-
   return (
-    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8 }}>
-      <Box sx={{ mb: 3.5 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            display: "block",
-            mb: 1,
-          }}
-        >
+    <div className="px-4 pb-16 pt-10 sm:px-12">
+      <div className="mb-7">
+        <p className="mb-2 text-xs uppercase tracking-[0.13em] text-muted-foreground">
           Manual grading
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 500 }}>
-          Essay Grading
-        </Typography>
-      </Box>
-
+        </p>
+        <h1 className="text-3xl font-medium">Essay Grading</h1>
+      </div>
       {attempts.length === 0 ? (
-        <Card variant="outlined" sx={{ p: 4.5, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            No essays pending manual review.
-          </Typography>
-        </Card>
+        <div className="rounded-lg border border-border p-16 text-center text-sm text-muted-foreground">
+          No essays pending manual review.
+        </div>
       ) : (
-        <Stack spacing={2.5}>
-          <Typography variant="caption" color="text.secondary">
+        <div className="space-y-5">
+          <p className="text-xs text-muted-foreground">
             {attempts.length} essay{attempts.length !== 1 ? "s" : ""} awaiting
             review
-          </Typography>
+          </p>
           {attempts.map((attempt) => {
             const g = grades[attempt.attempt_id] ?? {
               score: "",
@@ -167,151 +122,89 @@ export default function GradingPage() {
             const scoreNum = parseFloat(g.score);
             const scoreValid =
               !isNaN(scoreNum) && scoreNum >= 0 && scoreNum <= 100;
-
             return (
-              <Card key={attempt.attempt_id} variant="outlined">
-                <Box
-                  sx={{
-                    px: "22px",
-                    py: 2,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{
-                        display: "block",
-                        letterSpacing: 1.2,
-                        textTransform: "uppercase",
-                        mb: 0.5,
-                      }}
-                    >
+              <article
+                key={attempt.attempt_id}
+                className="overflow-hidden rounded-lg border border-border"
+              >
+                <div className="flex items-start justify-between border-b border-border px-5 py-4">
+                  <div>
+                    <p className="mb-1 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                       Essay · {attempt.response_word_count} words
-                    </Typography>
-                    <Typography
-                      variant="subtitle1"
-                      sx={{ fontWeight: 500, lineHeight: 1.4 }}
-                    >
+                    </p>
+                    <h2 className="text-base font-medium leading-snug">
                       {attempt.question_prompt}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ textAlign: "right", flexShrink: 0, ml: 3 }}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block" }}
-                    >
-                      {attempt.user_display_name}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.disabled"
-                      sx={{ display: "block" }}
-                    >
+                    </h2>
+                  </div>
+                  <div className="ml-6 shrink-0 text-right text-xs text-muted-foreground">
+                    <p>{attempt.user_display_name}</p>
+                    <p className="text-muted-foreground/70">
                       {attempt.user_email}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.disabled"
-                      sx={{ display: "block" }}
-                    >
+                    </p>
+                    <p className="text-muted-foreground/70">
                       {formatDate(attempt.created_at)}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Box
-                  sx={{
-                    px: "22px",
-                    py: 2,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    bgcolor: "action.hover",
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                      display: "block",
-                      letterSpacing: 1.2,
-                      textTransform: "uppercase",
-                      mb: 1,
-                    }}
-                  >
+                    </p>
+                  </div>
+                </div>
+                <div className="border-b border-border bg-muted/40 px-5 py-4">
+                  <p className="mb-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                     Response
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ lineHeight: 1.7, whiteSpace: "pre-wrap" }}
-                  >
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm leading-7">
                     {attempt.response_body || "(empty)"}
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    px: "22px",
-                    py: 2,
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "120px 1fr auto" },
-                    gap: 2,
-                    alignItems: { xs: "stretch", sm: "flex-end" },
-                  }}
-                >
-                  <TextField
-                    label="Score (0–100)"
-                    type="number"
-                    size="small"
-                    slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }}
-                    value={g.score}
-                    onChange={(e) =>
-                      setGrades((prev) => ({
-                        ...prev,
-                        [attempt.attempt_id]: {
-                          ...prev[attempt.attempt_id],
-                          score: e.target.value,
-                        },
-                      }))
-                    }
-                    placeholder="e.g. 75"
-                  />
-                  <TextField
-                    label="Notes (optional)"
-                    size="small"
-                    multiline
-                    rows={2}
-                    value={g.notes}
-                    onChange={(e) =>
-                      setGrades((prev) => ({
-                        ...prev,
-                        [attempt.attempt_id]: {
-                          ...prev[attempt.attempt_id],
-                          notes: e.target.value,
-                        },
-                      }))
-                    }
-                    placeholder="Good structure but missing examples…"
-                  />
+                  </p>
+                </div>
+                <div className="grid gap-4 px-5 py-4 sm:grid-cols-[120px_1fr_auto] sm:items-end">
+                  <label className="grid gap-1.5 text-xs text-muted-foreground">
+                    Score (0–100)
+                    <input
+                      className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={g.score}
+                      onChange={(e) =>
+                        setGrades((prev) => ({
+                          ...prev,
+                          [attempt.attempt_id]: {
+                            ...prev[attempt.attempt_id],
+                            score: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="e.g. 75"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs text-muted-foreground">
+                    Notes (optional)
+                    <textarea
+                      className="min-h-[72px] rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                      value={g.notes}
+                      onChange={(e) =>
+                        setGrades((prev) => ({
+                          ...prev,
+                          [attempt.attempt_id]: {
+                            ...prev[attempt.attempt_id],
+                            notes: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Good structure but missing examples…"
+                    />
+                  </label>
                   <Button
-                    variant="contained"
                     disabled={!scoreValid || g.submitting}
                     onClick={() => handleGrade(attempt.attempt_id)}
                   >
                     {g.submitting ? "Saving…" : "Grade"}
                   </Button>
-                </Box>
-              </Card>
+                </div>
+              </article>
             );
           })}
-        </Stack>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }

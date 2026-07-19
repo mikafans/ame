@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_URL, loginAs, setAuthCookie } from "./helpers";
+import { API_URL, setAuthCookie } from "./helpers";
 
 test.describe("Learn Deeper flow", () => {
   test.describe.configure({ mode: "serial" });
@@ -236,7 +236,7 @@ test.describe("Learn Deeper flow", () => {
 
     // Open drawer for Q1 (Paris)
     const parisCard = page.locator(
-      'div.MuiCard-root:has-text("Paris is the capital of France.")',
+      '[data-testid="answer-card"]:has-text("Paris is the capital of France.")',
     );
     await expect(parisCard).toBeVisible();
     await parisCard.getByRole("button", { name: "Dive deeper" }).click();
@@ -269,9 +269,9 @@ test.describe("Learn Deeper flow", () => {
     );
 
     // Verify related questions displays Rome
-    const relatedCard = resultsDrawer.locator(
-      'div.MuiCard-root:has-text("Rome is the capital of Italy.")',
-    );
+    const relatedCard = resultsDrawer.getByRole("button", {
+      name: /Rome is the capital of Italy\./,
+    });
     await expect(relatedCard).toBeVisible();
 
     // Navigate to Rome question in Drawer

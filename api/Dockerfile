@@ -27,8 +27,8 @@ RUN mkdir -p api/src api/src/bin api/benches \
 
 COPY api/src ./api/src
 # llms.txt is embedded into the binary via include_str! (served at GET /llms.txt),
-# so it must be present at compile time.
-COPY api/llms.txt ./api/llms.txt
+# so the canonical public document must be present at compile time.
+COPY docs/public ./docs/public
 # Migrations are embedded into the binary via sqlx::migrate!, so they must be
 # present at compile time (resolved as ../db/migrations relative to the crate).
 COPY db/migrations ./db/migrations

@@ -1,30 +1,20 @@
 "use client";
-
-import React, { useState, useEffect, useCallback } from "react";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import Grid from "@mui/material/Grid";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import WarningIcon from "@mui/icons-material/Warning";
-import ErrorIcon from "@mui/icons-material/Error";
-import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
-import PlayCircleOutlinedIcon from "@mui/icons-material/PlayCircleOutlined";
-import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
-import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import Alert from "@mui/material/Alert";
-import CircularProgress from "@mui/material/CircularProgress";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
-
+import { Button } from "@/components/ui/button";
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Database,
+  FileClock,
+  List,
+  Play,
+  RefreshCw,
+  Shield,
+  Users,
+} from "lucide-react";
 interface HealthData {
   database: string;
   valkey: string;
@@ -36,33 +26,26 @@ interface HealthData {
   auditLogCount: number;
   quotaRejectionsTotal: number;
 }
-
 export default function SystemHealthPage() {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-
   const fetchHealth = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const { data, error: apiError } = await api.GET("/v1/admin/health");
-
-      if (apiError) {
+      if (apiError)
         setError(
           "Failed to fetch system status: " +
             errorMessage(apiError, "Unknown error"),
         );
-        return;
-      }
-
-      if (data) {
+      else if (data) {
         setHealth(data as HealthData);
         setLastUpdated(new Date().toLocaleTimeString());
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError(
         "An unexpected error occurred while communicating with the server.",
       );
@@ -70,420 +53,153 @@ export default function SystemHealthPage() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     fetchHealth();
   }, [fetchHealth]);
-
-  const getStatusComponent = (status: string) => {
-    const isOk =
-      status.toLowerCase() === "ok" || status.toLowerCase() === "healthy";
-    const isDegraded = status.toLowerCase() === "degraded";
-
-    if (isOk) {
-      return (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <CheckCircleIcon color="success" />
-          <Typography variant="body2" fontWeight="600" color="success.main">
-            ONLINE
-          </Typography>
-        </Box>
-      );
-    } else if (isDegraded) {
-      return (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <WarningIcon color="warning" />
-          <Typography variant="body2" fontWeight="600" color="warning.main">
-            DEGRADED
-          </Typography>
-        </Box>
-      );
-    } else {
-      return (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <ErrorIcon color="error" />
-          <Typography variant="body2" fontWeight="600" color="error.main">
-            OFFLINE ({status})
-          </Typography>
-        </Box>
-      );
-    }
-  };
-
-  const dbStatus = health?.database ?? "unknown";
-  const valkeyStatus = health?.valkey ?? "unknown";
-
-  return (
-    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          mb: 5,
-          gap: 2,
-        }}
+  const status = (value: string) => {
+    const ok = ["ok", "healthy"].includes(value.toLowerCase());
+    return (
+      <span
+        className={`inline-flex items-center gap-2 text-sm font-semibold ${ok ? "text-emerald-600 dark:text-emerald-400" : value === "degraded" ? "text-amber-600" : "text-red-600"}`}
       >
-        <Box>
-          <Typography
-            variant="h4"
-            component="h1"
-            fontWeight="bold"
-            gutterBottom
-          >
-            System Health
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
+        {ok ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+        {ok
+          ? "ONLINE"
+          : value === "degraded"
+            ? "DEGRADED"
+            : `OFFLINE (${value})`}
+      </span>
+    );
+  };
+  const metrics = [
+    ["Total Users", health?.usersCount ?? 0, Users],
+    ["Total Agents", health?.agentsCount ?? 0, Activity],
+    ["Assessments", health?.assessmentsCount ?? 0, List],
+    ["Sessions", health?.sessionsCount ?? 0, Play],
+    ["Questions", health?.questionsCount ?? 0, Database],
+  ] as const;
+  return (
+    <main className="px-6 py-12 sm:px-12">
+      <header className="mb-10 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">System Health</h1>
+          <p className="mt-2 text-muted-foreground">
             Monitor infrastructure services, database tables, and rate-limiting
             metrics.
-          </Typography>
+          </p>
           {lastUpdated && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mt: 0.5 }}
-            >
+            <p className="mt-1 text-xs text-muted-foreground">
               Last checked: {lastUpdated}
-            </Typography>
+            </p>
           )}
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={
-            loading ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
-          onClick={fetchHealth}
-          disabled={loading}
-          sx={{ textTransform: "none", borderRadius: 2 }}
-        >
+        </div>
+        <Button variant="outline" onClick={fetchHealth} disabled={loading}>
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           Refresh Status
         </Button>
-      </Box>
-
+      </header>
       {error && (
-        <Box sx={{ mb: 4 }}>
-          <Alert severity="error">{error}</Alert>
-        </Box>
+        <div
+          role="alert"
+          className="mb-8 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {error}
+        </div>
       )}
-
-      {/* Services Status Cards */}
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2.5 }}>
-        Core Infrastructure
-      </Typography>
-      <Grid container spacing={3.5} sx={{ mb: 5 }}>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.01)",
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.01)"
-                  : "rgba(0,0,0,0.005)",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 3.5,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Box>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  gutterBottom
-                >
-                  Database Service (PostgreSQL)
-                </Typography>
-                <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
-                  Primary Database
-                </Typography>
-              </Box>
-              <Box>
-                {loading ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  getStatusComponent(dbStatus)
-                )}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              border: "1px solid",
-              borderColor: "divider",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.01)",
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.01)"
-                  : "rgba(0,0,0,0.005)",
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 3.5,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Box>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  gutterBottom
-                >
-                  Limiter Cache Service (Valkey)
-                </Typography>
-                <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
-                  Rate Limiting
-                </Typography>
-              </Box>
-              <Box>
-                {loading ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  getStatusComponent(valkeyStatus)
-                )}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Database Table Metrics */}
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2.5 }}>
-        Database Storage Row Counts
-      </Typography>
-      <Grid container spacing={3.5} sx={{ mb: 5 }}>
-        {[
-          {
-            title: "Total Users",
-            count: health?.usersCount ?? 0,
-            icon: (
-              <PeopleOutlinedIcon
-                sx={{ color: "primary.main", fontSize: 28 }}
-              />
-            ),
-          },
-          {
-            title: "Total Agents",
-            count: health?.agentsCount ?? 0,
-            icon: (
-              <SmartToyOutlinedIcon
-                sx={{ color: "secondary.main", fontSize: 28 }}
-              />
-            ),
-          },
-          {
-            title: "Assessments",
-            count: health?.assessmentsCount ?? 0,
-            icon: (
-              <AssignmentOutlinedIcon
-                sx={{ color: "success.main", fontSize: 28 }}
-              />
-            ),
-          },
-          {
-            title: "Sessions",
-            count: health?.sessionsCount ?? 0,
-            icon: (
-              <PlayCircleOutlinedIcon
-                sx={{ color: "warning.main", fontSize: 28 }}
-              />
-            ),
-          },
-          {
-            title: "Questions",
-            count: health?.questionsCount ?? 0,
-            icon: (
-              <FormatListBulletedOutlinedIcon
-                sx={{ color: "info.main", fontSize: 28 }}
-              />
-            ),
-          },
-        ].map((item) => (
-          <Grid size={{ xs: 12, sm: 6, md: 2.4 }} key={item.title}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                display: "flex",
-                alignItems: "center",
-                gap: 2.5,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.01)",
-              }}
-            >
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 2,
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.03)"
-                      : "rgba(0,0,0,0.015)",
-                }}
-              >
-                {item.icon}
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  fontWeight={500}
-                  noWrap
-                  display="block"
-                >
-                  {item.title}
-                </Typography>
-                <Typography variant="h5" fontWeight="bold" sx={{ mt: 0.5 }}>
-                  {loading ? (
-                    <CircularProgress size={18} />
-                  ) : (
-                    item.count.toLocaleString()
-                  )}
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
+      <h2 className="mb-4 text-lg font-bold">Core Infrastructure</h2>
+      <div className="mb-10 grid gap-5 sm:grid-cols-2">
+        <Service
+          title="Database Service (PostgreSQL)"
+          subtitle="Primary Database"
+        >
+          {loading ? "Checking…" : status(health?.database ?? "unknown")}
+        </Service>
+        <Service
+          title="Limiter Cache Service (Valkey)"
+          subtitle="Rate Limiting"
+        >
+          {loading ? "Checking…" : status(health?.valkey ?? "unknown")}
+        </Service>
+      </div>
+      <h2 className="mb-4 text-lg font-bold">Database Storage Row Counts</h2>
+      <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {metrics.map(([title, count, Icon]) => (
+          <div key={title} className="rounded-lg border border-border p-5">
+            <Icon size={24} className="mb-4 text-primary" />
+            <p className="text-xs text-muted-foreground">{title}</p>
+            <p className="mt-1 text-2xl font-bold">
+              {loading ? "…" : count.toLocaleString()}
+            </p>
+          </div>
         ))}
-      </Grid>
-
-      {/* Operational Metrics */}
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2.5 }}>
-        Operational Metrics
-      </Typography>
-      <Grid container spacing={3.5}>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 3.5,
-              borderRadius: 3,
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              height: "100%",
-            }}
-          >
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "info.light",
-                color: "info.contrastText",
-              }}
-            >
-              <HistoryOutlinedIcon sx={{ fontSize: 32 }} />
-            </Box>
-            <Box>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                fontWeight={500}
-              >
-                Audit Log Entries Count
-              </Typography>
-              <Typography variant="h4" fontWeight="bold" sx={{ mt: 0.5 }}>
-                {loading ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  (health?.auditLogCount.toLocaleString() ?? "0")
-                )}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mt: 0.5 }}
-              >
-                Append-only log total size.
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 3.5,
-              borderRadius: 3,
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              height: "100%",
-              borderColor:
-                (health?.quotaRejectionsTotal ?? 0) > 0
-                  ? "warning.main"
-                  : "divider",
-            }}
-          >
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor:
-                  (health?.quotaRejectionsTotal ?? 0) > 0
-                    ? "warning.light"
-                    : "success.light",
-                color:
-                  (health?.quotaRejectionsTotal ?? 0) > 0
-                    ? "warning.contrastText"
-                    : "success.contrastText",
-              }}
-            >
-              <ShieldOutlinedIcon sx={{ fontSize: 32 }} />
-            </Box>
-            <Box>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                fontWeight={500}
-              >
-                Rate-Limit Quota Rejections
-              </Typography>
-              <Typography
-                variant="h4"
-                fontWeight="bold"
-                color={
-                  (health?.quotaRejectionsTotal ?? 0) > 0
-                    ? "warning.main"
-                    : "text.primary"
-                }
-                sx={{ mt: 0.5 }}
-              >
-                {loading ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  (health?.quotaRejectionsTotal.toLocaleString() ?? "0")
-                )}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mt: 0.5 }}
-              >
-                Recent client quota requests rejected by Valkey.
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Container>
+      </div>
+      <h2 className="mb-4 text-lg font-bold">Operational Metrics</h2>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Metric
+          icon={FileClock}
+          title="Audit Log Entries Count"
+          value={health?.auditLogCount ?? 0}
+        >
+          Append-only log total size.
+        </Metric>
+        <Metric
+          icon={Shield}
+          title="Rate-Limit Quota Rejections"
+          value={health?.quotaRejectionsTotal ?? 0}
+          warning={(health?.quotaRejectionsTotal ?? 0) > 0}
+        >
+          Recent client quota requests rejected by Valkey.
+        </Metric>
+      </div>
+    </main>
+  );
+}
+function Service({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-border p-6">
+      <div>
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <p className="mt-1 font-semibold">{subtitle}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+function Metric({
+  icon: Icon,
+  title,
+  value,
+  warning,
+  children,
+}: {
+  icon: typeof Shield;
+  title: string;
+  value: number;
+  warning?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-5 rounded-lg border p-6 ${warning ? "border-amber-500/50" : "border-border"}`}
+    >
+      <Icon size={30} className={warning ? "text-amber-500" : "text-primary"} />
+      <div>
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <p
+          className={`mt-1 text-3xl font-bold ${warning ? "text-amber-600" : ""}`}
+        >
+          {value.toLocaleString()}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">{children}</p>
+      </div>
+    </div>
   );
 }

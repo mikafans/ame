@@ -1,52 +1,10 @@
 "use client";
-
-import React, { useState, useEffect, useCallback } from "react";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import TextField from "@mui/material/TextField";
-import InputAdornment from "@mui/material/InputAdornment";
-import SearchIcon from "@mui/icons-material/Search";
-import ClearIcon from "@mui/icons-material/Clear";
-import IconButton from "@mui/material/IconButton";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TablePagination from "@mui/material/TablePagination";
-import Avatar from "@mui/material/Avatar";
-import Chip from "@mui/material/Chip";
-import Menu from "@mui/material/Menu";
-import MenuItem from "@mui/material/MenuItem";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
-import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
-import StarBorderOutlinedIcon from "@mui/icons-material/StarBorderOutlined";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogActions from "@mui/material/DialogActions";
-import Button from "@mui/material/Button";
-import Alert from "@mui/material/Alert";
-import FormControl from "@mui/material/FormControl";
-import FormLabel from "@mui/material/FormLabel";
-import RadioGroup from "@mui/material/RadioGroup";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Radio from "@mui/material/Radio";
-import Checkbox from "@mui/material/Checkbox";
-import CircularProgress from "@mui/material/CircularProgress";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { formatDateTime } from "@/utils/format";
 import { useAuth } from "@/hooks/useAuth";
-
+import { Button } from "@/components/ui/button";
 interface UserType {
   id: string;
   email?: string | null;
@@ -56,759 +14,318 @@ interface UserType {
   deactivatedAt?: string | null;
   createdAt: string;
 }
-
 export default function ManageUsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserType[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-
-  // Pagination & Search
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-
-  // Error/Success Notification
-  const [pageError, setPageError] = useState<string | null>(null);
-
-  // Menu Anchor
-  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
-
-  // Dialog states
-  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-  const [targetRole, setTargetRole] = useState<string>("user");
-
-  const [planDialogOpen, setPlanDialogOpen] = useState(false);
-  const [targetPlan, setTargetPlan] = useState<string>("free");
-
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [understandDisable, setUnderstandDisable] = useState(false);
-
-  const [dialogLoading, setDialogLoading] = useState(false);
-  const [dialogError, setDialogError] = useState<string | null>(null);
-
-  const fetchUsers = useCallback(async () => {
+  const [rows, setRows] = useState(10);
+  const [query, setQuery] = useState("");
+  const [input, setInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<UserType | null>(null);
+  const [dialog, setDialog] = useState<"role" | "plan" | "status" | null>(null);
+  const [targetRole, setTargetRole] = useState("user");
+  const [targetPlan, setTargetPlan] = useState("free");
+  const [confirm, setConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const load = useCallback(async () => {
     setLoading(true);
-    setPageError(null);
+    setError(null);
     try {
       const { data, error } = await api.GET("/v1/admin/users", {
         params: {
-          query: {
-            limit: rowsPerPage,
-            offset: page * rowsPerPage,
-            q: search || undefined,
-          },
+          query: { limit: rows, offset: page * rows, q: query || undefined },
         },
       });
-
-      if (error) {
-        setPageError(
+      if (error)
+        setError(
           "Failed to load users: " + errorMessage(error, "Unknown error"),
         );
-        return;
-      }
-
-      if (data) {
+      else if (data) {
         setUsers(data.users as UserType[]);
         setTotal(data.total);
       }
-    } catch (err) {
-      console.error(err);
-      setPageError("An unexpected error occurred while fetching users.");
+    } catch {
+      setError("An unexpected error occurred while fetching users.");
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, search]);
-
+  }, [page, rows, query]);
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
-  // Search handlers
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(0);
-    setSearch(searchInput);
+    load();
+  }, [load]);
+  const open = (u: UserType, kind: "role" | "plan" | "status") => {
+    setSelected(u);
+    setDialog(kind);
+    setTargetRole(u.role);
+    setTargetPlan(u.plan);
+    setConfirm(false);
   };
-
-  const handleClearSearch = () => {
-    setSearchInput("");
-    setSearch("");
-    setPage(0);
-  };
-
-  const handlePageChange = (_: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleRowsPerPageChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Menu Handlers
-  const handleOpenMenu = (
-    event: React.MouseEvent<HTMLButtonElement>,
-    user: UserType,
-  ) => {
-    setMenuAnchor(event.currentTarget);
-    setSelectedUser(user);
-  };
-
-  const handleCloseMenu = () => {
-    setMenuAnchor(null);
-  };
-
-  // Dialog openers
-  const handleOpenRoleDialog = () => {
-    if (selectedUser) {
-      setTargetRole(selectedUser.role);
-      setDialogError(null);
-      setRoleDialogOpen(true);
-    }
-    handleCloseMenu();
-  };
-
-  const handleOpenPlanDialog = () => {
-    if (selectedUser) {
-      setTargetPlan(selectedUser.plan);
-      setDialogError(null);
-      setPlanDialogOpen(true);
-    }
-    handleCloseMenu();
-  };
-
-  const handleOpenStatusDialog = () => {
-    if (selectedUser) {
-      setUnderstandDisable(false);
-      setDialogError(null);
-      setStatusDialogOpen(true);
-    }
-    handleCloseMenu();
-  };
-
-  // Error Helper — delegates to the shared extractor (see @/api/errors).
-  const getErrorMessage = (error: unknown): string =>
-    errorMessage(error, "An unexpected error occurred.");
-
-  // API submit helpers
-  const handleSaveRole = async () => {
-    if (!selectedUser) return;
-    setDialogLoading(true);
-    setDialogError(null);
-
+  const save = async () => {
+    if (!selected || !dialog) return;
+    if (dialog === "status" && !selected.deactivatedAt && !confirm) return;
+    setSaving(true);
     try {
+      const body =
+        dialog === "role"
+          ? { role: targetRole }
+          : dialog === "plan"
+            ? { plan: targetPlan }
+            : { disabled: !selected.deactivatedAt };
       const { error } = await api.PATCH("/v1/admin/users/{id}", {
-        params: { path: { id: selectedUser.id } },
-        body: { role: targetRole },
+        params: { path: { id: selected.id } },
+        body,
       });
-
-      if (error) {
-        setDialogError(getErrorMessage(error));
-      } else {
-        setRoleDialogOpen(false);
-        fetchUsers();
+      if (error) setError(errorMessage(error, "Could not update user."));
+      else {
+        setDialog(null);
+        await load();
       }
-    } catch (err) {
-      setDialogError("Network or unexpected server error.");
+    } catch {
+      setError("Network or unexpected server error.");
     } finally {
-      setDialogLoading(false);
+      setSaving(false);
     }
   };
-
-  const handleSavePlan = async () => {
-    if (!selectedUser) return;
-    setDialogLoading(true);
-    setDialogError(null);
-
-    try {
-      const { error } = await api.PATCH("/v1/admin/users/{id}", {
-        params: { path: { id: selectedUser.id } },
-        body: { plan: targetPlan },
-      });
-
-      if (error) {
-        setDialogError(getErrorMessage(error));
-      } else {
-        setPlanDialogOpen(false);
-        fetchUsers();
-      }
-    } catch (err) {
-      setDialogError("Network or unexpected server error.");
-    } finally {
-      setDialogLoading(false);
-    }
-  };
-
-  const handleToggleStatus = async () => {
-    if (!selectedUser) return;
-    const currentlyDisabled = !!selectedUser.deactivatedAt;
-
-    // Safety guard UI validation check
-    if (!currentlyDisabled && !understandDisable) {
-      setDialogError(
-        "You must check the confirmation box to deactivate this user.",
-      );
-      return;
-    }
-
-    setDialogLoading(true);
-    setDialogError(null);
-
-    try {
-      const { error } = await api.PATCH("/v1/admin/users/{id}", {
-        params: { path: { id: selectedUser.id } },
-        body: { disabled: !currentlyDisabled },
-      });
-
-      if (error) {
-        setDialogError(getErrorMessage(error));
-      } else {
-        setStatusDialogOpen(false);
-        fetchUsers();
-      }
-    } catch (err) {
-      setDialogError("Network or unexpected server error.");
-    } finally {
-      setDialogLoading(false);
-    }
-  };
-
-  const getInitials = (user: UserType) => {
-    return (
-      user.displayName
-        ?.split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2) || "?"
-    );
-  };
-
+  const pages = Math.max(1, Math.ceil(total / rows));
   return (
-    <Container maxWidth={false} sx={{ py: 6, px: { xs: 3, sm: 5 } }}>
-      {/* Title */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-          Manage Users
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
+    <main className="px-6 py-12 sm:px-12">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold">Manage Users</h1>
+        <p className="mt-2 text-muted-foreground">
           Paginate, search, and update roles, plans, or account suspension
           status.
-        </Typography>
-      </Box>
-
-      {/* Main Panel */}
-      <Paper
-        sx={{
-          borderRadius: 3,
-          overflow: "hidden",
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
+        </p>
+      </header>
+      <form
+        className="mb-5 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPage(0);
+          setQuery(input);
         }}
       >
-        {/* Top Control Bar */}
-        <Box
-          component="form"
-          onSubmit={handleSearchSubmit}
-          sx={{
-            p: 2.5,
-            borderBottom: "1px solid",
-            borderColor: "divider",
-            display: "flex",
-            flexDirection: { xs: "column", sm: "row" },
-            alignItems: "center",
-            gap: 2,
-            bgcolor: (theme) =>
-              theme.palette.mode === "dark"
-                ? "rgba(255,255,255,0.015)"
-                : "rgba(0,0,0,0.005)",
+        <input
+          className="h-9 max-w-md flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          placeholder="Search by display name or email..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <Button type="submit">Search</Button>
+      </form>
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">User</th>
+              <th className="px-4 py-3">Role</th>
+              <th className="px-4 py-3">Plan</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Joined</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
+                  Loading user accounts…
+                </td>
+              </tr>
+            ) : users.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
+                  No users found.
+                </td>
+              </tr>
+            ) : (
+              users.map((u) => (
+                <tr key={u.id} className={u.deactivatedAt ? "opacity-60" : ""}>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-9 items-center justify-center rounded-full border border-border bg-muted font-semibold">
+                        {u.displayName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </span>
+                      <div>
+                        <p className="font-medium">
+                          {u.displayName}
+                          {currentUser?.id === u.id && (
+                            <span className="ml-1 text-xs text-primary">
+                              (You)
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {u.email}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className="rounded-full border px-2 py-1 text-xs uppercase">
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">{u.plan}</td>
+                  <td className="px-4 py-4">
+                    {u.deactivatedAt ? (
+                      <span className="text-red-500">Disabled</span>
+                    ) : (
+                      <span className="text-emerald-600">Active</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-xs text-muted-foreground">
+                    {formatDateTime(u.createdAt)}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => open(u, "role")}
+                      >
+                        Role
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => open(u, "plan")}
+                      >
+                        Plan
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => open(u, "status")}
+                      >
+                        {u.deactivatedAt ? "Enable" : "Disable"}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-end gap-3 py-4 text-sm text-muted-foreground">
+        <select
+          className="rounded border border-input bg-background px-2 py-1"
+          value={rows}
+          onChange={(e) => {
+            setRows(Number(e.target.value));
+            setPage(0);
           }}
         >
-          <TextField
-            placeholder="Search by display name or email..."
-            size="small"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            fullWidth
-            sx={{ maxWidth: { sm: 400 } }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" fontSize="small" />
-                  </InputAdornment>
-                ),
-                endAdornment: searchInput ? (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={handleClearSearch}>
-                      <ClearIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ) : null,
-              },
-            }}
-          />
-          <Button
-            variant="contained"
-            type="submit"
-            sx={{ minWidth: 100, textTransform: "none", borderRadius: 2 }}
-          >
-            Search
-          </Button>
-        </Box>
-
-        {pageError && (
-          <Box sx={{ p: 2 }}>
-            <Alert severity="error">{pageError}</Alert>
-          </Box>
-        )}
-
-        {/* Table */}
-        <TableContainer>
-          <Table sx={{ minWidth: 650 }}>
-            <TableHead>
-              <TableRow
-                sx={{
-                  bgcolor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.01)"
-                      : "rgba(0,0,0,0.01)",
-                }}
+          <option value={10}>10 / page</option>
+          <option value={25}>25 / page</option>
+          <option value={50}>50 / page</option>
+        </select>
+        <span>
+          {total ? page * rows + 1 : 0}–{Math.min((page + 1) * rows, total)} of{" "}
+          {total}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={page === 0}
+          onClick={() => setPage(page - 1)}
+        >
+          Previous
+        </Button>
+        <span>
+          {page + 1} / {pages}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={page + 1 >= pages}
+          onClick={() => setPage(page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+      {dialog && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 className="text-lg font-semibold">
+              {dialog === "role"
+                ? "Change role"
+                : dialog === "plan"
+                  ? "Change plan"
+                  : selected.deactivatedAt
+                    ? "Enable user"
+                    : "Disable user"}
+            </h2>
+            {dialog === "role" && (
+              <select
+                className="mt-5 h-9 w-full rounded border border-input bg-background px-3"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
               >
-                <TableCell>User</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell>Plan</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Joined</TableCell>
-                <TableCell align="right" sx={{ pr: 3 }}>
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                    <CircularProgress size={32} sx={{ mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">
-                      Loading user accounts...
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                    <Typography
-                      variant="body1"
-                      color="text.secondary"
-                      fontWeight={500}
-                    >
-                      No users found.
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      Try adjusting your search criteria or clear the query.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((row) => {
-                  const isDisabled = !!row.deactivatedAt;
-                  const isSelf = currentUser?.id === row.id;
-                  return (
-                    <TableRow
-                      key={row.id}
-                      hover
-                      sx={{
-                        "&:last-child td, &:last-child th": { border: 0 },
-                        opacity: isDisabled ? 0.65 : 1,
-                      }}
-                    >
-                      <TableCell>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
-                          }}
-                        >
-                          <Avatar
-                            sx={{
-                              width: 36,
-                              height: 36,
-                              fontSize: 14,
-                              fontWeight: 600,
-                              bgcolor: (theme) =>
-                                theme.palette.mode === "dark"
-                                  ? "rgba(255,255,255,0.08)"
-                                  : "rgba(0,0,0,0.08)",
-                              color: "text.primary",
-                              border: "1px solid",
-                              borderColor: "divider",
-                            }}
-                          >
-                            {getInitials(row)}
-                          </Avatar>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {row.displayName}{" "}
-                              {isSelf && (
-                                <Typography
-                                  variant="caption"
-                                  color="primary"
-                                  sx={{ fontStyle: "italic", ml: 0.5 }}
-                                >
-                                  (You)
-                                </Typography>
-                              )}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              noWrap
-                              sx={{ display: "block" }}
-                            >
-                              {row.email}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={row.role.toUpperCase()}
-                          size="small"
-                          color={
-                            row.role === "admin"
-                              ? "primary"
-                              : row.role === "agent"
-                                ? "secondary"
-                                : "default"
-                          }
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: 10,
-                            borderRadius: 1.5,
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={row.plan.toUpperCase()}
-                          size="small"
-                          variant="outlined"
-                          color={row.plan === "premium" ? "warning" : "default"}
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: 10,
-                            borderRadius: 1.5,
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {isDisabled ? (
-                          <Chip
-                            label="DISABLED"
-                            size="small"
-                            color="error"
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: 10,
-                              borderRadius: 1.5,
-                            }}
-                          />
-                        ) : (
-                          <Chip
-                            label="ACTIVE"
-                            size="small"
-                            color="success"
-                            variant="outlined"
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: 10,
-                              borderRadius: 1.5,
-                            }}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ fontSize: 13 }}
-                        >
-                          {formatDateTime(row.createdAt)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right" sx={{ pr: 2 }}>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleOpenMenu(e, row)}
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          component="div"
-          count={total}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          sx={{ borderTop: "1px solid", borderColor: "divider" }}
-        />
-      </Paper>
-
-      {/* Row Operations Menu */}
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={handleCloseMenu}
-      >
-        <MenuItem onClick={handleOpenRoleDialog}>
-          <ListItemIcon>
-            <EditOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Change User Role</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleOpenPlanDialog}>
-          <ListItemIcon>
-            <StarBorderOutlinedIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Change Subscription Plan</ListItemText>
-        </MenuItem>
-        {selectedUser && (
-          <MenuItem onClick={handleOpenStatusDialog}>
-            <ListItemIcon>
-              {selectedUser.deactivatedAt ? (
-                <CheckCircleOutlinedIcon fontSize="small" color="success" />
-              ) : (
-                <BlockOutlinedIcon fontSize="small" color="error" />
-              )}
-            </ListItemIcon>
-            <ListItemText>
-              {selectedUser.deactivatedAt
-                ? "Enable Account"
-                : "Disable Account"}
-            </ListItemText>
-          </MenuItem>
-        )}
-      </Menu>
-
-      {/* Dialog: Change Role */}
-      <Dialog
-        open={roleDialogOpen}
-        onClose={() => !dialogLoading && setRoleDialogOpen(false)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle fontWeight="bold">Change User Role</DialogTitle>
-        <DialogContent dividers>
-          {dialogError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
-          <DialogContentText sx={{ mb: 3 }}>
-            Modify the role for <strong>{selectedUser?.displayName}</strong>.
-          </DialogContentText>
-          <FormControl component="fieldset">
-            <FormLabel component="legend" sx={{ mb: 1, fontSize: 13 }}>
-              Assign Role
-            </FormLabel>
-            <RadioGroup
-              value={targetRole}
-              onChange={(e) => setTargetRole(e.target.value)}
-            >
-              <FormControlLabel
-                value="user"
-                control={<Radio size="small" />}
-                label="User (Standard access)"
-              />
-              <FormControlLabel
-                value="agent"
-                control={<Radio size="small" />}
-                label="Agent (API/Integrations)"
-              />
-              <FormControlLabel
-                value="admin"
-                control={<Radio size="small" />}
-                label="Admin (Full control)"
-              />
-            </RadioGroup>
-          </FormControl>
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button
-            onClick={() => setRoleDialogOpen(false)}
-            color="inherit"
-            disabled={dialogLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveRole}
-            variant="contained"
-            disabled={dialogLoading}
-          >
-            {dialogLoading ? <CircularProgress size={20} /> : "Save Changes"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog: Change Plan */}
-      <Dialog
-        open={planDialogOpen}
-        onClose={() => !dialogLoading && setPlanDialogOpen(false)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle fontWeight="bold">Change Subscription Plan</DialogTitle>
-        <DialogContent dividers>
-          {dialogError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
-          <DialogContentText sx={{ mb: 3 }}>
-            Modify the tier plan for{" "}
-            <strong>{selectedUser?.displayName}</strong>.
-          </DialogContentText>
-          <FormControl component="fieldset">
-            <FormLabel component="legend" sx={{ mb: 1, fontSize: 13 }}>
-              Assign Plan
-            </FormLabel>
-            <RadioGroup
-              value={targetPlan}
-              onChange={(e) => setTargetPlan(e.target.value)}
-            >
-              <FormControlLabel
-                value="free"
-                control={<Radio size="small" />}
-                label="Free tier"
-              />
-              <FormControlLabel
-                value="premium"
-                control={<Radio size="small" />}
-                label="Premium tier"
-              />
-            </RadioGroup>
-          </FormControl>
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button
-            onClick={() => setPlanDialogOpen(false)}
-            color="inherit"
-            disabled={dialogLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSavePlan}
-            variant="contained"
-            disabled={dialogLoading}
-          >
-            {dialogLoading ? <CircularProgress size={20} /> : "Save Changes"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog: Suspend / Enable Account */}
-      <Dialog
-        open={statusDialogOpen}
-        onClose={() => !dialogLoading && setStatusDialogOpen(false)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle fontWeight="bold">
-          {selectedUser?.deactivatedAt ? "Enable Account" : "Disable Account"}
-        </DialogTitle>
-        <DialogContent dividers>
-          {dialogError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {dialogError}
-            </Alert>
-          )}
-
-          {selectedUser?.deactivatedAt ? (
-            <DialogContentText>
-              Reactivating the account for{" "}
-              <strong>{selectedUser?.displayName}</strong>. The user will be
-              allowed to log in and create API tokens again.
-            </DialogContentText>
-          ) : (
-            <Box>
-              <Alert severity="warning" sx={{ mb: 2.5 }}>
-                Disabling an account is a destructive admin action.
-              </Alert>
-              <DialogContentText sx={{ mb: 3 }}>
-                Are you sure you want to deactivate the account for{" "}
-                <strong>{selectedUser?.displayName}</strong>? The user will be
-                immediately logged out, any active API tokens will be
-                permanently revoked, and all future authentication attempts will
-                be blocked.
-              </DialogContentText>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={understandDisable}
-                    onChange={(e) => setUnderstandDisable(e.target.checked)}
-                  />
-                }
-                label={
-                  <Typography variant="body2" color="text.secondary">
-                    I understand the implications of deactivating this user.
-                  </Typography>
-                }
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5 }}>
-          <Button
-            onClick={() => setStatusDialogOpen(false)}
-            color="inherit"
-            disabled={dialogLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleToggleStatus}
-            variant="contained"
-            color={selectedUser?.deactivatedAt ? "success" : "error"}
-            disabled={
-              dialogLoading ||
-              (!selectedUser?.deactivatedAt && !understandDisable)
-            }
-          >
-            {dialogLoading ? (
-              <CircularProgress size={20} />
-            ) : selectedUser?.deactivatedAt ? (
-              "Enable Account"
-            ) : (
-              "Disable Account"
+                <option value="user">User</option>
+                <option value="agent">Agent</option>
+                <option value="admin">Admin</option>
+              </select>
             )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+            {dialog === "plan" && (
+              <select
+                className="mt-5 h-9 w-full rounded border border-input bg-background px-3"
+                value={targetPlan}
+                onChange={(e) => setTargetPlan(e.target.value)}
+              >
+                <option value="free">Free</option>
+                <option value="premium">Premium</option>
+              </select>
+            )}
+            {dialog === "status" && !selected.deactivatedAt && (
+              <label className="mt-5 flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={confirm}
+                  onChange={(e) => setConfirm(e.target.checked)}
+                />
+                I understand this disables the account.
+              </label>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDialog(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={save}
+                disabled={
+                  saving ||
+                  (dialog === "status" && !selected.deactivatedAt && !confirm)
+                }
+              >
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

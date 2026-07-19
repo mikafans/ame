@@ -51,12 +51,12 @@ frontend:
   framework: Next.js 16.2 (App Router)
   language: TypeScript 5.7 (strict, noEmit)
   react: "19.x"
-  ui_library: MUI v9 (@mui/material, @mui/icons-material)
+  ui_library: Tailwind CSS v4 + local shadcn-style primitives
   styling:
-    system: MUI sx / styled (Emotion backend)
-    css_baseline: MUI CssBaseline
-    tailwind: removed  # was present, removed during MUI migration
-  fonts: Roboto via @fontsource/roboto (MUI default)
+    system: Tailwind utility classes + CSS variables
+    css_baseline: Tailwind base layer
+    tailwind: active
+  fonts: Inter via Google Fonts
   api_client:
     codegen: openapi-typescript 7.x → web/src/api/generated/schema.d.ts
     client: openapi-fetch 0.17

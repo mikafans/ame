@@ -1,467 +1,306 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Box from "@mui/material/Box";
-import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Stack from "@mui/material/Stack";
-import Card from "@mui/material/Card";
-import Chip from "@mui/material/Chip";
-import Grid from "@mui/material/Grid";
-import Paper from "@mui/material/Paper";
-import Divider from "@mui/material/Divider";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import LinkIcon from "@mui/icons-material/Link";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import { useAuth } from "@/hooks/useAuth";
-import { useColorMode } from "@/components/ThemeRegistry";
-import { copyToClipboard } from "@/utils/clipboard";
+import Link from "next/link";
+import { ArrowRight, Check, Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
-import { BRAND } from "@/lib/brand";
+import { useColorMode } from "@/components/ThemeRegistry";
+import { useAuth } from "@/hooks/useAuth";
+
+const benefits = [
+  {
+    number: "01",
+    title: "Study plans that adapt",
+    body: "Plans start from your performance and change as you answer. Spend your next session where it matters most.",
+  },
+  {
+    number: "02",
+    title: "Questions, organized",
+    body: "Collect questions from anywhere into tagged banks. Turn a bank into a timed assessment when you are ready.",
+  },
+  {
+    number: "03",
+    title: "Progress you can see",
+    body: "Track movement by topic so you can replace 'I should study' with a clear next step.",
+  },
+];
+
+const faqs = [
+  {
+    question: "Can I use AME without an AI assistant?",
+    answer:
+      "Yes. The web app works on its own. Agent support is an optional way to connect an assistant to your assessments and study workflow.",
+  },
+  {
+    question: "Can I self-host AME?",
+    answer:
+      "AME is designed to be self-hostable. Follow the repository deployment documentation to run the platform on your own infrastructure.",
+  },
+  {
+    question: "What should I do first?",
+    answer:
+      "Create an account, open Explore, and start an assessment from the question bank. Your first session gives you a useful baseline.",
+  },
+];
+
+function QuizPreview() {
+  return (
+    <div
+      role="img"
+      aria-label="Preview of an adaptive multiple-choice question"
+      className="rounded-xl bg-white p-4 text-neutral-900 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6"
+    >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-mono text-xs text-neutral-500">Q 7 / 20</span>
+          <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] text-blue-700">
+            Adaptive · ELO 1480
+          </span>
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-neutral-200">
+          <div className="h-full w-[35%] bg-blue-600" />
+        </div>
+        <p className="pt-1 text-base font-bold sm:text-[17px]">
+          Which data structure gives O(1) average lookup?
+        </p>
+        <div className="space-y-2">
+          <div className="rounded-lg border border-neutral-300 px-3 py-2.5">
+            Binary search tree
+          </div>
+          <div className="flex items-center justify-between rounded-lg border-2 border-blue-600 bg-blue-100 px-3 py-2 text-blue-950">
+            <span>Hash table</span>
+            <Check className="size-5 text-lime-700" />
+          </div>
+          <div className="rounded-lg border border-neutral-300 px-3 py-2.5">
+            Linked list
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-xs text-neutral-500">
+            Hash maps · your weakest topic
+          </span>
+          <span className="rounded-full bg-neutral-950 px-4 py-2 text-center text-sm text-white">
+            Next
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
-  const [copied, setCopied] = useState(false);
   const { user } = useAuth();
   const { mode, toggle } = useColorMode();
-  const isDark = mode === "dark";
-
-  // The landing stays public (it's also the agent/discovery surface), but the
-  // human CTA adapts: signed-in visitors get a one-click way back into the app,
-  // signed-out visitors are sent to login. While useAuth is still resolving,
-  // `user` is null so we default to the logged-out label.
   const signedIn = !!user;
-  const ctaLabel = signedIn ? "Open Explore" : "Use Now";
-  const ctaHref = signedIn ? "/explore" : "/login";
-
-  // Resolve the origin only after mount. Computing it during render would
-  // diverge between server (no window) and client and break hydration, so we
-  // start empty (URLs render relative) and fill in the absolute origin once
-  // the client has mounted.
-  const [baseUrl, setBaseUrl] = useState("");
-  useEffect(() => {
-    setBaseUrl(window.location.origin);
-  }, []);
-
-  const starterPrompt = `You are an AI assistant helping me with my study on AME. AME has a first-class agent surface. To learn how to use it, please fetch and read the platform capabilities at:
-${baseUrl}/llms.txt
-
-The machine-readable tool schemas are available at:
-${baseUrl}/skill.json
-
-Authenticate all your requests using your Agent API Bearer Key.
-
-Your first task is to read my learning stats at /v1/me/stats, identify my weakest topics, and create a targeted practice assessment to help me master them!`;
-
-  const handleCopyPrompt = () => {
-    copyToClipboard(starterPrompt).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  // Mode-dependent palette. The page hardcodes its own colors (rather than
-  // leaning on the MUI theme) so the hero gradients stay intentional, but each
-  // value has a light + dark variant so text never goes invisible-on-invisible.
-  const c = isDark
-    ? {
-        pageBg: BRAND.dark.background,
-        pageGradient: `radial-gradient(circle at 10% 20%, rgba(98, 216, 205, 0.12) 0%, transparent 40%),
-                       radial-gradient(circle at 90% 80%, rgba(255, 157, 192, 0.12) 0%, transparent 42%)`,
-        textPrimary: BRAND.dark.text,
-        textSecondary: "#90A4AE",
-        headingGradient: "linear-gradient(135deg, #E2E8F0 0%, #62D8CD 100%)",
-        agentChipColor: BRAND.dark.secondary,
-        brandStart: BRAND.dark.primary,
-        brandEnd: BRAND.dark.secondary,
-        brandStartSoft: "rgba(98, 216, 205, 0.15)",
-        brandEndSoft: "rgba(255, 157, 192, 0.16)",
-        brandBorder: "rgba(98, 216, 205, 0.35)",
-        brandShadow: "rgba(98, 216, 205, 0.28)",
-        cardBg: "rgba(27, 42, 40, 0.78)",
-        cardBorder: "1px solid rgba(255, 255, 255, 0.08)",
-        cardShadow: "0 20px 40px rgba(0,0,0,0.4)",
-        rowBg: "rgba(255, 255, 255, 0.03)",
-        rowBorder: "1px solid rgba(255, 255, 255, 0.05)",
-        rowHoverBg: "rgba(255, 255, 255, 0.06)",
-        outlineBorder: "rgba(255, 255, 255, 0.15)",
-        outlineColor: "#FFF",
-        ghostBorder: "rgba(255, 255, 255, 0.1)",
-        ghostColor: "#B0BEC5",
-        promptBg: "rgba(0, 0, 0, 0.25)",
-        divider: "rgba(255, 255, 255, 0.08)",
-      }
-    : {
-        pageBg: BRAND.light.background,
-        pageGradient: `radial-gradient(circle at 10% 20%, rgba(69, 196, 185, 0.14) 0%, transparent 42%),
-                       radial-gradient(circle at 90% 80%, rgba(255, 143, 180, 0.16) 0%, transparent 42%)`,
-        textPrimary: BRAND.light.text,
-        textSecondary: "#5A6473",
-        headingGradient: "linear-gradient(135deg, #0F172A 0%, #1F766F 100%)",
-        agentChipColor: BRAND.light.secondaryDark,
-        brandStart: BRAND.light.primary,
-        brandEnd: BRAND.light.secondary,
-        brandStartSoft: "rgba(69, 196, 185, 0.14)",
-        brandEndSoft: "rgba(255, 143, 180, 0.16)",
-        brandBorder: "rgba(47, 167, 158, 0.26)",
-        brandShadow: "rgba(47, 167, 158, 0.16)",
-        cardBg: "rgba(255, 255, 255, 0.85)",
-        cardBorder: "1px solid rgba(0, 0, 0, 0.08)",
-        cardShadow: "0 20px 40px rgba(47, 167, 158, 0.12)",
-        rowBg: "rgba(69, 196, 185, 0.07)",
-        rowBorder: "1px solid rgba(0, 0, 0, 0.06)",
-        rowHoverBg: "rgba(69, 196, 185, 0.12)",
-        outlineBorder: "rgba(0, 0, 0, 0.15)",
-        outlineColor: "#0F172A",
-        ghostBorder: "rgba(0, 0, 0, 0.15)",
-        ghostColor: "#4A5568",
-        promptBg: "rgba(0, 0, 0, 0.04)",
-        divider: "rgba(0, 0, 0, 0.08)",
-      };
+  const entryHref = signedIn ? "/explore" : "/login?tab=signup";
+  const entryLabel = signedIn ? "Open Explore" : "Sign up free";
+  const sampleHref = signedIn ? "/explore" : "#benefits";
+  const sampleLabel = signedIn ? "Open Explore" : "See how it works";
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: c.pageBg,
-        backgroundImage: c.pageGradient,
-        color: c.textPrimary,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        fontFamily: "'Outfit', 'Inter', sans-serif",
-        py: 8,
-        overflow: "hidden",
-      }}
-    >
-      <Container maxWidth="lg">
-        {/* Top Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 8,
-          }}
-        >
-          <Logo size={36} />
-
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Tooltip title={isDark ? "Light mode" : "Dark mode"}>
-              <IconButton
-                onClick={toggle}
-                sx={{ color: c.textSecondary }}
-                size="small"
+    <div className="min-h-screen bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <header className="flex min-h-16 items-center justify-between gap-4">
+          <Logo size={32} />
+          <div className="flex items-center gap-2 sm:gap-6">
+            <nav className="hidden items-center gap-6 text-sm text-neutral-600 dark:text-neutral-300 sm:flex">
+              <a
+                className="transition hover:text-neutral-950 dark:hover:text-white"
+                href="#benefits"
               >
-                {isDark ? (
-                  <LightModeOutlinedIcon fontSize="small" />
-                ) : (
-                  <DarkModeOutlinedIcon fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
+                Features
+              </a>
+              <a
+                className="transition hover:text-neutral-950 dark:hover:text-white"
+                href="#agents"
+              >
+                For agents
+              </a>
+              <a
+                className="transition hover:text-neutral-950 dark:hover:text-white"
+                href="#faq"
+              >
+                FAQ
+              </a>
+            </nav>
+            <button
+              type="button"
+              aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
+              onClick={toggle}
+              className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-600 outline-none transition hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              {mode === "dark" ? (
+                <Sun className="size-4" />
+              ) : (
+                <Moon className="size-4" />
+              )}
+            </button>
             <Button
-              variant="outlined"
-              onClick={() => (window.location.href = ctaHref)}
-              sx={{
-                borderColor: c.outlineBorder,
-                color: c.outlineColor,
-                textTransform: "none",
-                borderRadius: "8px",
-                px: 3,
-                py: 0.75,
-                fontSize: 14,
-                fontWeight: 500,
-                transition: "all 0.3s",
-                "&:hover": {
-                  borderColor: c.brandStart,
-                  bgcolor: c.brandStartSoft,
-                  boxShadow: `0 0 15px ${c.brandShadow}`,
-                },
-              }}
+              asChild
+              className="rounded-full bg-neutral-950 px-5 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
             >
-              {ctaLabel}
+              <Link href={entryHref}>{entryLabel}</Link>
             </Button>
-          </Stack>
-        </Box>
+          </div>
+        </header>
 
-        {/* Hero Section */}
-        <Grid container spacing={6} alignItems="center">
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Box sx={{ pr: { md: 4 } }}>
-              <Chip
-                label="First-Class Agent Support"
-                sx={{
-                  background: c.brandEndSoft,
-                  border: `1px solid ${c.brandBorder}`,
-                  color: c.agentChipColor,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  mb: 3,
-                  py: 1.5,
-                }}
-              />
-              <Typography
-                variant="h2"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: -1.5,
-                  lineHeight: 1.15,
-                  mb: 2.5,
-                  background: c.headingGradient,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                Adaptive Study Powered by AI Agents.
-              </Typography>
-              <Typography
-                variant="body1"
-                sx={{
-                  color: c.textSecondary,
-                  fontSize: 17,
-                  lineHeight: 1.6,
-                  mb: 4.5,
-                  maxWidth: 500,
-                }}
-              >
-                AME is the modern assessment platform built equally for humans
-                and AI assistants. Author question banks, analyze learner
-                performance, and generate customized study plans — all over a
-                unified programmatic surface.
-              </Typography>
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2.5}>
-                <Button
-                  variant="contained"
-                  onClick={() => (window.location.href = ctaHref)}
-                  endIcon={<ArrowForwardIcon />}
-                  sx={{
-                    background: `linear-gradient(135deg, ${c.brandStart} 0%, ${c.brandEnd} 100%)`,
-                    color: "#0C1817",
-                    textTransform: "none",
-                    borderRadius: "10px",
-                    px: 4,
-                    py: 1.5,
-                    fontSize: 16,
-                    fontWeight: 600,
-                    boxShadow: `0 6px 20px ${c.brandShadow}`,
-                    transition: "all 0.3s",
-                    "&:hover": {
-                      background: `linear-gradient(135deg, ${c.brandEnd} 0%, ${c.brandStart} 100%)`,
-                      transform: "translateY(-2px)",
-                      boxShadow: `0 8px 25px ${c.brandShadow}`,
-                    },
-                  }}
-                >
-                  {ctaLabel}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => window.open("/llms.txt", "_blank")}
-                  sx={{
-                    borderColor: c.ghostBorder,
-                    color: c.ghostColor,
-                    textTransform: "none",
-                    borderRadius: "10px",
-                    px: 3.5,
-                    py: 1.5,
-                    fontSize: 16,
-                    fontWeight: 500,
-                    transition: "all 0.3s",
-                    "&:hover": {
-                      borderColor: c.brandStart,
-                      color: c.textPrimary,
-                      bgcolor: c.brandStartSoft,
-                    },
-                  }}
-                >
-                  Read llms.txt Specs
-                </Button>
-              </Stack>
-            </Box>
-          </Grid>
-
-          {/* AI Discovery Card */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card
-              variant="outlined"
-              sx={{
-                bgcolor: c.cardBg,
-                backdropFilter: "blur(20px)",
-                border: c.cardBorder,
-                borderRadius: "16px",
-                p: 4,
-                boxShadow: c.cardShadow,
-                position: "relative",
-                "&::before": {
-                  content: '""',
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "3px",
-                  background: `linear-gradient(90deg, ${c.brandStart} 0%, ${c.brandEnd} 100%)`,
-                  borderTopLeftRadius: "16px",
-                  borderTopRightRadius: "16px",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  mb: 3,
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      letterSpacing: -0.3,
-                      mb: 0.5,
-                      color: c.textPrimary,
-                    }}
-                  >
-                    🤖 LLM Agent Discovery Surface
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{ color: c.textSecondary, display: "block" }}
-                  >
-                    Machine-readable configuration files served publicly
-                  </Typography>
-                </Box>
-                <Chip
-                  label="API v1"
-                  color="primary"
-                  size="small"
-                  sx={{ fontWeight: 600 }}
-                />
-              </Box>
-
-              <Stack spacing={2} sx={{ mb: 4 }}>
-                {[
-                  {
-                    href: "/llms.txt",
-                    label: "/llms.txt",
-                    desc: "Architecture overview, scopes, and ELO dynamic programming playbooks.",
-                  },
-                  {
-                    href: "/skill.json",
-                    label: "/skill.json",
-                    desc: "MCP-compatible tool definitions and schema parameters.",
-                  },
-                  {
-                    href: "/openapi.yaml",
-                    label: "/openapi.yaml",
-                    desc: "Standard OpenAPI 3.1 schema (YAML) for model client generators.",
-                  },
-                ].map((row) => (
-                  <Box
-                    key={row.href}
-                    onClick={() => window.open(row.href, "_blank")}
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      p: 2,
-                      borderRadius: "10px",
-                      bgcolor: c.rowBg,
-                      border: c.rowBorder,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      "&:hover": {
-                        bgcolor: c.rowHoverBg,
-                        borderColor: c.brandStart,
-                        transform: "translateX(4px)",
-                      },
-                    }}
-                  >
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          fontFamily: "monospace",
-                          fontWeight: 600,
-                          color: c.textPrimary,
-                        }}
-                      >
-                        {row.label}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{ color: c.textSecondary }}
-                      >
-                        {row.desc}
-                      </Typography>
-                    </Box>
-                    <LinkIcon sx={{ color: c.textSecondary, fontSize: 18 }} />
-                  </Box>
-                ))}
-              </Stack>
-
-              <Divider sx={{ borderColor: c.divider, mb: 3 }} />
-
-              {/* Dynamic Starter Prompt Constructor */}
-              <Box>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 1.5,
-                  }}
-                >
-                  <Typography
-                    variant="subtitle2"
-                    sx={{ fontWeight: 600, color: c.textPrimary }}
-                  >
-                    🚀 Boot Prompt for AI Assistants
-                  </Typography>
+        <main>
+          <section className="rounded-none bg-neutral-950 px-6 py-14 text-white sm:px-10 md:rounded-lg md:px-14 md:py-20">
+            <div className="grid items-center gap-12 md:grid-cols-2 md:gap-16">
+              <div className="space-y-6">
+                <span className="inline-flex rounded-full border border-lime-700 px-3 py-1 font-mono text-[11px] tracking-[0.12em] text-lime-300">
+                  OPEN · SELF-HOSTABLE
+                </span>
+                <h1 className="max-w-xl text-[42px] font-extrabold leading-[0.99] tracking-[-0.06em] sm:text-6xl md:text-[66px]">
+                  Study what you don&apos;t know yet.
+                </h1>
+                <p className="max-w-xl text-[17px] leading-7 text-neutral-400 sm:text-[19px]">
+                  AME builds question banks, tracks every answer, and adapts
+                  each session to your weakest topics — so no minute of studying
+                  is wasted.
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
-                    size="small"
-                    variant="text"
-                    onClick={handleCopyPrompt}
-                    startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
-                    sx={{
-                      color: copied ? c.brandStart : c.brandEnd,
-                      textTransform: "none",
-                      fontSize: 12,
-                    }}
+                    asChild
+                    className="rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
                   >
-                    {copied ? "Copied Prompt!" : "Copy Prompt"}
+                    <Link href={entryHref}>
+                      {entryLabel}
+                      <ArrowRight className="size-4" />
+                    </Link>
                   </Button>
-                </Box>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    bgcolor: c.promptBg,
-                    borderColor: c.divider,
-                    borderRadius: "8px",
-                    fontFamily: "monospace",
-                    fontSize: 10.5,
-                    lineHeight: 1.5,
-                    maxHeight: 140,
-                    overflowY: "auto",
-                    color: c.textSecondary,
-                    whiteSpace: "pre-wrap",
-                  }}
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="rounded-full border-neutral-600 bg-transparent px-6 py-3 text-white hover:border-white hover:bg-white/10 hover:text-white"
+                  >
+                    <Link href={sampleHref}>{sampleLabel}</Link>
+                  </Button>
+                </div>
+              </div>
+              <QuizPreview />
+            </div>
+          </section>
+
+          <section id="benefits" className="px-2 py-16 sm:px-4 md:py-20">
+            <p className="mb-2 font-mono text-xs tracking-[0.14em] text-blue-600">
+              WHY AME
+            </p>
+            <h2 className="mb-8 max-w-3xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
+              Everything between{" "}
+              <span className="whitespace-nowrap">
+                &quot;I should study&quot;
+              </span>{" "}
+              and{" "}
+              <span className="whitespace-nowrap">&quot;I passed.&quot;</span>
+            </h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              {benefits.map((benefit) => (
+                <article
+                  key={benefit.number}
+                  className="rounded-xl border border-neutral-200 p-6 shadow-[0_4px_0_#f0f0f0] dark:border-neutral-800 dark:shadow-[0_4px_0_#171717]"
                 >
-                  {starterPrompt}
-                </Paper>
-              </Box>
-            </Card>
-          </Grid>
-        </Grid>
-      </Container>
-    </Box>
+                  <span className="mb-4 inline-flex size-9 items-center justify-center rounded-full bg-blue-100 font-mono text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    {benefit.number}
+                  </span>
+                  <h3 className="mb-2 text-lg font-bold">{benefit.title}</h3>
+                  <p className="leading-6 text-neutral-600 dark:text-neutral-400">
+                    {benefit.body}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section
+            id="agents"
+            className="flex flex-col gap-4 bg-neutral-100 px-6 py-6 dark:bg-neutral-900 md:flex-row md:items-center md:justify-between"
+          >
+            <div>
+              <h2 className="font-bold">Bring your AI assistant</h2>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                First-class agent API — connect an assistant to your assessments
+                and study workflow.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {["/llms.txt", "/skill.json", "/openapi.yaml"].map((href) => (
+                <Button
+                  key={href}
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-neutral-300 font-mono text-xs font-normal dark:border-neutral-700"
+                >
+                  <Link href={href}>{href}</Link>
+                </Button>
+              ))}
+            </div>
+          </section>
+
+          <section
+            id="faq"
+            className="grid gap-12 px-2 py-16 sm:px-4 md:grid-cols-[1.4fr_1fr] md:py-20"
+          >
+            <div>
+              <h2 className="mb-3 text-3xl font-extrabold tracking-[-0.04em]">
+                Questions?
+              </h2>
+              <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                {faqs.map((faq) => (
+                  <div key={faq.question} className="py-5">
+                    <h3 className="mb-2 font-bold">{faq.question}</h3>
+                    <p className="leading-6 text-neutral-600 dark:text-neutral-400">
+                      {faq.answer}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="self-start rounded-xl border border-neutral-200 bg-neutral-50 p-7 dark:border-neutral-800 dark:bg-neutral-900">
+              <h2 className="mb-3 text-3xl font-extrabold leading-tight tracking-[-0.04em]">
+                Your next exam is already easier.
+              </h2>
+              <p className="mb-6 leading-6 text-neutral-600 dark:text-neutral-400">
+                Start with a few questions and turn your weakest topics into a
+                focused practice session.
+              </p>
+              <Button
+                asChild
+                className="rounded-full bg-blue-600 font-bold text-white hover:bg-blue-700"
+              >
+                <Link href={entryHref}>{entryLabel}</Link>
+              </Button>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <footer className="border-t border-neutral-200 px-4 py-6 text-sm text-neutral-500 dark:border-neutral-800">
+        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
+          <span>© 2026 AME</span>
+          <div className="flex gap-5">
+            <Link
+              href="/llms.txt"
+              className="transition hover:text-neutral-950 dark:hover:text-white"
+            >
+              Docs
+            </Link>
+            <a
+              href="https://github.com/mikafans/ame"
+              className="transition hover:text-neutral-950 dark:hover:text-white"
+            >
+              GitHub
+            </a>
+            <Link
+              href="/self-hosting"
+              className="transition hover:text-neutral-950 dark:hover:text-white"
+            >
+              Self-hosting
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

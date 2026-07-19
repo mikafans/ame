@@ -1,8 +1,5 @@
 "use client";
-
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import { CheckCircle2 } from "lucide-react";
 
 interface Props {
   items: string[];
@@ -10,7 +7,6 @@ interface Props {
   compact?: boolean;
   accentBars?: boolean;
 }
-
 export function LearningObjectives({
   items,
   kicker = "What you'll learn",
@@ -18,133 +14,56 @@ export function LearningObjectives({
   accentBars = true,
 }: Props) {
   if (!items.length) return null;
-
   const overLimit = items.length > 6;
-
-  if (compact) {
+  if (compact)
     return (
-      <Box>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            display: "block",
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            mb: 1,
-          }}
-        >
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
           {kicker}
-        </Typography>
-        <Box
-          component="ul"
-          sx={{
-            listStyle: "none",
-            p: 0,
-            m: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-          }}
-        >
+        </p>
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {items.map((it, i) => (
-            <Box
-              component="li"
-              key={i}
-              sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
-            >
-              <CheckCircleOutlineIcon
-                sx={{
-                  fontSize: 16,
-                  color: "primary.main",
-                  mt: "2px",
-                  flexShrink: 0,
-                }}
+            <li key={i} className="flex items-start gap-2">
+              <CheckCircle2
+                size={16}
+                className="mt-0.5 shrink-0 text-primary"
               />
-              <Typography variant="body2" color="text.secondary">
-                {it}
-              </Typography>
-            </Box>
+              <span className="text-sm text-muted-foreground">{it}</span>
+            </li>
           ))}
-        </Box>
+        </ul>
         {overLimit && (
-          <Typography
-            variant="caption"
-            color="warning.main"
-            sx={{ display: "inline-block", mt: 1 }}
-          >
+          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
             {items.length} objectives — consider splitting
-          </Typography>
+          </p>
         )}
-      </Box>
+      </div>
     );
-  }
-
   return (
-    <Box
-      sx={{
-        p: 2.5,
-        bgcolor: "action.hover",
-        border: 1,
-        borderColor: "divider",
-        borderRadius: 2,
-      }}
-    >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ letterSpacing: 1, textTransform: "uppercase" }}
-        >
+    <div className="rounded-lg border border-border bg-muted/40 p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
           {kicker}
-        </Typography>
+        </p>
         {overLimit && (
-          <Typography
-            variant="caption"
-            color="warning.main"
-            sx={{ ml: "auto" }}
-          >
+          <p className="ml-auto text-xs text-amber-600 dark:text-amber-400">
             {items.length} objectives
-          </Typography>
+          </p>
         )}
-      </Box>
-      <Box
-        component="ul"
-        sx={{
-          listStyle: "none",
-          p: 0,
-          m: 0,
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          gap: 1.25,
-        }}
-      >
+      </div>
+      <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
         {items.map((it, i) => (
-          <Box
-            component="li"
+          <li
             key={i}
-            sx={{
-              display: "flex",
-              gap: 1.25,
-              alignItems: "flex-start",
-              pl: accentBars ? 1.25 : 0,
-              borderLeft: accentBars ? 2 : 0,
-              borderColor: "primary.main",
-            }}
+            className={`flex items-start gap-3 ${accentBars ? "border-l-2 border-primary pl-3" : ""}`}
           >
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontFamily: "monospace", pt: "2px", flexShrink: 0 }}
-            >
+            <span className="shrink-0 pt-0.5 font-mono text-xs text-muted-foreground">
               {String(i + 1).padStart(2, "0")}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {it}
-            </Typography>
-          </Box>
+            </span>
+            <span className="text-sm text-muted-foreground">{it}</span>
+          </li>
         ))}
-      </Box>
-    </Box>
+      </ul>
+    </div>
   );
 }

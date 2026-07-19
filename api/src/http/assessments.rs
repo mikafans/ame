@@ -92,6 +92,7 @@ pub struct AssessmentQuestion {
     pub id: Uuid,
     pub kind: String,
     pub prompt: String,
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code_snippet: Option<serde_json::Value>,
     pub payload: serde_json::Value,
@@ -611,7 +612,9 @@ pub async fn get_assessment(
     // Fetch all items for all sections in a single JOIN query
     let item_rows = sqlx::query(
         "SELECT sec.id AS section_id, sec.order_index AS sec_order_index,
-                q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source,
+                q.id, q.kind, q.prompt,
+                COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags,
+                q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source,
                 COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
          FROM tb_assessment_items ai
          JOIN tb_assessment_sections sec ON sec.id = ai.section_id
@@ -633,6 +636,7 @@ pub async fn get_assessment(
             id: row.get("id"),
             kind: row.get("kind"),
             prompt: row.get("prompt"),
+            tags: row.get("tags"),
             code_snippet: row.get("code_snippet"),
             payload: row.get("payload"),
             explanation: row.get("explanation"),
@@ -1114,7 +1118,9 @@ pub async fn patch_assessment_section(
 
     // Fetch questions for this section
     let item_rows = sqlx::query(
-        "SELECT q.id, q.kind, q.prompt, q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source,
+        "SELECT q.id, q.kind, q.prompt,
+                COALESCE(ARRAY(SELECT t.name FROM tb_question_tags qt JOIN tb_tags t ON t.id = qt.tag_id WHERE qt.question_id = q.id ORDER BY t.name), '{}') AS tags,
+                q.code_snippet, q.payload, q.explanation, q.deep_dive, q.source,
                 COALESCE(ai.points_override, q.points) AS points, q.status, ai.order_index
          FROM tb_assessment_items ai
          JOIN tb_questions q ON q.id = ai.question_id
@@ -1132,6 +1138,7 @@ pub async fn patch_assessment_section(
             id: r.get("id"),
             kind: r.get("kind"),
             prompt: r.get("prompt"),
+            tags: r.get("tags"),
             code_snippet: r.get("code_snippet"),
             payload: r.get("payload"),
             explanation: r.get("explanation"),

@@ -1,19 +1,12 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
-import Stack from "@mui/material/Stack";
 import {
   deriveBack,
   hasModelAnswer,
   type FlashQuestion,
 } from "@/lib/flashcards";
 import { HighlightedCode } from "@/components/HighlightedCode";
+import { Button } from "@/components/ui/button";
 
 const KIND_LABEL: Record<string, string> = {
   mc: "Multiple choice",
@@ -22,7 +15,6 @@ const KIND_LABEL: Record<string, string> = {
   essay: "Essay",
   code: "Code",
 };
-
 interface Props {
   question: FlashQuestion;
   index: number;
@@ -31,7 +23,6 @@ interface Props {
   onSkip: () => void;
   onFinish?: () => void;
 }
-
 export function FlashcardReview({
   question,
   index,
@@ -42,174 +33,115 @@ export function FlashcardReview({
 }: Props) {
   const [revealed, setRevealed] = useState(false);
   const back = deriveBack(question);
-
-  // Reset flip when the card changes.
-  useEffect(() => {
-    setRevealed(false);
-  }, [question.id]);
-
-  // Space flips; 1/ArrowLeft = missed, 2/ArrowRight = got it (only once
-  // revealed); s = skip for now (any time).
+  useEffect(() => setRevealed(false), [question.id]);
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === " ") {
         e.preventDefault();
         setRevealed(true);
-      } else if ((e.key === "s" || e.key === "S") && index + 1 < total) {
+      } else if ((e.key === "s" || e.key === "S") && index + 1 < total)
         onSkip();
-      } else if (revealed && (e.key === "2" || e.key === "ArrowRight")) {
+      else if (revealed && (e.key === "2" || e.key === "ArrowRight"))
         onRate(true);
-      } else if (revealed && (e.key === "1" || e.key === "ArrowLeft")) {
+      else if (revealed && (e.key === "1" || e.key === "ArrowLeft"))
         onRate(false);
-      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [revealed, onRate, onSkip, index, total]);
-
   const snippet =
     question.code_snippet && typeof question.code_snippet === "object"
       ? (question.code_snippet as { code?: string }).code
       : undefined;
-
   return (
-    <Box sx={{ maxWidth: 680 }}>
-      <Stack
-        direction="row"
-        sx={{ alignItems: "center", justifyContent: "space-between", mb: 1.5 }}
-      >
-        <Chip label={KIND_LABEL[question.kind] ?? question.kind} size="small" />
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontFamily: "monospace" }}
-        >
+    <div className="max-w-[680px]">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="rounded-full border border-border px-2 py-1 text-xs">
+          {KIND_LABEL[question.kind] ?? question.kind}
+        </span>
+        <span className="font-mono text-xs text-muted-foreground">
           {index + 1} / {total}
-        </Typography>
-      </Stack>
-
-      <Card variant="outlined" sx={{ minHeight: 240, borderRadius: 2 }}>
-        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 400, lineHeight: 1.5, mb: snippet ? 2 : 0 }}
-          >
-            {question.prompt}
-          </Typography>
-
-          {snippet && (
-            <Box sx={{ mt: snippet ? 2 : 0 }}>
-              <HighlightedCode
-                code={snippet}
-                language={(question.payload?.language as string) ?? "python"}
-              />
-            </Box>
-          )}
-
-          {revealed && (
-            <Box sx={{ mt: 3, pt: 3, borderTop: 1, borderColor: "divider" }}>
-              {back.answer !== null ? (
-                <>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ letterSpacing: 0.5 }}
-                  >
-                    Answer
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{ fontWeight: 500, mb: back.explanation ? 2 : 0 }}
-                  >
-                    {back.answer}
-                  </Typography>
-                </>
-              ) : null}
-
-              {back.explanation ? (
-                <>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ letterSpacing: 0.5 }}
-                  >
-                    Explanation
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {back.explanation}
-                  </Typography>
-                </>
-              ) : null}
-
-              {!hasModelAnswer(back) && (
-                <Typography variant="body2" color="text.secondary">
-                  No model answer provided.
-                </Typography>
-              )}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-
-      <Stack
-        direction="row"
-        sx={{
-          mt: 2.5,
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          rowGap: 1.5,
-          gap: 1,
-        }}
-      >
+        </span>
+      </div>
+      <article className="min-h-60 rounded-lg border border-border p-6 sm:p-8">
+        <h2 className="text-lg font-normal leading-7">{question.prompt}</h2>
+        {snippet && (
+          <div className="mt-4">
+            <HighlightedCode
+              code={snippet}
+              language={(question.payload?.language as string) ?? "python"}
+            />
+          </div>
+        )}
+        {revealed && (
+          <div className="mt-6 border-t border-border pt-6">
+            {back.answer !== null && (
+              <>
+                <p className="mb-1 text-xs tracking-wide text-muted-foreground">
+                  Answer
+                </p>
+                <p className="mb-4 font-medium">{back.answer}</p>
+              </>
+            )}
+            {back.explanation && (
+              <>
+                <p className="mb-1 text-xs tracking-wide text-muted-foreground">
+                  Explanation
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {back.explanation}
+                </p>
+              </>
+            )}
+            {!hasModelAnswer(back) && (
+              <p className="text-sm text-muted-foreground">
+                No model answer provided.
+              </p>
+            )}
+          </div>
+        )}
+      </article>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         {!revealed ? (
-          <Button
-            variant="contained"
-            disableElevation
-            onClick={() => setRevealed(true)}
-          >
-            Show answer (Space)
-          </Button>
+          <Button onClick={() => setRevealed(true)}>Show answer (Space)</Button>
         ) : (
-          <Stack direction="row" spacing={1.5}>
+          <div className="flex gap-3">
             <Button
-              variant="outlined"
-              color="error"
+              variant="outline"
+              className="border-red-500/50 text-red-600 hover:bg-red-500/10"
               onClick={() => onRate(false)}
             >
               Missed it (1)
             </Button>
             <Button
-              variant="contained"
-              color="success"
-              disableElevation
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
               onClick={() => onRate(true)}
             >
               Got it (2)
             </Button>
-          </Stack>
+          </div>
         )}
-        <Stack direction="row" spacing={1}>
+        <div className="flex gap-2">
           {index + 1 < total && (
             <Button
-              color="inherit"
+              variant="ghost"
+              className="text-muted-foreground"
               onClick={onSkip}
-              sx={{ color: "text.secondary" }}
             >
               Skip (S)
             </Button>
           )}
           {onFinish && (
             <Button
-              color="inherit"
+              variant="ghost"
+              className="text-muted-foreground"
               onClick={onFinish}
-              sx={{ color: "text.secondary" }}
             >
               Finish
             </Button>
           )}
-        </Stack>
-      </Stack>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }

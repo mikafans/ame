@@ -3,29 +3,19 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/api/client";
-import { useAuth } from "@/hooks/useAuth";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
-import Chip from "@mui/material/Chip";
-import CircularProgress from "@mui/material/CircularProgress";
 import { formatDuration, formatDate } from "@/utils/format";
+import { Button } from "@/components/ui/button";
 
 interface PlanItem {
   kind: string;
   ref_id: string;
   hours_est: number;
 }
-
 interface PlanWeek {
   week_num: number;
   focus: string;
   items: PlanItem[];
 }
-
 interface StudyPlan {
   id: string;
   goal: string;
@@ -40,180 +30,99 @@ export default function PlanPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user } = useAuth();
   const router = useRouter();
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)
       .GET("/v1/plans/{id}", { params: { path: { id } } })
       .then(({ data, error }: { data?: StudyPlan; error?: unknown }) => {
-        if (error || !data) {
-          setNotFound(true);
-        } else {
-          setPlan(data);
-        }
+        if (error || !data) setNotFound(true);
+        else setPlan(data);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
-
-  if (loading) {
+  if (loading)
     return (
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          p: 4,
-          color: "text.secondary",
-        }}
-      >
-        <CircularProgress size={20} />
-        <Typography variant="body2">Loading plan…</Typography>
-      </Box>
+      <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+        <span className="size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        Loading plan…
+      </div>
     );
-  }
-
-  if (notFound || !plan) {
+  if (notFound || !plan)
     return (
-      <Box sx={{ p: 4 }}>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
-          Plan not found.
-        </Typography>
-        <Button variant="outlined" onClick={() => router.push("/progress")}>
+      <div className="p-8">
+        <p className="mb-4 text-muted-foreground">Plan not found.</p>
+        <Button variant="outline" onClick={() => router.push("/progress")}>
           ← Back to progress
         </Button>
-      </Box>
+      </div>
     );
-  }
-
   const totalHours = plan.weeks
     .flatMap((w) => w.items)
     .reduce((sum, item) => sum + item.hours_est, 0);
-
   return (
-    <Box sx={{ pt: 5, px: { xs: 2, sm: 5 }, pb: 8, maxWidth: 760 }}>
-      <Box sx={{ mb: 3.5 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            fontFamily: "monospace",
-            letterSpacing: 1.3,
-            textTransform: "uppercase",
-            display: "block",
-            mb: 0.75,
-          }}
-        >
+    <div className="max-w-[760px] px-4 pb-16 pt-10 sm:px-12">
+      <div className="mb-7">
+        <p className="mb-2 font-mono text-xs uppercase tracking-[0.13em] text-muted-foreground">
           Study plan · {plan.weeks.length} weeks · {formatDuration(totalHours)}{" "}
           est.
-        </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 500, mb: 1 }}>
-          {plan.goal}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
+        </p>
+        <h1 className="mb-1 text-2xl font-medium">{plan.goal}</h1>
+        <p className="text-xs text-muted-foreground">
           Generated {formatDate(plan.generated_at)} · based on last{" "}
           {plan.lookback_days} days
-        </Typography>
-      </Box>
-
-      <Stack spacing={2}>
+        </p>
+      </div>
+      <div className="space-y-4">
         {plan.weeks.map((week) => (
-          <Card key={week.week_num} variant="outlined">
-            <Box
-              sx={{
-                px: 2.5,
-                py: 1.75,
-                borderBottom: 1,
-                borderColor: "divider",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    fontFamily: "monospace",
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                  }}
-                >
+          <section
+            key={week.week_num}
+            className="overflow-hidden rounded-lg border border-border"
+          >
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   Week {week.week_num}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {week.focus}
-                </Typography>
-              </Box>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ fontFamily: "monospace" }}
-              >
+                </span>
+                <span className="text-sm font-semibold">{week.focus}</span>
+              </div>
+              <span className="font-mono text-xs text-muted-foreground">
                 {formatDuration(
                   week.items.reduce((s, i) => s + i.hours_est, 0),
                 )}
-              </Typography>
-            </Box>
-            <CardContent>
-              <Stack spacing={1}>
-                {week.items.map((item, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      p: 1,
-                      pl: 1.5,
-                      bgcolor: "action.hover",
-                      borderRadius: 0.5,
-                    }}
-                  >
-                    <Box
-                      sx={{ display: "flex", gap: 1.25, alignItems: "center" }}
-                    >
-                      <Chip
-                        label={item.kind}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        sx={{ height: 20, fontSize: 9, letterSpacing: 1 }}
-                      />
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontFamily: "monospace" }}
-                      >
-                        {item.ref_id}
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ fontFamily: "monospace" }}
-                    >
-                      {formatDuration(item.hours_est)}
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </CardContent>
-          </Card>
+              </span>
+            </div>
+            <div className="space-y-2 p-4">
+              {week.items.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between rounded-md bg-muted/50 p-2 pl-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-full border border-primary/50 px-2 py-0.5 text-[9px] uppercase tracking-wider text-primary">
+                      {item.kind}
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {item.ref_id}
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {formatDuration(item.hours_est)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
         ))}
-      </Stack>
-
-      <Box sx={{ mt: 3.5 }}>
-        <Button variant="outlined" onClick={() => router.push("/progress")}>
+      </div>
+      <div className="mt-7">
+        <Button variant="outline" onClick={() => router.push("/progress")}>
           ← Back to progress
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }

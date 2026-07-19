@@ -14,7 +14,7 @@
  * See also: roles/agent-api.spec.ts (now superseded by this file).
  */
 import { test, expect } from "@playwright/test";
-import { API_URL, loginAs, registerUser, registerUserFull } from "./helpers";
+import { API_URL, registerUser } from "./helpers";
 
 test.describe("agent management (owner API)", () => {
   test.describe.configure({ mode: "serial" });
