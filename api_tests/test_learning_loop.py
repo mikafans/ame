@@ -516,3 +516,91 @@ def test_generation_runs_are_retryable_failure_safe_and_owner_scoped(client):
         f"/api/v1/generation-runs/{run_id}", headers=other_headers
     )
     assert cross_owner.status_code == 404, cross_owner.text
+
+
+def test_generated_content_requires_successful_owner_generation_run(client):
+    started, headers = _start_learner(client, "I want a generated practice set")
+    question = {
+        "kind": "multiple_choice",
+        "prompt": "Which component coordinates a deployed job?",
+        "options": [
+            {"id": "wrong", "text": "The browser", "is_correct": False},
+            {"id": "right", "text": "The JobManager", "is_correct": True},
+        ],
+        "points": 1,
+        "reviewStatus": "draft",
+        "sourceReferences": ["https://nightlies.apache.org/flink/"],
+    }
+
+    missing_provenance = client.post(
+        "/api/v1/questions", headers=headers, json=question
+    )
+    assert missing_provenance.status_code == 422, missing_provenance.text
+
+    failed_run = client.post(
+        "/api/v1/generation-runs",
+        headers=headers,
+        json={
+            "operation": "question.compose",
+            "provider": "test-provider",
+            "retryKey": f"failed-question-{uuid.uuid4()}",
+            "contentVersion": 1,
+        },
+    )
+    assert failed_run.status_code == 201, failed_run.text
+    failed_run_id = failed_run.json()["id"]
+    assert client.patch(
+        f"/api/v1/generation-runs/{failed_run_id}",
+        headers=headers,
+        json={"status": "running"},
+    ).status_code == 200
+    assert client.patch(
+        f"/api/v1/generation-runs/{failed_run_id}",
+        headers=headers,
+        json={"status": "failed", "error": {"code": "provider_unavailable"}},
+    ).status_code == 200
+    failed_content = client.post(
+        "/api/v1/questions",
+        headers=headers,
+        json={**question, "generationRunId": failed_run_id},
+    )
+    assert failed_content.status_code == 409, failed_content.text
+
+    _, other_headers = _start_learner(client, "I want another generated practice set")
+    other_run = client.post(
+        "/api/v1/generation-runs",
+        headers=other_headers,
+        json={
+            "operation": "question.compose",
+            "provider": "test-provider",
+            "retryKey": f"other-question-{uuid.uuid4()}",
+            "contentVersion": 1,
+        },
+    )
+    assert other_run.status_code == 201, other_run.text
+    cross_owner_content = client.post(
+        "/api/v1/questions",
+        headers=headers,
+        json={**question, "generationRunId": other_run.json()["id"]},
+    )
+    assert cross_owner_content.status_code == 404, cross_owner_content.text
+
+    deep_dive_missing_provenance = client.post(
+        "/api/v1/deep-dives",
+        headers=headers,
+        json={
+            "journeyId": started["journeyId"],
+            "activityId": str(uuid.uuid4()),
+            "objectiveId": str(uuid.uuid4()),
+            "triggeringEvidenceId": str(uuid.uuid4()),
+            "title": "Generated explanation",
+            "body": "A grounded explanation.",
+            "example": "A small example.",
+            "caveats": [],
+            "sourceReferences": ["https://example.test/source"],
+            "applicationTask": "Apply the idea.",
+        },
+    )
+    assert deep_dive_missing_provenance.status_code == 422, (
+        deep_dive_missing_provenance.text
+    )
