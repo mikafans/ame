@@ -19,6 +19,8 @@ path = "src/bin/gen_openapi.rs"
 anyhow = "1"
 async-trait = "0.1"
 axum = "0.8.1"
+chrono = { version = "0.4", default-features = false }
+chrono-tz = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

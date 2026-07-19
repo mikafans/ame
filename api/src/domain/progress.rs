@@ -64,6 +64,8 @@ pub struct Recommendation {
 pub enum ProgressError {
     EmptyField { field: &'static str },
     InvalidValue,
+    InvalidTimezone,
+    InvalidStreakDay,
     DuplicateStreakEvent,
     SubjectMismatch,
     NotFound,
@@ -79,6 +81,11 @@ impl Display for ProgressError {
             Self::InvalidValue => write!(
                 formatter,
                 "mastery evidence value must be between zero and one"
+            ),
+            Self::InvalidTimezone => write!(formatter, "learner timezone is not recognized"),
+            Self::InvalidStreakDay => write!(
+                formatter,
+                "qualifying day does not match the completed attempt"
             ),
             Self::DuplicateStreakEvent => write!(formatter, "streak event was already recorded"),
             Self::SubjectMismatch => write!(formatter, "progress belongs to another subject"),
@@ -115,6 +122,29 @@ pub fn validate_streak_event(input: &StreakEventInput) -> Result<(), ProgressErr
     }
     attempt_id_from_event_key(&input.qualifying_event_key)?;
     Ok(())
+}
+
+pub fn qualifying_day_for_attempt(
+    graded_at: OffsetDateTime,
+    learner_timezone: &str,
+) -> Result<time::Date, ProgressError> {
+    use chrono::Datelike;
+
+    let timezone = learner_timezone
+        .parse::<chrono_tz::Tz>()
+        .map_err(|_| ProgressError::InvalidTimezone)?;
+    let utc = chrono::DateTime::<chrono::Utc>::from_timestamp(
+        graded_at.unix_timestamp(),
+        graded_at.nanosecond(),
+    )
+    .ok_or(ProgressError::InvalidTimezone)?;
+    let local = utc.with_timezone(&timezone);
+    time::Date::from_calendar_date(
+        local.year(),
+        time::Month::try_from(local.month() as u8).map_err(|_| ProgressError::InvalidTimezone)?,
+        local.day() as u8,
+    )
+    .map_err(|_| ProgressError::InvalidTimezone)
 }
 
 pub fn attempt_id_from_event_key(event_key: &str) -> Result<Uuid, ProgressError> {

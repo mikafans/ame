@@ -2,12 +2,12 @@
 
 use crate::domain::progress::{
     MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError, Recommendation,
-    StreakEvent, StreakEventInput, attempt_id_from_event_key, validate_evidence,
-    validate_streak_event,
+    StreakEvent, StreakEventInput, attempt_id_from_event_key, qualifying_day_for_attempt,
+    validate_evidence, validate_streak_event,
 };
 use async_trait::async_trait;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 use time::OffsetDateTime;
@@ -23,7 +23,7 @@ struct ProgressState {
     evidence: Vec<MasteryEvidence>,
     streak_events: HashMap<String, StreakEvent>,
     journey_owners: HashMap<Uuid, Uuid>,
-    completed_attempts: HashSet<(Uuid, Uuid, Uuid, Uuid)>,
+    completed_attempts: HashMap<(Uuid, Uuid, Uuid, Uuid), OffsetDateTime>,
 }
 
 #[async_trait]
@@ -72,12 +72,14 @@ impl InMemoryProgressRepository {
         journey_id: Uuid,
         activity_id: Uuid,
         attempt_id: Uuid,
+        graded_at: OffsetDateTime,
     ) {
         if let Ok(mut state) = self.state.lock() {
             state.journey_owners.insert(journey_id, subject_user_id);
-            state
-                .completed_attempts
-                .insert((subject_user_id, journey_id, activity_id, attempt_id));
+            state.completed_attempts.insert(
+                (subject_user_id, journey_id, activity_id, attempt_id),
+                graded_at,
+            );
         }
     }
 
@@ -210,13 +212,17 @@ impl InMemoryProgressRepository {
             return Err(ProgressError::SubjectMismatch);
         }
         let attempt_id = attempt_id_from_event_key(&input.qualifying_event_key)?;
-        if !state.completed_attempts.contains(&(
+        let Some(graded_at) = state.completed_attempts.get(&(
             input.subject_user_id,
             input.journey_id,
             input.activity_id,
             attempt_id,
-        )) {
+        )) else {
             return Err(ProgressError::SubjectMismatch);
+        };
+        if qualifying_day_for_attempt(*graded_at, &input.learner_timezone)? != input.qualifying_day
+        {
+            return Err(ProgressError::InvalidStreakDay);
         }
         if let Some(event) = state.streak_events.get(&input.qualifying_event_key) {
             if event.input == input {
@@ -318,8 +324,6 @@ impl ProgressRepository for InMemoryProgressRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use time::macros::date;
-
     fn evidence(subject: Uuid, objective: Uuid, value: f32) -> MasteryEvidenceInput {
         MasteryEvidenceInput {
             subject_user_id: subject,
@@ -397,21 +401,25 @@ mod tests {
 
     #[test]
     fn streak_recording_is_idempotent_and_timezone_explicit() {
+        use time::macros::datetime;
+
         let repository = InMemoryProgressRepository::default();
         let owner = Uuid::now_v7();
         let journey = Uuid::now_v7();
         let activity = Uuid::now_v7();
         let attempt = Uuid::now_v7();
+        let graded_at = datetime!(2026-07-19 23:30 UTC);
         let input = StreakEventInput {
             subject_user_id: owner,
             journey_id: journey,
             activity_id: activity,
             qualifying_event_key: format!("attempt:{attempt}"),
             learner_timezone: "Asia/Tokyo".into(),
-            qualifying_day: date!(2026 - 07 - 19),
+            qualifying_day: qualifying_day_for_attempt(graded_at, "Asia/Tokyo")
+                .expect("qualifying day"),
         };
         repository.register_journey(owner, journey);
-        repository.register_completed_attempt(owner, journey, activity, attempt);
+        repository.register_completed_attempt(owner, journey, activity, attempt, graded_at);
         let first = repository
             .record_streak_event(input.clone())
             .expect("streak records");
@@ -423,6 +431,8 @@ mod tests {
         );
         let mut conflict = input.clone();
         conflict.learner_timezone = "UTC".into();
+        conflict.qualifying_day =
+            qualifying_day_for_attempt(graded_at, "UTC").expect("UTC qualifying day");
         assert_eq!(
             repository.record_streak_event(conflict),
             Err(ProgressError::DuplicateStreakEvent)

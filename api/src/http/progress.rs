@@ -339,6 +339,14 @@ fn map_progress_error(error: ProgressError) -> ApiError {
             field: "value".into(),
             message: "must be between 0 and 1".into(),
         }]),
+        ProgressError::InvalidTimezone => ApiError::Validation(vec![FieldError {
+            field: "learnerTimezone".into(),
+            message: "must be a recognized IANA timezone".into(),
+        }]),
+        ProgressError::InvalidStreakDay => ApiError::Validation(vec![FieldError {
+            field: "qualifyingDay".into(),
+            message: "must match the completed attempt in the learner timezone".into(),
+        }]),
         ProgressError::DuplicateStreakEvent => ApiError::IdempotencyConflict,
         ProgressError::Storage(message) => ApiError::Internal(anyhow::anyhow!(message)),
     }
