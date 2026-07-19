@@ -142,6 +142,41 @@ pub fn build_skill_manifest() -> Value {
             "/v1/attempts/{attempt_id}",
             json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),
         ),
+        endpoint(
+            "learning.progress.evidence",
+            "Record rebuildable mastery evidence linked to a learner activity or attempt.",
+            "POST",
+            "/v1/progress/evidence",
+            json!({"type":"object","required":["journeyId","objectiveId","activityId","value","derivationVersion"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"attemptId":{"type":"string","format":"uuid"},"value":{"type":"number","minimum":0,"maximum":1},"derivationVersion":{"type":"integer","minimum":1}}}),
+        ),
+        endpoint(
+            "learning.progress.snapshot",
+            "Read evidence-derived mastery and confidence for one objective.",
+            "GET",
+            "/v1/progress/{journey_id}/objectives/{objective_id}",
+            json!({"type":"object","required":["journeyId","objectiveId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.progress.recommend",
+            "Select the weakest objective from an explicit journey objective set.",
+            "POST",
+            "/v1/progress/{journey_id}/recommendation",
+            json!({"type":"object","required":["journeyId","objectives"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectives":{"type":"array"}}}),
+        ),
+        endpoint(
+            "learning.deep_dive.create",
+            "Create a source-backed explanatory deep dive linked to evidence.",
+            "POST",
+            "/v1/deep-dives",
+            json!({"type":"object","required":["journeyId","activityId","objectiveId","triggeringEvidenceId","title","body","example","sourceReferences","applicationTask"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"triggeringEvidenceId":{"type":"string","format":"uuid"},"title":{"type":"string"},"body":{"type":"string"},"example":{"type":"string"},"sourceReferences":{"type":"array"},"applicationTask":{"type":"string"}}}),
+        ),
+        endpoint(
+            "learning.deep_dive.get",
+            "Read one source-backed deep dive owned by the learner.",
+            "GET",
+            "/v1/deep-dives/{id}",
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
+        ),
     ];
 
     json!({

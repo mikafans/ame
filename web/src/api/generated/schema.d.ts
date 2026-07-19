@@ -243,6 +243,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deep-dives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/deep-dives/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/learning/journeys": {
         parameters: {
             query?: never;
@@ -373,6 +405,70 @@ export interface paths {
         put?: never;
         /** POST /v1/onboarding/start — create or resume a learner's first journey. */
         post: operations["start_learning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/progress/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_evidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/progress/streaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_streak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/progress/{journey_id}/objectives/{objective_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/progress/{journey_id}/recommendation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recommend"];
         delete?: never;
         options?: never;
         head?: never;
@@ -544,6 +640,23 @@ export interface components {
             mode: components["schemas"]["AssessmentMode"];
             status?: components["schemas"]["AssessmentStatus"];
         };
+        CreateDeepDiveBody: {
+            /** Format: uuid */
+            activityId: string;
+            applicationTask: string;
+            body: string;
+            caveats: string[];
+            example: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            reviewStatus?: components["schemas"]["ContentReviewStatus"];
+            sourceReferences: string[];
+            title: string;
+            /** Format: uuid */
+            triggeringEvidenceId: string;
+        };
         CreateQuestionBody: {
             acceptedAnswers?: string[];
             explanation?: string | null;
@@ -556,6 +669,26 @@ export interface components {
             reviewStatus?: components["schemas"]["ContentReviewStatus"];
             sourceReferences?: string[];
         };
+        DeepDiveResponse: {
+            /** Format: uuid */
+            activityId: string;
+            applicationTask: string;
+            body: string;
+            caveats: string[];
+            /** Format: int32 */
+            contentVersion: number;
+            example: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            sourceReferences: string[];
+            title: string;
+            /** Format: uuid */
+            triggeringEvidenceId: string;
+        };
         /**
          * @description The effective platform settings: config defaults with `tb_settings` overrides
          *     applied. Serialized both as the admin API response and as the cache blob.
@@ -563,6 +696,36 @@ export interface components {
         EffectiveSettings: {
             maintenanceMode: boolean;
             ratelimit: components["schemas"]["RateLimitSettings"];
+        };
+        EvidenceBody: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            attemptId?: string | null;
+            /** Format: int32 */
+            derivationVersion: number;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: float */
+            value: number;
+        };
+        EvidenceResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            attemptId?: string | null;
+            /** Format: int32 */
+            derivationVersion: number;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: float */
+            value: number;
         };
         FieldError: {
             field: string;
@@ -717,6 +880,12 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        ObjectiveActivityBody: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            objectiveId: string;
+        };
         /** @enum {string} */
         ObjectiveStatus: "active" | "paused" | "completed";
         PatchUserAdminBody: {
@@ -776,6 +945,19 @@ export interface components {
             free: components["schemas"]["TierLimit"];
             premium: components["schemas"]["TierLimit"];
         };
+        RecommendationBody: {
+            objectives: components["schemas"]["ObjectiveActivityBody"][];
+        };
+        RecommendationResponse: {
+            /** Format: uuid */
+            activityId: string;
+            evidenceIds: string[];
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            reason: string;
+        };
         RegisterBody: {
             email: string;
             name: string;
@@ -789,6 +971,19 @@ export interface components {
             /** Format: uuid */
             questionVersionId: string;
             response: unknown;
+        };
+        SnapshotResponse: {
+            calculatedAt: string;
+            /** Format: float */
+            confidence: number;
+            /** Format: int32 */
+            evidenceCount: number;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: float */
+            mastery: number;
+            /** Format: uuid */
+            objectiveId: string;
         };
         StartAttemptBody: {
             /** Format: uuid */
@@ -813,6 +1008,25 @@ export interface components {
             token: string;
             /** Format: uuid */
             userId: string;
+        };
+        StreakBody: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            journeyId: string;
+            learnerTimezone: string;
+            qualifyingDay: string;
+            qualifyingEventKey: string;
+        };
+        StreakResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            qualifyingDay: string;
+            qualifyingEventKey: string;
         };
         TierLimit: {
             /** Format: int32 */
@@ -1310,6 +1524,50 @@ export interface operations {
             };
         };
     };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeepDiveBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDiveResponse"];
+                };
+            };
+        };
+    };
+    get_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDiveResponse"];
+                };
+            };
+        };
+    };
     list_journeys: {
         parameters: {
             query?: never;
@@ -1619,6 +1877,99 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    record_evidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceResponse"];
+                };
+            };
+        };
+    };
+    record_streak: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StreakBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreakResponse"];
+                };
+            };
+        };
+    };
+    snapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                objective_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotResponse"];
+                };
+            };
+        };
+    };
+    recommend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecommendationBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationResponse"];
+                };
             };
         };
     };

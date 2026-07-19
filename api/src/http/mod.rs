@@ -85,12 +85,14 @@ pub mod assessments;
 pub mod attempts;
 pub mod auth;
 pub mod db;
+pub mod deep_dives;
 pub mod health;
 pub mod idempotency;
 pub mod learning;
 pub mod me;
 pub mod onboarding;
 pub mod openapi;
+pub mod progress;
 pub mod questions;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
@@ -161,6 +163,8 @@ pub fn router(pool: PgPool) -> Router {
         .merge(questions::router(state.clone()))
         .merge(assessments::router(state.clone()))
         .merge(attempts::router(state.clone()))
+        .merge(progress::router(state.clone()))
+        .merge(deep_dives::router(state.clone()))
         .merge(agents::public_router(state.clone()))
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))

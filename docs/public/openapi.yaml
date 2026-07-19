@@ -382,6 +382,47 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '422':
           description: Validation failed
+  /v1/deep-dives:
+    post:
+      tags:
+      - deep-dives
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeepDiveBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveResponse'
+      security:
+      - bearer: []
+  /v1/deep-dives/{id}:
+    get:
+      tags:
+      - deep-dives
+      operationId: get_one
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveResponse'
+      security:
+      - bearer: []
   /v1/learning/journeys:
     get:
       tags:
@@ -593,6 +634,100 @@ paths:
           description: Email already belongs to a learner
         '422':
           description: Validation failed
+  /v1/progress/evidence:
+    post:
+      tags:
+      - progress
+      operationId: record_evidence
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceResponse'
+      security:
+      - bearer: []
+  /v1/progress/streaks:
+    post:
+      tags:
+      - progress
+      operationId: record_streak
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreakBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreakResponse'
+      security:
+      - bearer: []
+  /v1/progress/{journey_id}/objectives/{objective_id}:
+    get:
+      tags:
+      - progress
+      operationId: snapshot
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: objective_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotResponse'
+      security:
+      - bearer: []
+  /v1/progress/{journey_id}/recommendation:
+    post:
+      tags:
+      - progress
+      operationId: recommend
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+      security:
+      - bearer: []
   /v1/questions:
     post:
       tags:
@@ -986,6 +1121,50 @@ components:
           $ref: '#/components/schemas/AssessmentMode'
         status:
           $ref: '#/components/schemas/AssessmentStatus'
+    CreateDeepDiveBody:
+      type: object
+      required:
+      - journeyId
+      - activityId
+      - objectiveId
+      - triggeringEvidenceId
+      - title
+      - body
+      - example
+      - caveats
+      - sourceReferences
+      - applicationTask
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        applicationTask:
+          type: string
+        body:
+          type: string
+        caveats:
+          type: array
+          items:
+            type: string
+        example:
+          type: string
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reviewStatus:
+          $ref: '#/components/schemas/ContentReviewStatus'
+        sourceReferences:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        triggeringEvidenceId:
+          type: string
+          format: uuid
     CreateQuestionBody:
       type: object
       required:
@@ -1023,6 +1202,57 @@ components:
           type: array
           items:
             type: string
+    DeepDiveResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - activityId
+      - objectiveId
+      - triggeringEvidenceId
+      - title
+      - body
+      - example
+      - caveats
+      - sourceReferences
+      - applicationTask
+      - contentVersion
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        applicationTask:
+          type: string
+        body:
+          type: string
+        caveats:
+          type: array
+          items:
+            type: string
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        example:
+          type: string
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        sourceReferences:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        triggeringEvidenceId:
+          type: string
+          format: uuid
     EffectiveSettings:
       type: object
       description: |-
@@ -1036,6 +1266,70 @@ components:
           type: boolean
         ratelimit:
           $ref: '#/components/schemas/RateLimitSettings'
+    EvidenceBody:
+      type: object
+      required:
+      - journeyId
+      - objectiveId
+      - activityId
+      - value
+      - derivationVersion
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        attemptId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        derivationVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        value:
+          type: number
+          format: float
+    EvidenceResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - objectiveId
+      - activityId
+      - value
+      - derivationVersion
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        attemptId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        derivationVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        value:
+          type: number
+          format: float
     FieldError:
       type: object
       required:
@@ -1417,6 +1711,18 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
+    ObjectiveActivityBody:
+      type: object
+      required:
+      - objectiveId
+      - activityId
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
     ObjectiveStatus:
       type: string
       enum:
@@ -1582,6 +1888,40 @@ components:
           $ref: '#/components/schemas/TierLimit'
         premium:
           $ref: '#/components/schemas/TierLimit'
+    RecommendationBody:
+      type: object
+      required:
+      - objectives
+      properties:
+        objectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectiveActivityBody'
+    RecommendationResponse:
+      type: object
+      required:
+      - journeyId
+      - objectiveId
+      - activityId
+      - reason
+      - evidenceIds
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reason:
+          type: string
     RegisterBody:
       type: object
       required:
@@ -1614,6 +1954,34 @@ components:
           type: string
           format: uuid
         response: {}
+    SnapshotResponse:
+      type: object
+      required:
+      - journeyId
+      - objectiveId
+      - mastery
+      - confidence
+      - evidenceCount
+      - calculatedAt
+      properties:
+        calculatedAt:
+          type: string
+        confidence:
+          type: number
+          format: float
+        evidenceCount:
+          type: integer
+          format: int32
+          minimum: 0
+        journeyId:
+          type: string
+          format: uuid
+        mastery:
+          type: number
+          format: float
+        objectiveId:
+          type: string
+          format: uuid
     StartAttemptBody:
       type: object
       required:
@@ -1671,6 +2039,49 @@ components:
         userId:
           type: string
           format: uuid
+    StreakBody:
+      type: object
+      required:
+      - journeyId
+      - activityId
+      - qualifyingEventKey
+      - learnerTimezone
+      - qualifyingDay
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        learnerTimezone:
+          type: string
+        qualifyingDay:
+          type: string
+        qualifyingEventKey:
+          type: string
+    StreakResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - activityId
+      - qualifyingEventKey
+      - qualifyingDay
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        qualifyingDay:
+          type: string
+        qualifyingEventKey:
+          type: string
     TierLimit:
       type: object
       required:
