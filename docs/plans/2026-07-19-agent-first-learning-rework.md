@@ -1,6 +1,6 @@
 # AME 0.3 — Agent-first learning platform
 
-Status: implementation in progress; C1-C5 exercised PASS; C6 clean-volume certification pending
+Status: implementation in progress; C1-C6 clean-stack gates PASS; human review pending
 
 This document is the canonical plan for the clean-slate AME 0.3 redesign. It
 defines the product promise, learner stories, domain model, API shape, TDD
@@ -118,6 +118,8 @@ learner start, learn, practice, understand results, continue, and return later.
 - versioned template registry with the first three templates:
   `understand-a-subject`, `prepare-for-an-exam`, and `build-a-project`;
 - natural-language intent capture and idempotent journey bootstrap;
+- template-driven prompt grounding: the learner's goal is rendered into
+  objectives, first-activity copy, questions, and follow-up activity titles;
 - learner-visible goal, objectives, effort, success criteria, explanation, and
   worked example before the first assessment;
 - learner-scoped topics/skills and objective links;
