@@ -389,6 +389,7 @@ pub(crate) fn validate_activity(input: &CreateActivity) -> Result<(), LearningRe
 }
 
 pub(crate) fn validate_activity_content(
+    activity_kind: ActivityKind,
     input: &AuthorActivityContent,
 ) -> Result<(), LearningRepositoryError> {
     if input.source_references.is_empty()
@@ -412,32 +413,34 @@ pub(crate) fn validate_activity_content(
     let Some(content_type) = object.get("type").and_then(serde_json::Value::as_str) else {
         return Err(LearningRepositoryError::InvalidActivityContent);
     };
-    let required_fields: &[&str] = match content_type {
-        "explanation" => &["heading", "body", "key_points"],
-        "worked_example" => &["heading", "prompt", "steps", "reflection"],
+    let (expected_type, text_fields, list_field) = match activity_kind {
+        ActivityKind::Explanation => ("explanation", &["heading", "body"][..], "key_points"),
+        ActivityKind::Example => (
+            "worked_example",
+            &["heading", "prompt", "reflection"][..],
+            "steps",
+        ),
         _ => return Err(LearningRepositoryError::InvalidActivityContent),
     };
-    if required_fields.iter().any(|field| {
-        object.get(*field).is_none_or(|value| {
-            value.is_null() || value.as_str().is_some_and(|text| text.trim().is_empty())
+    if content_type != expected_type
+        || text_fields.iter().any(|field| {
+            object
+                .get(*field)
+                .and_then(serde_json::Value::as_str)
+                .is_none_or(|text| text.trim().is_empty())
         })
-    }) {
+    {
         return Err(LearningRepositoryError::InvalidActivityContent);
     }
-    for field in required_fields
-        .iter()
-        .filter(|field| **field == "key_points" || **field == "steps")
+    let Some(items) = object.get(list_field).and_then(serde_json::Value::as_array) else {
+        return Err(LearningRepositoryError::InvalidActivityContent);
+    };
+    if items.is_empty()
+        || items
+            .iter()
+            .any(|item| item.as_str().is_none_or(|text| text.trim().is_empty()))
     {
-        let Some(items) = object.get(*field).and_then(serde_json::Value::as_array) else {
-            return Err(LearningRepositoryError::InvalidActivityContent);
-        };
-        if items.is_empty()
-            || items
-                .iter()
-                .any(|item| item.as_str().is_none_or(|text| text.trim().is_empty()))
-        {
-            return Err(LearningRepositoryError::InvalidActivityContent);
-        }
+        return Err(LearningRepositoryError::InvalidActivityContent);
     }
     Ok(())
 }

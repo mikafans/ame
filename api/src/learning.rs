@@ -360,7 +360,6 @@ impl LearningRepository for InMemoryLearningRepository {
         &self,
         input: AuthorActivityContent,
     ) -> Result<LearningActivity, LearningRepositoryError> {
-        validate_activity_content(&input)?;
         let mut state = self
             .state
             .lock()
@@ -379,6 +378,7 @@ impl LearningRepository for InMemoryLearningRepository {
         ) {
             return Err(LearningRepositoryError::InvalidActivityContent);
         }
+        validate_activity_content(activity.kind, &input)?;
         if activity.status == ActivityStatus::Completed {
             return Err(LearningRepositoryError::ActivityContentCompleted);
         }

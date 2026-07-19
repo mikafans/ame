@@ -433,7 +433,6 @@ impl LearningRepository for PgLearningRepository {
         &self,
         input: AuthorActivityContent,
     ) -> Result<LearningActivity, LearningRepositoryError> {
-        validate_activity_content(&input)?;
         let row = sqlx::query(
             "SELECT journey_id, subject_user_id, kind, status FROM tb_activities WHERE id = $1",
         )
@@ -448,12 +447,11 @@ impl LearningRepository for PgLearningRepository {
         if subject_user_id != input.subject_user_id {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
-        if !matches!(
-            activity_kind(row.get::<String, _>("kind").as_str()),
-            ActivityKind::Explanation | ActivityKind::Example
-        ) {
+        let kind = activity_kind(row.get::<String, _>("kind").as_str());
+        if !matches!(kind, ActivityKind::Explanation | ActivityKind::Example) {
             return Err(LearningRepositoryError::InvalidActivityContent);
         }
+        validate_activity_content(kind, &input)?;
         if activity_status(row.get::<String, _>("status").as_str()) == ActivityStatus::Completed {
             return Err(LearningRepositoryError::ActivityContentCompleted);
         }
