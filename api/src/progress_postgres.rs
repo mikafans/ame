@@ -21,6 +21,61 @@ impl PgProgressRepository {
         Self { pool }
     }
 
+    async fn ensure_owned_target(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        objective_id: Uuid,
+        activity_id: Uuid,
+        attempt_id: Option<Uuid>,
+    ) -> Result<(), ProgressError> {
+        let owned = sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS (
+                    SELECT 1
+                      FROM tb_learning_journeys j
+                      JOIN tb_journey_objectives o
+                        ON o.journey_id = j.id
+                       AND o.subject_user_id = j.subject_user_id
+                      JOIN tb_activities a
+                        ON a.journey_id = j.id
+                       AND a.subject_user_id = j.subject_user_id
+                      JOIN tb_activity_objectives ao
+                        ON ao.activity_id = a.id
+                       AND ao.objective_id = o.id
+                     WHERE j.id = $1
+                       AND j.subject_user_id = $2
+                       AND o.id = $3
+                       AND a.id = $4
+                       AND (
+                            $5::uuid IS NULL
+                            OR EXISTS (
+                                SELECT 1
+                                  FROM tb_attempts at
+                                  JOIN tb_learning_sessions ls
+                                    ON ls.id = at.learning_session_id
+                                 WHERE at.id = $5
+                                   AND at.subject_user_id = $2
+                                   AND at.activity_id = $4
+                                   AND ls.journey_id = $1
+                            )
+                       )
+                )"#,
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .bind(objective_id)
+        .bind(activity_id)
+        .bind(attempt_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        if owned {
+            Ok(())
+        } else {
+            Err(ProgressError::SubjectMismatch)
+        }
+    }
+
     async fn refresh_snapshot(
         &self,
         subject_user_id: Uuid,
@@ -143,6 +198,14 @@ impl ProgressRepository for PgProgressRepository {
         input: MasteryEvidenceInput,
     ) -> Result<MasteryEvidence, ProgressError> {
         validate_evidence(&input)?;
+        self.ensure_owned_target(
+            input.subject_user_id,
+            input.journey_id,
+            input.objective_id,
+            input.activity_id,
+            input.attempt_id,
+        )
+        .await?;
         let row = sqlx::query(
             r#"INSERT INTO tb_mastery_evidence (
                     subject_user_id, journey_id, objective_id, activity_id,
@@ -220,6 +283,14 @@ impl ProgressRepository for PgProgressRepository {
     ) -> Result<Recommendation, ProgressError> {
         let mut weakest: Option<(f32, i32, Uuid, Uuid)> = None;
         for (objective_id, activity_id) in objectives {
+            self.ensure_owned_target(
+                subject_user_id,
+                journey_id,
+                *objective_id,
+                *activity_id,
+                None,
+            )
+            .await?;
             let candidate = match self
                 .snapshot(subject_user_id, journey_id, *objective_id)
                 .await

@@ -21,6 +21,7 @@ pub struct InMemoryProgressRepository {
 struct ProgressState {
     evidence: Vec<MasteryEvidence>,
     streak_events: HashMap<String, StreakEvent>,
+    journey_owners: HashMap<Uuid, Uuid>,
 }
 
 #[async_trait]
@@ -57,6 +58,12 @@ pub trait ProgressRepository: Send + Sync {
 }
 
 impl InMemoryProgressRepository {
+    pub fn register_journey(&self, subject_user_id: Uuid, journey_id: Uuid) {
+        if let Ok(mut state) = self.state.lock() {
+            state.journey_owners.insert(journey_id, subject_user_id);
+        }
+    }
+
     pub fn record_evidence(
         &self,
         input: MasteryEvidenceInput,
@@ -66,6 +73,11 @@ impl InMemoryProgressRepository {
             .state
             .lock()
             .map_err(|error| ProgressError::Storage(error.to_string()))?;
+        if let Some(owner_id) = state.journey_owners.get(&input.journey_id)
+            && *owner_id != input.subject_user_id
+        {
+            return Err(ProgressError::SubjectMismatch);
+        }
         let evidence = MasteryEvidence {
             id: Uuid::now_v7(),
             input,
@@ -325,15 +337,27 @@ mod tests {
     #[test]
     fn invalid_or_cross_subject_evidence_cannot_create_progress() {
         let repository = InMemoryProgressRepository::default();
+        let journey = Uuid::now_v7();
+        let owner = Uuid::now_v7();
+        repository.register_journey(owner, journey);
         let mut invalid = evidence(Uuid::now_v7(), Uuid::now_v7(), 1.1);
         assert_eq!(
             repository.record_evidence(invalid.clone()),
             Err(ProgressError::InvalidValue)
         );
+        invalid.subject_user_id = owner;
         invalid.value = 0.5;
+        invalid.journey_id = journey;
         repository
             .record_evidence(invalid)
             .expect("valid evidence records");
+        let mut cross_owner = evidence(Uuid::now_v7(), journey, 0.5);
+        cross_owner.journey_id = journey;
+        cross_owner.activity_id = Uuid::now_v7();
+        assert_eq!(
+            repository.record_evidence(cross_owner),
+            Err(ProgressError::SubjectMismatch)
+        );
         assert_eq!(
             repository.snapshot(Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()),
             Err(ProgressError::NotFound)
