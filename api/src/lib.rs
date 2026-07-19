@@ -12,6 +12,7 @@ pub mod engine;
 pub mod http;
 pub mod learning;
 pub mod learning_postgres;
+pub mod onboarding;
 pub mod ratelimit;
 pub mod settings;
 pub mod templates;
