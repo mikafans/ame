@@ -29,6 +29,27 @@ export default function LearningJourneyPage() {
           throw new Error("Could not load this learning journey");
         }
         if (!cancelled) setJourney(data);
+        const storedSessionId = window.localStorage.getItem(
+          `ame-learning-session:${params.id}`,
+        );
+        if (storedSessionId) {
+          return api.GET("/v1/learning/sessions/{id}", {
+            params: { path: { id: storedSessionId } },
+          });
+        }
+        return null;
+      })
+      .then((result) => {
+        if (
+          result &&
+          result.response.ok &&
+          result.data &&
+          result.data.journeyId === params.id &&
+          result.data.status === "in_progress" &&
+          !cancelled
+        ) {
+          setSession(result.data);
+        }
       })
       .catch((loadError) => {
         if (!cancelled) {
@@ -57,6 +78,7 @@ export default function LearningJourneyPage() {
       if (!response.ok || !data)
         throw new Error("Could not start this activity");
       setSession(data);
+      window.localStorage.setItem(`ame-learning-session:${params.id}`, data.id);
     } catch (startError) {
       setError(
         startError instanceof Error
@@ -83,6 +105,7 @@ export default function LearningJourneyPage() {
       if (!response.ok || !data)
         throw new Error("Could not finish this activity");
       setSession(data);
+      window.localStorage.removeItem(`ame-learning-session:${params.id}`);
       const refreshed = await api.GET("/v1/learning/journeys/{id}", {
         params: { path: { id: params.id } },
       });
