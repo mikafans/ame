@@ -22,7 +22,7 @@ test("visitor can preview a first learning journey from an intent", async ({
         normalizedStatement: "Learn distributed systems",
         promise:
           "Build a durable foundation through guided practice and review",
-        templateId: "learn-a-subject",
+        templateId: "understand-a-subject",
         templateVersion: 1,
         objectives: [
           {

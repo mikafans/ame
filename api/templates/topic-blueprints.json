@@ -1,7 +1,7 @@
 [
   {
     "id": "subject-starter",
-    "template_id": "learn-a-subject",
+    "template_id": "understand-a-subject",
     "aliases": [],
     "objectives": [
       {"verb": "identify", "statement": "Identify the core concepts", "success_criteria": "Name the essential ideas and how they relate"},
@@ -29,7 +29,7 @@
   },
   {
     "id": "exam-starter",
-    "template_id": "exam-prep",
+    "template_id": "prepare-for-an-exam",
     "aliases": [],
     "objectives": [
       {"verb": "map", "statement": "Map the target syllabus", "success_criteria": "Name the main domains and their expected weight"},

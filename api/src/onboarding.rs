@@ -576,7 +576,7 @@ mod tests {
             raw_intent: "I would like to learn a learner-selected topic".to_string(),
             normalized_statement: "Understand the learner-selected topic".to_string(),
             promise: "Explain and apply the learner-selected topic".to_string(),
-            template_id: "learn-a-subject".to_string(),
+            template_id: "understand-a-subject".to_string(),
             template_version: 1,
             template_version_id: None,
             idempotency_key: "onboarding/learner-selected-topic".to_string(),
@@ -591,7 +591,7 @@ mod tests {
             raw_intent: "I would like to learn a learner-selected topic".to_string(),
             normalized_statement: "Understand the learner-selected topic".to_string(),
             promise: "Explain and apply the learner-selected topic".to_string(),
-            template_id: "learn-a-subject".to_string(),
+            template_id: "understand-a-subject".to_string(),
             template_version: 1,
             template_version_id: None,
             idempotency_key: "onboarding/learner-selected-topic".to_string(),
@@ -621,7 +621,7 @@ mod tests {
             .await
             .expect("prompt onboarding succeeds");
 
-        assert_eq!(result.bootstrap.template_id, "learn-a-subject");
+        assert_eq!(result.bootstrap.template_id, "understand-a-subject");
         assert_eq!(
             result.bootstrap.goal.raw_intent,
             "I would like to learn a learner-selected topic"
@@ -642,7 +642,7 @@ mod tests {
             .await
             .expect("preview succeeds");
 
-        assert_eq!(preview.interpretation.template_id, "learn-a-subject");
+        assert_eq!(preview.interpretation.template_id, "understand-a-subject");
         assert_eq!(preview.objectives.len(), 3);
         assert_eq!(preview.first_activity.kind, ActivityKind::Explanation);
         assert_eq!(preview.first_activity.estimated_minutes, 5);
@@ -720,7 +720,7 @@ mod tests {
         let retry = service.bootstrap(plan).await.expect("bootstrap retries");
 
         assert_eq!(first, retry);
-        assert_eq!(first.template_id, "learn-a-subject");
+        assert_eq!(first.template_id, "understand-a-subject");
         assert_eq!(first.template_version, 1);
         let objectives = repository
             .list_objectives(first.goal.subject_user_id, first.journey.id)

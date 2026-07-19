@@ -144,7 +144,7 @@ pub fn recommend_builtin_template(intent: &str) -> TemplateRecommendation {
         "qualification",
     ]) {
         return TemplateRecommendation {
-            template_id: "exam-prep",
+            template_id: "prepare-for-an-exam",
             reason: "The intent names an exam, certification, test, or qualification target.",
         };
     }
@@ -159,7 +159,7 @@ pub fn recommend_builtin_template(intent: &str) -> TemplateRecommendation {
     }
 
     TemplateRecommendation {
-        template_id: "learn-a-subject",
+        template_id: "understand-a-subject",
         reason: "The intent names a subject without an explicit exam or project target.",
     }
 }
@@ -232,13 +232,13 @@ mod tests {
             catalog
                 .templates
                 .iter()
-                .any(|template| template.id == "learn-a-subject")
+                .any(|template| template.id == "understand-a-subject")
         );
         assert!(
             catalog
                 .templates
                 .iter()
-                .any(|template| template.id == "exam-prep")
+                .any(|template| template.id == "prepare-for-an-exam")
         );
         assert!(
             catalog
@@ -279,7 +279,7 @@ mod tests {
                 && !topic.follow_up_activities.is_empty()
         }));
         assert!(
-            super::find_template_blueprint("learn-a-subject")
+            super::find_template_blueprint("understand-a-subject")
                 .expect("topic blueprint catalog must parse")
                 .is_some()
         );
@@ -295,7 +295,7 @@ mod tests {
         assert_eq!(
             recommend_builtin_template("I want to prepare for a distributed systems exam"),
             TemplateRecommendation {
-                template_id: "exam-prep",
+                template_id: "prepare-for-an-exam",
                 reason: "The intent names an exam, certification, test, or qualification target."
             }
         );
@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(
             recommend_builtin_template("I would like to learn distributed systems"),
             TemplateRecommendation {
-                template_id: "learn-a-subject",
+                template_id: "understand-a-subject",
                 reason: "The intent names a subject without an explicit exam or project target."
             }
         );
@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(
             recommend_builtin_template("I want to understand contest history"),
             TemplateRecommendation {
-                template_id: "learn-a-subject",
+                template_id: "understand-a-subject",
                 reason: "The intent names a subject without an explicit exam or project target."
             }
         );
