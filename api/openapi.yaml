@@ -231,6 +231,106 @@ paths:
                 $ref: '#/components/schemas/AssessmentResponse'
       security:
       - bearer: []
+  /v1/assessments/{assessment_id}/attempts:
+    post:
+      tags:
+      - attempts
+      operationId: start_attempt
+      parameters:
+      - name: assessment_id
+        in: path
+        description: Assessment ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartAttemptBody'
+        required: true
+      responses:
+        '200':
+          description: Started or resumed attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /v1/attempts/{attempt_id}:
+    get:
+      tags:
+      - attempts
+      operationId: get_attempt
+      parameters:
+      - name: attempt_id
+        in: path
+        description: Attempt ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /v1/attempts/{attempt_id}/answers:
+    post:
+      tags:
+      - attempts
+      operationId: save_answer
+      parameters:
+      - name: attempt_id
+        in: path
+        description: Attempt ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAnswerBody'
+        required: true
+      responses:
+        '200':
+          description: Saved answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /v1/attempts/{attempt_id}/finish:
+    post:
+      tags:
+      - attempts
+      operationId: finish_attempt
+      parameters:
+      - name: attempt_id
+        in: path
+        description: Attempt ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Finished attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
   /v1/auth/login:
     post:
       tags:
@@ -700,10 +800,14 @@ components:
     AssessmentItemResponse:
       type: object
       required:
+      - id
       - questionVersionId
       - orderIndex
       - points
       properties:
+        id:
+          type: string
+          format: uuid
         orderIndex:
           type: integer
           format: int32
@@ -753,6 +857,52 @@ components:
       - draft
       - published
       - retired
+    AttemptResponse:
+      type: object
+      required:
+      - id
+      - assessmentId
+      - assessmentVersion
+      - status
+      - responses
+      properties:
+        assessmentId:
+          type: string
+          format: uuid
+        assessmentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        awardedPoints:
+          type:
+          - number
+          - 'null'
+          format: float
+        id:
+          type: string
+          format: uuid
+        maxPoints:
+          type:
+          - number
+          - 'null'
+          format: float
+        responses:
+          type: object
+          additionalProperties: {}
+          propertyNames:
+            type: string
+            format: uuid
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
+        status:
+          type: string
+        submittedAt:
+          type:
+          - string
+          - 'null'
     AuditLogEntry:
       type: object
       required:
@@ -1450,6 +1600,28 @@ components:
       enum:
       - user
       - admin
+    SaveAnswerBody:
+      type: object
+      required:
+      - assessmentItemId
+      - questionVersionId
+      - response
+      properties:
+        assessmentItemId:
+          type: string
+          format: uuid
+        questionVersionId:
+          type: string
+          format: uuid
+        response: {}
+    StartAttemptBody:
+      type: object
+      required:
+      - learningSessionId
+      properties:
+        learningSessionId:
+          type: string
+          format: uuid
     StartLearningBody:
       type: object
       required:

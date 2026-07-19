@@ -55,6 +55,7 @@ pub struct AssessmentResponse {
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentItemResponse {
+    pub id: Uuid,
     pub question_version_id: Uuid,
     pub order_index: i32,
     pub points: u32,
@@ -144,6 +145,7 @@ fn assessment_response(assessment: crate::domain::assessment::Assessment) -> Ass
             .items
             .into_iter()
             .map(|item| AssessmentItemResponse {
+                id: item.id,
                 question_version_id: item.question_version_id,
                 order_index: item.order_index,
                 points: item.points,

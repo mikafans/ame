@@ -295,6 +295,97 @@
       "method": "GET",
       "name": "learning.assessment.get",
       "path": "/v1/assessments/{assessment_id}"
+    },
+    {
+      "description": "Start or resume an attempt against one immutable assessment version.",
+      "input_schema": {
+        "properties": {
+          "assessmentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "learningSessionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assessmentId",
+          "learningSessionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.attempt.start",
+      "path": "/v1/assessments/{assessment_id}/attempts"
+    },
+    {
+      "description": "Save one answer while preserving assessment item and question version identity.",
+      "input_schema": {
+        "properties": {
+          "assessmentItemId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "questionVersionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "response": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "attemptId",
+          "assessmentItemId",
+          "questionVersionId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.attempt.answer",
+      "path": "/v1/attempts/{attempt_id}/answers"
+    },
+    {
+      "description": "Finish an attempt, grade deterministic items, and return manual-review state when needed.",
+      "input_schema": {
+        "properties": {
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attemptId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.attempt.finish",
+      "path": "/v1/attempts/{attempt_id}/finish"
+    },
+    {
+      "description": "Read an owned attempt and its saved responses/result.",
+      "input_schema": {
+        "properties": {
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attemptId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.attempt.get",
+      "path": "/v1/attempts/{attempt_id}"
     }
   ]
 }

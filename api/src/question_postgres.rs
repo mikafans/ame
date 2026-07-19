@@ -19,6 +19,32 @@ impl PgQuestionRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    pub async fn get_version_by_id(
+        &self,
+        subject_user_id: Uuid,
+        version_id: Uuid,
+    ) -> Result<QuestionVersion, QuestionRepositoryError> {
+        let row = sqlx::query(
+            r#"SELECT q.subject_user_id, qv.id, qv.question_id, qv.version,
+                      qv.kind, qv.prompt, qv.payload, qv.explanation, qv.rationale,
+                      qv.points, qv.review_status, qv.source_references, qv.created_at
+               FROM tb_questions q
+               JOIN tb_question_versions qv ON qv.question_id = q.id
+               WHERE qv.id = $1"#,
+        )
+        .bind(version_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(QuestionRepositoryError::NotFound {
+            resource: "question version",
+        })?;
+        if row.get::<Uuid, _>("subject_user_id") != subject_user_id {
+            return Err(QuestionRepositoryError::SubjectMismatch);
+        }
+        question_version_from_row(&row)
+    }
 }
 
 #[async_trait]

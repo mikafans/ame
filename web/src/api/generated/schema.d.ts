@@ -128,6 +128,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/assessments/{assessment_id}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_attempt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/attempts/{attempt_id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["save_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/attempts/{attempt_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["finish_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -407,6 +471,8 @@ export interface components {
             questionVersion: number;
         };
         AssessmentItemResponse: {
+            /** Format: uuid */
+            id: string;
             /** Format: int32 */
             orderIndex: number;
             /** Format: int32 */
@@ -429,6 +495,25 @@ export interface components {
         };
         /** @enum {string} */
         AssessmentStatus: "draft" | "published" | "retired";
+        AttemptResponse: {
+            /** Format: uuid */
+            assessmentId: string;
+            /** Format: int32 */
+            assessmentVersion: number;
+            /** Format: float */
+            awardedPoints?: number | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: float */
+            maxPoints?: number | null;
+            responses: {
+                [key: string]: unknown;
+            };
+            /** Format: float */
+            score?: number | null;
+            status: string;
+            submittedAt?: string | null;
+        };
         AuditLogEntry: {
             action: string;
             actorEmail?: string | null;
@@ -698,6 +783,17 @@ export interface components {
         };
         /** @enum {string} */
         Role: "user" | "admin";
+        SaveAnswerBody: {
+            /** Format: uuid */
+            assessmentItemId: string;
+            /** Format: uuid */
+            questionVersionId: string;
+            response: unknown;
+        };
+        StartAttemptBody: {
+            /** Format: uuid */
+            learningSessionId: string;
+        };
         StartLearningBody: {
             displayName: string;
             email: string;
@@ -1030,6 +1126,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssessmentResponse"];
+                };
+            };
+        };
+    };
+    start_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Assessment ID */
+                assessment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartAttemptBody"];
+            };
+        };
+        responses: {
+            /** @description Started or resumed attempt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
+                };
+            };
+        };
+    };
+    get_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Attempt ID */
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attempt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
+                };
+            };
+        };
+    };
+    save_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Attempt ID */
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveAnswerBody"];
+            };
+        };
+        responses: {
+            /** @description Saved answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
+                };
+            };
+        };
+    };
+    finish_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Attempt ID */
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Finished attempt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
                 };
             };
         };

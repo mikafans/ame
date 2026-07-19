@@ -82,6 +82,7 @@ pub async fn maintenance_mode_middleware(
 pub mod admin;
 pub mod agents;
 pub mod assessments;
+pub mod attempts;
 pub mod auth;
 pub mod db;
 pub mod health;
@@ -159,6 +160,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(onboarding::router(state.clone()))
         .merge(questions::router(state.clone()))
         .merge(assessments::router(state.clone()))
+        .merge(attempts::router(state.clone()))
         .merge(agents::public_router(state.clone()))
         .route("/v1/auth/register", post(auth::register))
         .route("/v1/auth/login", post(auth::login))

@@ -114,6 +114,34 @@ pub fn build_skill_manifest() -> Value {
             "/v1/assessments/{assessment_id}",
             json!({"type":"object","required":["assessmentId"],"properties":{"assessmentId":{"type":"string","format":"uuid"}}}),
         ),
+        endpoint(
+            "learning.attempt.start",
+            "Start or resume an attempt against one immutable assessment version.",
+            "POST",
+            "/v1/assessments/{assessment_id}/attempts",
+            json!({"type":"object","required":["assessmentId","learningSessionId"],"properties":{"assessmentId":{"type":"string","format":"uuid"},"learningSessionId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.attempt.answer",
+            "Save one answer while preserving assessment item and question version identity.",
+            "POST",
+            "/v1/attempts/{attempt_id}/answers",
+            json!({"type":"object","required":["attemptId","assessmentItemId","questionVersionId","response"],"properties":{"attemptId":{"type":"string","format":"uuid"},"assessmentItemId":{"type":"string","format":"uuid"},"questionVersionId":{"type":"string","format":"uuid"},"response":{"type":"object"}}}),
+        ),
+        endpoint(
+            "learning.attempt.finish",
+            "Finish an attempt, grade deterministic items, and return manual-review state when needed.",
+            "POST",
+            "/v1/attempts/{attempt_id}/finish",
+            json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.attempt.get",
+            "Read an owned attempt and its saved responses/result.",
+            "GET",
+            "/v1/attempts/{attempt_id}",
+            json!({"type":"object","required":["attemptId"],"properties":{"attemptId":{"type":"string","format":"uuid"}}}),
+        ),
     ];
 
     json!({
