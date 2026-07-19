@@ -574,8 +574,9 @@ These IDs are the execution backlog. Dependencies are hard gates. A task is
 complete only when its deliverable and acceptance checks are present in the
 repository.
 
-Current execution status: T00 and T01 are complete; T02 is in progress with
-the built-in catalog and loader landed; T03 has not started.
+Current execution status: T00 and T01 are complete; T02 has its first-release
+catalog and loader; T03 is in progress with the clean SQL baseline validated;
+Rust storage/query rewrites have not started.
 
 Checkpoint policy: commit after each bounded task or reviewable vertical slice.
 Do not combine template design, PostgreSQL schema replacement, API contracts,
@@ -655,13 +656,17 @@ backfills, or dual reads; ownership and actor/subject rules are explicit;
 version, idempotency, lifecycle, and objective-to-evidence linkage are
 queryable; bootstrap retries cannot duplicate starter content.
 
-Required next-task scope: replace the current PostgreSQL migration baseline with
-the new clean schema for the journey model. This is a required future task, not
-optional cleanup. It may be deferred to a separate session, but no API or
-frontend implementation should claim the redesign is complete until a clean
-PostgreSQL volume can create and exercise the new baseline. There is no data
-migration from the old model; local validation uses a clean volume and the
-deployment instructions must document that reset boundary.
+Required T03 scope: the current PostgreSQL migration baseline is replaced by the
+new clean schema for the journey model. This is required work, not optional
+cleanup. No API or frontend implementation should claim the redesign is
+complete until a clean PostgreSQL volume can create and exercise the new
+baseline. There is no data migration from the old model; local validation uses a
+clean volume and the deployment instructions must document that reset boundary.
+
+Migration checkpoint: `db/migrations/20260719000000_learning_baseline.sql` was
+applied with `ON_ERROR_STOP=1` to a temporary Postgres database. It created the
+25 target `tb_*` tables listed in the schema specification; the temporary
+database was then dropped. The existing local development volume was not reset.
 
 ### T04 — Implement self-host-first identity and registration
 
