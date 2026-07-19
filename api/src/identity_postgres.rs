@@ -22,6 +22,22 @@ impl PgIdentityRepository {
 
 #[async_trait]
 impl IdentityRepository for PgIdentityRepository {
+    async fn get_learner(&self, user_id: Uuid) -> Result<LearnerAccount, IdentityRepositoryError> {
+        sqlx::query(
+            r#"
+            SELECT id, email_canonical, display_name, status, created_at
+            FROM tb_users
+            WHERE id = $1 AND role = 'learner'
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .map(account_from_row)
+        .ok_or(IdentityRepositoryError::AccountNotFound)
+    }
+
     async fn find_learner_by_email(
         &self,
         email: &str,

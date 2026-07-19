@@ -47,6 +47,7 @@ pub enum BootstrapError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StartLearningRequest {
+    pub authenticated_user_id: Option<Uuid>,
     pub email: String,
     pub display_name: String,
     pub raw_intent: String,
@@ -148,28 +149,24 @@ where
             return Err(StartLearningError::UnsupportedRegistrationMode);
         }
 
-        let account = match self.identity.find_learner_by_email(&request.email).await? {
-            Some(account) => account,
-            None => match self
-                .identity
-                .create_learner(CreateLearner {
-                    email: request.email.clone(),
-                    display_name: request.display_name.clone(),
-                })
-                .await
-            {
-                Ok(account) => account,
-                Err(IdentityRepositoryError::AccountAlreadyExists) => self
-                    .identity
-                    .find_learner_by_email(&request.email)
-                    .await?
-                    .ok_or_else(|| {
-                        IdentityRepositoryError::storage(
-                            "learner account disappeared after duplicate registration",
-                        )
-                    })?,
-                Err(error) => return Err(error.into()),
-            },
+        let account = if let Some(user_id) = request.authenticated_user_id {
+            let account = self.identity.get_learner(user_id).await?;
+            if crate::auth::token::canonical_email(&request.email) != account.email {
+                return Err(IdentityRepositoryError::AccountEmailMismatch.into());
+            }
+            account
+        } else {
+            match self.identity.find_learner_by_email(&request.email).await? {
+                Some(_) => return Err(IdentityRepositoryError::AccountAlreadyExists.into()),
+                None => {
+                    self.identity
+                        .create_learner(CreateLearner {
+                            email: request.email.clone(),
+                            display_name: request.display_name.clone(),
+                        })
+                        .await?
+                }
+            }
         };
         if account.status != AccountStatus::Active {
             return Err(IdentityRepositoryError::AccountNotFound.into());
@@ -251,6 +248,7 @@ mod tests {
 
     fn start_learning_request() -> StartLearningRequest {
         StartLearningRequest {
+            authenticated_user_id: None,
             email: "learner@example.test".to_string(),
             display_name: "Learner".to_string(),
             raw_intent: "I would like to learn music theory".to_string(),
@@ -265,7 +263,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn self_host_start_learning_creates_account_and_is_retryable() {
+    async fn self_host_start_learning_requires_authentication_to_retry() {
         let service = SelfHostOnboardingService::new(
             InMemoryIdentityRepository::default(),
             InMemoryLearningRepository::default(),
@@ -276,14 +274,36 @@ mod tests {
             .start_learning(request.clone())
             .await
             .expect("first learning start succeeds");
+        let mut retry_request = request;
+        retry_request.authenticated_user_id = Some(first.account.id);
         let retry = service
-            .start_learning(request)
+            .start_learning(retry_request)
             .await
-            .expect("retry learning start succeeds");
+            .expect("authenticated retry succeeds");
 
         assert_eq!(first, retry);
         assert_eq!(first.bootstrap.goal.subject_user_id, first.account.id);
         assert_eq!(first.bootstrap.goal.source_actor_id, first.account.id);
+    }
+
+    #[tokio::test]
+    async fn self_host_start_learning_rejects_existing_email_without_authentication() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let request = start_learning_request();
+        service
+            .start_learning(request.clone())
+            .await
+            .expect("first learning start succeeds");
+
+        assert_eq!(
+            service.start_learning(request).await,
+            Err(StartLearningError::Identity(
+                crate::domain::identity::IdentityRepositoryError::AccountAlreadyExists
+            ))
+        );
     }
 
     #[tokio::test]

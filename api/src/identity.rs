@@ -42,6 +42,18 @@ struct State {
 
 #[async_trait]
 impl IdentityRepository for InMemoryIdentityRepository {
+    async fn get_learner(&self, user_id: Uuid) -> Result<LearnerAccount, IdentityRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(IdentityRepositoryError::storage)?;
+        state
+            .accounts
+            .get(&user_id)
+            .cloned()
+            .ok_or(IdentityRepositoryError::AccountNotFound)
+    }
+
     async fn find_learner_by_email(
         &self,
         email: &str,
@@ -156,6 +168,13 @@ pub async fn exercise_identity_repository_contract<R: IdentityRepository>(
         .expect("lookup succeeds")
         .expect("account exists");
     assert_eq!(existing.id, account.id);
+    assert_eq!(
+        repository
+            .get_learner(account.id)
+            .await
+            .expect("account reads by id"),
+        account
+    );
 
     assert_eq!(
         repository

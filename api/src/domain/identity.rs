@@ -59,6 +59,8 @@ pub enum IdentityRepositoryError {
     AccountAlreadyExists,
     #[error("learner account not found")]
     AccountNotFound,
+    #[error("learner email does not match the authenticated account")]
+    AccountEmailMismatch,
     #[error("browser session not found")]
     SessionNotFound,
     #[error("identity repository storage failure: {0}")]
@@ -73,6 +75,8 @@ impl IdentityRepositoryError {
 
 #[async_trait]
 pub trait IdentityRepository: Send + Sync {
+    async fn get_learner(&self, user_id: Uuid) -> Result<LearnerAccount, IdentityRepositoryError>;
+
     async fn find_learner_by_email(
         &self,
         email: &str,
