@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/admin/audit — retrieve append-only audit trail logs */
+        /** GET /api/v1/admin/audit — retrieve append-only audit trail logs */
         get: operations["list_audit_logs"];
         put?: never;
         post?: never;
@@ -45,7 +45,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * GET /v1/admin/settings — current effective platform settings (config
+         * GET /api/v1/admin/settings — current effective platform settings (config
          *     defaults overlaid with any tb_settings overrides).
          */
         get: operations["get_settings"];
@@ -69,7 +69,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/admin/users — list all users */
+        /** GET /api/v1/admin/users — list all users */
         get: operations["list_users"];
         put?: never;
         post?: never;
@@ -248,7 +248,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/learning/journeys — list the caller's learner-owned journeys. */
+        /** GET /api/v1/learning/journeys — list the caller's learner-owned journeys. */
         get: operations["list_journeys"];
         put?: never;
         post?: never;
@@ -265,7 +265,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey. */
+        /** GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey. */
         get: operations["get_journey"];
         put?: never;
         post?: never;
@@ -284,7 +284,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session. */
+        /** POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session. */
         post: operations["start_activity"];
         delete?: never;
         options?: never;
@@ -299,7 +299,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/learning/sessions/{id} — retrieve a learner's resumable session. */
+        /** GET /api/v1/learning/sessions/{id} — retrieve a learner's resumable session. */
         get: operations["get_learning_session"];
         put?: never;
         post?: never;
@@ -318,7 +318,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST /v1/learning/sessions/{id}/finish — finish the current learning activity. */
+        /** POST /api/v1/learning/sessions/{id}/finish — finish the current learning activity. */
         post: operations["finish_learning_session"];
         delete?: never;
         options?: never;

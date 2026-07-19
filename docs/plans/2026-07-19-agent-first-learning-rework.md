@@ -307,8 +307,8 @@ The clean baseline must cover:
 
 The schema specification at
 [`2026-07-19-learning-baseline-schema.md`](../specs/2026-07-19-learning-baseline-schema.md)
-must be revised if it cannot represent this model. No schema migration is
-needed; replace the clean baseline before API implementation depends on it.
+is the fresh 0.3 baseline. There is no compatibility migration from the
+retired pre-0.3 model; a new self-host stack applies this baseline on startup.
 
 ## Unified API direction
 
@@ -341,10 +341,9 @@ GET    /readyz
 GET    /metrics
 ```
 
-These are design-shaped resources, not approved final route names. TDD
-contracts define semantics first; OpenAPI is generated only after the service
-contracts settle. The same endpoints must serve the browser and an external
-agent, with content negotiation and response fields sufficient for both.
+These are the 0.3 route names. TDD contracts define their semantics, and the
+generated OpenAPI, skill manifest, and `llms.txt` are checked against the same
+source. The same endpoints serve the browser and an external agent.
 
 The API must provide explicit errors for expired sessions, email collisions,
 provider unavailability, stale versions, invalid transitions, forbidden

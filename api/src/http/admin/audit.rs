@@ -45,7 +45,7 @@ pub struct ListAuditLogsQuery {
     pub target_id: Option<Uuid>,
 }
 
-/// GET /v1/admin/audit — retrieve append-only audit trail logs
+/// GET /api/v1/admin/audit — retrieve append-only audit trail logs
 #[utoipa::path(
     get,
     path = "/api/v1/admin/audit",

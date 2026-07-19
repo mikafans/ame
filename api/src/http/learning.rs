@@ -174,7 +174,7 @@ pub fn router(state: AppState) -> Router<AppState> {
         .with_state(state)
 }
 
-/// GET /v1/learning/journeys — list the caller's learner-owned journeys.
+/// GET /api/v1/learning/journeys — list the caller's learner-owned journeys.
 #[utoipa::path(
     get,
     path = "/api/v1/learning/journeys",
@@ -224,7 +224,7 @@ pub async fn list_journeys(
     Ok(Json(response))
 }
 
-/// GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey.
+/// GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey.
 #[utoipa::path(
     get,
     path = "/api/v1/learning/journeys/{id}",
@@ -290,7 +290,7 @@ pub async fn get_journey(
     }))
 }
 
-/// POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
+/// POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
 #[utoipa::path(
     post,
     path = "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
@@ -327,7 +327,7 @@ pub async fn start_activity(
     Ok((StatusCode::CREATED, Json(session_response(session))))
 }
 
-/// GET /v1/learning/sessions/{id} — retrieve a learner's resumable session.
+/// GET /api/v1/learning/sessions/{id} — retrieve a learner's resumable session.
 #[utoipa::path(
     get,
     path = "/api/v1/learning/sessions/{id}",
@@ -353,7 +353,7 @@ pub async fn get_learning_session(
     Ok(Json(session_response(session)))
 }
 
-/// POST /v1/learning/sessions/{id}/finish — finish the current learning activity.
+/// POST /api/v1/learning/sessions/{id}/finish — finish the current learning activity.
 #[utoipa::path(
     post,
     path = "/api/v1/learning/sessions/{id}/finish",

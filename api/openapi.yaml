@@ -10,7 +10,7 @@ paths:
     get:
       tags:
       - admin
-      summary: GET /v1/admin/audit — retrieve append-only audit trail logs
+      summary: GET /api/v1/admin/audit — retrieve append-only audit trail logs
       operationId: list_audit_logs
       parameters:
       - name: limit
@@ -78,7 +78,7 @@ paths:
       tags:
       - admin
       summary: |-
-        GET /v1/admin/settings — current effective platform settings (config
+        GET /api/v1/admin/settings — current effective platform settings (config
         defaults overlaid with any tb_settings overrides).
       operationId: get_settings
       responses:
@@ -125,7 +125,7 @@ paths:
     get:
       tags:
       - admin
-      summary: GET /v1/admin/users — list all users
+      summary: GET /api/v1/admin/users — list all users
       operationId: list_users
       parameters:
       - name: limit
@@ -385,7 +385,7 @@ paths:
     get:
       tags:
       - learning
-      summary: GET /v1/learning/journeys — list the caller's learner-owned journeys.
+      summary: GET /api/v1/learning/journeys — list the caller's learner-owned journeys.
       operationId: list_journeys
       responses:
         '200':
@@ -404,7 +404,7 @@ paths:
     get:
       tags:
       - learning
-      summary: GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey.
+      summary: GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey.
       operationId: get_journey
       parameters:
       - name: id
@@ -431,7 +431,7 @@ paths:
     post:
       tags:
       - learning
-      summary: POST /v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
+      summary: POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
       operationId: start_activity
       parameters:
       - name: journey_id
@@ -469,7 +469,7 @@ paths:
     get:
       tags:
       - learning
-      summary: GET /v1/learning/sessions/{id} — retrieve a learner's resumable session.
+      summary: GET /api/v1/learning/sessions/{id} — retrieve a learner's resumable session.
       operationId: get_learning_session
       parameters:
       - name: id
@@ -496,7 +496,7 @@ paths:
     post:
       tags:
       - learning
-      summary: POST /v1/learning/sessions/{id}/finish — finish the current learning activity.
+      summary: POST /api/v1/learning/sessions/{id}/finish — finish the current learning activity.
       operationId: finish_learning_session
       parameters:
       - name: id

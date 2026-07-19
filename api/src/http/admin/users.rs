@@ -39,7 +39,7 @@ pub struct PatchUserAdminBody {
     pub role: Option<String>,
 }
 
-/// GET /v1/admin/users — list all users
+/// GET /api/v1/admin/users — list all users
 #[utoipa::path(
     get,
     path = "/api/v1/admin/users",

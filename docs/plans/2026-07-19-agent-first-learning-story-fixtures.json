@@ -114,7 +114,7 @@
       "persona": "The learner asks the agent to explain the topic exposed by evidence.",
       "input": {
         "journey": "the C1 learner-selected-topic journey",
-        "weak_objective": "Understand reconciliation, savepoints, and upgrade behavior",
+        "weak_objective": "Understand the lifecycle and upgrade behavior of one selected concept",
         "request": "Explain this deeply with a minimal example and tell me what to try next."
       },
       "agent_actions": [
@@ -172,9 +172,9 @@
       "must_be_available": [
         "/",
         "/self-hosting",
-        "/llms.txt",
-        "/skill.json",
-        "/openapi.yaml",
+        "/public/llms.txt",
+        "/public/skill.json",
+        "/public/openapi.yaml",
         "/healthz",
         "/readyz"
       ],

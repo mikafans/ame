@@ -12,7 +12,7 @@ pub struct UpdateSettingsBody {
     pub ratelimit: Option<crate::settings::RateLimitSettings>,
 }
 
-/// GET /v1/admin/settings — current effective platform settings (config
+/// GET /api/v1/admin/settings — current effective platform settings (config
 /// defaults overlaid with any tb_settings overrides).
 #[utoipa::path(
     get,
