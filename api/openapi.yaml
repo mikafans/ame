@@ -991,6 +991,7 @@ components:
       - questionVersionId
       - orderIndex
       - points
+      - question
       properties:
         id:
           type: string
@@ -1002,6 +1003,8 @@ components:
           type: integer
           format: int32
           minimum: 0
+        question:
+          $ref: '#/components/schemas/AssessmentQuestionResponse'
         questionVersionId:
           type: string
           format: uuid
@@ -1010,6 +1013,31 @@ components:
       enum:
       - practice
       - graded
+    AssessmentOptionResponse:
+      type: object
+      required:
+      - id
+      - text
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+    AssessmentQuestionResponse:
+      type: object
+      required:
+      - kind
+      - prompt
+      - options
+      properties:
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentOptionResponse'
+        prompt:
+          type: string
     AssessmentResponse:
       type: object
       required:

@@ -95,6 +95,10 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert discovered_assessment.status_code == 200, discovered_assessment.text
     assert discovered_assessment.json()["id"] == assessment["id"]
+    projected_question = assessment["items"][0]["question"]
+    assert projected_question["prompt"]
+    assert projected_question["options"]
+    assert "is_correct" not in projected_question["options"][0]
     assert client.get(
         f"/api/v1/assessments/{assessment['id']}", headers=headers
     ).status_code == 200

@@ -16,6 +16,7 @@ use crate::{
     domain::{
         assessment::{AssessmentItemInput, AssessmentMode, AssessmentStatus, CreateAssessment},
         error::{ApiError, FieldError},
+        question::{QuestionKind, QuestionVersion},
     },
     http::AppState,
     question::QuestionRepository,
@@ -59,6 +60,22 @@ pub struct AssessmentItemResponse {
     pub question_version_id: Uuid,
     pub order_index: i32,
     pub points: u32,
+    pub question: AssessmentQuestionResponse,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentQuestionResponse {
+    pub kind: QuestionKind,
+    pub prompt: String,
+    pub options: Vec<AssessmentOptionResponse>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentOptionResponse {
+    pub id: String,
+    pub text: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema, utoipa::IntoParams)]
@@ -92,14 +109,17 @@ pub async fn get_assessment_for_activity(
     auth: AuthenticatedUser,
     Query(query): Query<AssessmentActivityQuery>,
 ) -> Result<Json<AssessmentResponse>, ApiError> {
-    let assessment = PgAssessmentRepository::new(state.pool)
+    let assessment = PgAssessmentRepository::new(state.pool.clone())
         .get_for_activity(auth.owner_id(), query.activity_id)
         .await
         .map_err(map_assessment_error)?
         .ok_or(ApiError::NotFound {
             resource: "assessment",
         })?;
-    Ok(Json(assessment_response(assessment)))
+    let questions = load_assessment_questions(&state.pool, auth.owner_id(), &assessment)
+        .await
+        .map_err(map_assessment_error)?;
+    Ok(Json(assessment_response(assessment, &questions)?))
 }
 
 #[utoipa::path(
@@ -131,7 +151,7 @@ pub async fn create_assessment(
         });
         questions.push(question);
     }
-    let assessment = PgAssessmentRepository::new(state.pool)
+    let assessment = PgAssessmentRepository::new(state.pool.clone())
         .create_assessment(
             CreateAssessment {
                 subject_user_id: auth.owner_id(),
@@ -145,7 +165,10 @@ pub async fn create_assessment(
         )
         .await
         .map_err(map_assessment_error)?;
-    Ok(Json(assessment_response(assessment)))
+    let questions = load_assessment_questions(&state.pool, auth.owner_id(), &assessment)
+        .await
+        .map_err(map_assessment_error)?;
+    Ok(Json(assessment_response(assessment, &questions)?))
 }
 
 #[utoipa::path(
@@ -161,31 +184,76 @@ pub async fn get_assessment(
     auth: AuthenticatedUser,
     Path(assessment_id): Path<Uuid>,
 ) -> Result<Json<AssessmentResponse>, ApiError> {
-    let assessment = PgAssessmentRepository::new(state.pool)
+    let assessment = PgAssessmentRepository::new(state.pool.clone())
         .get_assessment(auth.owner_id(), assessment_id)
         .await
         .map_err(map_assessment_error)?;
-    Ok(Json(assessment_response(assessment)))
+    let questions = load_assessment_questions(&state.pool, auth.owner_id(), &assessment)
+        .await
+        .map_err(map_assessment_error)?;
+    Ok(Json(assessment_response(assessment, &questions)?))
 }
 
-fn assessment_response(assessment: crate::domain::assessment::Assessment) -> AssessmentResponse {
-    AssessmentResponse {
+async fn load_assessment_questions(
+    pool: &sqlx::PgPool,
+    subject_user_id: Uuid,
+    assessment: &crate::domain::assessment::Assessment,
+) -> Result<Vec<QuestionVersion>, AssessmentApiError> {
+    let repository = PgQuestionRepository::new(pool.clone());
+    let mut questions = Vec::with_capacity(assessment.items.len());
+    for item in &assessment.items {
+        questions.push(
+            repository
+                .get_version_by_id(subject_user_id, item.question_version_id)
+                .await
+                .map_err(AssessmentApiError::Question)?,
+        );
+    }
+    Ok(questions)
+}
+
+fn assessment_response(
+    assessment: crate::domain::assessment::Assessment,
+    questions: &[QuestionVersion],
+) -> Result<AssessmentResponse, ApiError> {
+    let items = assessment
+        .items
+        .into_iter()
+        .map(|item| {
+            let question = questions
+                .iter()
+                .find(|question| question.id == item.question_version_id)
+                .ok_or(ApiError::Internal(anyhow::anyhow!(
+                    "assessment question version missing"
+                )))?;
+            Ok(AssessmentItemResponse {
+                id: item.id,
+                question_version_id: item.question_version_id,
+                order_index: item.order_index,
+                points: item.points,
+                question: AssessmentQuestionResponse {
+                    kind: question.kind,
+                    prompt: question.prompt.clone(),
+                    options: question
+                        .options
+                        .iter()
+                        .map(|option| AssessmentOptionResponse {
+                            id: option.id.clone(),
+                            text: option.text.clone(),
+                        })
+                        .collect(),
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+    Ok(AssessmentResponse {
         id: assessment.id,
         activity_id: assessment.activity_id,
         version: assessment.version,
         mode: assessment.mode,
         status: assessment.status,
-        items: assessment
-            .items
-            .into_iter()
-            .map(|item| AssessmentItemResponse {
-                id: item.id,
-                question_version_id: item.question_version_id,
-                order_index: item.order_index,
-                points: item.points,
-            })
-            .collect(),
-    }
+        items,
+    })
 }
 
 fn map_assessment_error(error: impl Into<AssessmentApiError>) -> ApiError {

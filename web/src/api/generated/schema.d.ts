@@ -577,11 +577,21 @@ export interface components {
             orderIndex: number;
             /** Format: int32 */
             points: number;
+            question: components["schemas"]["AssessmentQuestionResponse"];
             /** Format: uuid */
             questionVersionId: string;
         };
         /** @enum {string} */
         AssessmentMode: "practice" | "graded";
+        AssessmentOptionResponse: {
+            id: string;
+            text: string;
+        };
+        AssessmentQuestionResponse: {
+            kind: components["schemas"]["QuestionKind"];
+            options: components["schemas"]["AssessmentOptionResponse"][];
+            prompt: string;
+        };
         AssessmentResponse: {
             /** Format: uuid */
             activityId: string;

@@ -8,7 +8,8 @@ use crate::http::{
         PatchUserAdminBody, UpdateSettingsBody,
     },
     assessments::{
-        AssessmentActivityQuery, AssessmentItemBody, AssessmentResponse, CreateAssessmentBody,
+        AssessmentActivityQuery, AssessmentItemBody, AssessmentOptionResponse,
+        AssessmentQuestionResponse, AssessmentResponse, CreateAssessmentBody,
     },
     attempts::{AttemptResponse, SaveAnswerBody, StartAttemptBody},
     auth::{AuthResponse, LoginBody, RegisterBody, UserInfo},
@@ -97,6 +98,8 @@ use crate::http::{
         QuestionResponse,
         CreateAssessmentBody,
         AssessmentActivityQuery,
+        AssessmentQuestionResponse,
+        AssessmentOptionResponse,
         AssessmentItemBody,
         AssessmentResponse,
         StartAttemptBody,
