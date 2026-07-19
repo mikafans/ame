@@ -1,8 +1,10 @@
 //! PostgreSQL implementation of the learning repository contract.
 
 use crate::domain::learning::{
-    CreateGoal, CreateJourney, GoalStatus, JourneyStatus, LearningGoal, LearningJourney,
-    LearningRepository, LearningRepositoryError, validate_goal, validate_journey,
+    ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective,
+    GoalStatus, JourneyStatus, LearningActivity, LearningGoal, LearningJourney, LearningObjective,
+    LearningRepository, LearningRepositoryError, ObjectiveStatus, validate_activity, validate_goal,
+    validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -237,6 +239,174 @@ impl LearningRepository for PgLearningRepository {
             },
         }
     }
+
+    async fn create_objective(
+        &self,
+        input: CreateObjective,
+    ) -> Result<LearningObjective, LearningRepositoryError> {
+        validate_objective(&input)?;
+        let journey = self
+            .get_journey(input.subject_user_id, input.journey_id)
+            .await?;
+        let row = sqlx::query(
+            r#"
+            INSERT INTO tb_journey_objectives (
+                journey_id, subject_user_id, verb, statement, success_criteria, order_index
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, journey_id, subject_user_id, verb, statement,
+                      success_criteria, order_index, status, created_at
+            "#,
+        )
+        .bind(journey.id)
+        .bind(input.subject_user_id)
+        .bind(&input.verb)
+        .bind(&input.statement)
+        .bind(&input.success_criteria)
+        .bind(input.order_index)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| {
+            if let sqlx::Error::Database(database) = &error
+                && database.constraint() == Some("tb_journey_objectives_journey_id_order_index_key")
+            {
+                return LearningRepositoryError::OrderConflict {
+                    resource: "objective",
+                };
+            }
+            storage_error(error)
+        })?;
+        Ok(objective_from_row(row))
+    }
+
+    async fn list_objectives(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let rows = sqlx::query(
+            r#"
+            SELECT id, journey_id, subject_user_id, verb, statement,
+                   success_criteria, order_index, status, created_at
+            FROM tb_journey_objectives
+            WHERE journey_id = $1 AND subject_user_id = $2
+            ORDER BY order_index ASC
+            "#,
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows.into_iter().map(objective_from_row).collect())
+    }
+
+    async fn create_activity(
+        &self,
+        input: CreateActivity,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity(&input)?;
+        let journey = self
+            .get_journey(input.subject_user_id, input.journey_id)
+            .await?;
+        for objective_id in &input.objective_ids {
+            let row = sqlx::query(
+                "SELECT 1 FROM tb_journey_objectives WHERE id = $1 AND journey_id = $2 AND subject_user_id = $3",
+            )
+            .bind(objective_id)
+            .bind(journey.id)
+            .bind(input.subject_user_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(storage_error)?;
+            if row.is_none() {
+                return Err(LearningRepositoryError::SubjectMismatch);
+            }
+        }
+
+        let mut transaction = self.pool.begin().await.map_err(storage_error)?;
+        let row = sqlx::query(
+            r#"
+            INSERT INTO tb_activities (
+                journey_id, subject_user_id, source_actor_id, source_run_id,
+                kind, title, order_index, payload_schema_version, payload
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, journey_id, subject_user_id, source_actor_id, source_run_id,
+                      kind, title, order_index, payload_schema_version, payload,
+                      status, created_at, updated_at
+            "#,
+        )
+        .bind(journey.id)
+        .bind(input.subject_user_id)
+        .bind(input.source_actor_id)
+        .bind(input.source_run_id)
+        .bind(activity_kind_value(input.kind))
+        .bind(&input.title)
+        .bind(input.order_index)
+        .bind(input.payload_schema_version)
+        .bind(&input.payload)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|error| {
+            if let sqlx::Error::Database(database) = &error
+                && database.constraint() == Some("tb_activities_journey_id_order_index_key")
+            {
+                return LearningRepositoryError::OrderConflict {
+                    resource: "activity",
+                };
+            }
+            storage_error(error)
+        })?;
+        let activity_id: Uuid = row.get("id");
+        for objective_id in &input.objective_ids {
+            sqlx::query(
+                "INSERT INTO tb_activity_objectives (activity_id, objective_id) VALUES ($1, $2)",
+            )
+            .bind(activity_id)
+            .bind(objective_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(storage_error)?;
+        }
+        transaction.commit().await.map_err(storage_error)?;
+        Ok(activity_from_row(row, input.objective_ids))
+    }
+
+    async fn list_activities(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let rows = sqlx::query(
+            r#"
+            SELECT a.id, a.journey_id, a.subject_user_id, a.source_actor_id,
+                   a.source_run_id, a.kind, a.title, a.order_index,
+                   a.payload_schema_version, a.payload, a.status,
+                   a.created_at, a.updated_at,
+                   COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids
+            FROM tb_activities a
+            LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id
+            WHERE a.journey_id = $1 AND a.subject_user_id = $2
+            GROUP BY a.id
+            ORDER BY a.order_index ASC
+            "#,
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let objective_ids: Vec<Uuid> = row.get("objective_ids");
+                activity_from_row(row, objective_ids)
+            })
+            .collect())
+    }
 }
 
 fn storage_error(error: sqlx::Error) -> LearningRepositoryError {
@@ -296,6 +466,87 @@ fn journey_status_value(status: JourneyStatus) -> &'static str {
         JourneyStatus::Paused => "paused",
         JourneyStatus::Completed => "completed",
         JourneyStatus::Failed => "failed",
+    }
+}
+
+fn objective_from_row(row: sqlx::postgres::PgRow) -> LearningObjective {
+    LearningObjective {
+        id: row.get("id"),
+        journey_id: row.get("journey_id"),
+        subject_user_id: row.get("subject_user_id"),
+        verb: row.get("verb"),
+        statement: row.get("statement"),
+        success_criteria: row.get("success_criteria"),
+        order_index: row.get("order_index"),
+        status: objective_status(row.get::<String, _>("status").as_str()),
+        created_at: row.get("created_at"),
+    }
+}
+
+fn activity_from_row(row: sqlx::postgres::PgRow, objective_ids: Vec<Uuid>) -> LearningActivity {
+    LearningActivity {
+        id: row.get("id"),
+        journey_id: row.get("journey_id"),
+        subject_user_id: row.get("subject_user_id"),
+        source_actor_id: row.get("source_actor_id"),
+        source_run_id: row.get("source_run_id"),
+        kind: activity_kind(row.get::<String, _>("kind").as_str()),
+        title: row.get("title"),
+        order_index: row.get("order_index"),
+        payload_schema_version: row.get("payload_schema_version"),
+        payload: row.get("payload"),
+        objective_ids,
+        status: activity_status(row.get::<String, _>("status").as_str()),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }
+}
+
+fn objective_status(value: &str) -> ObjectiveStatus {
+    match value {
+        "paused" => ObjectiveStatus::Paused,
+        "completed" => ObjectiveStatus::Completed,
+        _ => ObjectiveStatus::Active,
+    }
+}
+
+fn activity_kind(value: &str) -> ActivityKind {
+    match value {
+        "example" => ActivityKind::Example,
+        "diagnostic" => ActivityKind::Diagnostic,
+        "practice" => ActivityKind::Practice,
+        "feedback" => ActivityKind::Feedback,
+        "application" => ActivityKind::Application,
+        "reflection" => ActivityKind::Reflection,
+        "milestone" => ActivityKind::Milestone,
+        "timed_practice" => ActivityKind::TimedPractice,
+        "recommendation" => ActivityKind::Recommendation,
+        _ => ActivityKind::Explanation,
+    }
+}
+
+fn activity_kind_value(kind: ActivityKind) -> &'static str {
+    match kind {
+        ActivityKind::Explanation => "explanation",
+        ActivityKind::Example => "example",
+        ActivityKind::Diagnostic => "diagnostic",
+        ActivityKind::Practice => "practice",
+        ActivityKind::Feedback => "feedback",
+        ActivityKind::Application => "application",
+        ActivityKind::Reflection => "reflection",
+        ActivityKind::Milestone => "milestone",
+        ActivityKind::TimedPractice => "timed_practice",
+        ActivityKind::Recommendation => "recommendation",
+    }
+}
+
+fn activity_status(value: &str) -> ActivityStatus {
+    match value {
+        "ready" => ActivityStatus::Ready,
+        "in_progress" => ActivityStatus::InProgress,
+        "completed" => ActivityStatus::Completed,
+        "failed" => ActivityStatus::Failed,
+        _ => ActivityStatus::Proposed,
     }
 }
 

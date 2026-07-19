@@ -27,6 +27,39 @@ pub enum JourneyStatus {
     Failed,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveStatus {
+    Active,
+    Paused,
+    Completed,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityKind {
+    Explanation,
+    Example,
+    Diagnostic,
+    Practice,
+    Feedback,
+    Application,
+    Reflection,
+    Milestone,
+    TimedPractice,
+    Recommendation,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityStatus {
+    Proposed,
+    Ready,
+    InProgress,
+    Completed,
+    Failed,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateGoal {
     pub subject_user_id: Uuid,
@@ -69,6 +102,61 @@ pub struct LearningJourney {
     pub created_at: OffsetDateTime,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateObjective {
+    pub journey_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub verb: String,
+    pub statement: String,
+    pub success_criteria: String,
+    pub order_index: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LearningObjective {
+    pub id: Uuid,
+    pub journey_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub verb: String,
+    pub statement: String,
+    pub success_criteria: String,
+    pub order_index: i32,
+    pub status: ObjectiveStatus,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateActivity {
+    pub journey_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub source_actor_id: Uuid,
+    pub source_run_id: Option<Uuid>,
+    pub kind: ActivityKind,
+    pub title: String,
+    pub order_index: i32,
+    pub payload_schema_version: i32,
+    pub payload: serde_json::Value,
+    pub objective_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningActivity {
+    pub id: Uuid,
+    pub journey_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub source_actor_id: Uuid,
+    pub source_run_id: Option<Uuid>,
+    pub kind: ActivityKind,
+    pub title: String,
+    pub order_index: i32,
+    pub payload_schema_version: i32,
+    pub payload: serde_json::Value,
+    pub objective_ids: Vec<Uuid>,
+    pub status: ActivityStatus,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum LearningRepositoryError {
     #[error("learning field {field} must not be empty")]
@@ -81,6 +169,8 @@ pub enum LearningRepositoryError {
     IdempotencyConflict,
     #[error("a journey already exists for this goal")]
     JourneyAlreadyExists,
+    #[error("{resource} order already exists in this journey")]
+    OrderConflict { resource: &'static str },
     #[error("learning repository storage failure: {0}")]
     Storage(String),
 }
@@ -119,6 +209,28 @@ pub trait LearningRepository: Send + Sync {
         journey_id: Uuid,
         status: JourneyStatus,
     ) -> Result<LearningJourney, LearningRepositoryError>;
+
+    async fn create_objective(
+        &self,
+        input: CreateObjective,
+    ) -> Result<LearningObjective, LearningRepositoryError>;
+
+    async fn list_objectives(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError>;
+
+    async fn create_activity(
+        &self,
+        input: CreateActivity,
+    ) -> Result<LearningActivity, LearningRepositoryError>;
+
+    async fn list_activities(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
 }
 
 pub(crate) fn validate_goal(input: &CreateGoal) -> Result<(), LearningRepositoryError> {
@@ -147,6 +259,41 @@ pub(crate) fn validate_goal(input: &CreateGoal) -> Result<(), LearningRepository
 pub(crate) fn validate_journey(input: &CreateJourney) -> Result<(), LearningRepositoryError> {
     if input.promise.trim().is_empty() {
         return Err(LearningRepositoryError::EmptyField { field: "promise" });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_objective(input: &CreateObjective) -> Result<(), LearningRepositoryError> {
+    for (field, value) in [
+        ("verb", input.verb.as_str()),
+        ("statement", input.statement.as_str()),
+        ("success_criteria", input.success_criteria.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(LearningRepositoryError::EmptyField { field });
+        }
+    }
+    if input.order_index < 0 {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "order_index",
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_activity(input: &CreateActivity) -> Result<(), LearningRepositoryError> {
+    if input.title.trim().is_empty() {
+        return Err(LearningRepositoryError::EmptyField { field: "title" });
+    }
+    if input.order_index < 0 {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "order_index",
+        });
+    }
+    if input.payload_schema_version <= 0 {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "payload_schema_version",
+        });
     }
     Ok(())
 }

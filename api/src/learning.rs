@@ -1,8 +1,10 @@
 //! Learning repositories and their contract tests.
 
 use crate::domain::learning::{
-    CreateGoal, CreateJourney, GoalStatus, JourneyStatus, LearningGoal, LearningJourney,
-    LearningRepository, LearningRepositoryError, validate_goal, validate_journey,
+    ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective, GoalStatus,
+    JourneyStatus, LearningActivity, LearningGoal, LearningJourney, LearningObjective,
+    LearningRepository, LearningRepositoryError, ObjectiveStatus, validate_activity, validate_goal,
+    validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -36,6 +38,8 @@ impl Default for LearningContractFixtures {
 struct State {
     goals: HashMap<Uuid, LearningGoal>,
     journeys: HashMap<Uuid, LearningJourney>,
+    objectives: HashMap<Uuid, LearningObjective>,
+    activities: HashMap<Uuid, LearningActivity>,
 }
 
 #[async_trait]
@@ -172,6 +176,165 @@ impl LearningRepository for InMemoryLearningRepository {
         journey.status = status;
         Ok(journey.clone())
     }
+
+    async fn create_objective(
+        &self,
+        input: CreateObjective,
+    ) -> Result<LearningObjective, LearningRepositoryError> {
+        validate_objective(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let journey =
+            state
+                .journeys
+                .get(&input.journey_id)
+                .ok_or(LearningRepositoryError::NotFound {
+                    resource: "journey",
+                })?;
+        if journey.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if state.objectives.values().any(|objective| {
+            objective.journey_id == input.journey_id && objective.order_index == input.order_index
+        }) {
+            return Err(LearningRepositoryError::OrderConflict {
+                resource: "objective",
+            });
+        }
+        let now = OffsetDateTime::now_utc();
+        let objective = LearningObjective {
+            id: Uuid::now_v7(),
+            journey_id: input.journey_id,
+            subject_user_id: input.subject_user_id,
+            verb: input.verb,
+            statement: input.statement,
+            success_criteria: input.success_criteria,
+            order_index: input.order_index,
+            status: ObjectiveStatus::Active,
+            created_at: now,
+        };
+        state.objectives.insert(objective.id, objective.clone());
+        Ok(objective)
+    }
+
+    async fn list_objectives(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let journey = state
+            .journeys
+            .get(&journey_id)
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "journey",
+            })?;
+        if journey.subject_user_id != subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        let mut objectives: Vec<_> = state
+            .objectives
+            .values()
+            .filter(|objective| objective.journey_id == journey_id)
+            .cloned()
+            .collect();
+        objectives.sort_by_key(|objective| objective.order_index);
+        Ok(objectives)
+    }
+
+    async fn create_activity(
+        &self,
+        input: CreateActivity,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let journey =
+            state
+                .journeys
+                .get(&input.journey_id)
+                .ok_or(LearningRepositoryError::NotFound {
+                    resource: "journey",
+                })?;
+        if journey.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if state.activities.values().any(|activity| {
+            activity.journey_id == input.journey_id && activity.order_index == input.order_index
+        }) {
+            return Err(LearningRepositoryError::OrderConflict {
+                resource: "activity",
+            });
+        }
+        for objective_id in &input.objective_ids {
+            let objective =
+                state
+                    .objectives
+                    .get(objective_id)
+                    .ok_or(LearningRepositoryError::NotFound {
+                        resource: "objective",
+                    })?;
+            if objective.journey_id != input.journey_id
+                || objective.subject_user_id != input.subject_user_id
+            {
+                return Err(LearningRepositoryError::SubjectMismatch);
+            }
+        }
+        let now = OffsetDateTime::now_utc();
+        let activity = LearningActivity {
+            id: Uuid::now_v7(),
+            journey_id: input.journey_id,
+            subject_user_id: input.subject_user_id,
+            source_actor_id: input.source_actor_id,
+            source_run_id: input.source_run_id,
+            kind: input.kind,
+            title: input.title,
+            order_index: input.order_index,
+            payload_schema_version: input.payload_schema_version,
+            payload: input.payload,
+            objective_ids: input.objective_ids,
+            status: ActivityStatus::Proposed,
+            created_at: now,
+            updated_at: now,
+        };
+        state.activities.insert(activity.id, activity.clone());
+        Ok(activity)
+    }
+
+    async fn list_activities(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let journey = state
+            .journeys
+            .get(&journey_id)
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "journey",
+            })?;
+        if journey.subject_user_id != subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        let mut activities: Vec<_> = state
+            .activities
+            .values()
+            .filter(|activity| activity.journey_id == journey_id)
+            .cloned()
+            .collect();
+        activities.sort_by_key(|activity| activity.order_index);
+        Ok(activities)
+    }
 }
 
 pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
@@ -259,6 +422,52 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         .await
         .expect("journey updates");
     assert_eq!(active.status, JourneyStatus::Active);
+
+    let objective = repository
+        .create_objective(CreateObjective {
+            journey_id: journey.id,
+            subject_user_id: subject,
+            verb: "identify".to_string(),
+            statement: "Identify intervals by ear".to_string(),
+            success_criteria: "Name eight of ten intervals correctly".to_string(),
+            order_index: 0,
+        })
+        .await
+        .expect("objective creates");
+    assert_eq!(
+        repository
+            .list_objectives(subject, journey.id)
+            .await
+            .expect("objectives list"),
+        vec![objective.clone()]
+    );
+
+    let activity = repository
+        .create_activity(CreateActivity {
+            journey_id: journey.id,
+            subject_user_id: subject,
+            source_actor_id: actor,
+            source_run_id: None,
+            kind: crate::domain::learning::ActivityKind::Diagnostic,
+            title: "Interval diagnostic".to_string(),
+            order_index: 0,
+            payload_schema_version: 1,
+            payload: serde_json::json!({"count": 10}),
+            objective_ids: vec![objective.id],
+        })
+        .await
+        .expect("activity creates");
+    assert_eq!(
+        repository
+            .list_activities(subject, journey.id)
+            .await
+            .expect("activities list"),
+        vec![activity]
+    );
+    assert_eq!(
+        repository.list_activities(other_subject, journey.id).await,
+        Err(LearningRepositoryError::SubjectMismatch)
+    );
     assert_eq!(
         repository.get_journey(other_subject, journey.id).await,
         Err(LearningRepositoryError::SubjectMismatch)
