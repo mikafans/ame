@@ -16,6 +16,7 @@ export default function LearningJourneyPage() {
   const [session, setSession] = useState<LearningSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [startingActivity, setStartingActivity] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +68,36 @@ export default function LearningJourneyPage() {
     }
   }
 
+  async function finishSession() {
+    if (!session) return;
+    setFinishing(true);
+    setError(null);
+    try {
+      const { data, response } = await api.POST(
+        "/v1/learning/sessions/{id}/finish",
+        {
+          params: { path: { id: session.id } },
+          body: { result: {} },
+        },
+      );
+      if (!response.ok || !data)
+        throw new Error("Could not finish this activity");
+      setSession(data);
+      const refreshed = await api.GET("/v1/learning/journeys/{id}", {
+        params: { path: { id: params.id } },
+      });
+      if (refreshed.response.ok && refreshed.data) setJourney(refreshed.data);
+    } catch (finishError) {
+      setError(
+        finishError instanceof Error
+          ? finishError.message
+          : "Could not finish this activity",
+      );
+    } finally {
+      setFinishing(false);
+    }
+  }
+
   if (error && !journey) {
     return <div className="p-8 text-destructive">{error}</div>;
   }
@@ -79,6 +110,9 @@ export default function LearningJourneyPage() {
   const readyActivity = journey.activities.find(
     (activity) => activity.status === "ready",
   );
+  const activeActivity = session
+    ? journey.activities.find((activity) => activity.id === session.activityId)
+    : null;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 p-6 sm:p-10">
@@ -151,11 +185,30 @@ export default function LearningJourneyPage() {
             Session started
           </p>
           <h2 className="mt-2 text-xl font-semibold">
-            You are ready for the first activity.
+            {activeActivity?.title ?? "Your first activity"}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Session {session.id}
+            {activeActivity?.payload &&
+            typeof activeActivity.payload === "object" &&
+            "purpose" in activeActivity.payload
+              ? String(activeActivity.payload.purpose)
+              : "Take this focused first step, then AME will open the next one."}
           </p>
+          {session.status === "in_progress" ? (
+            <Button
+              type="button"
+              disabled={finishing}
+              onClick={finishSession}
+              className="mt-5 rounded-full"
+            >
+              {finishing ? "Saving progress…" : "Mark activity complete"}
+              <Check className="size-4" />
+            </Button>
+          ) : (
+            <p className="mt-5 text-sm font-medium text-primary">
+              Complete. Your next activity is now ready.
+            </p>
+          )}
         </section>
       )}
       {error && (
