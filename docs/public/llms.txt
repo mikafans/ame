@@ -62,9 +62,11 @@ The journey contains the learner's intent, promise, objectives, activities,
 and persisted evidence. Agents choose the next useful activity and record the
 result; the web app presents the same state. Evidence must reference a graded
 attempt, and streak events use `attempt:<completed-attempt-id>` as their
-qualifying event key. A deep dive must reference existing evidence owned by
-the same learner and matching its journey, objective, and activity; include at
-least one source reference.
+qualifying event key. The submitted `qualifyingDay` must match that attempt's
+graded timestamp in the supplied IANA `learnerTimezone`; arbitrary historical
+or future days are rejected. A deep dive must reference existing evidence
+owned by the same learner and matching its journey, objective, and activity;
+include at least one source reference.
 
 Provider generation runs are owner-scoped and retryable. Reusing the same
 `retryKey` for the same operation returns the existing run. A run may move

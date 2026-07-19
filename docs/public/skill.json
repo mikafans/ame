@@ -549,7 +549,7 @@
       "path": "/api/v1/progress/{journey_id}/recommendation"
     },
     {
-      "description": "Record an idempotent qualifying learning day from a completed attempt event (attempt:<id>).",
+      "description": "Record an idempotent qualifying learning day from a completed attempt event (attempt:<id>); the day must match the attempt's graded timestamp in the supplied IANA learner timezone.",
       "input_schema": {
         "properties": {
           "activityId": {
