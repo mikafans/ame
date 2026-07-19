@@ -375,6 +375,13 @@ mod tests {
         let journey = Uuid::now_v7();
         let owner = Uuid::now_v7();
         repository.register_journey(owner, journey);
+        let missing_attempt = evidence(owner, Uuid::now_v7(), 0.5);
+        assert_eq!(
+            repository.record_evidence(missing_attempt),
+            Err(ProgressError::EmptyField {
+                field: "attempt_id"
+            })
+        );
         let mut invalid = evidence(Uuid::now_v7(), Uuid::now_v7(), 1.1);
         assert_eq!(
             repository.record_evidence(invalid.clone()),
