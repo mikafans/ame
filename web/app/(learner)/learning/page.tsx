@@ -84,8 +84,8 @@ export default function LearningHomePage() {
               : [],
           );
           if (!response.ok) return null;
-          const objectives = ((data as { objectives?: Objective[] })
-            .objectives ?? []);
+          const objectives =
+            (data as { objectives?: Objective[] }).objectives ?? [];
           const objectiveProgress = await Promise.all(
             objectives.map(async (objective) => {
               const snapshot = await api.GET(
