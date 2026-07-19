@@ -25,6 +25,21 @@ This does not authorize destructive commands against a user environment during
 implementation. It means the new baseline and validation must use a clean
 volume.
 
+## Trait-contract-first invariant
+
+Every new backend capability must establish its trait contract before a concrete
+PostgreSQL adapter or HTTP handler is implemented. The required order is:
+
+1. define domain types, trait methods, invariants, and error semantics;
+2. write contract tests against an in-memory/fake implementation;
+3. implement the PostgreSQL repository behind the trait;
+4. run the same contract suite against PostgreSQL;
+5. expose the behavior through the API and then the frontend.
+
+Handlers must depend on domain/repository traits, not issue ad-hoc SQL. A task
+cannot be marked complete because the SQL parses or one HTTP example works; the
+trait contract and both implementation paths must agree first.
+
 ## 1. Product decision
 
 AME should make one promise:
@@ -581,6 +596,10 @@ Rust storage/query rewrites have not started.
 Checkpoint policy: commit after each bounded task or reviewable vertical slice.
 Do not combine template design, PostgreSQL schema replacement, API contracts,
 and frontend work in one commit.
+
+The next storage task therefore begins with the goal/journey repository traits
+and contract tests. The PostgreSQL implementation follows those tests; it does
+not define the contract retroactively.
 
 ### T00 — Approve product invariants
 
