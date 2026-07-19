@@ -209,6 +209,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert snapshot.status_code == 200, snapshot.text
     assert snapshot.json()["evidenceCount"] == 1
+    snapshot_again = client.get(
+        f"/api/v1/progress/{journey_id}/objectives/{objective_id}", headers=headers
+    )
+    assert snapshot_again.status_code == 200, snapshot_again.text
+    assert snapshot_again.json()["calculatedAt"] == snapshot.json()["calculatedAt"]
 
     recommendation = client.post(
         f"/api/v1/progress/{journey_id}/recommendation",
