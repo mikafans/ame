@@ -20,6 +20,34 @@ def _start_learner(client, prompt):
     return body, {"Authorization": f"Bearer {body['token']}"}
 
 
+def _published_generation_run(client, headers, operation):
+    response = client.post(
+        "/api/v1/generation-runs",
+        headers=headers,
+        json={
+            "operation": operation,
+            "provider": "test-provider",
+            "retryKey": f"{operation}-{uuid.uuid4()}",
+            "contentVersion": 1,
+        },
+    )
+    assert response.status_code == 201, response.text
+    run_id = response.json()["id"]
+    running = client.patch(
+        f"/api/v1/generation-runs/{run_id}",
+        headers=headers,
+        json={"status": "running"},
+    )
+    assert running.status_code == 200, running.text
+    published = client.patch(
+        f"/api/v1/generation-runs/{run_id}",
+        headers=headers,
+        json={"status": "published"},
+    )
+    assert published.status_code == 200, published.text
+    return run_id
+
+
 def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     prompt = "I want to understand stream processing and deploy a Flink operator"
 
@@ -50,11 +78,15 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert session_response.status_code == 201, session_response.text
     session_id = session_response.json()["id"]
+    question_generation_run_id = _published_generation_run(
+        client, headers, "question.compose"
+    )
 
     question_response = client.post(
         "/api/v1/questions",
         headers=headers,
         json={
+            "generationRunId": question_generation_run_id,
             "kind": "multiple_choice",
             "prompt": "Which Flink component schedules a deployed job?",
             "options": [
@@ -323,10 +355,14 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert streaks.status_code == 200, streaks.text
     assert len(streaks.json()) == 1
 
+    deep_dive_generation_run_id = _published_generation_run(
+        client, headers, "deep_dive.create"
+    )
     deep_dive_response = client.post(
         "/api/v1/deep-dives",
         headers=headers,
         json={
+            "generationRunId": deep_dive_generation_run_id,
             "journeyId": journey_id,
             "activityId": activity_id,
             "objectiveId": objective_id,
@@ -360,6 +396,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "activityId": activity_id,
             "objectiveId": objective_id,
             "triggeringEvidenceId": str(uuid.uuid4()),
+            "generationRunId": deep_dive_generation_run_id,
             "title": "Forged evidence",
             "body": "This must not be stored.",
             "example": "No example.",
@@ -433,6 +470,9 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert other_journey.status_code == 200, other_journey.text
     other_journey_body = other_journey.json()
     other_activity = other_journey_body["activities"][0]
+    other_deep_dive_generation_run_id = _published_generation_run(
+        client, other_headers, "deep_dive.create"
+    )
     cross_owner_deep_dive = client.post(
         "/api/v1/deep-dives",
         headers=other_headers,
@@ -441,6 +481,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "activityId": other_activity["id"],
             "objectiveId": other_journey_body["objectives"][0]["id"],
             "triggeringEvidenceId": evidence_id,
+            "generationRunId": other_deep_dive_generation_run_id,
             "title": "Cross-owner evidence",
             "body": "This must not be stored.",
             "example": "No example.",

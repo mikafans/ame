@@ -1,5 +1,6 @@
 //! PostgreSQL implementation of the versioned question contract.
 
+use crate::domain::generation::{GenerationRepository, validate_content_run};
 use crate::domain::question::{
     ContentReviewStatus, CreateQuestion, Question, QuestionKind, QuestionRepositoryError,
     QuestionVersion, validate_question,
@@ -26,7 +27,7 @@ impl PgQuestionRepository {
         version_id: Uuid,
     ) -> Result<QuestionVersion, QuestionRepositoryError> {
         let row = sqlx::query(
-            r#"SELECT q.subject_user_id, qv.id, qv.question_id, qv.version,
+            r#"SELECT q.subject_user_id, qv.generation_run_id, qv.id, qv.question_id, qv.version,
                       qv.kind, qv.prompt, qv.payload, qv.explanation, qv.rationale,
                       qv.points, qv.difficulty, qv.review_status, qv.source_references, qv.created_at
                FROM tb_questions q
@@ -45,6 +46,19 @@ impl PgQuestionRepository {
         }
         question_version_from_row(&row)
     }
+
+    async fn ensure_generation_run(
+        &self,
+        subject_user_id: Uuid,
+        generation_run_id: Uuid,
+    ) -> Result<(), QuestionRepositoryError> {
+        let run = crate::generation_postgres::PgGenerationRepository::new(self.pool.clone())
+            .get(subject_user_id, generation_run_id)
+            .await
+            .map_err(QuestionRepositoryError::Generation)?;
+        validate_content_run(&run, subject_user_id, "question.compose")
+            .map_err(QuestionRepositoryError::Generation)
+    }
 }
 
 #[async_trait]
@@ -54,17 +68,21 @@ impl QuestionRepository for PgQuestionRepository {
         input: CreateQuestion,
     ) -> Result<(Question, QuestionVersion), QuestionRepositoryError> {
         validate_question(&input)?;
+        self.ensure_generation_run(input.subject_user_id, input.generation_run_id)
+            .await?;
         let mut transaction = self.pool.begin().await.map_err(storage_error)?;
         let question_row = sqlx::query(
             r#"INSERT INTO tb_questions (
-                    subject_user_id, source_actor_id, kind, status, current_version
+                    subject_user_id, source_actor_id, generation_run_id,
+                    kind, status, current_version
                 )
-                VALUES ($1, $2, $3, $4, 1)
+                VALUES ($1, $2, $3, $4, $5, 1)
                 RETURNING id, subject_user_id, source_actor_id, kind, status,
-                          current_version, created_at"#,
+                          current_version, generation_run_id, created_at"#,
         )
         .bind(input.subject_user_id)
         .bind(input.source_actor_id)
+        .bind(input.generation_run_id)
         .bind(kind_value(input.kind))
         .bind(question_status_value(input.review_status))
         .fetch_one(&mut *transaction)
@@ -83,9 +101,11 @@ impl QuestionRepository for PgQuestionRepository {
         input: CreateQuestion,
     ) -> Result<QuestionVersion, QuestionRepositoryError> {
         validate_question(&input)?;
+        self.ensure_generation_run(subject_user_id, input.generation_run_id)
+            .await?;
         let mut transaction = self.pool.begin().await.map_err(storage_error)?;
         let row = sqlx::query(
-            "SELECT id, subject_user_id, source_actor_id, kind, status, current_version, created_at
+            "SELECT id, subject_user_id, source_actor_id, kind, status, current_version, generation_run_id, created_at
              FROM tb_questions WHERE id = $1 FOR UPDATE",
         )
         .bind(question_id)
@@ -111,10 +131,11 @@ impl QuestionRepository for PgQuestionRepository {
             &input,
         )
         .await?;
-        sqlx::query("UPDATE tb_questions SET current_version = $2, status = $3, updated_at = now() WHERE id = $1")
+        sqlx::query("UPDATE tb_questions SET current_version = $2, status = $3, generation_run_id = $4, updated_at = now() WHERE id = $1")
             .bind(question_id)
             .bind(version.version as i32)
             .bind(question_status_value(input.review_status))
+            .bind(input.generation_run_id)
             .execute(&mut *transaction)
             .await
             .map_err(storage_error)?;
@@ -129,7 +150,7 @@ impl QuestionRepository for PgQuestionRepository {
         version: u32,
     ) -> Result<QuestionVersion, QuestionRepositoryError> {
         let row = sqlx::query(
-            r#"SELECT q.subject_user_id, qv.id, qv.question_id, qv.version,
+            r#"SELECT q.subject_user_id, qv.generation_run_id, qv.id, qv.question_id, qv.version,
                       qv.kind, qv.prompt, qv.payload, qv.explanation, qv.rationale,
                       qv.points, qv.difficulty, qv.review_status, qv.source_references, qv.created_at
                FROM tb_questions q
@@ -165,16 +186,17 @@ async fn insert_version(
     });
     let row = sqlx::query(
         r#"INSERT INTO tb_question_versions (
-                question_id, version, kind, prompt, payload, explanation,
+                question_id, version, generation_run_id, kind, prompt, payload, explanation,
                 rationale, points, difficulty, source_references, review_status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING id, question_id, version, kind, prompt, payload,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING id, question_id, version, generation_run_id, kind, prompt, payload,
                       explanation, rationale, points, difficulty, review_status,
                       source_references, created_at"#,
     )
     .bind(question.id)
     .bind(version as i32)
+    .bind(input.generation_run_id)
     .bind(kind_value(input.kind))
     .bind(&input.prompt)
     .bind(payload)
@@ -195,6 +217,7 @@ fn question_from_row(row: &sqlx::postgres::PgRow) -> Result<Question, QuestionRe
         id: row.get("id"),
         subject_user_id: row.get("subject_user_id"),
         source_actor_id: row.get("source_actor_id"),
+        generation_run_id: row.get("generation_run_id"),
         kind: parse_kind(row.get("kind"))?,
         current_version: row.get::<i32, _>("current_version") as u32,
         status: parse_question_status(row.get("status"))?,
@@ -214,6 +237,7 @@ fn question_version_from_row(
     Ok(QuestionVersion {
         id: row.get("id"),
         question_id: row.get("question_id"),
+        generation_run_id: row.get("generation_run_id"),
         version: row.get::<i32, _>("version") as u32,
         kind: parse_kind(row.get("kind"))?,
         prompt: row.get("prompt"),

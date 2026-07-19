@@ -160,6 +160,13 @@ fn map_error(error: GenerationError) -> ApiError {
             }])
         }
         GenerationError::InvalidTransition { .. } => ApiError::GenerationStateConflict,
+        GenerationError::NotPublished => ApiError::GenerationStateConflict,
+        GenerationError::OperationMismatch => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "operation".into(),
+                message: "does not match the content resource".into(),
+            }])
+        }
         GenerationError::SubjectMismatch | GenerationError::NotFound => ApiError::NotFound {
             resource: "generation run",
         },

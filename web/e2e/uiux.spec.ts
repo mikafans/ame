@@ -5,7 +5,28 @@
  * states an intent, creates a local learner account, completes the first
  * starter check, and receives a grounded next recommendation.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function publishedGenerationRun(page: Page, operation: string) {
+  const response = await page.request.post("/api/v1/generation-runs", {
+    data: {
+      operation,
+      provider: "test-provider",
+      retryKey: `${operation}-${Date.now()}-${Math.random()}`,
+      contentVersion: 1,
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  const run = await response.json();
+  for (const status of ["running", "published"]) {
+    const transition = await page.request.patch(
+      `/api/v1/generation-runs/${run.id}`,
+      { data: { status } },
+    );
+    expect(transition.ok()).toBeTruthy();
+  }
+  return run.id as string;
+}
 
 test("learner can turn an intent into an evidence-backed next step", async ({
   page,
@@ -110,9 +131,14 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   );
   expect(sessionResponse.ok()).toBeTruthy();
   const session = await sessionResponse.json();
+  const questionGenerationRunId = await publishedGenerationRun(
+    page,
+    "question.compose",
+  );
 
   const questionResponse = await page.request.post("/api/v1/questions", {
     data: {
+      generationRunId: questionGenerationRunId,
       kind: "multiple_choice",
       prompt: "Which layer coordinates distributed work?",
       options: [
@@ -183,9 +209,14 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   );
   expect(evidenceResponse.ok()).toBeTruthy();
   const evidence = await evidenceResponse.json();
+  const deepDiveGenerationRunId = await publishedGenerationRun(
+    page,
+    "deep_dive.create",
+  );
 
   const deepDiveResponse = await page.request.post("/api/v1/deep-dives", {
     data: {
+      generationRunId: deepDiveGenerationRunId,
       journeyId,
       activityId: activity.id,
       objectiveId: objective.id,

@@ -6,6 +6,8 @@ use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use super::generation::GenerationError;
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QuestionKind {
@@ -38,6 +40,7 @@ pub struct QuestionOption {
 pub struct CreateQuestion {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
+    pub generation_run_id: Uuid,
     pub kind: QuestionKind,
     pub prompt: String,
     pub options: Vec<QuestionOption>,
@@ -55,6 +58,7 @@ pub struct Question {
     pub id: Uuid,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
+    pub generation_run_id: Uuid,
     pub kind: QuestionKind,
     pub current_version: u32,
     pub status: ContentReviewStatus,
@@ -65,6 +69,7 @@ pub struct Question {
 pub struct QuestionVersion {
     pub id: Uuid,
     pub question_id: Uuid,
+    pub generation_run_id: Uuid,
     pub version: u32,
     pub kind: QuestionKind,
     pub prompt: String,
@@ -86,6 +91,7 @@ pub enum QuestionRepositoryError {
     NotFound { resource: &'static str },
     SubjectMismatch,
     VersionConflict,
+    Generation(GenerationError),
     Storage(String),
 }
 
@@ -101,6 +107,7 @@ impl Display for QuestionRepositoryError {
             }
             Self::SubjectMismatch => write!(formatter, "question belongs to another subject"),
             Self::VersionConflict => write!(formatter, "question version is not the next version"),
+            Self::Generation(error) => write!(formatter, "question generation provenance: {error}"),
             Self::Storage(message) => {
                 write!(formatter, "question repository storage failure: {message}")
             }

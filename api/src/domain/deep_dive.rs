@@ -1,5 +1,6 @@
 //! Domain contract for evidence-linked explanatory deep dives.
 
+use crate::domain::generation::GenerationError;
 use crate::domain::question::ContentReviewStatus;
 use std::fmt::Display;
 use time::OffsetDateTime;
@@ -9,6 +10,7 @@ use uuid::Uuid;
 pub struct CreateDeepDive {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
+    pub generation_run_id: Uuid,
     pub journey_id: Uuid,
     pub activity_id: Uuid,
     pub objective_id: Uuid,
@@ -36,6 +38,7 @@ pub enum DeepDiveError {
     MissingSource,
     NotFound,
     SubjectMismatch,
+    Generation(GenerationError),
     Storage(String),
 }
 
@@ -50,6 +53,9 @@ impl Display for DeepDiveError {
             }
             Self::NotFound => write!(formatter, "deep-dive not found"),
             Self::SubjectMismatch => write!(formatter, "deep-dive belongs to another subject"),
+            Self::Generation(error) => {
+                write!(formatter, "deep-dive generation provenance: {error}")
+            }
             Self::Storage(message) => write!(formatter, "deep-dive storage failure: {message}"),
         }
     }

@@ -23,6 +23,7 @@ use crate::{
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateQuestionBody {
+    pub generation_run_id: Uuid,
     pub kind: QuestionKind,
     pub prompt: String,
     #[serde(default)]
@@ -45,6 +46,7 @@ pub struct QuestionResponse {
     pub id: Uuid,
     pub question_id: Uuid,
     pub version: u32,
+    pub generation_run_id: Uuid,
     pub kind: QuestionKind,
     pub prompt: String,
     pub options: Vec<QuestionOption>,
@@ -89,6 +91,7 @@ pub async fn create_question(
         .create_question(CreateQuestion {
             subject_user_id: auth.owner_id(),
             source_actor_id: auth.owner_id(),
+            generation_run_id: body.generation_run_id,
             kind: body.kind,
             prompt: body.prompt,
             options: body.options,
@@ -128,6 +131,7 @@ pub async fn create_question_version(
             CreateQuestion {
                 subject_user_id: auth.owner_id(),
                 source_actor_id: auth.owner_id(),
+                generation_run_id: body.generation_run_id,
                 kind: body.kind,
                 prompt: body.prompt,
                 options: body.options,
@@ -174,6 +178,7 @@ fn question_response(version: crate::domain::question::QuestionVersion) -> Quest
         id: version.id,
         question_id: version.question_id,
         version: version.version,
+        generation_run_id: version.generation_run_id,
         kind: version.kind,
         prompt: version.prompt,
         options: version.options,
@@ -210,6 +215,22 @@ fn map_question_error(error: crate::domain::question::QuestionRepositoryError) -
         crate::domain::question::QuestionRepositoryError::VersionConflict => {
             ApiError::IdempotencyConflict
         }
+        crate::domain::question::QuestionRepositoryError::Generation(error) => match error {
+            crate::domain::generation::GenerationError::NotPublished => {
+                ApiError::GenerationStateConflict
+            }
+            crate::domain::generation::GenerationError::OperationMismatch => {
+                ApiError::Validation(vec![FieldError {
+                    field: "generationRunId".into(),
+                    message: "must reference a question.compose run".into(),
+                }])
+            }
+            crate::domain::generation::GenerationError::SubjectMismatch
+            | crate::domain::generation::GenerationError::NotFound => ApiError::NotFound {
+                resource: "generation run",
+            },
+            other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
+        },
         crate::domain::question::QuestionRepositoryError::Storage(error) => {
             ApiError::Internal(anyhow::anyhow!(error))
         }

@@ -24,6 +24,7 @@ use crate::{
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDeepDiveBody {
+    pub generation_run_id: Uuid,
     pub journey_id: Uuid,
     pub activity_id: Uuid,
     pub objective_id: Uuid,
@@ -42,6 +43,7 @@ pub struct CreateDeepDiveBody {
 #[serde(rename_all = "camelCase")]
 pub struct DeepDiveResponse {
     pub id: Uuid,
+    pub generation_run_id: Uuid,
     pub journey_id: Uuid,
     pub activity_id: Uuid,
     pub objective_id: Uuid,
@@ -106,6 +108,7 @@ pub async fn create(
         .create(CreateDeepDive {
             subject_user_id: auth.owner_id(),
             source_actor_id: auth.owner_id(),
+            generation_run_id: body.generation_run_id,
             journey_id: body.journey_id,
             activity_id: body.activity_id,
             objective_id: body.objective_id,
@@ -141,6 +144,7 @@ fn response(value: crate::domain::deep_dive::DeepDive) -> DeepDiveResponse {
     let input = value.input;
     DeepDiveResponse {
         id: value.id,
+        generation_run_id: input.generation_run_id,
         journey_id: input.journey_id,
         activity_id: input.activity_id,
         objective_id: input.objective_id,
@@ -167,6 +171,22 @@ fn map_error(error: DeepDiveError) -> ApiError {
             field: "sourceReferences".into(),
             message: "must contain at least one source".into(),
         }]),
+        DeepDiveError::Generation(error) => match error {
+            crate::domain::generation::GenerationError::NotPublished => {
+                ApiError::GenerationStateConflict
+            }
+            crate::domain::generation::GenerationError::OperationMismatch => {
+                ApiError::Validation(vec![FieldError {
+                    field: "generationRunId".into(),
+                    message: "must reference a deep_dive.create run".into(),
+                }])
+            }
+            crate::domain::generation::GenerationError::SubjectMismatch
+            | crate::domain::generation::GenerationError::NotFound => ApiError::NotFound {
+                resource: "generation run",
+            },
+            other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
+        },
         DeepDiveError::Storage(message) => ApiError::Internal(anyhow::anyhow!(message)),
     }
 }

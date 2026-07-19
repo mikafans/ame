@@ -1,6 +1,7 @@
 //! Evidence-linked deep-dive repository contract.
 
 use crate::domain::deep_dive::{CreateDeepDive, DeepDive, DeepDiveError, validate_deep_dive};
+use crate::domain::generation::{GenerationError, GenerationRun, validate_content_run};
 use async_trait::async_trait;
 use std::{
     collections::{HashMap, HashSet},
@@ -15,6 +16,7 @@ type EvidenceKey = (Uuid, Uuid, Uuid, Uuid, Uuid);
 pub struct InMemoryDeepDiveRepository {
     deep_dives: Arc<Mutex<HashMap<Uuid, DeepDive>>>,
     verified_evidence: Arc<Mutex<HashSet<EvidenceKey>>>,
+    generation_runs: Arc<Mutex<HashMap<Uuid, GenerationRun>>>,
 }
 
 #[async_trait]
@@ -29,6 +31,14 @@ pub trait DeepDiveRepository: Send + Sync {
 }
 
 impl InMemoryDeepDiveRepository {
+    pub fn register_generation_run(&self, run: GenerationRun) -> Result<(), DeepDiveError> {
+        self.generation_runs
+            .lock()
+            .map_err(|error| DeepDiveError::Storage(error.to_string()))?
+            .insert(run.id, run);
+        Ok(())
+    }
+
     pub fn register_evidence(
         &self,
         subject_user_id: Uuid,
@@ -52,6 +62,15 @@ impl InMemoryDeepDiveRepository {
 
     pub fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError> {
         validate_deep_dive(&input)?;
+        let run = self
+            .generation_runs
+            .lock()
+            .map_err(|error| DeepDiveError::Storage(error.to_string()))?
+            .get(&input.generation_run_id)
+            .cloned()
+            .ok_or(DeepDiveError::Generation(GenerationError::NotFound))?;
+        validate_content_run(&run, input.subject_user_id, "deep_dive.create")
+            .map_err(DeepDiveError::Generation)?;
         let evidence_is_owned = self
             .verified_evidence
             .lock()
@@ -125,12 +144,17 @@ impl DeepDiveRepository for InMemoryDeepDiveRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{deep_dive::CreateDeepDive, question::ContentReviewStatus};
+    use crate::domain::{
+        deep_dive::CreateDeepDive,
+        generation::{GenerationError, GenerationRun, GenerationStatus},
+        question::ContentReviewStatus,
+    };
 
     fn input(subject: Uuid) -> CreateDeepDive {
         CreateDeepDive {
             subject_user_id: subject,
             source_actor_id: subject,
+            generation_run_id: Uuid::now_v7(),
             journey_id: Uuid::now_v7(),
             activity_id: Uuid::now_v7(),
             objective_id: Uuid::now_v7(),
@@ -150,6 +174,13 @@ mod tests {
         let subject = Uuid::now_v7();
         let repository = InMemoryDeepDiveRepository::default();
         let value = input(subject);
+        repository
+            .register_generation_run(published_run(
+                value.generation_run_id,
+                subject,
+                "deep_dive.create",
+            ))
+            .expect("generation run registers");
         repository
             .register_evidence(
                 value.subject_user_id,
@@ -175,7 +206,7 @@ mod tests {
         let repository = InMemoryDeepDiveRepository::default();
         assert_eq!(
             repository.create(input(subject)),
-            Err(DeepDiveError::SubjectMismatch)
+            Err(DeepDiveError::Generation(GenerationError::NotFound))
         );
         let mut invalid = input(subject);
         invalid.source_references.clear();
@@ -184,6 +215,13 @@ mod tests {
             Err(DeepDiveError::MissingSource)
         );
         let value = input(subject);
+        repository
+            .register_generation_run(published_run(
+                value.generation_run_id,
+                subject,
+                "deep_dive.create",
+            ))
+            .expect("generation run registers");
         repository
             .register_evidence(
                 value.subject_user_id,
@@ -198,5 +236,22 @@ mod tests {
             repository.get(Uuid::now_v7(), created.id),
             Err(DeepDiveError::SubjectMismatch)
         );
+    }
+
+    fn published_run(id: Uuid, subject_user_id: Uuid, operation: &str) -> GenerationRun {
+        let now = OffsetDateTime::now_utc();
+        GenerationRun {
+            id,
+            subject_user_id,
+            source_actor_id: subject_user_id,
+            operation: operation.into(),
+            provider: Some("test-provider".into()),
+            retry_key: None,
+            content_version: 1,
+            status: GenerationStatus::Published,
+            error: None,
+            created_at: now,
+            updated_at: now,
+        }
     }
 }

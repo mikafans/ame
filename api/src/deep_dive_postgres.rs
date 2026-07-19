@@ -4,6 +4,7 @@ use crate::{
     deep_dive::DeepDiveRepository,
     domain::{
         deep_dive::{CreateDeepDive, DeepDive, DeepDiveError, validate_deep_dive},
+        generation::{GenerationRepository, validate_content_run},
         question::ContentReviewStatus,
     },
 };
@@ -66,12 +67,27 @@ impl PgDeepDiveRepository {
             Err(DeepDiveError::SubjectMismatch)
         }
     }
+
+    async fn ensure_generation_run(
+        &self,
+        subject_user_id: Uuid,
+        generation_run_id: Uuid,
+    ) -> Result<(), DeepDiveError> {
+        let run = crate::generation_postgres::PgGenerationRepository::new(self.pool.clone())
+            .get(subject_user_id, generation_run_id)
+            .await
+            .map_err(DeepDiveError::Generation)?;
+        validate_content_run(&run, subject_user_id, "deep_dive.create")
+            .map_err(DeepDiveError::Generation)
+    }
 }
 
 #[async_trait]
 impl DeepDiveRepository for PgDeepDiveRepository {
     async fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError> {
         validate_deep_dive(&input)?;
+        self.ensure_generation_run(input.subject_user_id, input.generation_run_id)
+            .await?;
         self.ensure_owned_evidence(
             input.subject_user_id,
             input.journey_id,
@@ -89,9 +105,9 @@ impl DeepDiveRepository for PgDeepDiveRepository {
         let row = sqlx::query(
             r#"INSERT INTO tb_deep_dives (
                     activity_id, subject_user_id, objective_id,
-                    triggering_evidence_id, source_actor_id, body,
+                    triggering_evidence_id, source_actor_id, generation_run_id, body,
                     source_references, review_status, application_task
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id, content_version, created_at"#,
         )
         .bind(input.activity_id)
@@ -99,6 +115,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
         .bind(input.objective_id)
         .bind(input.triggering_evidence_id)
         .bind(input.source_actor_id)
+        .bind(input.generation_run_id)
         .bind(body)
         .bind(json!(input.source_references))
         .bind(review_status_value(input.review_status))
@@ -116,7 +133,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
 
     async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError> {
         let row = sqlx::query(
-            "SELECT d.id, d.subject_user_id, d.source_actor_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1",
+            "SELECT d.id, d.subject_user_id, d.source_actor_id, d.generation_run_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -132,6 +149,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
             input: CreateDeepDive {
                 subject_user_id: row.get("subject_user_id"),
                 source_actor_id: row.get("source_actor_id"),
+                generation_run_id: row.get("generation_run_id"),
                 journey_id: row.get("journey_id"),
                 activity_id: row.get("activity_id"),
                 objective_id: row.get("objective_id"),
@@ -172,7 +190,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
         activity_id: Uuid,
     ) -> Result<Option<DeepDive>, DeepDiveError> {
         let row = sqlx::query(
-            "SELECT d.id, d.subject_user_id, d.source_actor_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.activity_id = $1 AND d.subject_user_id = $2",
+            "SELECT d.id, d.subject_user_id, d.source_actor_id, d.generation_run_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.activity_id = $1 AND d.subject_user_id = $2",
         )
         .bind(activity_id)
         .bind(subject_user_id)
@@ -190,6 +208,7 @@ fn deep_dive_from_row(row: &sqlx::postgres::PgRow) -> Result<DeepDive, DeepDiveE
         input: CreateDeepDive {
             subject_user_id: row.get("subject_user_id"),
             source_actor_id: row.get("source_actor_id"),
+            generation_run_id: row.get("generation_run_id"),
             journey_id: row.get("journey_id"),
             activity_id: row.get("activity_id"),
             objective_id: row.get("objective_id"),

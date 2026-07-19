@@ -69,10 +69,31 @@ pub enum GenerationError {
     },
     #[error("generation run belongs to another subject")]
     SubjectMismatch,
+    #[error("generation run is not published")]
+    NotPublished,
+    #[error("generation run operation does not match content kind")]
+    OperationMismatch,
     #[error("generation run was not found")]
     NotFound,
     #[error("generation storage failure: {0}")]
     Storage(String),
+}
+
+pub fn validate_content_run(
+    run: &GenerationRun,
+    subject_user_id: Uuid,
+    expected_operation: &str,
+) -> Result<(), GenerationError> {
+    if run.subject_user_id != subject_user_id {
+        return Err(GenerationError::SubjectMismatch);
+    }
+    if run.status != GenerationStatus::Published {
+        return Err(GenerationError::NotPublished);
+    }
+    if run.operation != expected_operation {
+        return Err(GenerationError::OperationMismatch);
+    }
+    Ok(())
 }
 
 pub fn validate_start(input: &StartGenerationRun) -> Result<(), GenerationError> {

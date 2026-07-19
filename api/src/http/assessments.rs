@@ -290,6 +290,24 @@ fn map_assessment_error(error: impl Into<AssessmentApiError>) -> ApiError {
         AssessmentApiError::Question(
             crate::domain::question::QuestionRepositoryError::VersionConflict,
         ) => ApiError::IdempotencyConflict,
+        AssessmentApiError::Question(
+            crate::domain::question::QuestionRepositoryError::Generation(error),
+        ) => match error {
+            crate::domain::generation::GenerationError::NotPublished => {
+                ApiError::GenerationStateConflict
+            }
+            crate::domain::generation::GenerationError::OperationMismatch => {
+                ApiError::Validation(vec![FieldError {
+                    field: "generationRunId".into(),
+                    message: "must reference a question.compose run".into(),
+                }])
+            }
+            crate::domain::generation::GenerationError::SubjectMismatch
+            | crate::domain::generation::GenerationError::NotFound => ApiError::NotFound {
+                resource: "generation run",
+            },
+            other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
+        },
         AssessmentApiError::Assessment(
             crate::domain::assessment::AssessmentRepositoryError::InvalidItem(message),
         ) => ApiError::Validation(vec![FieldError {

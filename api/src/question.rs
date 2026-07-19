@@ -1,5 +1,6 @@
 //! Question repository contract and deterministic grading primitives.
 
+use crate::domain::generation::{GenerationError, GenerationRun, validate_content_run};
 use crate::domain::question::{
     CreateQuestion, Question, QuestionKind, QuestionRepositoryError, QuestionVersion,
     validate_question,
@@ -43,6 +44,7 @@ pub struct InMemoryQuestionRepository {
 struct QuestionState {
     questions: HashMap<Uuid, Question>,
     versions: HashMap<(Uuid, u32), QuestionVersion>,
+    generation_runs: HashMap<Uuid, GenerationRun>,
 }
 
 #[async_trait]
@@ -56,11 +58,13 @@ impl QuestionRepository for InMemoryQuestionRepository {
             .state
             .lock()
             .map_err(|error| QuestionRepositoryError::Storage(error.to_string()))?;
+        validate_generation_run(&state, input.subject_user_id, input.generation_run_id)?;
         let now = OffsetDateTime::now_utc();
         let question = Question {
             id: Uuid::now_v7(),
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
+            generation_run_id: input.generation_run_id,
             kind: input.kind,
             current_version: 1,
             status: input.review_status,
@@ -83,6 +87,7 @@ impl QuestionRepository for InMemoryQuestionRepository {
             .state
             .lock()
             .map_err(|error| QuestionRepositoryError::Storage(error.to_string()))?;
+        validate_generation_run(&state, input.subject_user_id, input.generation_run_id)?;
         let question =
             state
                 .questions
@@ -102,6 +107,7 @@ impl QuestionRepository for InMemoryQuestionRepository {
         let now = OffsetDateTime::now_utc();
         let version = question_version(question, version_number, &input, now);
         question.current_version = version_number;
+        question.generation_run_id = input.generation_run_id;
         question.status = input.review_status;
         state
             .versions
@@ -137,6 +143,32 @@ impl QuestionRepository for InMemoryQuestionRepository {
     }
 }
 
+impl InMemoryQuestionRepository {
+    pub fn register_generation_run(
+        &self,
+        run: GenerationRun,
+    ) -> Result<(), QuestionRepositoryError> {
+        self.state
+            .lock()
+            .map_err(|error| QuestionRepositoryError::Storage(error.to_string()))?
+            .generation_runs
+            .insert(run.id, run);
+        Ok(())
+    }
+}
+
+fn validate_generation_run(
+    state: &QuestionState,
+    subject_user_id: Uuid,
+    generation_run_id: Uuid,
+) -> Result<(), QuestionRepositoryError> {
+    let run = state.generation_runs.get(&generation_run_id).ok_or(
+        QuestionRepositoryError::Generation(GenerationError::NotFound),
+    )?;
+    validate_content_run(run, subject_user_id, "question.compose")
+        .map_err(QuestionRepositoryError::Generation)
+}
+
 fn question_version(
     question: &Question,
     version: u32,
@@ -146,6 +178,7 @@ fn question_version(
     QuestionVersion {
         id: Uuid::now_v7(),
         question_id: question.id,
+        generation_run_id: input.generation_run_id,
         version,
         kind: question.kind,
         prompt: input.prompt.clone(),
@@ -247,12 +280,16 @@ pub fn grade_answer(question: &QuestionVersion, response: &serde_json::Value) ->
 #[cfg(test)]
 mod contract_tests {
     use super::*;
-    use crate::domain::question::{ContentReviewStatus, QuestionOption};
+    use crate::domain::{
+        generation::{GenerationRun, GenerationStatus},
+        question::{ContentReviewStatus, QuestionOption},
+    };
 
     fn multiple_choice() -> CreateQuestion {
         CreateQuestion {
             subject_user_id: Uuid::now_v7(),
             source_actor_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
             kind: QuestionKind::MultipleChoice,
             prompt: "Which option is correct?".into(),
             options: vec![
@@ -282,6 +319,13 @@ mod contract_tests {
         let repository = InMemoryQuestionRepository::default();
         let input = multiple_choice();
         let subject = input.subject_user_id;
+        repository
+            .register_generation_run(published_run(
+                input.generation_run_id,
+                subject,
+                "question.compose",
+            ))
+            .expect("generation run registers");
         let (question, first) = repository
             .create_question(input.clone())
             .await
@@ -302,12 +346,30 @@ mod contract_tests {
         );
     }
 
+    fn published_run(id: Uuid, subject_user_id: Uuid, operation: &str) -> GenerationRun {
+        let now = OffsetDateTime::now_utc();
+        GenerationRun {
+            id,
+            subject_user_id,
+            source_actor_id: subject_user_id,
+            operation: operation.into(),
+            provider: Some("test-provider".into()),
+            retry_key: None,
+            content_version: 1,
+            status: GenerationStatus::Published,
+            error: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
     #[test]
     fn shuffled_multiple_choice_is_graded_by_option_id_not_position() {
         let input = multiple_choice();
         let version = QuestionVersion {
             id: Uuid::now_v7(),
             question_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
             version: 1,
             kind: input.kind,
             prompt: input.prompt,
@@ -341,6 +403,7 @@ mod contract_tests {
         let version = QuestionVersion {
             id: Uuid::now_v7(),
             question_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
             version: 1,
             kind: input.kind,
             prompt: input.prompt,
