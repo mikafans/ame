@@ -334,6 +334,24 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     deep_dive = client.get(f"/api/v1/deep-dives/{deep_dive_id}", headers=headers)
     assert deep_dive.status_code == 200, deep_dive.text
 
+    forged_deep_dive = client.post(
+        "/api/v1/deep-dives",
+        headers=headers,
+        json={
+            "journeyId": journey_id,
+            "activityId": activity_id,
+            "objectiveId": objective_id,
+            "triggeringEvidenceId": str(uuid.uuid4()),
+            "title": "Forged evidence",
+            "body": "This must not be stored.",
+            "example": "No example.",
+            "caveats": ["This is a negative-path test."],
+            "sourceReferences": ["https://example.test/forged"],
+            "applicationTask": "Reject this content.",
+        },
+    )
+    assert forged_deep_dive.status_code == 404, forged_deep_dive.text
+
     finished_session = client.post(
         f"/api/v1/learning/sessions/{session_id}/finish",
         headers=headers,
@@ -387,7 +405,33 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         if activity["id"] == next_activity["id"]
     )["status"] == "ready"
 
-    _, other_headers = _start_learner(client, "I want to learn a different subject")
+    other_started, other_headers = _start_learner(
+        client, "I want to learn a different subject"
+    )
+    other_journey = client.get(
+        f"/api/v1/learning/journeys/{other_started['journeyId']}",
+        headers=other_headers,
+    )
+    assert other_journey.status_code == 200, other_journey.text
+    other_journey_body = other_journey.json()
+    other_activity = other_journey_body["activities"][0]
+    cross_owner_deep_dive = client.post(
+        "/api/v1/deep-dives",
+        headers=other_headers,
+        json={
+            "journeyId": other_started["journeyId"],
+            "activityId": other_activity["id"],
+            "objectiveId": other_journey_body["objectives"][0]["id"],
+            "triggeringEvidenceId": evidence_id,
+            "title": "Cross-owner evidence",
+            "body": "This must not be stored.",
+            "example": "No example.",
+            "caveats": ["This is a negative-path test."],
+            "sourceReferences": ["https://example.test/cross-owner"],
+            "applicationTask": "Reject this content.",
+        },
+    )
+    assert cross_owner_deep_dive.status_code == 404, cross_owner_deep_dive.text
     other_streaks = client.get(
         f"/api/v1/progress/{journey_id}/streaks", headers=other_headers
     )
