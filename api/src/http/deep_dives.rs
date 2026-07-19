@@ -54,6 +54,7 @@ pub struct DeepDiveResponse {
     pub caveats: Vec<String>,
     pub source_references: Vec<String>,
     pub application_task: String,
+    pub review_status: ContentReviewStatus,
     pub content_version: u32,
 }
 
@@ -155,6 +156,7 @@ fn response(value: crate::domain::deep_dive::DeepDive) -> DeepDiveResponse {
         caveats: input.caveats,
         source_references: input.source_references,
         application_task: input.application_task,
+        review_status: input.review_status,
         content_version: value.content_version,
     }
 }

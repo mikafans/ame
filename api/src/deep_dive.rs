@@ -108,6 +108,9 @@ impl InMemoryDeepDiveRepository {
         if deep_dive.input.subject_user_id != subject_user_id {
             return Err(DeepDiveError::SubjectMismatch);
         }
+        if deep_dive.input.review_status != crate::domain::question::ContentReviewStatus::Approved {
+            return Err(DeepDiveError::NotFound);
+        }
         Ok(deep_dive.clone())
     }
 }
@@ -136,6 +139,8 @@ impl DeepDiveRepository for InMemoryDeepDiveRepository {
             .find(|deep_dive| {
                 deep_dive.input.activity_id == activity_id
                     && deep_dive.input.subject_user_id == subject_user_id
+                    && deep_dive.input.review_status
+                        == crate::domain::question::ContentReviewStatus::Approved
             })
             .cloned())
     }

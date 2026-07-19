@@ -133,7 +133,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
 
     async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError> {
         let row = sqlx::query(
-            "SELECT d.id, d.subject_user_id, d.source_actor_id, d.generation_run_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1",
+            "SELECT d.id, d.subject_user_id, d.source_actor_id, d.generation_run_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1 AND d.review_status = 'approved'",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -190,7 +190,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
         activity_id: Uuid,
     ) -> Result<Option<DeepDive>, DeepDiveError> {
         let row = sqlx::query(
-            "SELECT d.id, d.subject_user_id, d.source_actor_id, d.generation_run_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.activity_id = $1 AND d.subject_user_id = $2",
+            "SELECT d.id, d.subject_user_id, d.source_actor_id, d.generation_run_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.activity_id = $1 AND d.subject_user_id = $2 AND d.review_status = 'approved'",
         )
         .bind(activity_id)
         .bind(subject_user_id)
