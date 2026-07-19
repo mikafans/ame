@@ -59,8 +59,12 @@ GET /api/v1/progress/{journey_id}/timeline
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,
-and persisted evidence. Agents choose the next useful activity and record the
-result; the web app presents the same state. Every evidence request requires an
+and persisted evidence. `GET /api/v1/learning/journeys/{id}` returns one
+evidence-backed recommendation with `objectiveId`, `activityId`, and
+server-derived `evidenceIds`; this is the same recommendation shown by the web
+app and returned by `POST /api/v1/progress/{journey_id}/recommendation`. Agents
+choose the next useful activity and record the result; the web app presents the
+same state. Every evidence request requires an
 `attemptId` and must reference a graded attempt owned by the learner; an
 evidence record without attempt provenance is invalid. Streak events use
 `attempt:<completed-attempt-id>` as their

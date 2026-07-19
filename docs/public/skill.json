@@ -73,7 +73,7 @@
       "path": "/api/v1/learning/journeys"
     },
     {
-      "description": "Read one authenticated learner's intent, objectives, activities, and evidence.",
+      "description": "Read one authenticated learner's intent, objectives, activities, evidence, and the same evidence-backed recommendation returned to the browser. The recommendation includes objectiveId and server-derived evidenceIds.",
       "input_schema": {
         "properties": {
           "id": {

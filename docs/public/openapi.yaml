@@ -1911,8 +1911,10 @@ components:
       type: object
       required:
       - activityId
+      - objectiveId
       - title
       - objectiveIds
+      - evidenceIds
       - rationale
       properties:
         activityId:
@@ -1922,6 +1924,14 @@ components:
           type:
           - string
           - 'null'
+          format: uuid
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        objectiveId:
+          type: string
           format: uuid
         objectiveIds:
           type: array

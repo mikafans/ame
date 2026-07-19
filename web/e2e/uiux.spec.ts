@@ -79,7 +79,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     page.getByRole("heading", { name: "Try a short first task" }).first(),
   ).toBeVisible();
   await expect(
-    page.getByText("Your latest activity produced evidence."),
+    page.getByText("This objective has the weakest available evidence."),
   ).toBeVisible();
   await page.goto("/learning");
   await expect(page.getByText(/Recent:/)).toBeVisible();

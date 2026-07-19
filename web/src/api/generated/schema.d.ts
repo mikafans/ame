@@ -970,6 +970,9 @@ export interface components {
             activityId: string;
             /** Format: uuid */
             basedOnSessionId?: string | null;
+            evidenceIds: string[];
+            /** Format: uuid */
+            objectiveId: string;
             objectiveIds: string[];
             rationale: string;
             title: string;

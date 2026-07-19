@@ -41,7 +41,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.journey.get",
-            "Read one authenticated learner's intent, objectives, activities, and evidence.",
+            "Read one authenticated learner's intent, objectives, activities, evidence, and the same evidence-backed recommendation returned to the browser. The recommendation includes objectiveId and server-derived evidenceIds.",
             "GET",
             "/api/v1/learning/journeys/{id}",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
