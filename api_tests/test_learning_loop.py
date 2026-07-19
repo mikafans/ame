@@ -48,6 +48,15 @@ def _published_generation_run(client, headers, operation):
     return run_id
 
 
+def _recommendation_candidates(journey_body):
+    return [
+        {"objectiveId": objective_id, "activityId": activity["id"]}
+        for activity in journey_body["activities"]
+        if activity["status"] in {"ready", "in_progress"}
+        for objective_id in activity["objectiveIds"]
+    ]
+
+
 def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     prompt = "I want to understand stream processing and deploy a Flink operator"
 
@@ -69,8 +78,23 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     activity = journey_body["activities"][0]
     activity_id = activity["id"]
     initial_recommendation = journey_body["recommendation"]
-    assert initial_recommendation["objectiveId"] == objective_id
-    assert initial_recommendation["evidenceIds"] == []
+    initial_progress_recommendation = client.post(
+        f"/api/v1/progress/{journey_id}/recommendation",
+        headers=headers,
+        json={"objectives": _recommendation_candidates(journey_body)},
+    )
+    assert initial_progress_recommendation.status_code == 200, (
+        initial_progress_recommendation.text
+    )
+    assert initial_recommendation["objectiveId"] == initial_progress_recommendation.json()[
+        "objectiveId"
+    ]
+    assert initial_recommendation["activityId"] == initial_progress_recommendation.json()[
+        "activityId"
+    ]
+    assert initial_recommendation["evidenceIds"] == initial_progress_recommendation.json()[
+        "evidenceIds"
+    ]
 
     journeys = client.get("/api/v1/learning/journeys", headers=headers)
     assert journeys.status_code == 200, journeys.text
@@ -438,7 +462,24 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         f"/api/v1/learning/journeys/{journey_id}", headers=headers
     )
     assert resumed_journey.status_code == 200, resumed_journey.text
-    assert evidence_id in resumed_journey.json()["recommendation"]["evidenceIds"]
+    resumed_journey_body = resumed_journey.json()
+    resumed_progress_recommendation = client.post(
+        f"/api/v1/progress/{journey_id}/recommendation",
+        headers=headers,
+        json={"objectives": _recommendation_candidates(resumed_journey_body)},
+    )
+    assert resumed_progress_recommendation.status_code == 200, (
+        resumed_progress_recommendation.text
+    )
+    assert resumed_journey_body["recommendation"] == {
+        "activityId": resumed_progress_recommendation.json()["activityId"],
+        "objectiveId": resumed_progress_recommendation.json()["objectiveId"],
+        "title": resumed_journey_body["recommendation"]["title"],
+        "objectiveIds": resumed_journey_body["recommendation"]["objectiveIds"],
+        "evidenceIds": resumed_progress_recommendation.json()["evidenceIds"],
+        "rationale": resumed_progress_recommendation.json()["reason"],
+        "basedOnSessionId": resumed_journey_body["recommendation"]["basedOnSessionId"],
+    }
     next_activity = next(
         activity
         for activity in resumed_journey.json()["activities"]
