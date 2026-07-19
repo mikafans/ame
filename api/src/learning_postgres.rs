@@ -570,7 +570,7 @@ impl LearningRepository for PgLearningRepository {
         let row = sqlx::query(
             r#"
             UPDATE tb_learning_sessions
-            SET status = 'finished', result = $3, finished_at = now()
+            SET status = $3, result = $4, finished_at = now()
             WHERE id = $1 AND subject_user_id = $2 AND status = 'in_progress'
             RETURNING id, journey_id, activity_id, subject_user_id, actor_identity_id,
                       status, question_plan, result, started_at, finished_at
@@ -578,6 +578,11 @@ impl LearningRepository for PgLearningRepository {
         )
         .bind(input.session_id)
         .bind(input.subject_user_id)
+        .bind(if input.completed {
+            "finished"
+        } else {
+            "abandoned"
+        })
         .bind(&input.result)
         .fetch_optional(&mut *transaction)
         .await
@@ -613,6 +618,10 @@ impl LearningRepository for PgLearningRepository {
             };
         };
         let session = learning_session_from_row(row);
+        if !input.completed {
+            transaction.commit().await.map_err(storage_error)?;
+            return Ok(session);
+        }
         sqlx::query(
             "UPDATE tb_activities SET status = 'completed', updated_at = now() WHERE id = $1",
         )

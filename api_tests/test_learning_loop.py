@@ -295,6 +295,37 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         event["occurredAt"] for event in timeline_body
     )
 
+    resumed_journey = client.get(
+        f"/api/v1/learning/journeys/{journey_id}", headers=headers
+    )
+    assert resumed_journey.status_code == 200, resumed_journey.text
+    next_activity = next(
+        activity
+        for activity in resumed_journey.json()["activities"]
+        if activity["status"] == "ready"
+    )
+    abandoned_session = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{next_activity['id']}/start",
+        headers=headers,
+    )
+    assert abandoned_session.status_code == 201, abandoned_session.text
+    abandoned = client.post(
+        f"/api/v1/learning/sessions/{abandoned_session.json()['id']}/finish",
+        headers=headers,
+        json={"completed": False, "responses": []},
+    )
+    assert abandoned.status_code == 200, abandoned.text
+    assert abandoned.json()["status"] == "abandoned"
+    after_abandon = client.get(
+        f"/api/v1/learning/journeys/{journey_id}", headers=headers
+    )
+    assert after_abandon.status_code == 200, after_abandon.text
+    assert next(
+        activity
+        for activity in after_abandon.json()["activities"]
+        if activity["id"] == next_activity["id"]
+    )["status"] == "ready"
+
     _, other_headers = _start_learner(client, "I want to learn a different subject")
     other_streaks = client.get(
         f"/api/v1/progress/{journey_id}/streaks", headers=other_headers

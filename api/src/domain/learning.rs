@@ -177,6 +177,7 @@ pub struct CreateLearningSession {
 pub struct FinishLearningSession {
     pub subject_user_id: Uuid,
     pub session_id: Uuid,
+    pub completed: bool,
     pub result: serde_json::Value,
 }
 

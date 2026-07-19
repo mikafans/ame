@@ -405,6 +405,7 @@ pub async fn finish_learning_session(
         .finish_learning_session(FinishLearningSessionInput {
             subject_user_id: auth.owner_id(),
             session_id: id,
+            completed: body.completed,
             result: serde_json::json!({
                 "completed": body.completed,
                 "responses": body.responses,

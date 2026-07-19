@@ -492,11 +492,18 @@ impl LearningRepository for InMemoryLearningRepository {
                 };
             }
             let activity_id = session.activity_id;
-            session.status = LearningSessionStatus::Finished;
+            session.status = if input.completed {
+                LearningSessionStatus::Finished
+            } else {
+                LearningSessionStatus::Abandoned
+            };
             session.result = Some(input.result);
             session.finished_at = Some(OffsetDateTime::now_utc());
             (activity_id, session.clone())
         };
+        if !input.completed {
+            return Ok(finished_session);
+        }
         let (journey_id, order_index) = state
             .activities
             .get(&activity_id)
@@ -706,7 +713,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     );
     assert_eq!(
         repository
-            .start_learning_session(session_input)
+            .start_learning_session(session_input.clone())
             .await
             .expect("learning session retry resumes"),
         session
@@ -717,10 +724,34 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             .await,
         Err(LearningRepositoryError::SubjectMismatch)
     );
-    let finished = repository
+    let abandoned = repository
         .finish_learning_session(FinishLearningSession {
             subject_user_id: subject,
             session_id: session.id,
+            completed: false,
+            result: serde_json::json!({"completed": false}),
+        })
+        .await
+        .expect("abandoned learning session records");
+    assert_eq!(abandoned.status, LearningSessionStatus::Abandoned);
+    assert_eq!(
+        repository
+            .list_activities(subject, journey.id)
+            .await
+            .expect("activities after abandon")[0]
+            .status,
+        ActivityStatus::Ready
+    );
+    let resumed_session = repository
+        .start_learning_session(session_input.clone())
+        .await
+        .expect("abandoned session can be resumed");
+    assert_ne!(resumed_session.id, session.id);
+    let finished = repository
+        .finish_learning_session(FinishLearningSession {
+            subject_user_id: subject,
+            session_id: resumed_session.id,
+            completed: true,
             result: serde_json::json!({"completed": true}),
         })
         .await
@@ -737,7 +768,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let finished_retry = repository
         .finish_learning_session(FinishLearningSession {
             subject_user_id: subject,
-            session_id: session.id,
+            session_id: resumed_session.id,
+            completed: true,
             result: serde_json::json!({"completed": true}),
         })
         .await
@@ -747,7 +779,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         repository
             .finish_learning_session(FinishLearningSession {
                 subject_user_id: subject,
-                session_id: session.id,
+                session_id: resumed_session.id,
+                completed: false,
                 result: serde_json::json!({"completed": false}),
             })
             .await,
