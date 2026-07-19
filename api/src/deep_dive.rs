@@ -1,6 +1,7 @@
 //! Evidence-linked deep-dive repository contract.
 
 use crate::domain::deep_dive::{CreateDeepDive, DeepDive, DeepDiveError, validate_deep_dive};
+use async_trait::async_trait;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -11,6 +12,12 @@ use uuid::Uuid;
 #[derive(Clone, Default)]
 pub struct InMemoryDeepDiveRepository {
     deep_dives: Arc<Mutex<HashMap<Uuid, DeepDive>>>,
+}
+
+#[async_trait]
+pub trait DeepDiveRepository: Send + Sync {
+    async fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError>;
+    async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError>;
 }
 
 impl InMemoryDeepDiveRepository {
@@ -40,6 +47,17 @@ impl InMemoryDeepDiveRepository {
             return Err(DeepDiveError::SubjectMismatch);
         }
         Ok(deep_dive.clone())
+    }
+}
+
+#[async_trait]
+impl DeepDiveRepository for InMemoryDeepDiveRepository {
+    async fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError> {
+        self.create(input)
+    }
+
+    async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError> {
+        self.get(subject_user_id, id)
     }
 }
 

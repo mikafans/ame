@@ -4,6 +4,7 @@ use crate::domain::progress::{
     MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError, Recommendation,
     StreakEvent, StreakEventInput, validate_evidence, validate_streak_event,
 };
+use async_trait::async_trait;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -20,6 +21,33 @@ pub struct InMemoryProgressRepository {
 struct ProgressState {
     evidence: Vec<MasteryEvidence>,
     streak_events: HashMap<String, StreakEvent>,
+}
+
+#[async_trait]
+pub trait ProgressRepository: Send + Sync {
+    async fn record_evidence(
+        &self,
+        input: MasteryEvidenceInput,
+    ) -> Result<MasteryEvidence, ProgressError>;
+
+    async fn snapshot(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        objective_id: Uuid,
+    ) -> Result<MasterySnapshot, ProgressError>;
+
+    async fn recommend_weakest(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        objectives: &[(Uuid, Uuid)],
+    ) -> Result<Recommendation, ProgressError>;
+
+    async fn record_streak_event(
+        &self,
+        input: StreakEventInput,
+    ) -> Result<StreakEvent, ProgressError>;
 }
 
 impl InMemoryProgressRepository {
@@ -171,6 +199,41 @@ impl InMemoryProgressRepository {
             .filter(|event| event.input.subject_user_id == subject_user_id)
             .cloned()
             .collect())
+    }
+}
+
+#[async_trait]
+impl ProgressRepository for InMemoryProgressRepository {
+    async fn record_evidence(
+        &self,
+        input: MasteryEvidenceInput,
+    ) -> Result<MasteryEvidence, ProgressError> {
+        self.record_evidence(input)
+    }
+
+    async fn snapshot(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        objective_id: Uuid,
+    ) -> Result<MasterySnapshot, ProgressError> {
+        self.snapshot(subject_user_id, journey_id, objective_id)
+    }
+
+    async fn recommend_weakest(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        objectives: &[(Uuid, Uuid)],
+    ) -> Result<Recommendation, ProgressError> {
+        self.recommend_weakest(subject_user_id, journey_id, objectives)
+    }
+
+    async fn record_streak_event(
+        &self,
+        input: StreakEventInput,
+    ) -> Result<StreakEvent, ProgressError> {
+        self.record_streak_event(input)
     }
 }
 
