@@ -541,11 +541,13 @@ export default function LearningJourneyPage() {
                 Complete. Your next activity is now ready.
               </p>
             )}
-            {attempt?.status === "graded" && (
+            {(attempt?.status === "graded" ||
+              attempt?.status === "submitted") && (
               <div className="mt-4 space-y-3 border-t border-primary/20 pt-4">
                 <p className="text-sm font-medium text-primary">
-                  Assessment complete · {Math.round((attempt.score ?? 0) * 100)}
-                  %
+                  {attempt.status === "submitted"
+                    ? "Assessment submitted · pending review"
+                    : `Assessment complete · ${Math.round((attempt.score ?? 0) * 100)}%`}
                 </p>
                 {attempt.items.length > 0 && (
                   <ul className="space-y-2 text-sm">
