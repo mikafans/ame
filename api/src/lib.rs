@@ -9,6 +9,7 @@ pub mod auth;
 pub mod authentication;
 pub mod authentication_postgres;
 pub mod config;
+pub mod deep_dive;
 pub mod domain;
 pub mod http;
 pub mod identity;
