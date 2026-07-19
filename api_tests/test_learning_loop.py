@@ -1,0 +1,219 @@
+import uuid
+
+
+def _start_learner(client, prompt):
+    email = f"loop-{uuid.uuid4()}@example.test"
+    response = client.post(
+        "/public/v1/onboarding/start",
+        headers={"Cookie": ""},
+        json={
+            "email": email,
+            "displayName": "Learning Loop",
+            "prompt": prompt,
+            "idempotencyKey": f"loop-{uuid.uuid4()}",
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    return body, {"Authorization": f"Bearer {body['token']}"}
+
+
+def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
+    prompt = "I want to understand stream processing and deploy a Flink operator"
+
+    preview = client.post("/public/v1/onboarding/preview", json={"prompt": prompt})
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["objectives"]
+    assert preview.json()["firstActivity"]["title"]
+
+    empty_preview = client.post("/public/v1/onboarding/preview", json={"prompt": " "})
+    assert empty_preview.status_code == 422
+
+    started, headers = _start_learner(client, prompt)
+    journey_id = started["journeyId"]
+
+    journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
+    assert journey.status_code == 200, journey.text
+    journey_body = journey.json()
+    objective_id = journey_body["objectives"][0]["id"]
+    activity = journey_body["activities"][0]
+    activity_id = activity["id"]
+
+    journeys = client.get("/api/v1/learning/journeys", headers=headers)
+    assert journeys.status_code == 200, journeys.text
+    assert any(item["id"] == journey_id for item in journeys.json())
+
+    session_response = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
+        headers=headers,
+    )
+    assert session_response.status_code == 201, session_response.text
+    session_id = session_response.json()["id"]
+
+    question_response = client.post(
+        "/api/v1/questions",
+        headers=headers,
+        json={
+            "kind": "multiple_choice",
+            "prompt": "Which Flink component schedules a deployed job?",
+            "options": [
+                {"id": "wrong", "text": "The client only", "is_correct": False},
+                {"id": "right", "text": "The JobManager", "is_correct": True},
+            ],
+            "points": 1,
+            "reviewStatus": "approved",
+            "explanation": "The JobManager coordinates scheduling and execution.",
+            "sourceReferences": ["https://nightlies.apache.org/flink/"],
+        },
+    )
+    assert question_response.status_code == 200, question_response.text
+    question = question_response.json()
+
+    assessment_response = client.post(
+        "/api/v1/assessments",
+        headers=headers,
+        json={
+            "activityId": activity_id,
+            "mode": "practice",
+            "status": "published",
+            "items": [
+                {
+                    "questionId": question["questionId"],
+                    "questionVersion": question["version"],
+                    "orderIndex": 0,
+                    "points": 1,
+                }
+            ],
+        },
+    )
+    assert assessment_response.status_code == 200, assessment_response.text
+    assessment = assessment_response.json()
+    assert client.get(
+        f"/api/v1/assessments/{assessment['id']}", headers=headers
+    ).status_code == 200
+
+    attempt_response = client.post(
+        f"/api/v1/assessments/{assessment['id']}/attempts",
+        headers=headers,
+        json={"learningSessionId": session_id},
+    )
+    assert attempt_response.status_code == 200, attempt_response.text
+    attempt = attempt_response.json()
+    item_id = assessment["items"][0]["id"]
+    version_id = assessment["items"][0]["questionVersionId"]
+
+    stale_answer = client.post(
+        f"/api/v1/attempts/{attempt['id']}/answers",
+        headers=headers,
+        json={
+            "assessmentItemId": item_id,
+            "questionVersionId": str(uuid.uuid4()),
+            "response": {"option_id": "right"},
+        },
+    )
+    assert stale_answer.status_code == 422, stale_answer.text
+
+    answer = client.post(
+        f"/api/v1/attempts/{attempt['id']}/answers",
+        headers=headers,
+        json={
+            "assessmentItemId": item_id,
+            "questionVersionId": version_id,
+            "response": {"option_id": "right"},
+        },
+    )
+    assert answer.status_code == 200, answer.text
+
+    finished = client.post(
+        f"/api/v1/attempts/{attempt['id']}/finish", headers=headers
+    )
+    assert finished.status_code == 200, finished.text
+    assert finished.json()["score"] == 1
+    repeated_finish = client.post(
+        f"/api/v1/attempts/{attempt['id']}/finish", headers=headers
+    )
+    assert repeated_finish.status_code == 409, repeated_finish.text
+
+    evidence_response = client.post(
+        "/api/v1/progress/evidence",
+        headers=headers,
+        json={
+            "journeyId": journey_id,
+            "objectiveId": objective_id,
+            "activityId": activity_id,
+            "attemptId": attempt["id"],
+            "value": 1,
+            "derivationVersion": 1,
+        },
+    )
+    assert evidence_response.status_code == 200, evidence_response.text
+    evidence_id = evidence_response.json()["id"]
+
+    snapshot = client.get(
+        f"/api/v1/progress/{journey_id}/objectives/{objective_id}", headers=headers
+    )
+    assert snapshot.status_code == 200, snapshot.text
+    assert snapshot.json()["evidenceCount"] == 1
+
+    recommendation = client.post(
+        f"/api/v1/progress/{journey_id}/recommendation",
+        headers=headers,
+        json={
+            "objectives": [
+                {"objectiveId": objective_id, "activityId": activity_id}
+            ]
+        },
+    )
+    assert recommendation.status_code == 200, recommendation.text
+
+    streak_body = {
+        "journeyId": journey_id,
+        "activityId": activity_id,
+        "qualifyingEventKey": f"attempt:{attempt['id']}",
+        "learnerTimezone": "Asia/Tokyo",
+        "qualifyingDay": "2026-07-19",
+    }
+    streak = client.post(
+        "/api/v1/progress/streaks", headers=headers, json=streak_body
+    )
+    assert streak.status_code == 200, streak.text
+    duplicate_streak = client.post(
+        "/api/v1/progress/streaks", headers=headers, json=streak_body
+    )
+    assert duplicate_streak.status_code == 200, duplicate_streak.text
+    assert duplicate_streak.json()["id"] == streak.json()["id"]
+
+    deep_dive_response = client.post(
+        "/api/v1/deep-dives",
+        headers=headers,
+        json={
+            "journeyId": journey_id,
+            "activityId": activity_id,
+            "objectiveId": objective_id,
+            "triggeringEvidenceId": evidence_id,
+            "title": "Flink operator scheduling",
+            "body": "The JobManager coordinates the deployment lifecycle.",
+            "example": "Inspect the JobManager and TaskManager roles.",
+            "caveats": ["Deployment behavior depends on the configured operator version."],
+            "sourceReferences": ["https://nightlies.apache.org/flink/"],
+            "applicationTask": "Explain the scheduling path in your own words.",
+            "reviewStatus": "approved",
+        },
+    )
+    assert deep_dive_response.status_code == 200, deep_dive_response.text
+    deep_dive_id = deep_dive_response.json()["id"]
+    deep_dive = client.get(f"/api/v1/deep-dives/{deep_dive_id}", headers=headers)
+    assert deep_dive.status_code == 200, deep_dive.text
+
+    finished_session = client.post(
+        f"/api/v1/learning/sessions/{session_id}/finish",
+        headers=headers,
+        json={"completed": True, "responses": [{"id": "q1", "value": "right"}]},
+    )
+    assert finished_session.status_code == 200, finished_session.text
+
+    _, other_headers = _start_learner(client, "I want to learn a different subject")
+    forbidden_journey = client.get(
+        f"/api/v1/learning/journeys/{journey_id}", headers=other_headers
+    )
+    assert forbidden_journey.status_code == 404, forbidden_journey.text

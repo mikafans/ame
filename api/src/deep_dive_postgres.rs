@@ -63,7 +63,7 @@ impl DeepDiveRepository for PgDeepDiveRepository {
 
     async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError> {
         let row = sqlx::query(
-            "SELECT id, subject_user_id, source_actor_id, journey_id, activity_id, objective_id, triggering_evidence_id, body, source_references, review_status, application_task, content_version, created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1",
+            "SELECT d.id, d.subject_user_id, d.source_actor_id, a.journey_id, d.activity_id, d.objective_id, d.triggering_evidence_id, d.body, d.source_references, d.review_status, d.application_task, d.content_version, d.created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
