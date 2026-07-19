@@ -20,7 +20,8 @@ Evidence:
   objective links, and prompt rendering;
 - the browser contract starts the first activity, completes the starter check,
   discovers both package activities through the API, starts the explanation,
-  and renders its goal-specific heading/body;
+  authors and starts the worked example, and renders the goal-specific
+  authored content and source-backed provenance;
 - `make check` passed with 67 Rust tests and 24 frontend tests;
 - `make local-uiux` passed all 4 browser behavior tests against the restarted
   local stack.

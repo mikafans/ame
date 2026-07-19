@@ -32,8 +32,9 @@ Evidence:
 - the API behavior contract covers happy, malformed, missing-source,
   unpublished, wrong-operation, cross-owner, completed-activity, kind-mismatch,
   non-string-field, empty-list, and unapproved-review paths;
-- the browser contract authors an explanation through the API and renders the
-  resulting heading and body in the learner journey;
+- the browser contract authors both an explanation and a worked example
+  through the API, renders their authored fields in the learner journey, and
+  shows the HTTPS provenance as a source-backed activity;
 - the Rust library suite passes 67 tests;
 - the black-box API suite passes 6 tests after rebuilding the API
   container and restarting Caddy to refresh its service address;
