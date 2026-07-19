@@ -9,7 +9,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
-use time::OffsetDateTime;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -20,6 +19,120 @@ pub struct PgProgressRepository {
 impl PgProgressRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    async fn refresh_snapshot(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        objective_id: Uuid,
+    ) -> Result<MasterySnapshot, ProgressError> {
+        let aggregate = sqlx::query(
+            r#"SELECT AVG(value)::float4 AS mastery,
+                      COUNT(*)::int AS evidence_count,
+                      COALESCE(MAX(derivation_version), 1)::int AS derivation_version
+                 FROM tb_mastery_evidence
+                WHERE subject_user_id = $1
+                  AND journey_id = $2
+                  AND objective_id = $3"#,
+        )
+        .bind(subject_user_id)
+        .bind(journey_id)
+        .bind(objective_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        let evidence_count: i32 = aggregate.get("evidence_count");
+        if evidence_count == 0 {
+            return Err(ProgressError::NotFound);
+        }
+        let mastery: f32 = aggregate.get("mastery");
+        let confidence = (evidence_count as f32 / 3.0).min(1.0);
+        let derivation_version: i32 = aggregate.get("derivation_version");
+        let row = sqlx::query(
+            r#"INSERT INTO tb_mastery_snapshots (
+                    subject_user_id, journey_id, objective_id,
+                    mastery, confidence, evidence_count, derivation_version
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (subject_user_id, journey_id, objective_id)
+                DO UPDATE SET mastery = EXCLUDED.mastery,
+                              confidence = EXCLUDED.confidence,
+                              evidence_count = EXCLUDED.evidence_count,
+                              derivation_version = EXCLUDED.derivation_version,
+                              calculated_at = now()
+                RETURNING mastery::float4 AS mastery,
+                          confidence::float4 AS confidence,
+                          evidence_count,
+                          calculated_at"#,
+        )
+        .bind(subject_user_id)
+        .bind(journey_id)
+        .bind(objective_id)
+        .bind(mastery)
+        .bind(confidence)
+        .bind(evidence_count)
+        .bind(derivation_version)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(MasterySnapshot {
+            subject_user_id,
+            journey_id,
+            objective_id,
+            mastery: row.get("mastery"),
+            confidence: row.get("confidence"),
+            evidence_count: row.get::<i32, _>("evidence_count") as u32,
+            calculated_at: row.get("calculated_at"),
+        })
+    }
+
+    async fn persist_recommendation(
+        &self,
+        recommendation: &Recommendation,
+    ) -> Result<(), ProgressError> {
+        let evidence_ids =
+            serde_json::to_value(&recommendation.evidence_ids).map_err(storage_error)?;
+        let existing = sqlx::query(
+            r#"SELECT id
+                 FROM tb_recommendations
+                WHERE subject_user_id = $1
+                  AND journey_id = $2
+                  AND objective_id = $3
+                  AND activity_id = $4
+                  AND reason = $5
+                  AND evidence_ids = $6
+                  AND status = 'proposed'
+                ORDER BY created_at DESC
+                LIMIT 1"#,
+        )
+        .bind(recommendation.subject_user_id)
+        .bind(recommendation.journey_id)
+        .bind(recommendation.objective_id)
+        .bind(recommendation.activity_id)
+        .bind(&recommendation.reason)
+        .bind(&evidence_ids)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        if existing.is_none() {
+            sqlx::query(
+                r#"INSERT INTO tb_recommendations (
+                        subject_user_id, journey_id, objective_id, activity_id,
+                        reason, evidence_ids, status, recommendation_version
+                    ) VALUES ($1, $2, $3, $4, $5, $6, 'proposed', 1)"#,
+            )
+            .bind(recommendation.subject_user_id)
+            .bind(recommendation.journey_id)
+            .bind(recommendation.objective_id)
+            .bind(recommendation.activity_id)
+            .bind(&recommendation.reason)
+            .bind(evidence_ids)
+            .execute(&self.pool)
+            .await
+            .map_err(storage_error)?;
+        }
+        Ok(())
     }
 }
 
@@ -48,11 +161,18 @@ impl ProgressRepository for PgProgressRepository {
         .fetch_one(&self.pool)
         .await
         .map_err(storage_error)?;
-        Ok(MasteryEvidence {
+        let evidence = MasteryEvidence {
             id: row.get("id"),
             input,
             created_at: row.get("created_at"),
-        })
+        };
+        self.refresh_snapshot(
+            evidence.input.subject_user_id,
+            evidence.input.journey_id,
+            evidence.input.objective_id,
+        )
+        .await?;
+        Ok(evidence)
     }
 
     async fn snapshot(
@@ -62,28 +182,34 @@ impl ProgressRepository for PgProgressRepository {
         objective_id: Uuid,
     ) -> Result<MasterySnapshot, ProgressError> {
         let row = sqlx::query(
-            "SELECT AVG(value)::float4 AS mastery, COUNT(*)::int AS evidence_count FROM tb_mastery_evidence WHERE subject_user_id = $1 AND journey_id = $2 AND objective_id = $3",
+            r#"SELECT mastery::float4 AS mastery,
+                      confidence::float4 AS confidence,
+                      evidence_count,
+                      calculated_at
+                 FROM tb_mastery_snapshots
+                WHERE subject_user_id = $1
+                  AND journey_id = $2
+                  AND objective_id = $3"#,
         )
         .bind(subject_user_id)
         .bind(journey_id)
         .bind(objective_id)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(storage_error)?;
-        let evidence_count: i32 = row.get("evidence_count");
-        if evidence_count == 0 {
-            return Err(ProgressError::NotFound);
+        if let Some(row) = row {
+            return Ok(MasterySnapshot {
+                subject_user_id,
+                journey_id,
+                objective_id,
+                mastery: row.get("mastery"),
+                confidence: row.get("confidence"),
+                evidence_count: row.get::<i32, _>("evidence_count") as u32,
+                calculated_at: row.get("calculated_at"),
+            });
         }
-        let mastery: f32 = row.get("mastery");
-        Ok(MasterySnapshot {
-            subject_user_id,
-            journey_id,
-            objective_id,
-            mastery,
-            confidence: (evidence_count as f32 / 3.0).min(1.0),
-            evidence_count: evidence_count as u32,
-            calculated_at: OffsetDateTime::now_utc(),
-        })
+        self.refresh_snapshot(subject_user_id, journey_id, objective_id)
+            .await
     }
 
     async fn recommend_weakest(
@@ -130,14 +256,16 @@ impl ProgressRepository for PgProgressRepository {
         .into_iter()
         .map(|row| row.get("id"))
         .collect();
-        Ok(Recommendation {
+        let recommendation = Recommendation {
             subject_user_id,
             journey_id,
             objective_id,
             activity_id,
             reason: "This objective has the weakest available evidence.".to_string(),
             evidence_ids,
-        })
+        };
+        self.persist_recommendation(&recommendation).await?;
+        Ok(recommendation)
     }
 
     async fn record_streak_event(
