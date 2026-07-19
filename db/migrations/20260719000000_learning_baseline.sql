@@ -423,6 +423,25 @@ CREATE TABLE tb_mastery_snapshots (
     UNIQUE (subject_user_id, journey_id, objective_id)
 );
 
+CREATE TABLE tb_recommendations (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v7(),
+    subject_user_id uuid NOT NULL REFERENCES tb_users (id) ON DELETE CASCADE,
+    journey_id uuid NOT NULL REFERENCES tb_learning_journeys (id) ON DELETE CASCADE,
+    objective_id uuid REFERENCES tb_journey_objectives (id) ON DELETE SET NULL,
+    activity_id uuid NOT NULL REFERENCES tb_activities (id) ON DELETE RESTRICT,
+    source_generation_run_id uuid REFERENCES tb_generation_runs (id) ON DELETE SET NULL,
+    reason text NOT NULL,
+    evidence_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+    status text NOT NULL DEFAULT 'proposed',
+    recommendation_version integer NOT NULL DEFAULT 1,
+    expires_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT tb_recommendations_status_check CHECK (status IN ('proposed', 'accepted', 'dismissed', 'expired')),
+    CONSTRAINT tb_recommendations_version_check CHECK (recommendation_version > 0)
+);
+CREATE INDEX tb_recommendations_subject_status ON tb_recommendations (subject_user_id, status, created_at DESC);
+
 CREATE TABLE tb_streak_events (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v7(),
     subject_user_id uuid NOT NULL REFERENCES tb_users (id) ON DELETE CASCADE,
@@ -487,6 +506,8 @@ FOR EACH ROW EXECUTE FUNCTION fn_update_updated_at();
 CREATE TRIGGER tr_attempts_updated_at BEFORE UPDATE ON tb_attempts
 FOR EACH ROW EXECUTE FUNCTION fn_update_updated_at();
 CREATE TRIGGER tr_attempt_answers_updated_at BEFORE UPDATE ON tb_attempt_answers
+FOR EACH ROW EXECUTE FUNCTION fn_update_updated_at();
+CREATE TRIGGER tr_recommendations_updated_at BEFORE UPDATE ON tb_recommendations
 FOR EACH ROW EXECUTE FUNCTION fn_update_updated_at();
 GRANT USAGE ON SCHEMA public TO ame_app;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ame_app;
