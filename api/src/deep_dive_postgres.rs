@@ -1,0 +1,140 @@
+//! PostgreSQL implementation of the evidence-linked deep-dive contract.
+
+use crate::{
+    deep_dive::DeepDiveRepository,
+    domain::{
+        deep_dive::{CreateDeepDive, DeepDive, DeepDiveError, validate_deep_dive},
+        question::ContentReviewStatus,
+    },
+};
+use async_trait::async_trait;
+use serde_json::json;
+use sqlx::{PgPool, Row};
+use uuid::Uuid;
+
+#[derive(Clone)]
+pub struct PgDeepDiveRepository {
+    pool: PgPool,
+}
+
+impl PgDeepDiveRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl DeepDiveRepository for PgDeepDiveRepository {
+    async fn create(&self, input: CreateDeepDive) -> Result<DeepDive, DeepDiveError> {
+        validate_deep_dive(&input)?;
+        let body = json!({
+            "title": input.title,
+            "body": input.body,
+            "example": input.example,
+            "caveats": input.caveats,
+        });
+        let row = sqlx::query(
+            r#"INSERT INTO tb_deep_dives (
+                    activity_id, subject_user_id, objective_id,
+                    triggering_evidence_id, source_actor_id, body,
+                    source_references, review_status, application_task
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING id, content_version, created_at"#,
+        )
+        .bind(input.activity_id)
+        .bind(input.subject_user_id)
+        .bind(input.objective_id)
+        .bind(input.triggering_evidence_id)
+        .bind(input.source_actor_id)
+        .bind(body)
+        .bind(json!(input.source_references))
+        .bind(review_status_value(input.review_status))
+        .bind(json!(input.application_task))
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(DeepDive {
+            id: row.get("id"),
+            input,
+            content_version: row.get::<i32, _>("content_version") as u32,
+            created_at: row.get("created_at"),
+        })
+    }
+
+    async fn get(&self, subject_user_id: Uuid, id: Uuid) -> Result<DeepDive, DeepDiveError> {
+        let row = sqlx::query(
+            "SELECT id, subject_user_id, source_actor_id, journey_id, activity_id, objective_id, triggering_evidence_id, body, source_references, review_status, application_task, content_version, created_at FROM tb_deep_dives d JOIN tb_activities a ON a.id = d.activity_id WHERE d.id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(DeepDiveError::NotFound)?;
+        if row.get::<Uuid, _>("subject_user_id") != subject_user_id {
+            return Err(DeepDiveError::SubjectMismatch);
+        }
+        let body: serde_json::Value = row.get("body");
+        Ok(DeepDive {
+            id: row.get("id"),
+            input: CreateDeepDive {
+                subject_user_id: row.get("subject_user_id"),
+                source_actor_id: row.get("source_actor_id"),
+                journey_id: row.get("journey_id"),
+                activity_id: row.get("activity_id"),
+                objective_id: row.get("objective_id"),
+                triggering_evidence_id: row.get("triggering_evidence_id"),
+                title: body
+                    .get("title")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("Deep dive")
+                    .to_string(),
+                body: body
+                    .get("body")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                example: body
+                    .get("example")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                caveats: serde_json::from_value(body.get("caveats").cloned().unwrap_or_default())
+                    .map_err(storage_error)?,
+                source_references: serde_json::from_value(row.get("source_references"))
+                    .map_err(storage_error)?,
+                application_task: row
+                    .get::<Option<serde_json::Value>, _>("application_task")
+                    .and_then(|value| value.as_str().map(ToString::to_string))
+                    .unwrap_or_default(),
+                review_status: parse_review_status(row.get("review_status"))?,
+            },
+            content_version: row.get::<i32, _>("content_version") as u32,
+            created_at: row.get("created_at"),
+        })
+    }
+}
+
+fn review_status_value(status: ContentReviewStatus) -> &'static str {
+    match status {
+        ContentReviewStatus::Draft => "draft",
+        ContentReviewStatus::Review => "review",
+        ContentReviewStatus::Approved => "approved",
+        ContentReviewStatus::Rejected | ContentReviewStatus::Retired => "rejected",
+    }
+}
+
+fn parse_review_status(value: &str) -> Result<ContentReviewStatus, DeepDiveError> {
+    match value {
+        "draft" => Ok(ContentReviewStatus::Draft),
+        "review" => Ok(ContentReviewStatus::Review),
+        "approved" => Ok(ContentReviewStatus::Approved),
+        "rejected" => Ok(ContentReviewStatus::Rejected),
+        _ => Err(DeepDiveError::Storage(format!(
+            "unknown deep-dive review status {value}"
+        ))),
+    }
+}
+
+fn storage_error(error: impl std::fmt::Display) -> DeepDiveError {
+    DeepDiveError::Storage(error.to_string())
+}
