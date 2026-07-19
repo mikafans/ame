@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "purpose": "Observable contract fixtures for the agent-first learning redesign.",
+  "contract_style": "semantic",
+  "note": "These fixtures intentionally do not prescribe HTTP route names. The API contract is selected in T00 and implemented in T05.",
+  "stories": [
+    {
+      "id": "A",
+      "name": "new_learner_intent_to_first_session",
+      "input": {
+        "intent": "I would like to learn music theory",
+        "email": "learner-a@example.test"
+      },
+      "must_create": [
+        "one learner principal",
+        "one authenticated session",
+        "one persisted learning intent",
+        "one learning goal",
+        "one learning journey",
+        "at least one objective",
+        "at least one explanation or worked example",
+        "at least one diagnostic or practice activity",
+        "one next action"
+      ],
+      "must_not_create": [
+        "duplicate learner principal on retry",
+        "duplicate journey on retry",
+        "duplicate starter activities on retry"
+      ],
+      "observable_checks": [
+        "the learner can preview the promise and objectives",
+        "the learner can start and complete the first activity",
+        "the learner receives feedback and one primary next action",
+        "the browser can resume the journey after refresh"
+      ]
+    },
+    {
+      "id": "B",
+      "name": "journey_preview_and_adjustment",
+      "input": {
+        "intent": "I want to prepare for a beginner music theory exam",
+        "email": "learner-b@example.test",
+        "current_level": "beginner",
+        "available_time": "15 minutes"
+      },
+      "must_show_before_start": [
+        "learner-language goal",
+        "observable objectives",
+        "template or journey type",
+        "estimated first-session effort",
+        "purpose of the first activity",
+        "success criteria"
+      ],
+      "must_prove": [
+        "each starter activity maps to an objective or skill",
+        "adjusting the goal changes the proposed package",
+        "an existing attempt is not rewritten by adjustment"
+      ]
+    },
+    {
+      "id": "C",
+      "name": "results_to_next_action",
+      "input": {
+        "journey_template": "learn-a-subject",
+        "topic": "music theory",
+        "answer_profile": "mixed_with_one_known_weak_objective"
+      },
+      "must_show_after_completion": [
+        "score or equivalent performance summary",
+        "item-level feedback",
+        "weak objective or skill",
+        "plain-language explanation",
+        "one primary next action"
+      ],
+      "must_prove": [
+        "shuffled multiple-choice options are graded and displayed correctly",
+        "the weak objective is supported by attempt evidence",
+        "the recommended activity can start without rebuilding the journey",
+        "the learner timeline contains both the completed and next activity"
+      ]
+    },
+    {
+      "id": "D",
+      "name": "agent_learner_co_pilot",
+      "input": {
+        "journey_template": "build-a-project",
+        "intent": "I want to learn web accessibility by improving a small site",
+        "actor": "agent",
+        "subject": "learner-d"
+      },
+      "must_prove": [
+        "agent writes are attributed to the agent actor",
+        "all resources remain owned by the learner subject",
+        "the learner can read agent-created content",
+        "cross-owner reads and writes are rejected",
+        "revocation blocks new agent writes",
+        "revocation does not delete learner history"
+      ]
+    },
+    {
+      "id": "E",
+      "name": "self_host_public_origin",
+      "input": {
+        "stack": [
+          "postgres",
+          "valkey",
+          "api",
+          "web",
+          "caddy"
+        ],
+        "email_delivery": false
+      },
+      "must_be_available": [
+        "landing page",
+        "self-hosting guidance",
+        "llms.txt",
+        "skill.json",
+        "openapi.yaml",
+        "health status"
+      ],
+      "must_prove": [
+        "the documented stack reaches its declared health or started state",
+        "the first learner story works through the Caddy origin",
+        "public documents agree between frontend and API delivery",
+        "registration does not require SMTP",
+        "the learner can resume after API or web restart"
+      ]
+    }
+  ],
+  "failure_cases": [
+    {
+      "id": "duplicate_submission",
+      "trigger": "repeat the same onboarding request with the same idempotency identity",
+      "expected": "return the existing bootstrap result without duplicate owner, journey, or activities"
+    },
+    {
+      "id": "partial_bootstrap",
+      "trigger": "fail after goal creation and retry",
+      "expected": "resume or safely complete the same journey without duplicate records"
+    },
+    {
+      "id": "expired_session",
+      "trigger": "use an expired browser session",
+      "expected": "return an explicit reauthentication state without exposing another owner"
+    },
+    {
+      "id": "provider_unavailable",
+      "trigger": "disable the configured model/provider during bootstrap",
+      "expected": "show resumable failure state and create no false learning progress"
+    },
+    {
+      "id": "cross_owner_access",
+      "trigger": "use one learner or agent credential against another learner's resource",
+      "expected": "reject the operation and record the security-relevant attempt"
+    }
+  ]
+}

@@ -547,11 +547,39 @@ Unresolved decisions are not permission to invent behavior:
 - provenance and review state for generated content;
 - whether the email identifier is required in every deployment mode.
 
+### T00 working decisions for this rework
+
+These are explicit implementation defaults, recorded here so they can be
+reviewed and changed deliberately. They are not hidden assumptions:
+
+| Decision | Rework default | Consequence |
+| --- | --- | --- |
+| Local registration | The recommended local profile is `open`; it accepts one email identifier and creates a learner session. `invite` and `password` remain explicit operator modes. | The landing flow has no password field in `open` mode. |
+| Account collision | Email alone never claims an existing account. A collision returns an explicit existing-account state and requires the configured login/claim path. | No unsafe account takeover and no fake recovery path. |
+| Recovery without mail | The MVP promises resume through the active browser session only. It does not promise email verification, magic links, or recovery mail. | A deployment needing durable recovery must configure another identity mode before release. |
+| Built-in templates | Store the three built-in template definitions as versioned structured files in the repository, loaded by the API as one source of truth. | No prompt/frontend/API copies and no template migration is needed for the first baseline. |
+| Bootstrap actor | Onboarding bootstrap runs as a scoped `system/bootstrap` actor for the newly created learner subject. External agents use the same journey service through their own actor identity. | Initial onboarding does not require minting an agent token first. |
+| Model/provider | AME does not pretend to host a model. A configured provider/agent is required for generated content; absence or failure produces a resumable unavailable state. | The stack must expose provider configuration and test the no-provider path. |
+| First activity set | All templates support explanation, example, diagnostic/practice, feedback, and next action. `exam-prep` additionally supports timed practice; `build-a-project` additionally supports an application milestone. | The activity union is small and typed before adding projects, courses, or media. |
+| Skill taxonomy | The first journey may create learner-scoped skill/topic records from the normalized intent. A shared taxonomy is deferred until evidence shows reuse. | No invented global taxonomy blocks the first learning loop. |
+| Generated content provenance | Every generated goal, objective, activity, and recommendation records source actor, template version, provider/run identity, and review/status state. | Unsupported or failed generation cannot appear as trusted progress. |
+| Public documentation | Human self-host guidance and machine contracts remain separate canonical files, delivered directly by the frontend/public origin; raw OpenAPI remains machine-readable. | A human API explorer is not implied by `/openapi.yaml`. |
+
+These defaults close T00 for implementation planning. Any change must update
+this table, the story fixtures, and the affected acceptance checks together.
+
 ## 10. Real implementation task list
 
 These IDs are the execution backlog. Dependencies are hard gates. A task is
 complete only when its deliverable and acceptance checks are present in the
 repository.
+
+Current execution status: T00 and T01 are complete; T02 is in progress with
+the built-in catalog and loader landed; T03 has not started.
+
+Checkpoint policy: commit after each bounded task or reviewable vertical slice.
+Do not combine template design, PostgreSQL schema replacement, API contracts,
+and frontend work in one commit.
 
 ### T00 — Approve product invariants
 
@@ -573,6 +601,9 @@ Deliverable: deterministic fixtures for Stories A–E, including music theory,
 exam preparation, and project learning; API, browser, database, retry, and
 cross-owner assertions.
 
+Initial fixture source: [`2026-07-19-agent-first-learning-story-fixtures.json`](./2026-07-19-agent-first-learning-story-fixtures.json).
+It is semantic by design; T00 must approve wire-level route and field names.
+
 Acceptance: each story has exact input, state transitions, observable output,
 and clean-stack commands; fixtures do not require email delivery; partial
 bootstrap, duplicate submission, expired session, and unavailable provider are
@@ -585,9 +616,29 @@ Depends on: T00, T01.
 Deliverable: the chosen single source of truth for the three templates, schema
 validation, and learner-visible preview examples.
 
+Initial source of truth: [`api/templates/index.json`](../../api/templates/index.json),
+loaded and validated by [`api/src/templates.rs`](../../api/src/templates.rs).
+
 Acceptance: each template has the complete Section 8 contract; mapping an
 intent produces a tested preview; templates cannot create undeclared activity
 types/capabilities; a change creates a new version without rewriting journeys.
+
+The three templates are sufficient for the first release because they cover the
+three distinct initial intents already required by the stories: understand a
+subject, prepare for an exam, and produce an artifact. The catalog must remain
+extensible. After the first journey loop is working, evaluate these additional
+templates as separate versioned work rather than adding arbitrary prompt
+variants:
+
+- `refresh-knowledge` — recover a previously learned topic with a short
+  diagnostic and spaced review;
+- `learn-from-source` — turn a supplied book, article, or documentation source
+  into grounded objectives and activities;
+- `teach-back` — learn by explaining a concept and receiving feedback on the
+  explanation.
+
+Each candidate requires a real story and acceptance fixture before entering the
+built-in catalog.
 
 ### T03 — Implement the clean persistence baseline
 
@@ -601,6 +652,14 @@ Acceptance: a clean volume creates it without compatibility tables, columns,
 backfills, or dual reads; ownership and actor/subject rules are explicit;
 version, idempotency, lifecycle, and objective-to-evidence linkage are
 queryable; bootstrap retries cannot duplicate starter content.
+
+Required next-task scope: replace the current PostgreSQL migration baseline with
+the new clean schema for the journey model. This is a required future task, not
+optional cleanup. It may be deferred to a separate session, but no API or
+frontend implementation should claim the redesign is complete until a clean
+PostgreSQL volume can create and exercise the new baseline. There is no data
+migration from the old model; local validation uses a clean volume and the
+deployment instructions must document that reset boundary.
 
 ### T04 — Implement self-host-first identity and registration
 
