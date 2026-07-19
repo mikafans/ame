@@ -189,6 +189,19 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert repeated_finish.status_code == 409, repeated_finish.text
 
+    forged_evidence = client.post(
+        "/api/v1/progress/evidence",
+        headers=headers,
+        json={
+            "journeyId": journey_id,
+            "objectiveId": objective_id,
+            "activityId": activity_id,
+            "value": 1,
+            "derivationVersion": 1,
+        },
+    )
+    assert forged_evidence.status_code == 422, forged_evidence.text
+
     evidence_response = client.post(
         "/api/v1/progress/evidence",
         headers=headers,
