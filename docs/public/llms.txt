@@ -6,10 +6,10 @@
 > file is the entry point and describes the entire contract.
 
 This is NOT an MCP server and there is no JSON-RPC. An agent token can call
-read-only endpoints directly (e.g., GET /v1/assessments, GET /v1/questions) and
-must use the run-door dispatcher `POST /v1/agents/run` for all writes. Agents
-never take assessments and never hold their own sessions; the learner REST
-surface is human-only.
+read-only endpoints directly (e.g., GET /v1/assessments, GET /v1/questions)
+and uses the run-door dispatcher `POST /v1/agents/run` for writes and for the
+owner-scoped learning journey read. Agents never take assessments and never
+hold their own sessions; the learner REST surface is human-only.
 
 ## Getting a key
 
@@ -25,10 +25,9 @@ The key travels on every request as `Authorization: Bearer <apiKey>`. The secret
 is shown once at creation and stored only as a hash.
 
 **Valid scopes**: `assessment.read`, `assessment.write`, `attempt.read`,
-`attempt.write`, `stats.read`. These are the only scopes an agent token can
-hold — each maps to one or more tools below. `admin` and the human-only REST
-scopes (`feedback.write`, `plan.read`, `plan.write`) cannot be granted to an
-agent.
+`attempt.write`, `stats.read`, `plan.read`. These are the scopes an agent token
+can hold — each maps to one or more tools below. `admin`, `feedback.write`, and
+`plan.write` cannot be granted to an agent.
 
 ## REST API and the run-door dispatcher
 
@@ -116,6 +115,11 @@ A scope mismatch returns `403`; a malformed `params` returns `422`.
   `params: { cursor?, limit? }` (scope `assessment.read`).
 - `stats.user` — the owner's aggregate learning statistics.
   `GET /v1/me/stats` (scope `stats.read`).
+
+**Learning journey (run-door read, scope `plan.read`)**
+- `learning.journey.get` — read the owner's intent, objectives, activities,
+  persisted response evidence, next recommendation, and source attribution.
+  `POST /v1/agents/run` with `params: { id }`.
 
 **Self-management (no scope required, via POST /v1/agents/run)**
 - `profile.get` — the agent's own config (label, focus tags, goal, memory) plus the

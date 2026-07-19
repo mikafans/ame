@@ -99,16 +99,11 @@ impl Scope {
     }
 
     /// Whether an agent token may hold this scope. Agents reach the platform
-    /// only through the run-door (`POST /v1/agents/run`); `admin` is role-gated,
-    /// and `feedback.write` / `plan.read` / `plan.write` have no agent tool
-    /// behind them (they gate human-only REST routes). Granting any of these to
-    /// an agent would be a dormant no-op or an escalation footgun. The human
-    /// personal-token surface keeps all scopes.
+    /// through the run-door (`POST /v1/agents/run`); `plan.read` is grantable
+    /// because it backs the agent's owner-scoped learning journey read tool.
+    /// Write-only human scopes remain unavailable to agents.
     pub fn is_agent_grantable(&self) -> bool {
-        !matches!(
-            self,
-            Scope::Admin | Scope::FeedbackWrite | Scope::PlanRead | Scope::PlanWrite
-        )
+        !matches!(self, Scope::Admin | Scope::FeedbackWrite | Scope::PlanWrite)
     }
 }
 

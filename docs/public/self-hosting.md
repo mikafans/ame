@@ -1,11 +1,42 @@
 # Self-hosting AME
 
-This is the operator guide for running AME on one Linux host with Docker or
-Podman Compose and a TLS reverse proxy. It is separate from the agent guide:
+This is the operator guide for running AME on one host with Docker or Podman
+Compose. It is separate from the agent guide:
 `llms.txt` describes the public HTTP agent interface for AI clients; it is not a
 deployment manifest or an installation guide.
 
-## Architecture
+## Recommended local stack
+
+Use the repository's complete local stack first. It includes the same topology
+used by the browser-facing deployment: Caddy, Next.js, the Rust API, Postgres,
+and Valkey.
+
+```bash
+make local-up
+make local-uiux
+```
+
+Open `http://localhost:28800`. The stack provides:
+
+```text
+localhost:28800 -> ame-caddy -> ame-web:3000
+                           \-> ame-api:8080 -> ame-postgres:5432
+                                           \-> ame-valkey:6379
+```
+
+The local Caddy container owns the public origin and routes `/v1/*`, health
+checks, and public documents consistently. Do not add a system-level Caddy to
+test this stack. Stop it with:
+
+```bash
+make local-down
+```
+
+If you need a completely fresh clean-slate database during the rework, remove
+the local `ame-local-postgres` volume deliberately; normal restarts preserve
+data.
+
+## Production architecture
 
 ```text
 Internet -> Caddy/nginx -> web:3000
@@ -23,10 +54,11 @@ clients connecting directly to its port.
 
 - Docker Compose v2 or a working Podman machine with Compose support
 - DNS pointing your hostname at the server
-- Caddy, nginx, or another TLS-capable reverse proxy
+- Caddy, nginx, or another TLS-capable reverse proxy for an internet-facing
+  deployment
 - Persistent backup storage for Postgres
 
-## Configure and start
+## Configure and start a production deployment
 
 ```bash
 cp .env.example .env

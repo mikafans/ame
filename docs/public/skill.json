@@ -22,6 +22,7 @@
       "assessment.stats",
       "question.list",
       "activity.list",
+      "learning.journey.get",
       "stats.user",
       "attempt.list",
       "assessment.create",
@@ -704,6 +705,24 @@
       "name": "activity.list",
       "path": "/v1/agents/activity",
       "scope": "assessment.read"
+    },
+    {
+      "description": "Read the owner's intent, objectives, activities, persisted evidence-backed recommendation, and source attribution for a learning journey.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.journey.get",
+      "path": "/v1/agents/run",
+      "scope": "plan.read"
     },
     {
       "description": "Read the caller's aggregate learning statistics.",

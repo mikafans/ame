@@ -263,7 +263,7 @@ async fn create_agent_rejects_non_grantable_scope() {
 
     let auth_header = format!("lgn_{token_id}_{secret}");
 
-    // 2. Attempt to create agent with plan.read scope -> should 422
+    // 2. plan.read is grantable because it backs the agent learning-journey tool.
     let res = client
         .post(format!("{base_url}/v1/me/agents"))
         .header("Authorization", format!("Bearer {auth_header}"))
@@ -275,18 +275,7 @@ async fn create_agent_rejects_non_grantable_scope() {
         .await
         .unwrap();
 
-    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
-    let body: serde_json::Value = res.json().await.unwrap();
-    // Validation errors have nested structure: error.details.fields
-    let error_msg = body["error"]["details"]["fields"][0]["message"].as_str();
-    assert!(
-        error_msg.is_some()
-            && error_msg
-                .unwrap()
-                .contains("scope not grantable to an agent"),
-        "Unexpected error message: {:?}",
-        body
-    );
+    assert_eq!(res.status(), StatusCode::CREATED);
 
     // 3. Attempt to create agent with feedback.write scope -> should 422
     let res = client
@@ -352,7 +341,7 @@ async fn create_agent_rejects_non_grantable_scope() {
         .header("Authorization", format!("Bearer {auth_header}"))
         .json(&json!({
             "name": "invalid-token",
-            "scopes": ["plan.read"]
+            "scopes": ["plan.write"]
         }))
         .send()
         .await
