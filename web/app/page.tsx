@@ -101,7 +101,7 @@ function LearningPreviewCard({
   prompt: string;
 }) {
   return (
-    <div className="border border-neutral-200 bg-white p-5 text-neutral-900 shadow-[10px_10px_0_#dbeafe] sm:p-7">
+    <div className="border border-neutral-300 bg-white p-5 text-neutral-900 shadow-[10px_10px_0_#c7e86b] sm:p-7">
       <div className="space-y-5">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-blue-600">
@@ -184,12 +184,12 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f0] text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="min-h-screen bg-neutral-100 text-neutral-950 dark:bg-neutral-950 dark:text-neutral-100">
       <div className="mx-auto max-w-7xl px-4 sm:px-8">
-        <header className="flex min-h-20 items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800">
+        <header className="flex min-h-20 items-center justify-between gap-4 border-b border-neutral-300 dark:border-neutral-800">
           <Logo size={32} />
           <div className="flex items-center gap-2 sm:gap-6">
-            <nav className="hidden items-center gap-6 text-sm text-neutral-600 dark:text-neutral-300 sm:flex">
+            <nav className="hidden items-center gap-6 text-sm text-neutral-700 dark:text-neutral-300 sm:flex">
               <a
                 className="transition hover:text-neutral-950 dark:hover:text-white"
                 href="#benefits"
@@ -213,7 +213,7 @@ export default function LandingPage() {
               type="button"
               aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
               onClick={toggle}
-              className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-600 outline-none transition hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 outline-none transition hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-lime-500 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               {mode === "dark" ? (
                 <Sun className="size-4" />
@@ -231,8 +231,8 @@ export default function LandingPage() {
         </header>
 
         <main>
-          <section className="relative overflow-hidden border-x border-b border-neutral-200 bg-neutral-950 px-6 py-14 text-white sm:px-10 md:px-14 md:py-20">
-            <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-neutral-800 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.04)_100%)] md:block" />
+          <section className="relative overflow-hidden border border-neutral-700 bg-neutral-950 px-6 py-14 text-white shadow-[0_24px_70px_rgba(0,0,0,0.16)] sm:px-10 md:px-14 md:py-20">
+            <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-neutral-700 bg-neutral-950 md:block" />
             <div className="relative grid items-start gap-12 md:grid-cols-[0.85fr_1.15fr] md:gap-20">
               <div className="space-y-8">
                 <span className="inline-flex border-l-2 border-lime-400 pl-3 font-mono text-[11px] tracking-[0.14em] text-lime-300">
@@ -241,7 +241,7 @@ export default function LandingPage() {
                 <h1 className="max-w-xl text-[42px] font-extrabold leading-[0.96] tracking-[-0.06em] sm:text-6xl md:text-[72px]">
                   Study what you don&apos;t know yet.
                 </h1>
-                <p className="max-w-xl text-[17px] leading-7 text-neutral-400 sm:text-[19px]">
+                <p className="max-w-xl text-[17px] leading-7 text-neutral-300 sm:text-[19px]">
                   Tell AME what you want to learn. It turns your intent into a
                   focused first journey, then gives you one clear next step.
                 </p>
@@ -255,7 +255,7 @@ export default function LandingPage() {
                       value={prompt}
                       onChange={(event) => setPrompt(event.target.value)}
                       placeholder="I'd like to learn music theory"
-                      className="min-h-11 flex-1 rounded-full border border-neutral-700 bg-neutral-900 px-5 text-sm text-white outline-none placeholder:text-neutral-500 focus:border-lime-400 focus:ring-2 focus:ring-lime-400/30"
+                      className="min-h-11 flex-1 rounded-full border border-neutral-600 bg-neutral-900 px-5 text-sm text-white outline-none placeholder:text-neutral-400 focus:border-lime-400 focus:ring-2 focus:ring-lime-400/30"
                     />
                     <Button
                       type="submit"
@@ -272,10 +272,10 @@ export default function LandingPage() {
                     </p>
                   )}
                 </form>
-                <div className="flex flex-col gap-3 border-t border-neutral-800 pt-5 sm:flex-row">
+                <div className="flex flex-col gap-3 border-t border-neutral-700 pt-5 sm:flex-row">
                   <Button
                     asChild
-                    className="rounded-full bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
+                    className="rounded-full bg-lime-400 px-6 py-3 font-bold text-neutral-950 hover:bg-lime-300"
                   >
                     <Link href={entryHref}>
                       {entryLabel}
@@ -285,7 +285,7 @@ export default function LandingPage() {
                   <Button
                     asChild
                     variant="outline"
-                    className="rounded-full border-neutral-600 bg-transparent px-6 py-3 text-white hover:border-white hover:bg-white/10 hover:text-white"
+                    className="rounded-full border-neutral-500 bg-transparent px-6 py-3 text-white hover:border-white hover:bg-white/10 hover:text-white"
                   >
                     <Link href={sampleHref}>{sampleLabel}</Link>
                   </Button>
@@ -300,7 +300,7 @@ export default function LandingPage() {
                 ) : (
                   <QuizPreview />
                 )}
-                <p className="max-w-md text-xs leading-5 text-neutral-500">
+                <p className="max-w-md text-xs leading-5 text-neutral-400">
                   A first signal is enough. AME turns it into a small, useful
                   beginning and leaves the next decision visible.
                 </p>
