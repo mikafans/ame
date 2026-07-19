@@ -17,6 +17,7 @@ use crate::{
     attempt_postgres::PgAttemptRepository,
     auth::extractor::AuthenticatedUser,
     domain::{
+        assessment::AssessmentStatus,
         attempt::{Attempt, AttemptError, StartAttempt},
         error::{ApiError, FieldError},
     },
@@ -83,6 +84,11 @@ pub async fn start_attempt(
         .get_assessment(auth.owner_id(), assessment_id)
         .await
         .map_err(|error| map_attempt_error(AttemptError::Storage(error.to_string())))?;
+    if assessment.status != AssessmentStatus::Published {
+        return Err(ApiError::NotFound {
+            resource: "assessment",
+        });
+    }
     let attempt = PgAttemptRepository::new(state.pool)
         .start(
             StartAttempt {

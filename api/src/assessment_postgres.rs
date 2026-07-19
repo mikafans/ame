@@ -140,7 +140,7 @@ impl AssessmentRepository for PgAssessmentRepository {
         activity_id: Uuid,
     ) -> Result<Option<Assessment>, AssessmentRepositoryError> {
         let row = sqlx::query(
-            "SELECT id, subject_user_id, source_actor_id, activity_id, version, mode, status, created_at FROM tb_assessments WHERE activity_id = $1 AND subject_user_id = $2",
+            "SELECT id, subject_user_id, source_actor_id, activity_id, version, mode, status, created_at FROM tb_assessments WHERE activity_id = $1 AND subject_user_id = $2 AND status = 'published'",
         )
         .bind(activity_id)
         .bind(subject_user_id)

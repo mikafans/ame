@@ -69,6 +69,34 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert question_response.status_code == 200, question_response.text
     question = question_response.json()
 
+    draft_activity = journey_body["activities"][1]
+    draft_assessment_response = client.post(
+        "/api/v1/assessments",
+        headers=headers,
+        json={
+            "activityId": draft_activity["id"],
+            "mode": "practice",
+            "status": "draft",
+            "items": [
+                {
+                    "questionId": question["questionId"],
+                    "questionVersion": question["version"],
+                    "orderIndex": 0,
+                    "points": 1,
+                }
+            ],
+        },
+    )
+    assert draft_assessment_response.status_code == 200, draft_assessment_response.text
+    assert (
+        client.get(
+            "/api/v1/assessments",
+            params={"activityId": draft_activity["id"]},
+            headers=headers,
+        ).status_code
+        == 404
+    )
+
     assessment_response = client.post(
         "/api/v1/assessments",
         headers=headers,

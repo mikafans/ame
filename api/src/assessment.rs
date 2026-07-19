@@ -123,6 +123,7 @@ impl AssessmentRepository for InMemoryAssessmentRepository {
             .find(|assessment| {
                 assessment.activity_id == activity_id
                     && assessment.subject_user_id == subject_user_id
+                    && assessment.status == crate::domain::assessment::AssessmentStatus::Published
             })
             .cloned())
     }
