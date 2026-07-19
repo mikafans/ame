@@ -1190,6 +1190,33 @@ paths:
           description: Activity is not ready
       security:
       - bearer_auth: []
+  /v1/learning/sessions/{id}:
+    get:
+      tags:
+      - learning
+      summary: GET /v1/learning/sessions/{id} — retrieve a learner's resumable session.
+      operationId: get_learning_session
+      parameters:
+      - name: id
+        in: path
+        description: Learning session ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Learning session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Session does not exist for this learner
+      security:
+      - bearer_auth: []
   /v1/me:
     get:
       tags:

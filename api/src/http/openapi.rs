@@ -76,6 +76,7 @@ use crate::{
         crate::http::auth::logout,
         crate::http::onboarding::start_learning,
         crate::http::learning::get_journey,
+        crate::http::learning::get_learning_session,
         crate::http::learning::start_activity,
         crate::http::me::get_me,
         crate::http::me::list_agents,

@@ -48,6 +48,7 @@ fn derive_tool_name(method: &str, path: &str) -> String {
         ("POST", "/v1/messages") => "feedback.send",
         ("GET", "/v1/agents/activity") => "agent.activity",
         ("GET", "/v1/learning/journeys/{id}") => "learning.journey.get",
+        ("GET", "/v1/learning/sessions/{id}") => "learning.session.get",
         ("POST", "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start") => {
             "learning.activity.start"
         }

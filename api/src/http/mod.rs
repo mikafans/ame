@@ -77,6 +77,7 @@ pub async fn agent_guard_middleware(
                 | ("GET", "/v1/me/stats")
                 | ("GET", "/v1/agents/activity")
                 | ("GET", "/v1/learning/journeys/{id}")
+                | ("GET", "/v1/learning/sessions/{id}")
                 | (
                     "POST",
                     "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"

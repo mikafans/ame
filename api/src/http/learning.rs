@@ -122,6 +122,7 @@ pub struct LearningJourneyResponse {
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/learning/journeys/{id}", get(get_journey))
+        .route("/v1/learning/sessions/{id}", get(get_learning_session))
         .route(
             "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
             post(start_activity),
@@ -234,6 +235,32 @@ pub async fn start_activity(
         .await
         .map_err(map_learning_error)?;
     Ok((StatusCode::CREATED, Json(session_response(session))))
+}
+
+/// GET /v1/learning/sessions/{id} — retrieve a learner's resumable session.
+#[utoipa::path(
+    get,
+    path = "/v1/learning/sessions/{id}",
+    params(("id" = Uuid, Path, description = "Learning session ID")),
+    responses(
+        (status = 200, description = "Learning session", body = LearningSessionResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Session does not exist for this learner")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn get_learning_session(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<LearningSessionResponse>, ApiError> {
+    let repository = PgLearningRepository::new(state.pool);
+    let session = repository
+        .get_learning_session(auth.owner_id(), id)
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(session_response(session)))
 }
 
 fn objective_response(objective: LearningObjective) -> LearningObjectiveResponse {
