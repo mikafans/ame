@@ -188,6 +188,9 @@ test("learner can complete an agent-provided assessment and open its deep dive",
 
   await expect(page.getByText("Assessment complete")).toBeVisible();
   await expect(
+    page.getByText("correct", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
     page.getByRole("heading", {
       name: "A coordinator gives the system a shared decision point",
     }),
