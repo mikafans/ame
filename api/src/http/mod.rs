@@ -76,6 +76,7 @@ pub async fn agent_guard_middleware(
                 | ("GET", "/v1/me/attempts")
                 | ("GET", "/v1/me/stats")
                 | ("GET", "/v1/agents/activity")
+                | ("GET", "/v1/learning/journeys/{id}")
                 | ("POST", "/v1/agents/run")
                 | ("GET", "/llms.txt")
                 | ("GET", "/skill.json")
@@ -143,6 +144,7 @@ pub mod explore;
 pub mod export;
 pub mod health;
 pub mod idempotency;
+pub mod learning;
 pub mod me;
 pub mod messages;
 pub mod onboarding;
@@ -213,6 +215,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(me::router(state.clone()))
         .merge(agents::logged_router(state.clone()))
         .merge(messages::router(state.clone()))
+        .merge(learning::router(state.clone()))
         .route("/v1/me/export", axum::routing::get(export::export_data))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

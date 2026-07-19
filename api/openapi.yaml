@@ -1125,6 +1125,33 @@ paths:
           description: Unauthorized
       security:
       - bearer_auth: []
+  /v1/learning/journeys/{id}:
+    get:
+      tags:
+      - learning
+      summary: GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey.
+      operationId: get_journey
+      parameters:
+      - name: id
+        in: path
+        description: Learning journey ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Learning journey and its goal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningJourneyResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Journey does not exist for this learner
+      security:
+      - bearer_auth: []
   /v1/me:
     get:
       tags:
@@ -3330,6 +3357,14 @@ components:
             $ref: '#/components/schemas/GetSessionQuestion'
         session:
           $ref: '#/components/schemas/Session'
+    GoalStatus:
+      type: string
+      enum:
+      - proposed
+      - active
+      - paused
+      - completed
+      - failed
     GradeAttemptBody:
       type: object
       required:
@@ -3391,6 +3426,81 @@ components:
           - 'null'
           format: double
         questionId:
+          type: string
+          format: uuid
+    JourneyStatus:
+      type: string
+      enum:
+      - onboarding
+      - active
+      - paused
+      - completed
+      - failed
+    LearningGoalResponse:
+      type: object
+      required:
+      - id
+      - subjectUserId
+      - sourceActorId
+      - rawIntent
+      - normalizedStatement
+      - status
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        normalizedStatement:
+          type: string
+        rawIntent:
+          type: string
+        sourceActorId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/GoalStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        templateVersionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    LearningJourneyResponse:
+      type: object
+      required:
+      - id
+      - goalId
+      - subjectUserId
+      - sourceActorId
+      - promise
+      - status
+      - createdAt
+      - goal
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        goal:
+          $ref: '#/components/schemas/LearningGoalResponse'
+        goalId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        promise:
+          type: string
+        sourceActorId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/JourneyStatus'
+        subjectUserId:
           type: string
           format: uuid
     ListAgentsResponse:

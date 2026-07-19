@@ -4,9 +4,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use time::OffsetDateTime;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum GoalStatus {
     Proposed,
@@ -16,7 +17,7 @@ pub enum GoalStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum JourneyStatus {
     Onboarding,

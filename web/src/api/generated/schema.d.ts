@@ -508,6 +508,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/learning/journeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /v1/learning/journeys/{id} — retrieve the caller's resumable journey. */
+        get: operations["get_journey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -1398,6 +1415,8 @@ export interface components {
             questions: components["schemas"]["GetSessionQuestion"][];
             session: components["schemas"]["Session"];
         };
+        /** @enum {string} */
+        GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
         GradeAttemptBody: {
             notes?: string | null;
             /** Format: double */
@@ -1424,6 +1443,38 @@ export interface components {
             discriminationIdx?: number | null;
             /** Format: uuid */
             questionId: string;
+        };
+        /** @enum {string} */
+        JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
+        LearningGoalResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            normalizedStatement: string;
+            rawIntent: string;
+            /** Format: uuid */
+            sourceActorId: string;
+            status: components["schemas"]["GoalStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            /** Format: uuid */
+            templateVersionId?: string | null;
+        };
+        LearningJourneyResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            goal: components["schemas"]["LearningGoalResponse"];
+            /** Format: uuid */
+            goalId: string;
+            /** Format: uuid */
+            id: string;
+            promise: string;
+            /** Format: uuid */
+            sourceActorId: string;
+            status: components["schemas"]["JourneyStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
         };
         ListAgentsResponse: {
             agents: components["schemas"]["AgentSummary"][];
@@ -3298,6 +3349,43 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_journey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning journey ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Learning journey and its goal */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningJourneyResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey does not exist for this learner */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
