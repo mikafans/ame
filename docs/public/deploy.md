@@ -4,7 +4,7 @@ This directory documents the supported deploy shapes. The repo ships container
 artifacts but **not** opinionated infra-as-code — bring your own k8s manifests,
 Terraform, Helm chart, etc.
 
-For a complete single-host installation, see [`../docs/public/self-hosting.md`](../docs/public/self-hosting.md).
+For a complete single-host installation, see [`self-hosting.md`](self-hosting.md).
 
 ## Artifacts
 
@@ -30,8 +30,8 @@ make docker-up      # bring the stack up (-d)
 make docker-down
 ```
 
-The compose stack runs the sqlx migration job once, waits for healthy postgres,
-then starts the API.
+The API runs embedded SQLx migrations during startup, waits for healthy Postgres
+and Valkey, then serves the web application and API.
 
 ## Production checklist
 

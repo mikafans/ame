@@ -10,7 +10,7 @@ users and external clients.
 - [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/skill.json`.
 
 Build and runtime projections must consume these files; do not create parallel
-copies under `api/`, `deploy/`, or `web/`. The public origin serves all four
+copies under `api/`, `deploy/`, or `web/`. The public origin serves the three
 machine-readable documents directly from the frontend; the API's direct routes
 remain only for compatibility with callers that connect to the API port.
 

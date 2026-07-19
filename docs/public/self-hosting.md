@@ -13,9 +13,11 @@ Internet -> Caddy/nginx -> web:3000
                                      \-> valkey:6379
 ```
 
-Use one public origin for the browser and API. The API owns `/v1/*`, `/healthz`,
-`/readyz`, `/llms.txt`, `/skill.json`, and `/openapi.yaml`; all other paths go
-to Next.js.
+Use one public origin for the browser and API. Caddy sends `/v1/*`, `/healthz`,
+and `/readyz` to the API; all other paths go to Next.js. The canonical public
+documents (`/llms.txt`, `/skill.json`, and `/openapi.yaml`) are served by the
+frontend from `docs/public`. The API also exposes compatibility routes for
+clients connecting directly to its port.
 
 ## Requirements
 
@@ -69,7 +71,7 @@ podman machine start
 
 ## Reverse proxy
 
-The repository includes [`Caddyfile.example`](Caddyfile.example). Replace the
+The repository includes [`Caddyfile.example`](../../deploy/Caddyfile.example). Replace the
 hostname and load it into Caddy:
 
 ```bash

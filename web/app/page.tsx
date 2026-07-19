@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, ExternalLink, Moon, Sun } from "lucide-react";
+import { ArrowRight, Check, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useColorMode } from "@/components/ThemeRegistry";
@@ -275,14 +275,6 @@ export default function LandingPage() {
           </section>
         </main>
       </div>
-
-      <Link
-        href="/self-hosting"
-        className="fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-neutral-950 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-black/20 transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 dark:bg-white dark:text-neutral-950 dark:hover:bg-blue-200 dark:focus-visible:ring-offset-neutral-950"
-      >
-        Self-host AME
-        <ExternalLink className="size-3.5" />
-      </Link>
 
       <footer className="border-t border-neutral-200 px-4 py-6 text-sm text-neutral-500 dark:border-neutral-800">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
