@@ -819,7 +819,7 @@ export interface components {
             /** Format: uuid */
             activityId: string;
             /** Format: uuid */
-            attemptId?: string | null;
+            attemptId: string;
             /** Format: int32 */
             derivationVersion: number;
             /** Format: uuid */
@@ -833,7 +833,7 @@ export interface components {
             /** Format: uuid */
             activityId: string;
             /** Format: uuid */
-            attemptId?: string | null;
+            attemptId: string;
             /** Format: int32 */
             derivationVersion: number;
             /** Format: uuid */

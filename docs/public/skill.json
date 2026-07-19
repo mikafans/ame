@@ -460,7 +460,7 @@
       "path": "/api/v1/learning/journeys/{journey_id}/attempts"
     },
     {
-      "description": "Record rebuildable mastery evidence linked to a learner activity or attempt.",
+      "description": "Record rebuildable mastery evidence from a completed learner attempt.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -493,6 +493,7 @@
           "journeyId",
           "objectiveId",
           "activityId",
+          "attemptId",
           "value",
           "derivationVersion"
         ],

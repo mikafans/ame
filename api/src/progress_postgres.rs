@@ -56,6 +56,8 @@ impl PgProgressRepository {
                                  WHERE at.id = $5
                                    AND at.subject_user_id = $2
                                    AND at.activity_id = $4
+                                   AND at.status = 'graded'
+                                   AND at.review_status IN ('not_required', 'complete')
                                    AND ls.journey_id = $1
                             )
                        )

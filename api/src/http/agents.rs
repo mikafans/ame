@@ -139,10 +139,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.progress.evidence",
-            "Record rebuildable mastery evidence linked to a learner activity or attempt.",
+            "Record rebuildable mastery evidence from a completed learner attempt.",
             "POST",
             "/api/v1/progress/evidence",
-            json!({"type":"object","required":["journeyId","objectiveId","activityId","value","derivationVersion"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"attemptId":{"type":"string","format":"uuid"},"value":{"type":"number","minimum":0,"maximum":1},"derivationVersion":{"type":"integer","minimum":1}}}),
+            json!({"type":"object","required":["journeyId","objectiveId","activityId","attemptId","value","derivationVersion"],"properties":{"journeyId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"attemptId":{"type":"string","format":"uuid"},"value":{"type":"number","minimum":0,"maximum":1},"derivationVersion":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.progress.snapshot",

@@ -1553,6 +1553,7 @@ components:
       - journeyId
       - objectiveId
       - activityId
+      - attemptId
       - value
       - derivationVersion
       properties:
@@ -1560,9 +1561,7 @@ components:
           type: string
           format: uuid
         attemptId:
-          type:
-          - string
-          - 'null'
+          type: string
           format: uuid
         derivationVersion:
           type: integer
@@ -1584,6 +1583,7 @@ components:
       - journeyId
       - objectiveId
       - activityId
+      - attemptId
       - value
       - derivationVersion
       properties:
@@ -1591,9 +1591,7 @@ components:
           type: string
           format: uuid
         attemptId:
-          type:
-          - string
-          - 'null'
+          type: string
           format: uuid
         derivationVersion:
           type: integer
