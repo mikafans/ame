@@ -280,8 +280,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     other_streaks = client.get(
         f"/api/v1/progress/{journey_id}/streaks", headers=other_headers
     )
-    assert other_streaks.status_code == 200, other_streaks.text
-    assert other_streaks.json() == []
+    assert other_streaks.status_code == 404, other_streaks.text
     other_attempt_history = client.get(
         f"/api/v1/learning/journeys/{journey_id}/attempts", headers=other_headers
     )

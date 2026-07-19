@@ -13,9 +13,11 @@ use crate::{
     auth::extractor::AuthenticatedUser,
     domain::{
         error::{ApiError, FieldError},
+        learning::LearningRepository,
         progress::{MasteryEvidenceInput, ProgressError, StreakEventInput},
     },
     http::AppState,
+    learning_postgres::PgLearningRepository,
     progress::ProgressRepository,
     progress_postgres::PgProgressRepository,
 };
@@ -175,6 +177,18 @@ pub async fn list_streaks(
     auth: AuthenticatedUser,
     Path(journey_id): Path<Uuid>,
 ) -> Result<Json<Vec<StreakResponse>>, ApiError> {
+    PgLearningRepository::new(state.pool.clone())
+        .list_activities(auth.owner_id(), journey_id)
+        .await
+        .map_err(|error| match error {
+            crate::domain::learning::LearningRepositoryError::NotFound { .. }
+            | crate::domain::learning::LearningRepositoryError::SubjectMismatch => {
+                ApiError::NotFound {
+                    resource: "journey",
+                }
+            }
+            other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
+        })?;
     let events = PgProgressRepository::new(state.pool)
         .list_streak_events(auth.owner_id(), journey_id)
         .await
