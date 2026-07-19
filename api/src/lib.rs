@@ -16,5 +16,6 @@ pub mod learning;
 pub mod learning_postgres;
 pub mod onboarding;
 pub mod ratelimit;
+pub mod session;
 pub mod settings;
 pub mod templates;
