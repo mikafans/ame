@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
 pub mod assessment;
+pub mod assessment_postgres;
 pub mod audit;
 pub mod auth;
 pub mod authentication;
@@ -16,6 +17,7 @@ pub mod learning;
 pub mod learning_postgres;
 pub mod onboarding;
 pub mod question;
+pub mod question_postgres;
 pub mod ratelimit;
 pub mod session;
 pub mod settings;
