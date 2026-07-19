@@ -217,6 +217,12 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         },
     )
     assert cross_owner_evidence.status_code == 404, cross_owner_evidence.text
+    cross_owner_recommendation = client.post(
+        f"/api/v1/progress/{journey_id}/recommendation",
+        headers=other_headers,
+        json={"objectives": [{"objectiveId": objective_id, "activityId": activity_id}]},
+    )
+    assert cross_owner_recommendation.status_code == 404, cross_owner_recommendation.text
 
     snapshot = client.get(
         f"/api/v1/progress/{journey_id}/objectives/{objective_id}", headers=headers
