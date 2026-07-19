@@ -241,6 +241,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/generation-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/generation-runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["transition"];
+        trace?: never;
+    };
     "/api/v1/learning/journeys": {
         parameters: {
             query?: never;
@@ -601,7 +633,7 @@ export interface components {
             };
         } | {
             Validation: components["schemas"]["FieldError"][];
-        } | "SessionFinished" | "LearningSessionResultConflict" | "IdempotencyConflict" | "TooManyRequests" | "Maintenance" | {
+        } | "SessionFinished" | "LearningSessionResultConflict" | "IdempotencyConflict" | "GenerationStateConflict" | "TooManyRequests" | "Maintenance" | {
             Internal: string;
         };
         AssessmentActivityQuery: {
@@ -821,6 +853,23 @@ export interface components {
             completed: boolean;
             responses: components["schemas"]["LearningResponseBody"][];
         };
+        GenerationRunResponse: {
+            /** Format: int32 */
+            contentVersion: number;
+            /** Format: date-time */
+            createdAt: string;
+            error?: unknown;
+            /** Format: uuid */
+            id: string;
+            operation: string;
+            provider?: string | null;
+            retryKey?: string | null;
+            status: components["schemas"]["GenerationStatus"];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @enum {string} */
+        GenerationStatus: "requested" | "running" | "review_required" | "published" | "failed";
         /** @enum {string} */
         GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
         /** @enum {string} */
@@ -1076,6 +1125,13 @@ export interface components {
             /** Format: uuid */
             learningSessionId: string;
         };
+        StartGenerationRunBody: {
+            /** Format: int32 */
+            contentVersion?: number;
+            operation: string;
+            provider?: string | null;
+            retryKey?: string | null;
+        };
         StartLearningBody: {
             displayName: string;
             email: string;
@@ -1130,6 +1186,10 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
             title: string;
+        };
+        TransitionGenerationRunBody: {
+            error?: unknown;
+            status: components["schemas"]["GenerationStatus"];
         };
         /** @description Partial update for platform settings — any omitted field is left unchanged. */
         UpdateSettingsBody: {
@@ -1657,6 +1717,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeepDiveResponse"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartGenerationRunBody"];
+            };
+        };
+        responses: {
+            /** @description Started or resumed a provider generation run */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationRunResponse"];
+                };
+            };
+        };
+    };
+    get_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Generation run ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owned provider generation run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationRunResponse"];
+                };
+            };
+        };
+    };
+    transition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Generation run ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionGenerationRunBody"];
+            };
+        };
+        responses: {
+            /** @description Transitioned owned provider generation run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationRunResponse"];
                 };
             };
         };

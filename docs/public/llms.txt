@@ -53,11 +53,19 @@ POST /api/v1/attempts/{attempt_id}/answers
 POST /api/v1/attempts/{attempt_id}/finish
 GET /api/v1/progress/{journey_id}/streaks
 GET /api/v1/progress/{journey_id}/timeline
+POST /api/v1/generation-runs
+GET /api/v1/generation-runs/{id}
+PATCH /api/v1/generation-runs/{id}
 ```
 
 The journey contains the learner's intent, promise, objectives, activities,
 and persisted evidence. Agents choose the next useful activity and record the
 result; the web app presents the same state.
+
+Provider generation runs are owner-scoped and retryable. Reusing the same
+`retryKey` for the same operation returns the existing run. A run may move
+through `requested`, `running`, `review_required`, `published`, or `failed`;
+failed runs require an error and cannot be published without a new retry key.
 
 ## Discovery
 

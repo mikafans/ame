@@ -84,6 +84,7 @@ pub mod attempts;
 pub mod auth;
 pub mod db;
 pub mod deep_dives;
+pub mod generation;
 pub mod health;
 pub mod idempotency;
 pub mod learning;
@@ -178,6 +179,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(attempts::router(state.clone()))
         .merge(progress::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
+        .merge(generation::router(state.clone()))
         .route("/v1/auth/logout", post(auth::logout))
         .merge(logged_router)
         .layer(middleware::from_fn_with_state(

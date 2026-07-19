@@ -24,6 +24,8 @@ pub enum ApiError {
     LearningSessionResultConflict,
     #[error("idempotency key conflict")]
     IdempotencyConflict,
+    #[error("generation state transition conflicts with the current state")]
+    GenerationStateConflict,
     #[error("too many requests")]
     TooManyRequests,
     #[error("service in maintenance mode")]
@@ -51,7 +53,8 @@ impl ApiError {
             ApiError::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             ApiError::SessionFinished
             | ApiError::LearningSessionResultConflict
-            | ApiError::IdempotencyConflict => StatusCode::CONFLICT,
+            | ApiError::IdempotencyConflict
+            | ApiError::GenerationStateConflict => StatusCode::CONFLICT,
             ApiError::Maintenance => StatusCode::SERVICE_UNAVAILABLE,
             ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -97,6 +100,12 @@ impl IntoResponse for ApiError {
                 StatusCode::CONFLICT,
                 "idempotency_conflict",
                 "same Idempotency-Key reused with different body".to_string(),
+                None,
+            ),
+            ApiError::GenerationStateConflict => (
+                StatusCode::CONFLICT,
+                "generation_state_conflict",
+                "the generation run cannot make that state transition".to_string(),
                 None,
             ),
             ApiError::TooManyRequests => (

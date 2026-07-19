@@ -200,6 +200,27 @@ pub fn build_skill_manifest() -> Value {
             "/api/v1/deep-dives/{id}",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
         ),
+        endpoint(
+            "learning.generation.start",
+            "Start or resume an owner-scoped provider generation run with an idempotent retry key.",
+            "POST",
+            "/api/v1/generation-runs",
+            json!({"type":"object","required":["operation"],"properties":{"operation":{"type":"string"},"provider":{"type":"string"},"retryKey":{"type":"string"},"contentVersion":{"type":"integer","minimum":1}}}),
+        ),
+        endpoint(
+            "learning.generation.get",
+            "Read the status, provider, failure detail, and content version of an owned generation run.",
+            "GET",
+            "/api/v1/generation-runs/{id}",
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.generation.transition",
+            "Advance an owned generation run or record a provider failure; failed runs cannot be published.",
+            "PATCH",
+            "/api/v1/generation-runs/{id}",
+            json!({"type":"object","required":["id","status"],"properties":{"id":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["requested","running","review_required","published","failed"]},"error":{"type":"object"}}}),
+        ),
     ];
 
     json!({

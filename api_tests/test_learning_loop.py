@@ -42,7 +42,6 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     journeys = client.get("/api/v1/learning/journeys", headers=headers)
     assert journeys.status_code == 200, journeys.text
     assert any(item["id"] == journey_id for item in journeys.json())
-
     session_response = client.post(
         f"/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
         headers=headers,
@@ -343,3 +342,53 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         f"/api/v1/learning/journeys/{journey_id}", headers=other_headers
     )
     assert forbidden_journey.status_code == 404, forbidden_journey.text
+
+
+def test_generation_runs_are_retryable_failure_safe_and_owner_scoped(client):
+    started, headers = _start_learner(client, "I want to understand provider retries")
+    retry_key = f"generation-{uuid.uuid4()}"
+    payload = {
+        "operation": "question.compose",
+        "provider": "external-agent",
+        "retryKey": retry_key,
+        "contentVersion": 1,
+    }
+
+    first = client.post("/api/v1/generation-runs", headers=headers, json=payload)
+    assert first.status_code == 201, first.text
+    first_body = first.json()
+    assert first_body["status"] == "requested"
+
+    retry = client.post("/api/v1/generation-runs", headers=headers, json=payload)
+    assert retry.status_code == 201, retry.text
+    assert retry.json()["id"] == first_body["id"]
+
+    run_id = first_body["id"]
+    running = client.patch(
+        f"/api/v1/generation-runs/{run_id}",
+        headers=headers,
+        json={"status": "running"},
+    )
+    assert running.status_code == 200, running.text
+
+    failed = client.patch(
+        f"/api/v1/generation-runs/{run_id}",
+        headers=headers,
+        json={"status": "failed", "error": {"code": "provider_unavailable"}},
+    )
+    assert failed.status_code == 200, failed.text
+    assert failed.json()["status"] == "failed"
+
+    false_publish = client.patch(
+        f"/api/v1/generation-runs/{run_id}",
+        headers=headers,
+        json={"status": "published"},
+    )
+    assert false_publish.status_code == 409, false_publish.text
+
+    other, other_headers = _start_learner(client, "I want to understand another provider")
+    assert other["userId"] != started["userId"]
+    cross_owner = client.get(
+        f"/api/v1/generation-runs/{run_id}", headers=other_headers
+    )
+    assert cross_owner.status_code == 404, cross_owner.text

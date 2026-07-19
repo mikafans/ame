@@ -425,6 +425,75 @@ paths:
                 $ref: '#/components/schemas/DeepDiveResponse'
       security:
       - bearer: []
+  /api/v1/generation-runs:
+    post:
+      tags:
+      - generation
+      operationId: start
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartGenerationRunBody'
+        required: true
+      responses:
+        '201':
+          description: Started or resumed a provider generation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationRunResponse'
+      security:
+      - bearer: []
+  /api/v1/generation-runs/{id}:
+    get:
+      tags:
+      - generation
+      operationId: get_one
+      parameters:
+      - name: id
+        in: path
+        description: Generation run ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Owned provider generation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationRunResponse'
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - generation
+      operationId: transition
+      parameters:
+      - name: id
+        in: path
+        description: Generation run ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionGenerationRunBody'
+        required: true
+      responses:
+        '200':
+          description: Transitioned owned provider generation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationRunResponse'
+      security:
+      - bearer: []
   /api/v1/learning/journeys:
     get:
       tags:
@@ -1014,6 +1083,9 @@ components:
         - IdempotencyConflict
       - type: string
         enum:
+        - GenerationStateConflict
+      - type: string
+        enum:
         - TooManyRequests
       - type: string
         enum:
@@ -1561,6 +1633,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LearningResponseBody'
+    GenerationRunResponse:
+      type: object
+      required:
+      - id
+      - operation
+      - contentVersion
+      - status
+      - createdAt
+      - updatedAt
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        error: {}
+        id:
+          type: string
+          format: uuid
+        operation:
+          type: string
+        provider:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/GenerationStatus'
+        updatedAt:
+          type: string
+          format: date-time
+    GenerationStatus:
+      type: string
+      enum:
+      - requested
+      - running
+      - review_required
+      - published
+      - failed
     GoalStatus:
       type: string
       enum:
@@ -2203,6 +2319,25 @@ components:
         learningSessionId:
           type: string
           format: uuid
+    StartGenerationRunBody:
+      type: object
+      required:
+      - operation
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        operation:
+          type: string
+        provider:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type:
+          - string
+          - 'null'
     StartLearningBody:
       type: object
       required:
@@ -2332,6 +2467,14 @@ components:
           format: date-time
         title:
           type: string
+    TransitionGenerationRunBody:
+      type: object
+      required:
+      - status
+      properties:
+        error: {}
+        status:
+          $ref: '#/components/schemas/GenerationStatus'
     UpdateSettingsBody:
       type: object
       description: Partial update for platform settings — any omitted field is left unchanged.

@@ -707,6 +707,83 @@
       "method": "GET",
       "name": "learning.deep_dive.get",
       "path": "/api/v1/deep-dives/{id}"
+    },
+    {
+      "description": "Start or resume an owner-scoped provider generation run with an idempotent retry key.",
+      "input_schema": {
+        "properties": {
+          "contentVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "retryKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.generation.start",
+      "path": "/api/v1/generation-runs"
+    },
+    {
+      "description": "Read the status, provider, failure detail, and content version of an owned generation run.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.generation.get",
+      "path": "/api/v1/generation-runs/{id}"
+    },
+    {
+      "description": "Advance an owned generation run or record a provider failure; failed runs cannot be published.",
+      "input_schema": {
+        "properties": {
+          "error": {
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "requested",
+              "running",
+              "review_required",
+              "published",
+              "failed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.generation.transition",
+      "path": "/api/v1/generation-runs/{id}"
     }
   ]
 }
