@@ -181,7 +181,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.deep_dive.create",
-            "Create a source-backed explanatory deep dive linked to evidence.",
+            "Create a source-backed explanatory deep dive linked to existing evidence owned by the learner and matching the same journey, objective, and activity.",
             "POST",
             "/api/v1/deep-dives",
             json!({"type":"object","required":["journeyId","activityId","objectiveId","triggeringEvidenceId","title","body","example","sourceReferences","applicationTask"],"properties":{"journeyId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"triggeringEvidenceId":{"type":"string","format":"uuid"},"title":{"type":"string"},"body":{"type":"string"},"example":{"type":"string"},"sourceReferences":{"type":"array"},"applicationTask":{"type":"string"}}}),

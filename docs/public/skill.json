@@ -621,7 +621,7 @@
       "path": "/api/v1/progress/{journey_id}/timeline"
     },
     {
-      "description": "Create a source-backed explanatory deep dive linked to evidence.",
+      "description": "Create a source-backed explanatory deep dive linked to existing evidence owned by the learner and matching the same journey, objective, and activity.",
       "input_schema": {
         "properties": {
           "activityId": {
