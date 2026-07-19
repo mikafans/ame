@@ -165,7 +165,7 @@ mod tests {
             caveats: vec!["This does not change mastery by itself.".into()],
             source_references: vec!["https://example.test/source".into()],
             application_task: "Apply the concept in one small task.".into(),
-            review_status: ContentReviewStatus::Review,
+            review_status: ContentReviewStatus::Approved,
         }
     }
 
@@ -235,6 +235,43 @@ mod tests {
         assert_eq!(
             repository.get(Uuid::now_v7(), created.id),
             Err(DeepDiveError::SubjectMismatch)
+        );
+    }
+
+    #[tokio::test]
+    async fn unreviewed_deep_dives_are_not_learner_readable() {
+        let subject = Uuid::now_v7();
+        let repository = InMemoryDeepDiveRepository::default();
+        let mut value = input(subject);
+        value.review_status = ContentReviewStatus::Review;
+        repository
+            .register_generation_run(published_run(
+                value.generation_run_id,
+                subject,
+                "deep_dive.create",
+            ))
+            .expect("generation run registers");
+        repository
+            .register_evidence(
+                value.subject_user_id,
+                value.journey_id,
+                value.activity_id,
+                value.objective_id,
+                value.triggering_evidence_id,
+            )
+            .expect("evidence registers");
+
+        let created = repository.create(value).expect("deep-dive creates");
+        assert_eq!(
+            repository.get(subject, created.id),
+            Err(DeepDiveError::NotFound)
+        );
+        assert_eq!(
+            repository
+                .get_for_activity(subject, created.input.activity_id)
+                .await
+                .expect("activity lookup succeeds"),
+            None
         );
     }
 
