@@ -12,10 +12,12 @@ PATCH /api/v1/learning/activities/{activity_id}/content
 
 It requires a published `learning.activity.content.compose` generation run,
 one or more source references, and `reviewStatus: "approved"`. The operation
-accepts the existing `explanation` and `worked_example` payload shapes and
-stores provenance beside `payload.content`. It rejects malformed content,
-empty sources, unpublished or mismatched generation runs, cross-owner access,
-and rewrites after the activity is completed.
+accepts the existing `explanation` and `worked_example` payload shapes only
+when the content type matches the activity kind. Prose fields and step/key
+point lists are strict non-empty strings. Provenance is stored beside
+`payload.content`. The operation rejects malformed content, empty sources,
+unpublished or mismatched generation runs, cross-owner access, and rewrites
+after the activity is completed.
 
 This is deliberately payload-only: the clean 0.3 baseline needs no migration,
 new identity type, agent scope, or separate resource model. The same activity
@@ -28,7 +30,8 @@ owner-scoped.
 Evidence:
 
 - the API behavior contract covers happy, malformed, missing-source,
-  unpublished, wrong-operation, cross-owner, and completed-activity paths;
+  unpublished, wrong-operation, cross-owner, completed-activity, kind-mismatch,
+  non-string-field, empty-list, and unapproved-review paths;
 - the browser contract authors an explanation through the API and renders the
   resulting heading and body in the learner journey;
 - the Rust library suite passes 67 tests;

@@ -93,8 +93,10 @@ topic, start and publish a `learning.activity.content.compose` generation run,
 then call `PATCH /api/v1/learning/activities/{activity_id}/content` with the
 matching `generationRunId`, an `explanation` or `worked_example` content object,
 at least one `sourceReferences` entry, and `reviewStatus: "approved"`. The
-content is stored in the existing activity payload, so no database migration
-is required; completed activities cannot be rewritten.
+content type must match the activity kind, prose fields and steps/key points
+must be non-empty strings, and the content is stored in the existing activity
+payload. No database migration is required; completed activities cannot be
+rewritten.
 
 Attempt responses include `assessmentMode` (`practice` or `graded`) and
 `reviewStatus` (`not_required`, `complete`, or `pending`). Deterministic

@@ -148,7 +148,7 @@
             "type": "string"
           },
           "content": {
-            "description": "Use type explanation with heading, body, key_points, or worked_example with heading, prompt, steps, reflection.",
+            "description": "The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings.",
             "required": [
               "type"
             ],
