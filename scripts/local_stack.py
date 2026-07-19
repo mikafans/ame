@@ -59,12 +59,28 @@ def promote_admin() -> None:
         cwd=ROOT,
         text=True,
     ).strip()
-    sql = (
-        "INSERT INTO tb_users (email, display_name, role, password_hash) "
-        "VALUES ('admin@example.com', 'Carol Admin', 'admin', "
-        f"'{password_hash}') "
-        "ON CONFLICT (email) DO UPDATE SET role = 'admin';"
-    )
+    sql = f"""
+DO $$
+DECLARE
+  existing_user_id uuid;
+  new_user_id uuid;
+BEGIN
+  SELECT id INTO existing_user_id
+  FROM tb_users
+  WHERE email_canonical = 'admin@example.com';
+
+  IF existing_user_id IS NULL THEN
+    new_user_id := uuid_generate_v7();
+    INSERT INTO tb_identities (id, identity_type, label)
+    VALUES (new_user_id, 'human', 'Carol Admin');
+    INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
+    VALUES (new_user_id, 'admin@example.com', 'admin@example.com', 'Carol Admin', 'admin', '{password_hash}');
+  ELSE
+    UPDATE tb_users SET role = 'admin' WHERE id = existing_user_id;
+  END IF;
+END
+$$;
+"""
     compose(
         "exec",
         "-T",

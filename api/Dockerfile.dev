@@ -18,6 +18,7 @@ RUN mkdir -p api/src api/src/bin api/benches \
   && rm -rf api/src
 
 COPY api/src api/src
+COPY api/templates api/templates
 COPY docs/public docs/public
 COPY db/migrations db/migrations
 COPY ame.dev.toml ame.dev.toml
