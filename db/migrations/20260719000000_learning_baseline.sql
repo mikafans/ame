@@ -47,7 +47,9 @@ CREATE TABLE tb_users (
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT tb_users_role_check CHECK (role IN ('learner', 'admin')),
     CONSTRAINT tb_users_status_check CHECK (status IN ('active', 'deactivated')),
-    CONSTRAINT tb_users_email_canonical_check CHECK (email_canonical IS NULL OR email_canonical = lower(email_canonical))
+    CONSTRAINT tb_users_email_canonical_check CHECK (
+        email_canonical IS NULL OR email_canonical = lower(email_canonical)
+    )
 );
 CREATE UNIQUE INDEX tb_users_email_canonical_unique ON tb_users (email_canonical) WHERE email_canonical IS NOT NULL;
 
@@ -69,8 +71,8 @@ CREATE TABLE tb_identities (
 CREATE INDEX tb_identities_owner ON tb_identities (owner_user_id) WHERE owner_user_id IS NOT NULL;
 
 ALTER TABLE tb_users
-    ADD CONSTRAINT tb_users_identity_fk
-    FOREIGN KEY (id) REFERENCES tb_identities (id) DEFERRABLE INITIALLY DEFERRED;
+ADD CONSTRAINT tb_users_identity_fk
+FOREIGN KEY (id) REFERENCES tb_identities (id) DEFERRABLE INITIALLY DEFERRED;
 
 CREATE TABLE tb_agents (
     id uuid PRIMARY KEY REFERENCES tb_identities (id) ON DELETE CASCADE,
@@ -97,7 +99,7 @@ CREATE TABLE tb_api_tokens (
     agent_id uuid NOT NULL REFERENCES tb_agents (id) ON DELETE CASCADE,
     name text NOT NULL,
     token_hash text NOT NULL UNIQUE,
-    scopes text[] NOT NULL,
+    scopes text [] NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     last_used_at timestamptz,
     expires_at timestamptz NOT NULL,
@@ -145,7 +147,9 @@ CREATE TABLE tb_learning_journeys (
     status text NOT NULL DEFAULT 'onboarding',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT tb_learning_journeys_status_check CHECK (status IN ('onboarding', 'active', 'paused', 'completed', 'failed'))
+    CONSTRAINT tb_learning_journeys_status_check CHECK (
+        status IN ('onboarding', 'active', 'paused', 'completed', 'failed')
+    )
 );
 CREATE INDEX tb_learning_journeys_subject_status ON tb_learning_journeys (subject_user_id, status, updated_at DESC);
 
@@ -274,8 +278,8 @@ CREATE TABLE tb_assessments (
     time_limit_seconds integer,
     total_points integer NOT NULL DEFAULT 0,
     passing_points integer,
-    show_results_during boolean NOT NULL DEFAULT false,
-    affects_rating boolean NOT NULL DEFAULT false,
+    show_results_during boolean NOT NULL DEFAULT FALSE,
+    affects_rating boolean NOT NULL DEFAULT FALSE,
     CONSTRAINT tb_assessments_mode_check CHECK (mode IN ('practice', 'graded')),
     CONSTRAINT tb_assessments_time_check CHECK (time_limit_seconds IS NULL OR time_limit_seconds > 0),
     CONSTRAINT tb_assessments_points_check CHECK (total_points >= 0)
