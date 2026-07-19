@@ -330,7 +330,7 @@ impl LearningRepository for PgLearningRepository {
             r#"
             INSERT INTO tb_activities (
                 journey_id, subject_user_id, source_actor_id, source_run_id,
-                kind, title, order_index, payload_schema_version, payload
+                kind, title, order_index, payload_schema_version, payload, status
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id, journey_id, subject_user_id, source_actor_id, source_run_id,
@@ -347,6 +347,7 @@ impl LearningRepository for PgLearningRepository {
         .bind(input.order_index)
         .bind(input.payload_schema_version)
         .bind(&input.payload)
+        .bind(activity_status_value(input.status))
         .fetch_one(&mut *transaction)
         .await
         .map_err(|error| {
@@ -547,6 +548,16 @@ fn activity_status(value: &str) -> ActivityStatus {
         "completed" => ActivityStatus::Completed,
         "failed" => ActivityStatus::Failed,
         _ => ActivityStatus::Proposed,
+    }
+}
+
+fn activity_status_value(status: ActivityStatus) -> &'static str {
+    match status {
+        ActivityStatus::Proposed => "proposed",
+        ActivityStatus::Ready => "ready",
+        ActivityStatus::InProgress => "in_progress",
+        ActivityStatus::Completed => "completed",
+        ActivityStatus::Failed => "failed",
     }
 }
 

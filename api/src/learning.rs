@@ -300,7 +300,7 @@ impl LearningRepository for InMemoryLearningRepository {
             payload_schema_version: input.payload_schema_version,
             payload: input.payload,
             objective_ids: input.objective_ids,
-            status: ActivityStatus::Proposed,
+            status: input.status,
             created_at: now,
             updated_at: now,
         };
@@ -454,6 +454,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             payload_schema_version: 1,
             payload: serde_json::json!({"count": 10}),
             objective_ids: vec![objective.id],
+            status: ActivityStatus::Ready,
         })
         .await
         .expect("activity creates");

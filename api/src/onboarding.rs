@@ -5,8 +5,8 @@ use crate::domain::identity::{
     RegistrationMode,
 };
 use crate::domain::learning::{
-    CreateGoal, CreateJourney, LearningGoal, LearningJourney, LearningRepository,
-    LearningRepositoryError,
+    ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective,
+    LearningGoal, LearningJourney, LearningRepository, LearningRepositoryError,
 };
 use crate::templates::builtin_catalog;
 use async_trait::async_trait;
@@ -180,9 +180,9 @@ where
                 subject_user_id: plan.subject_user_id,
                 source_actor_id: plan.source_actor_id,
                 template_version_id: plan.template_version_id,
-                raw_intent: plan.raw_intent,
-                normalized_statement: plan.normalized_statement,
-                idempotency_key: Some(plan.idempotency_key),
+                raw_intent: plan.raw_intent.clone(),
+                normalized_statement: plan.normalized_statement.clone(),
+                idempotency_key: Some(plan.idempotency_key.clone()),
             })
             .await?;
         let journey = self
@@ -191,9 +191,72 @@ where
                 goal_id: goal.id,
                 subject_user_id: goal.subject_user_id,
                 source_actor_id: goal.source_actor_id,
-                promise: plan.promise,
+                promise: plan.promise.clone(),
             })
             .await?;
+
+        let blueprint = starter_blueprint(&plan, journey.id);
+        let mut objectives = self
+            .repository
+            .list_objectives(journey.subject_user_id, journey.id)
+            .await?;
+        for objective in blueprint.objectives {
+            if !objectives
+                .iter()
+                .any(|existing| existing.order_index == objective.order_index)
+            {
+                self.repository.create_objective(objective).await?;
+                objectives = self
+                    .repository
+                    .list_objectives(journey.subject_user_id, journey.id)
+                    .await?;
+            }
+        }
+
+        let mut activities = self
+            .repository
+            .list_activities(journey.subject_user_id, journey.id)
+            .await?;
+        for activity in blueprint.activities {
+            if activities
+                .iter()
+                .any(|existing| existing.order_index == activity.order_index)
+            {
+                continue;
+            }
+            let objective_ids = activity
+                .objective_orders
+                .iter()
+                .map(|order_index| {
+                    objectives
+                        .iter()
+                        .find(|objective| objective.order_index == *order_index)
+                        .map(|objective| objective.id)
+                        .ok_or(LearningRepositoryError::NotFound {
+                            resource: "objective",
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            self.repository
+                .create_activity(CreateActivity {
+                    journey_id: journey.id,
+                    subject_user_id: journey.subject_user_id,
+                    source_actor_id: plan.source_actor_id,
+                    source_run_id: None,
+                    kind: activity.kind,
+                    title: activity.title,
+                    order_index: activity.order_index,
+                    payload_schema_version: 1,
+                    payload: activity.payload,
+                    objective_ids,
+                    status: activity.status,
+                })
+                .await?;
+            activities = self
+                .repository
+                .list_activities(journey.subject_user_id, journey.id)
+                .await?;
+        }
 
         Ok(BootstrapResult {
             goal,
@@ -201,6 +264,140 @@ where
             template_id: plan.template_id,
             template_version: plan.template_version,
         })
+    }
+}
+
+struct StarterBlueprint {
+    objectives: Vec<CreateObjective>,
+    activities: Vec<StarterActivity>,
+}
+
+struct StarterActivity {
+    kind: ActivityKind,
+    title: String,
+    order_index: i32,
+    objective_orders: Vec<i32>,
+    payload: serde_json::Value,
+    status: ActivityStatus,
+}
+
+fn starter_blueprint(plan: &BootstrapPlan, journey_id: Uuid) -> StarterBlueprint {
+    let subject = plan.subject_user_id;
+    let objectives = match plan.template_id.as_str() {
+        "exam-prep" => vec![
+            (
+                "map",
+                "Map the target syllabus",
+                "Name the main domains and their expected weight",
+            ),
+            (
+                "solve",
+                "Solve representative problems",
+                "Complete a bounded set with explained reasoning",
+            ),
+            (
+                "review",
+                "Review the weakest domain",
+                "Choose one evidence-backed review target",
+            ),
+        ],
+        "build-a-project" => vec![
+            (
+                "define",
+                "Define the first artifact",
+                "Describe a small usable result and its constraints",
+            ),
+            (
+                "apply",
+                "Apply the core concept",
+                "Use the concept in a concrete implementation step",
+            ),
+            (
+                "ship",
+                "Complete the first milestone",
+                "Produce and inspect a small working increment",
+            ),
+        ],
+        _ => vec![
+            (
+                "identify",
+                "Identify the core concepts",
+                "Name the essential ideas and how they relate",
+            ),
+            (
+                "explain",
+                "Explain one concept clearly",
+                "Give an accurate explanation with a useful example",
+            ),
+            (
+                "apply",
+                "Apply the ideas in practice",
+                "Use the ideas in a new but bounded situation",
+            ),
+        ],
+    };
+    let objectives = objectives
+        .into_iter()
+        .enumerate()
+        .map(
+            |(order_index, (verb, statement, success_criteria))| CreateObjective {
+                journey_id,
+                subject_user_id: subject,
+                verb: verb.to_string(),
+                statement: format!("{statement}: {}", plan.normalized_statement),
+                success_criteria: success_criteria.to_string(),
+                order_index: order_index as i32,
+            },
+        )
+        .collect();
+    let first_title = match plan.template_id.as_str() {
+        "exam-prep" => "Orient on the target and estimate your starting point",
+        "build-a-project" => "Define the smallest useful first milestone",
+        _ => "Get oriented and see what you already know",
+    };
+    let second_kind = if plan.template_id == "build-a-project" {
+        ActivityKind::Application
+    } else {
+        ActivityKind::Diagnostic
+    };
+    StarterBlueprint {
+        objectives,
+        activities: vec![
+            StarterActivity {
+                kind: ActivityKind::Explanation,
+                title: first_title.to_string(),
+                order_index: 0,
+                objective_orders: vec![0],
+                payload: serde_json::json!({
+                    "purpose": "orientation",
+                    "intent": plan.normalized_statement,
+                    "estimated_minutes": 5
+                }),
+                status: ActivityStatus::Ready,
+            },
+            StarterActivity {
+                kind: second_kind,
+                title: "Try a short first task".to_string(),
+                order_index: 1,
+                objective_orders: vec![0, 1],
+                payload: serde_json::json!({
+                    "purpose": "diagnose_starting_point",
+                    "estimated_minutes": 10
+                }),
+                status: ActivityStatus::Proposed,
+            },
+            StarterActivity {
+                kind: ActivityKind::Recommendation,
+                title: "Review your result and choose the next step".to_string(),
+                order_index: 2,
+                objective_orders: vec![2],
+                payload: serde_json::json!({
+                    "purpose": "next_action",
+                    "estimated_minutes": 5
+                }),
+                status: ActivityStatus::Proposed,
+            },
+        ],
     }
 }
 
@@ -331,7 +528,7 @@ mod tests {
         StartLearningRequest,
     };
     use crate::domain::identity::RegistrationMode;
-    use crate::domain::learning::LearningRepositoryError;
+    use crate::domain::learning::{LearningRepository, LearningRepositoryError};
     use crate::identity::InMemoryIdentityRepository;
     use crate::learning::InMemoryLearningRepository;
     use uuid::Uuid;
@@ -456,7 +653,8 @@ mod tests {
 
     #[tokio::test]
     async fn bootstrap_creates_and_retries_the_same_journey() {
-        let service = OnboardingService::new(InMemoryLearningRepository::default());
+        let repository = InMemoryLearningRepository::default();
+        let service = OnboardingService::new(repository.clone());
         let plan = music_theory_plan();
 
         let first = service
@@ -468,6 +666,25 @@ mod tests {
         assert_eq!(first, retry);
         assert_eq!(first.template_id, "learn-a-subject");
         assert_eq!(first.template_version, 1);
+        let objectives = repository
+            .list_objectives(first.goal.subject_user_id, first.journey.id)
+            .await
+            .expect("starter objectives exist");
+        let activities = repository
+            .list_activities(first.goal.subject_user_id, first.journey.id)
+            .await
+            .expect("starter activities exist");
+        assert_eq!(objectives.len(), 3);
+        assert_eq!(activities.len(), 3);
+        assert_eq!(
+            activities[0].status,
+            crate::domain::learning::ActivityStatus::Ready
+        );
+        assert!(
+            activities
+                .iter()
+                .all(|activity| !activity.objective_ids.is_empty())
+        );
     }
 
     #[tokio::test]

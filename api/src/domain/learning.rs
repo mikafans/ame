@@ -137,6 +137,7 @@ pub struct CreateActivity {
     pub payload_schema_version: i32,
     pub payload: serde_json::Value,
     pub objective_ids: Vec<Uuid>,
+    pub status: ActivityStatus,
 }
 
 #[derive(Debug, Clone, PartialEq)]
