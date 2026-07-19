@@ -14,6 +14,8 @@ pub mod config;
 pub mod deep_dive;
 pub mod deep_dive_postgres;
 pub mod domain;
+pub mod generation;
+pub mod generation_postgres;
 pub mod http;
 pub mod identity;
 pub mod identity_postgres;
