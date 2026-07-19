@@ -15,6 +15,23 @@ pub struct InMemoryLearningRepository {
     state: Arc<Mutex<State>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct LearningContractFixtures {
+    pub subject_user_id: Uuid,
+    pub other_subject_user_id: Uuid,
+    pub source_actor_id: Uuid,
+}
+
+impl Default for LearningContractFixtures {
+    fn default() -> Self {
+        Self {
+            subject_user_id: Uuid::now_v7(),
+            other_subject_user_id: Uuid::now_v7(),
+            source_actor_id: Uuid::now_v7(),
+        }
+    }
+}
+
 #[derive(Default)]
 struct State {
     goals: HashMap<Uuid, LearningGoal>,
@@ -157,106 +174,112 @@ impl LearningRepository for InMemoryLearningRepository {
     }
 }
 
+pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
+    repository: &R,
+    fixtures: LearningContractFixtures,
+) {
+    let subject = fixtures.subject_user_id;
+    let other_subject = fixtures.other_subject_user_id;
+    let actor = fixtures.source_actor_id;
+    let idempotency_key = Some("onboarding/music-theory".to_string());
+    let input = CreateGoal {
+        subject_user_id: subject,
+        source_actor_id: actor,
+        template_version_id: None,
+        raw_intent: "I would like to learn music theory".to_string(),
+        normalized_statement: "Understand foundational music theory".to_string(),
+        idempotency_key: idempotency_key.clone(),
+    };
+
+    let goal = repository
+        .create_goal(input.clone())
+        .await
+        .expect("goal creates");
+    assert_eq!(goal.status, GoalStatus::Proposed);
+    assert_eq!(
+        repository
+            .get_goal(subject, goal.id)
+            .await
+            .expect("goal reads"),
+        goal
+    );
+    assert_eq!(
+        repository.create_goal(input).await.expect("retry resumes"),
+        goal
+    );
+
+    let conflict = repository
+        .create_goal(CreateGoal {
+            raw_intent: "I would like to learn harmony".to_string(),
+            ..CreateGoal {
+                subject_user_id: subject,
+                source_actor_id: actor,
+                template_version_id: None,
+                raw_intent: String::new(),
+                normalized_statement: "Different goal".to_string(),
+                idempotency_key,
+            }
+        })
+        .await;
+    assert_eq!(conflict, Err(LearningRepositoryError::IdempotencyConflict));
+
+    assert_eq!(
+        repository.get_goal(other_subject, goal.id).await,
+        Err(LearningRepositoryError::SubjectMismatch)
+    );
+
+    let journey_input = CreateJourney {
+        goal_id: goal.id,
+        subject_user_id: subject,
+        source_actor_id: actor,
+        promise: "Identify notes, intervals, and basic chords".to_string(),
+    };
+    let journey = repository
+        .ensure_journey(journey_input.clone())
+        .await
+        .expect("journey creates");
+    assert_eq!(journey.status, JourneyStatus::Onboarding);
+    assert_eq!(
+        repository
+            .ensure_journey(journey_input)
+            .await
+            .expect("journey retry resumes"),
+        journey
+    );
+    assert_eq!(
+        repository
+            .get_journey(subject, journey.id)
+            .await
+            .expect("journey reads"),
+        journey
+    );
+
+    let active = repository
+        .set_journey_status(subject, journey.id, JourneyStatus::Active)
+        .await
+        .expect("journey updates");
+    assert_eq!(active.status, JourneyStatus::Active);
+    assert_eq!(
+        repository.get_journey(other_subject, journey.id).await,
+        Err(LearningRepositoryError::SubjectMismatch)
+    );
+}
+
 #[cfg(test)]
 mod contract_tests {
-    use super::InMemoryLearningRepository;
-    use crate::domain::learning::{
-        CreateGoal, CreateJourney, GoalStatus, JourneyStatus, LearningRepository,
-        LearningRepositoryError,
+    use super::{
+        InMemoryLearningRepository, LearningContractFixtures, exercise_goal_and_journey_contract,
     };
+    use crate::domain::learning::{CreateGoal, LearningRepository, LearningRepositoryError};
     use uuid::Uuid;
-
-    async fn exercise_goal_and_journey_contract<R: LearningRepository>(repository: &R) {
-        let subject = Uuid::now_v7();
-        let other_subject = Uuid::now_v7();
-        let actor = Uuid::now_v7();
-        let idempotency_key = Some("onboarding/music-theory".to_string());
-        let input = CreateGoal {
-            subject_user_id: subject,
-            source_actor_id: actor,
-            template_version_id: Some(Uuid::now_v7()),
-            raw_intent: "I would like to learn music theory".to_string(),
-            normalized_statement: "Understand foundational music theory".to_string(),
-            idempotency_key: idempotency_key.clone(),
-        };
-
-        let goal = repository
-            .create_goal(input.clone())
-            .await
-            .expect("goal creates");
-        assert_eq!(goal.status, GoalStatus::Proposed);
-        assert_eq!(
-            repository
-                .get_goal(subject, goal.id)
-                .await
-                .expect("goal reads"),
-            goal
-        );
-        assert_eq!(
-            repository.create_goal(input).await.expect("retry resumes"),
-            goal
-        );
-
-        let conflict = repository
-            .create_goal(CreateGoal {
-                raw_intent: "I would like to learn harmony".to_string(),
-                ..CreateGoal {
-                    subject_user_id: subject,
-                    source_actor_id: actor,
-                    template_version_id: None,
-                    raw_intent: String::new(),
-                    normalized_statement: "Different goal".to_string(),
-                    idempotency_key,
-                }
-            })
-            .await;
-        assert_eq!(conflict, Err(LearningRepositoryError::IdempotencyConflict));
-
-        assert_eq!(
-            repository.get_goal(other_subject, goal.id).await,
-            Err(LearningRepositoryError::SubjectMismatch)
-        );
-
-        let journey_input = CreateJourney {
-            goal_id: goal.id,
-            subject_user_id: subject,
-            source_actor_id: actor,
-            promise: "Identify notes, intervals, and basic chords".to_string(),
-        };
-        let journey = repository
-            .ensure_journey(journey_input.clone())
-            .await
-            .expect("journey creates");
-        assert_eq!(journey.status, JourneyStatus::Onboarding);
-        assert_eq!(
-            repository
-                .ensure_journey(journey_input)
-                .await
-                .expect("journey retry resumes"),
-            journey
-        );
-        assert_eq!(
-            repository
-                .get_journey(subject, journey.id)
-                .await
-                .expect("journey reads"),
-            journey
-        );
-
-        let active = repository
-            .set_journey_status(subject, journey.id, JourneyStatus::Active)
-            .await
-            .expect("journey updates");
-        assert_eq!(active.status, JourneyStatus::Active);
-        assert_eq!(
-            repository.get_journey(other_subject, journey.id).await,
-            Err(LearningRepositoryError::SubjectMismatch)
-        );
-    }
 
     #[tokio::test]
     async fn in_memory_repository_satisfies_goal_and_journey_contract() {
-        exercise_goal_and_journey_contract(&InMemoryLearningRepository::default()).await;
+        exercise_goal_and_journey_contract(
+            &InMemoryLearningRepository::default(),
+            LearningContractFixtures::default(),
+        )
+        .await;
     }
 
     #[tokio::test]

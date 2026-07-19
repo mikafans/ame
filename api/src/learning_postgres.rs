@@ -54,6 +54,24 @@ impl PgLearningRepository {
         .map(|row| row.map(journey_from_row))
         .map_err(storage_error)
     }
+
+    async fn find_journey_by_goal(
+        &self,
+        goal_id: Uuid,
+    ) -> Result<Option<LearningJourney>, LearningRepositoryError> {
+        sqlx::query(
+            r#"
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            FROM tb_learning_journeys
+            WHERE goal_id = $1
+            "#,
+        )
+        .bind(goal_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| row.map(journey_from_row))
+        .map_err(storage_error)
+    }
 }
 
 #[async_trait]
@@ -167,7 +185,11 @@ impl LearningRepository for PgLearningRepository {
             return Ok(journey);
         }
 
-        self.get_journey(input.subject_user_id, goal.id).await
+        self.find_journey_by_goal(goal.id)
+            .await?
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "journey",
+            })
     }
 
     async fn get_journey(
@@ -274,5 +296,73 @@ fn journey_status_value(status: JourneyStatus) -> &'static str {
         JourneyStatus::Paused => "paused",
         JourneyStatus::Completed => "completed",
         JourneyStatus::Failed => "failed",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PgLearningRepository;
+    use crate::learning::{LearningContractFixtures, exercise_goal_and_journey_contract};
+    use sqlx::migrate::Migrator;
+    use sqlx::postgres::PgPoolOptions;
+
+    static MIGRATOR: Migrator = sqlx::migrate!("../db/migrations");
+
+    #[tokio::test]
+    async fn postgres_repository_satisfies_contract_on_clean_database() {
+        if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
+            eprintln!("skipping clean PostgreSQL contract test; set AME_RUN_DB_TESTS=1");
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL")
+            .expect("DATABASE_URL must point to a clean PostgreSQL database");
+        let pool = PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&database_url)
+            .await
+            .expect("connect to clean PostgreSQL database");
+        MIGRATOR
+            .run(&pool)
+            .await
+            .expect("apply clean learning baseline");
+
+        let defaults = LearningContractFixtures::default();
+        let fixtures = LearningContractFixtures {
+            source_actor_id: defaults.subject_user_id,
+            ..defaults
+        };
+        let mut transaction = pool.begin().await.expect("begin identity transaction");
+        sqlx::query("SET CONSTRAINTS ALL DEFERRED")
+            .execute(&mut *transaction)
+            .await
+            .expect("defer circular identity constraint");
+        sqlx::query(
+            "INSERT INTO tb_users (id, email, email_canonical, display_name, role)
+             VALUES ($1, $2, $2, $3, 'learner')",
+        )
+        .bind(fixtures.subject_user_id)
+        .bind(format!(
+            "contract-{}@example.test",
+            fixtures.subject_user_id
+        ))
+        .bind("Contract Learner")
+        .execute(&mut *transaction)
+        .await
+        .expect("create contract learner");
+        sqlx::query(
+            "INSERT INTO tb_identities (id, identity_type, owner_user_id, label)
+             VALUES ($1, 'human', $1, 'contract learner')",
+        )
+        .bind(fixtures.source_actor_id)
+        .execute(&mut *transaction)
+        .await
+        .expect("create human actor identity");
+        transaction
+            .commit()
+            .await
+            .expect("commit contract identity");
+
+        exercise_goal_and_journey_contract(&PgLearningRepository::new(pool), fixtures).await;
     }
 }
