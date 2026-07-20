@@ -22,3 +22,16 @@ fn skill_manifest_contains_namespaced_unified_learning_tools() {
         Value::String("/public/llms.txt".into())
     );
 }
+
+#[test]
+fn advertised_activity_authoring_is_present_in_openapi() {
+    let manifest = ame_api::http::agents::build_skill_manifest();
+    assert!(manifest["tools"].as_array().unwrap().iter().any(|tool| {
+        tool["method"] == "PATCH"
+            && tool["path"] == "/api/v1/learning/activities/{activity_id}/content"
+    }));
+
+    let openapi = ame_api::http::openapi::openapi_yaml();
+    assert!(openapi.contains("/api/v1/learning/activities/{activity_id}/content:"));
+    assert!(openapi.contains("  patch:\n"));
+}
