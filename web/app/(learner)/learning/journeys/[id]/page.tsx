@@ -374,6 +374,14 @@ export default function LearningJourneyPage() {
         <p className="text-sm leading-6 text-muted-foreground">
           {journey.goal.normalizedStatement}
         </p>
+        <div className="border-t border-border pt-4">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+            Original intent
+          </p>
+          <p className="mt-2 text-sm leading-6 text-foreground">
+            {journey.goal.rawIntent}
+          </p>
+        </div>
         <div className="border-t border-border pt-5">
           <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
             Outcomes

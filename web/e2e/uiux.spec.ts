@@ -108,7 +108,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   if (!explanation || !workedExample)
     throw new Error("first package is incomplete");
   expect(explanation.payload.content.type).toBe("explanation");
-  expect(explanation.payload.content.body).toContain(prompt);
+  expect(explanation.payload.content.body).toContain(topic);
   expect(workedExample.payload.content.type).toBe("worked_example");
   const contentGenerationRunId = await publishedGenerationRun(
     page,

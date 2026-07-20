@@ -129,18 +129,44 @@ pub trait LearningPromptInterpreter: Send + Sync {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CatalogPromptInterpreter;
 
+fn prompt_display_label(raw_prompt: &str) -> String {
+    let trimmed = raw_prompt.trim().trim_end_matches(['.', '!', '?']).trim();
+    let lower = trimmed.to_ascii_lowercase();
+    const PREFIXES: [&str; 9] = [
+        "i would like to learn ",
+        "i'd like to learn ",
+        "i want to learn ",
+        "i would like to understand ",
+        "i'd like to understand ",
+        "i want to understand ",
+        "help me learn ",
+        "help me understand ",
+        "learn ",
+    ];
+
+    PREFIXES
+        .iter()
+        .find_map(|prefix| {
+            lower.strip_prefix(prefix).and_then(|_| {
+                let label = trimmed[prefix.len()..].trim();
+                (!label.is_empty()).then(|| label.to_string())
+            })
+        })
+        .unwrap_or_else(|| trimmed.to_string())
+}
+
 #[async_trait]
 impl LearningPromptInterpreter for CatalogPromptInterpreter {
     async fn interpret(
         &self,
         raw_prompt: &str,
     ) -> Result<PromptInterpretation, PromptInterpretationError> {
-        let normalized_statement = raw_prompt.trim();
+        let normalized_statement = prompt_display_label(raw_prompt);
         if normalized_statement.is_empty() {
             return Err(PromptInterpretationError::EmptyPrompt);
         }
 
-        let recommendation = crate::templates::recommend_builtin_template(normalized_statement);
+        let recommendation = crate::templates::recommend_builtin_template(&normalized_statement);
         let catalog =
             builtin_catalog().map_err(PromptInterpretationError::InvalidTemplateCatalog)?;
         let template = catalog
@@ -154,7 +180,7 @@ impl LearningPromptInterpreter for CatalogPromptInterpreter {
                 ))
             })?;
         Ok(PromptInterpretation {
-            normalized_statement: normalized_statement.to_string(),
+            normalized_statement,
             promise: template.promise.clone(),
             template_id: template.id.clone(),
             template_version: template.version,
@@ -742,11 +768,11 @@ mod tests {
             .await
             .expect("prompt onboarding succeeds");
 
-        assert_eq!(result.bootstrap.goal.raw_intent, "I'd like to learn music theory");
         assert_eq!(
-            result.bootstrap.goal.normalized_statement,
-            "music theory"
+            result.bootstrap.goal.raw_intent,
+            "I'd like to learn music theory"
         );
+        assert_eq!(result.bootstrap.goal.normalized_statement, "music theory");
     }
 
     #[tokio::test]
