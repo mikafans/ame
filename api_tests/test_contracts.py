@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 
@@ -61,3 +62,16 @@ def test_active_docs_do_not_keep_retired_agent_surface():
         "docs/specs/mcp-prompts.md",
     ]
     assert [path for path in retired_docs if Path(path).exists()] == []
+
+
+def test_llms_entry_doc_lists_every_manifest_api_path():
+    manifest = json.loads(Path("docs/public/skill.json").read_text())
+    llms = Path("docs/public/llms.txt").read_text()
+    missing = sorted(
+        {
+            tool["path"].split("?", 1)[0]
+            for tool in manifest["tools"]
+            if tool["path"].split("?", 1)[0] not in llms
+        }
+    )
+    assert missing == []
