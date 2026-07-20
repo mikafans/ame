@@ -687,6 +687,7 @@ mod tests {
             InMemoryLearningRepository::default(),
         );
         let prompt = "I would like to learn Flink and the Flink Kubernetes Operator";
+        let topic = "Flink and the Flink Kubernetes Operator";
 
         let preview = service
             .preview_from_prompt(prompt, &CatalogPromptInterpreter)
@@ -697,9 +698,10 @@ mod tests {
             preview
                 .objectives
                 .iter()
-                .all(|objective| { objective.statement.contains(prompt) })
+                .all(|objective| { objective.statement.contains(topic) })
         );
-        assert!(preview.first_activity.title.contains(prompt));
+        assert!(preview.first_activity.title.contains(topic));
+        assert_eq!(preview.interpretation.normalized_statement, topic);
     }
 
     #[tokio::test]
@@ -715,8 +717,36 @@ mod tests {
             .await
             .expect("prompt preview succeeds");
 
-        assert!(preview.objectives[0].statement.contains(prompt));
-        assert!(preview.first_activity.title.contains(prompt));
+        assert_eq!(
+            preview.interpretation.normalized_statement,
+            "{{goal}} <script>alert(1)</script>"
+        );
+        assert!(preview.objectives[0].statement.contains("{{goal}}"));
+        assert!(preview.first_activity.title.contains("{{goal}}"));
+    }
+
+    #[tokio::test]
+    async fn prompt_interpretation_keeps_raw_intent_and_exposes_topic_label() {
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            InMemoryLearningRepository::default(),
+        );
+        let result = service
+            .start_from_prompt(
+                StartLearningPromptRequest {
+                    raw_prompt: "I'd like to learn music theory".to_string(),
+                    ..start_learning_prompt_request()
+                },
+                &CatalogPromptInterpreter,
+            )
+            .await
+            .expect("prompt onboarding succeeds");
+
+        assert_eq!(result.bootstrap.goal.raw_intent, "I'd like to learn music theory");
+        assert_eq!(
+            result.bootstrap.goal.normalized_statement,
+            "music theory"
+        );
     }
 
     #[tokio::test]

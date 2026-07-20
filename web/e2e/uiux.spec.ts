@@ -32,6 +32,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   page,
 }) => {
   const prompt = "I would like to learn a new subject";
+  const topic = "a new subject";
   const email = `subject-uiux-${Date.now()}@example.com`;
 
   await page.goto("/");
@@ -70,7 +71,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
 
   await page.getByRole("button", { name: "Begin" }).click();
   await expect(
-    page.getByRole("heading", { name: `Get oriented on ${prompt}` }).first(),
+    page.getByRole("heading", { name: `Get oriented on ${topic}` }).first(),
   ).toBeVisible();
   await expect(page.getByText(/How familiar are you with .+\?/)).toBeVisible();
   await page.getByRole("button", { name: "new to me" }).click();
@@ -85,7 +86,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(
     page
       .getByRole("heading", {
-        name: `Build a clear starting model for ${prompt}`,
+        name: `Build a clear starting model for ${topic}`,
       })
       .first(),
   ).toBeVisible();
