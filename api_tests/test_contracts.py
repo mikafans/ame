@@ -14,6 +14,8 @@ def test_operational_and_static_public_contracts(client):
 
     llms = client.get("/public/llms.txt")
     assert llms.status_code == 200
+    assert "POST /public/v1/auth/register" in llms.text
+    assert "POST /public/v1/auth/login" in llms.text
     assert "POST /public/v1/onboarding/start" in llms.text
 
     skill = client.get("/public/skill.json")
@@ -75,3 +77,10 @@ def test_llms_entry_doc_lists_every_manifest_api_path():
         }
     )
     assert missing == []
+
+
+def test_manifest_exposes_public_account_operations():
+    manifest = json.loads(Path("docs/public/skill.json").read_text())
+    tools = {(tool["name"], tool["method"], tool["path"]) for tool in manifest["tools"]}
+    assert ("identity.register", "POST", "/public/v1/auth/register") in tools
+    assert ("identity.login", "POST", "/public/v1/auth/login") in tools

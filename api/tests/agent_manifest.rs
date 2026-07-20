@@ -13,6 +13,8 @@ fn skill_manifest_contains_namespaced_unified_learning_tools() {
         .collect();
     assert!(paths.contains(&"/public/v1/onboarding/preview"));
     assert!(paths.contains(&"/public/v1/onboarding/start"));
+    assert!(paths.contains(&"/public/v1/auth/register"));
+    assert!(paths.contains(&"/public/v1/auth/login"));
     assert!(paths.contains(&"/api/v1/learning/journeys"));
     assert!(paths.contains(&"/api/v1/learning/sessions/{id}"));
     assert!(paths.contains(&"/api/v1/assessments?activityId={activity_id}"));
