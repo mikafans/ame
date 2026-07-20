@@ -19,6 +19,20 @@ pub fn build_skill_manifest() -> Value {
     let empty = json!({"type": "object", "properties": {}});
     let tools = vec![
         endpoint(
+            "identity.register",
+            "Register a learner account and receive the bearer session used by the unified learning API. Self-host mode does not send email.",
+            "POST",
+            "/public/v1/auth/register",
+            json!({"type":"object","required":["email","name","password"],"properties":{"email":{"type":"string","format":"email"},"name":{"type":"string"},"password":{"type":"string","minLength":8}}}),
+        ),
+        endpoint(
+            "identity.login",
+            "Authenticate an existing learner account and receive the bearer session used by the unified learning API.",
+            "POST",
+            "/public/v1/auth/login",
+            json!({"type":"object","required":["email","password"],"properties":{"email":{"type":"string","format":"email"},"password":{"type":"string"}}}),
+        ),
+        endpoint(
             "learning.preview",
             "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
             "POST",

@@ -16,6 +16,55 @@
   "schema_version": "v1",
   "tools": [
     {
+      "description": "Register a learner account and receive the bearer session used by the unified learning API. Self-host mode does not send email.",
+      "input_schema": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "password": {
+            "minLength": 8,
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "name",
+          "password"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "identity.register",
+      "path": "/public/v1/auth/register"
+    },
+    {
+      "description": "Authenticate an existing learner account and receive the bearer session used by the unified learning API.",
+      "input_schema": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "identity.login",
+      "path": "/public/v1/auth/login"
+    },
+    {
       "description": "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
       "input_schema": {
         "properties": {

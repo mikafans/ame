@@ -6,6 +6,28 @@ prompt, one email identifier, and one bearer session.
 
 ## Start with one learner prompt
 
+For an agent-managed account, register once and retain the returned bearer
+token:
+
+```http
+POST /public/v1/auth/register
+Content-Type: application/json
+
+{"email":"learner@example.com","name":"Learner","password":"at-least-8-chars"}
+```
+
+For an existing account, use the same public origin to sign in:
+
+```http
+POST /public/v1/auth/login
+Content-Type: application/json
+
+{"email":"learner@example.com","password":"at-least-8-chars"}
+```
+
+Both responses return `token` and `user`. Use the token as
+`Authorization: Bearer <token>` on authenticated `/api/v1/*` requests.
+
 Preview without creating data:
 
 ```http
