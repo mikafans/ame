@@ -1,4 +1,5 @@
 import uuid
+from pathlib import Path
 
 
 def test_operational_and_static_public_contracts(client):
@@ -40,3 +41,23 @@ def test_public_registration_and_authenticated_api_namespace(client):
 
     assert client.get("/v1/me", headers=headers).status_code != 200
     assert client.get("/public/v1/skill.json").status_code == 404
+
+
+def test_active_docs_do_not_keep_retired_agent_surface():
+    retired_docs = [
+        "docs/audits/2026-05-28-principal-swe-audit.md",
+        "docs/audits/2026-06-07-agent-surface-workflow-audit.md",
+        "docs/plans/2026-06-03-admin-token-audit.md",
+        "docs/plans/2026-06-14-identity-unification-plan.md",
+        "docs/reports/2026-06-14-audit-report.md",
+        "docs/specs/2026-05-19-question-exam-platform-design.md",
+        "docs/specs/2026-05-20-harus-platform-design.md",
+        "docs/specs/2026-05-25-role-simulation-design.md",
+        "docs/specs/2026-05-28-flashcards-design.md",
+        "docs/specs/2026-05-30-agent-identity-refactor.md",
+        "docs/specs/2026-05-31-assessment-unification.md",
+        "docs/specs/2026-06-08-agent-only-api-tokens.md",
+        "docs/specs/2026-06-14-learn-deeper.md",
+        "docs/specs/mcp-prompts.md",
+    ]
+    assert [path for path in retired_docs if Path(path).exists()] == []
