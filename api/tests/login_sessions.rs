@@ -43,7 +43,7 @@ fn create_test_router(pool: PgPool, ttl_seconds: u64) -> Router {
         limiter,
     };
 
-    let logged_router = Router::new().merge(me::router(state.clone()));
+    let logged_router = Router::new().merge(me::current_router(state.clone()));
 
     let api_routes = Router::new()
         .merge(admin::router(state.clone()))

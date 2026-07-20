@@ -23,7 +23,7 @@ interface ApiErrorBody {
 /**
  * Extract a human-readable message from an openapi-fetch `error` value,
  * unpacking the structured `details` for the cases where the top-level
- * `message` is generic (validation, quota).
+ * `message` is generic for validation failures.
  */
 export function errorMessage(error: unknown, fallback: string): string {
   const body = error as ApiErrorBody;
@@ -37,14 +37,6 @@ export function errorMessage(error: unknown, fallback: string): string {
       .fields;
     const reasons = fields?.map((f) => f.message).filter(Boolean);
     if (reasons && reasons.length > 0) return reasons.join("; ");
-  }
-
-  // quota_exceeded carries the limit/usage worth showing alongside the message.
-  if (env?.code === "quota_exceeded" && env.details) {
-    const { limit, usage } = env.details as { limit?: number; usage?: number };
-    if (limit != null) {
-      return `${message ?? fallback} (using ${usage ?? "?"} of ${limit}). Upgrade to premium for a higher limit.`;
-    }
   }
 
   return message || fallback;

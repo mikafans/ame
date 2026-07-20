@@ -1,11 +1,9 @@
-//! PostgreSQL implementation of the clean authentication contract.
+//! PostgreSQL implementation of the learner-only authentication contract.
 
 use crate::auth::token::verify_token_secret;
 use crate::domain::auth::{
-    AuthenticatedPrincipal, AuthenticationRepository, AuthenticationRepositoryError, PrincipalKind,
-    PrincipalRole,
+    AuthenticatedPrincipal, AuthenticationRepository, AuthenticationRepositoryError, PrincipalRole,
 };
-use crate::domain::user::Scope;
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
@@ -33,7 +31,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
         let row = sqlx::query(
             r#"
             SELECT s.id, s.token_hash, s.revoked_at, s.expires_at,
-                   u.id AS owner_user_id, u.email, u.display_name,
+                   u.id AS user_id, u.email, u.display_name,
                    u.role, u.status, i.status AS identity_status, i.created_at
             FROM tb_login_sessions s
             JOIN tb_users u ON u.id = s.user_id
@@ -57,79 +55,11 @@ impl AuthenticationRepository for PgAuthenticationRepository {
         validate_owner_status(row.get("status"), row.get("identity_status"))?;
 
         Ok(AuthenticatedPrincipal {
-            actor_identity_id: row.get("owner_user_id"),
-            owner_user_id: row.get("owner_user_id"),
-            kind: PrincipalKind::Human,
+            user_id: row.get("user_id"),
             role: parse_role(row.get("role"))?,
             email: row.get("email"),
             display_name: row.get("display_name"),
             created_at: row.get("created_at"),
-            scopes: Vec::new(),
-            credential_id: row.get("id"),
-            expires_at: row.get("expires_at"),
-        })
-    }
-
-    async fn authenticate_api_token(
-        &self,
-        token_id: Uuid,
-        secret: &str,
-        now: OffsetDateTime,
-    ) -> Result<AuthenticatedPrincipal, AuthenticationRepositoryError> {
-        let row = sqlx::query(
-            r#"
-            SELECT t.id, t.token_hash, t.scopes, t.revoked_at, t.expires_at,
-                   a.id AS actor_identity_id, a.revoked_at AS agent_revoked_at,
-                   i.status AS identity_status, i.label, i.created_at,
-                   o.id AS owner_user_id, o.email, o.status AS owner_status,
-                   o.role
-            FROM tb_api_tokens t
-            JOIN tb_agents a ON a.id = t.agent_id
-            JOIN tb_identities i ON i.id = a.id
-            JOIN tb_users o ON o.id = a.owner_user_id
-            WHERE t.id = $1
-            "#,
-        )
-        .bind(token_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(storage_error)?
-        .ok_or(AuthenticationRepositoryError::NotFound)?;
-
-        validate_credential(
-            row.get("token_hash"),
-            row.get("revoked_at"),
-            row.get("expires_at"),
-            secret,
-            now,
-        )?;
-        if row
-            .get::<Option<OffsetDateTime>, _>("agent_revoked_at")
-            .is_some()
-        {
-            return Err(AuthenticationRepositoryError::Revoked);
-        }
-        validate_owner_status(row.get("owner_status"), row.get("identity_status"))?;
-
-        let scopes = row
-            .get::<Vec<String>, _>("scopes")
-            .into_iter()
-            .map(|scope| {
-                scope.parse().map_err(|error| {
-                    AuthenticationRepositoryError::InvalidData(format!("invalid scope: {error}"))
-                })
-            })
-            .collect::<Result<Vec<Scope>, _>>()?;
-
-        Ok(AuthenticatedPrincipal {
-            actor_identity_id: row.get("actor_identity_id"),
-            owner_user_id: row.get("owner_user_id"),
-            kind: PrincipalKind::Agent,
-            role: parse_role(row.get("role"))?,
-            email: row.get("email"),
-            display_name: row.get("label"),
-            created_at: row.get("created_at"),
-            scopes,
             credential_id: row.get("id"),
             expires_at: row.get("expires_at"),
         })
@@ -167,7 +97,7 @@ fn validate_owner_status(
 
 fn parse_role(role: String) -> Result<PrincipalRole, AuthenticationRepositoryError> {
     match role.as_str() {
-        "learner" => Ok(PrincipalRole::Learner),
+        "learner" | "user" => Ok(PrincipalRole::Learner),
         "admin" => Ok(PrincipalRole::Admin),
         other => Err(AuthenticationRepositoryError::InvalidData(format!(
             "invalid user role: {other}"
@@ -183,7 +113,7 @@ fn storage_error(error: sqlx::Error) -> AuthenticationRepositoryError {
 mod tests {
     use super::PgAuthenticationRepository;
     use crate::auth::token::hash_secret;
-    use crate::domain::auth::{AuthenticationRepository, PrincipalKind, PrincipalRole};
+    use crate::domain::auth::{AuthenticationRepository, PrincipalRole};
     use sqlx::migrate::Migrator;
     use sqlx::postgres::PgPoolOptions;
     use time::OffsetDateTime;
@@ -198,17 +128,13 @@ mod tests {
             return;
         }
 
-        let database_url = std::env::var("DATABASE_URL")
-            .expect("DATABASE_URL must point to a clean PostgreSQL database");
+        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
         let pool = PgPoolOptions::new()
             .max_connections(2)
             .connect(&database_url)
             .await
             .expect("connect to clean PostgreSQL database");
-        MIGRATOR
-            .run(&pool)
-            .await
-            .expect("apply clean learning baseline");
+        MIGRATOR.run(&pool).await.expect("apply clean baseline");
 
         let user_id = Uuid::now_v7();
         let session_id = Uuid::now_v7();
@@ -218,7 +144,7 @@ mod tests {
         sqlx::query("SET CONSTRAINTS ALL DEFERRED")
             .execute(&mut *transaction)
             .await
-            .expect("defer user identity constraint");
+            .expect("defer identity constraint");
         sqlx::query(
             "INSERT INTO tb_users (id, email, email_canonical, display_name, role)
              VALUES ($1, $2, $2, $3, 'learner')",
@@ -237,7 +163,7 @@ mod tests {
         .bind("Auth Learner")
         .execute(&mut *transaction)
         .await
-        .expect("insert clean human identity");
+        .expect("insert clean identity");
         sqlx::query(
             "INSERT INTO tb_login_sessions (id, user_id, token_hash, expires_at)
              VALUES ($1, $2, $3, $4)",
@@ -248,18 +174,14 @@ mod tests {
         .bind(expires_at)
         .execute(&mut *transaction)
         .await
-        .expect("insert clean login session");
-        transaction
-            .commit()
-            .await
-            .expect("commit fixture transaction");
+        .expect("insert clean session");
+        transaction.commit().await.expect("commit fixture");
 
         let principal = PgAuthenticationRepository::new(pool)
             .authenticate_login_session(session_id, secret, OffsetDateTime::now_utc())
             .await
             .expect("clean session authenticates");
-        assert_eq!(principal.kind, PrincipalKind::Human);
+        assert_eq!(principal.user_id, user_id);
         assert_eq!(principal.role, PrincipalRole::Learner);
-        assert_eq!(principal.owner_user_id, user_id);
     }
 }

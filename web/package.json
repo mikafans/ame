@@ -10,8 +10,6 @@
     "type-check": "tsc --noEmit",
     "api:gen": "openapi-typescript ../api/openapi.yaml -o src/api/generated/schema.d.ts",
     "api:check": "bun run api:gen && git diff --exit-code src/api/generated/schema.d.ts",
-    "client:gen": "bun scripts/gen-client-source.mjs",
-    "client:check": "bun run client:gen && git diff --exit-code src/generated/clientSource.ts",
     "e2e": "playwright test"
   },
   "dependencies": {
@@ -21,6 +19,7 @@
     "lucide-react": "^1.24.0",
     "mermaid": "^11.15.0",
     "next": "16.2.6",
+    "next-themes": "^0.4.6",
     "openapi-fetch": "0.17.0",
     "prismjs": "1.30.0",
     "radix-ui": "^1.6.2",

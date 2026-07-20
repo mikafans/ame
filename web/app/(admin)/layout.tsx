@@ -26,8 +26,6 @@ export default function AdminLayout({
 
   const getRouteId = () => {
     if (pathname.startsWith("/admin/users")) return "admin-users";
-    if (pathname.startsWith("/admin/assessments")) return "admin-assessments";
-    if (pathname.startsWith("/admin/tokens")) return "admin-tokens";
     if (pathname.startsWith("/admin/audit")) return "admin-audit";
     if (pathname.startsWith("/admin/health")) return "admin-health";
     if (pathname.startsWith("/admin/settings")) return "admin-settings";
@@ -39,20 +37,9 @@ export default function AdminLayout({
     const routeMap: Record<string, string> = {
       "admin-dashboard": "/admin",
       "admin-users": "/admin/users",
-      "admin-assessments": "/admin/assessments",
-      "admin-tokens": "/admin/tokens",
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
       "admin-settings": "/admin/settings",
-      explore: "/explore",
-      assessment: "/practice",
-      flashcards: "/flashcards",
-      questions: "/questions",
-      results: "/results",
-      dashboard: "/progress",
-      author: "/author",
-      grading: "/grading",
-      agent: "/agent",
     };
     router.push(routeMap[route] || "/admin");
   };

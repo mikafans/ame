@@ -48,23 +48,32 @@ def admin() -> int:
     name = os.environ.get("ADMIN_NAME", "Carol Admin")
     password = os.environ.get("ADMIN_PASSWORD", "password123")
     hashed = subprocess.check_output(["uvx", "--quiet", "--from", "argon2-cffi", "python", "-c", f"from argon2 import PasswordHasher; print(PasswordHasher().hash({password!r}))"], text=True).strip()
-    sql = f"INSERT INTO tb_users (email, display_name, role, password_hash) VALUES ({email!r}, {name!r}, 'admin', {hashed!r}) ON CONFLICT (email) DO UPDATE SET role = 'admin';"
+    sql = f"""
+BEGIN;
+SET CONSTRAINTS ALL DEFERRED;
+DO $$
+DECLARE
+  existing_user_id uuid;
+  new_user_id uuid;
+BEGIN
+  SELECT id INTO existing_user_id FROM tb_users WHERE email_canonical = {email!r};
+  IF existing_user_id IS NULL THEN
+    new_user_id := uuid_generate_v7();
+    INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
+    VALUES (new_user_id, {email!r}, {email!r}, {name!r}, 'admin', {hashed!r});
+    INSERT INTO tb_identities (id, identity_type, owner_user_id, label)
+    VALUES (new_user_id, 'human', new_user_id, {name!r});
+  ELSE
+    UPDATE tb_users
+    SET display_name = {name!r}, role = 'admin', password_hash = {hashed!r}
+    WHERE id = existing_user_id;
+  END IF;
+END
+$$;
+COMMIT;
+"""
     return compose("exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "ame", "-v", "ON_ERROR_STOP=1", "-c", sql)
 
 
 def seed() -> int:
-    return run("uv", "run", "scripts/seed.py", "--api", f"http://localhost:{API_PORT}")
-
-
-def bulk() -> int:
-    return run("uv", "run", "scripts/mint_bulk.py", "--api", f"http://localhost:{API_PORT}")
-
-
-def heavy() -> int:
-    if reset() != 0:
-        return 1
-    if run("curl", "-fsS", f"http://localhost:{API_PORT}/healthz") != 0:
-        raise SystemExit(
-            "API not running — please start it with 'make dev' in another terminal"
-        )
-    return seed() or bulk()
+    return run("uv", "run", "scripts/seed_current.py", "--api", f"http://localhost:{API_PORT}")

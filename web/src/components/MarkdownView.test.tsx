@@ -2,11 +2,9 @@ import { describe, it, expect } from "bun:test";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { MarkdownView, sanitizeSvg } from "./MarkdownView";
-import ThemeRegistry from "./ThemeRegistry";
 
-// Helper to render within the theme to ensure theme context (like theme.palette.mode) is available
 function renderWithTheme(ui: React.ReactElement) {
-  return renderToString(<ThemeRegistry>{ui}</ThemeRegistry>);
+  return renderToString(ui);
 }
 
 describe("MarkdownView", () => {

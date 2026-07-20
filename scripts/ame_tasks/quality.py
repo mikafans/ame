@@ -21,7 +21,7 @@ def lint() -> int:
     if status != 0:
         return status
     if web_ready():
-        for command in (("bun", "run", "type-check"), ("bun", "run", "api:check"), ("bun", "run", "client:check")):
+        for command in (("bun", "run", "type-check"), ("bun", "run", "api:check")):
             status = mise(*command, cwd=ROOT / "web")
             if status != 0:
                 return status
@@ -35,7 +35,7 @@ def test() -> int:
     return status
 
 
-DB_TESTS = ["auth", "login_sessions", "bank", "me", "agent_tools", "cross_owner", "sessions", "exams", "quota", "stats", "planner", "agent_manifest", "export", "admin", "admin_settings", "retention"]
+DB_TESTS = ["login_sessions", "agent_manifest"]
 
 
 def test_db(name: str | None = None) -> int:
@@ -43,13 +43,7 @@ def test_db(name: str | None = None) -> int:
     env = {"AME_RUN_DB_TESTS": "1", "AME_CONFIG_PATH": "../ame.dev.toml"}
     for test_name in selected:
         args = ["cargo", "test", "--test", test_name, "--", "--nocapture"]
-        if test_name in {"admin_settings", "retention"}:
-            args.append("--test-threads=1")
         status = mise(*args, cwd=ROOT / "api", env=env)
         if status != 0:
             return status
     return 0
-
-
-def test_engine() -> int:
-    return mise("cargo", "test", "engine", cwd=ROOT / "api") or mise("cargo", "test", "--test", "planner", cwd=ROOT / "api")

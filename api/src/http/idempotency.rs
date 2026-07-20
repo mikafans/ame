@@ -69,51 +69,26 @@ pub async fn idempotency_middleware(
         Some(t) => t,
         None => return Ok(next.run(req).await),
     };
+    if parsed_token.kind != crate::auth::token::TokenKind::Login {
+        return Ok(next.run(req).await);
+    }
     let token_id = parsed_token.id;
-    let is_login = parsed_token.kind == crate::auth::token::TokenKind::Login;
-
-    let token_info = if is_login {
-        let rec = sqlx::query(
-            r#"
-            SELECT token_hash
-            FROM tb_login_sessions
-            WHERE id = $1
-            "#,
-        )
-        .bind(token_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-        match rec {
-            Some(r) => {
-                let h: String = r.get("token_hash");
-                Some((h, None))
-            }
-            None => None,
-        }
-    } else {
-        let rec = sqlx::query(
-            r#"
-            SELECT token_hash, revoked_at
-            FROM tb_api_tokens
-            WHERE id = $1
-            "#,
-        )
-        .bind(token_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-        match rec {
-            Some(r) => {
-                let h: String = r.get("token_hash");
-                let rev: Option<time::OffsetDateTime> = r.get("revoked_at");
-                Some((h, rev))
-            }
-            None => None,
-        }
-    };
+    let token_info = sqlx::query(
+        r#"
+        SELECT token_hash, revoked_at
+        FROM tb_login_sessions
+        WHERE id = $1
+        "#,
+    )
+    .bind(token_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?
+    .map(|row| {
+        let hash: String = row.get("token_hash");
+        let revoked_at: Option<time::OffsetDateTime> = row.get("revoked_at");
+        (hash, revoked_at)
+    });
 
     let Some((token_hash, revoked_at)) = token_info else {
         return Ok(next.run(req).await);

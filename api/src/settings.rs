@@ -28,21 +28,6 @@ pub struct RateLimitSettings {
     pub premium: TierLimit,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct TierQuota {
-    pub free: i64,
-    pub premium: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct QuotaSettings {
-    pub agents: TierQuota,
-    pub assessments: TierQuota,
-    pub questions: TierQuota,
-}
-
 /// The effective platform settings: config defaults with `tb_settings` overrides
 /// applied. Serialized both as the admin API response and as the cache blob.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -50,7 +35,6 @@ pub struct QuotaSettings {
 pub struct EffectiveSettings {
     pub maintenance_mode: bool,
     pub ratelimit: RateLimitSettings,
-    pub quota: QuotaSettings,
 }
 
 impl EffectiveSettings {
@@ -67,20 +51,6 @@ impl EffectiveSettings {
                 premium: TierLimit {
                     burst: c.ratelimit.premium.burst,
                     rate: c.ratelimit.premium.rate,
-                },
-            },
-            quota: QuotaSettings {
-                agents: TierQuota {
-                    free: c.quota.agents.free,
-                    premium: c.quota.agents.premium,
-                },
-                assessments: TierQuota {
-                    free: c.quota.assessments.free,
-                    premium: c.quota.assessments.premium,
-                },
-                questions: TierQuota {
-                    free: c.quota.questions.free,
-                    premium: c.quota.questions.premium,
                 },
             },
         }
@@ -139,11 +109,6 @@ async fn resolve_from_db(pool: &PgPool, config: &crate::config::Config) -> Effec
                     "ratelimit" => {
                         if let Ok(rl) = serde_json::from_value(value) {
                             settings.ratelimit = rl;
-                        }
-                    }
-                    "quota" => {
-                        if let Ok(q) = serde_json::from_value(value) {
-                            settings.quota = q;
                         }
                     }
                     _ => {}

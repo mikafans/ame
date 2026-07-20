@@ -45,6 +45,21 @@ def wait_for_api(timeout: int = 120) -> None:
     raise SystemExit("local stack did not become ready within 120 seconds")
 
 
+def wait_for_web(timeout: int = 120) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            ["curl", "-fsS", "http://localhost:28800/"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        time.sleep(1)
+    raise SystemExit("local web stack did not become ready within 120 seconds")
+
+
 def promote_admin() -> None:
     password_hash = subprocess.check_output(
         [
@@ -104,6 +119,7 @@ def run_uiux() -> None:
         "NEXT_PUBLIC_API_URL": "http://localhost:28800",
         "E2E_API_URL": "http://localhost:28800",
         "E2E_BASE_URL": "http://localhost:28800",
+        "E2E_EXTERNAL_SERVER": "1",
     }
     subprocess.run(
         [
@@ -154,7 +170,7 @@ def seed_stack(*, force: bool = False) -> None:
         return
     promote_admin()
     subprocess.run(
-        ["uv", "run", "scripts/seed.py", "--api", "http://localhost:28800"],
+        ["uv", "run", "scripts/seed_current.py", "--api", "http://localhost:28800"],
         cwd=ROOT,
         check=True,
     )
@@ -166,8 +182,12 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "up":
-        compose("up", "-d", "--build")
+        # The web source and its node_modules live in separate mounts. Recreate
+        # the web container on each start so a changed package manifest cannot
+        # leave a stale dependency volume behind.
+        compose("up", "-d", "--build", "--force-recreate", "web", "caddy")
         wait_for_api()
+        wait_for_web()
         seed_stack()
         print("local stack ready → http://localhost:28800")
     elif args.command == "down":

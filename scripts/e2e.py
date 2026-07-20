@@ -60,7 +60,7 @@ def main() -> int:
 
         subprocess.run(["make", "db-admin"], cwd=ROOT, check=True)
         subprocess.run(
-            ["uv", "run", "scripts/seed.py", "--api", API_URL],
+            ["uv", "run", "scripts/seed_current.py", "--api", API_URL],
             cwd=ROOT,
             check=True,
         )

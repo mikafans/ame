@@ -1,4 +1,4 @@
-//! API token format: `<uuid>_<hex-secret>`.
+//! Login token format: `lgn_<uuid>_<hex-secret>`.
 //!
 //! Secrets are server-generated 192-bit random values (48 hex chars). They are
 //! stored as `sha256(secret)` and compared in constant time. We deliberately
@@ -21,21 +21,18 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Login,
-    Agent,
 }
 
 impl TokenKind {
     pub fn prefix(&self) -> &'static str {
         match self {
             Self::Login => "lgn",
-            Self::Agent => "agt",
         }
     }
 
     pub fn parse(prefix: &str) -> Option<Self> {
         match prefix {
             "lgn" => Some(Self::Login),
-            "agt" => Some(Self::Agent),
             _ => None,
         }
     }
@@ -58,7 +55,7 @@ pub fn parse_bearer_token(bearer: &str) -> Option<ParsedToken> {
 
 /// Parse a raw token value without the "Bearer " prefix.
 /// Used for both Authorization header (after stripping "Bearer ") and Cookie header.
-/// Expects `<kind>_<uuid>_<secret>`.
+/// Expects `lgn_<uuid>_<secret>`.
 pub fn parse_token_value(token: &str) -> Option<ParsedToken> {
     let mut parts = token.splitn(3, '_');
     let kind_str = parts.next()?;
