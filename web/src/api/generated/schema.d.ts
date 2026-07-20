@@ -273,6 +273,23 @@ export interface paths {
         patch: operations["transition"];
         trace?: never;
     };
+    "/api/v1/learning/activities/{activity_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content. */
+        patch: operations["author_activity_content"];
+        trace?: never;
+    };
     "/api/v1/learning/journeys": {
         parameters: {
             query?: never;
@@ -747,6 +764,13 @@ export interface components {
         AuthResponse: {
             token: string;
             user: components["schemas"]["UserInfo"];
+        };
+        AuthorActivityContentBody: {
+            content: Record<string, never>;
+            /** Format: uuid */
+            generationRunId: string;
+            reviewStatus: string;
+            sourceReferences: string[];
         };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
@@ -1808,6 +1832,61 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GenerationRunResponse"];
                 };
+            };
+        };
+    };
+    author_activity_content: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Activity to ground */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorActivityContentBody"];
+            };
+        };
+        responses: {
+            /** @description Grounded learner activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity or generation run does not belong to this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generation is not published or activity content is immutable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Content, provenance, or review status is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

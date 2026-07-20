@@ -46,6 +46,7 @@ use crate::http::{
         crate::http::learning::get_learning_session,
         crate::http::learning::finish_learning_session,
         crate::http::learning::start_activity,
+        crate::http::learning::author_activity_content,
         crate::http::questions::create_question,
         crate::http::questions::create_question_version,
         crate::http::questions::get_question_version,

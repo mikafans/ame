@@ -494,6 +494,43 @@ paths:
                 $ref: '#/components/schemas/GenerationRunResponse'
       security:
       - bearer: []
+  /api/v1/learning/activities/{activity_id}/content:
+    patch:
+      tags:
+      - learning
+      summary: PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content.
+      operationId: author_activity_content
+      parameters:
+      - name: activity_id
+        in: path
+        description: Activity to ground
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorActivityContentBody'
+        required: true
+      responses:
+        '200':
+          description: Grounded learner activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity or generation run does not belong to this learner
+        '409':
+          description: Generation is not published or activity content is immutable
+        '422':
+          description: Content, provenance, or review status is invalid
+      security:
+      - bearer_auth: []
   /api/v1/learning/journeys:
     get:
       tags:
@@ -1379,6 +1416,25 @@ components:
           type: string
         user:
           $ref: '#/components/schemas/UserInfo'
+    AuthorActivityContentBody:
+      type: object
+      required:
+      - generationRunId
+      - content
+      - sourceReferences
+      - reviewStatus
+      properties:
+        content:
+          type: object
+        generationRunId:
+          type: string
+          format: uuid
+        reviewStatus:
+          type: string
+        sourceReferences:
+          type: array
+          items:
+            type: string
     ContentReviewStatus:
       type: string
       enum:
