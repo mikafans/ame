@@ -140,6 +140,24 @@
       "path": "/api/v1/learning/sessions/{id}/finish"
     },
     {
+      "description": "Read one authenticated learner's activity session so an external agent can resume the same state as the browser.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.session.get",
+      "path": "/api/v1/learning/sessions/{id}"
+    },
+    {
       "description": "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
       "input_schema": {
         "properties": {

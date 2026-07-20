@@ -41,6 +41,7 @@ With the learner token:
 GET /api/v1/learning/journeys
 GET /api/v1/learning/journeys/{id}
 POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
+GET /api/v1/learning/sessions/{id}
 POST /api/v1/learning/sessions/{id}/finish
 PATCH /api/v1/learning/activities/{activity_id}/content
 POST /api/v1/generation-runs

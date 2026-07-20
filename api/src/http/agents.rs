@@ -61,6 +61,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["id","completed","responses"],"properties":{"id":{"type":"string","format":"uuid"},"completed":{"type":"boolean"},"responses":{"type":"array"}}}),
         ),
         endpoint(
+            "learning.session.get",
+            "Read one authenticated learner's activity session so an external agent can resume the same state as the browser.",
+            "GET",
+            "/api/v1/learning/sessions/{id}",
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.activity.content.author",
             "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
             "PATCH",
