@@ -1,15 +1,17 @@
-use ame_api::domain::{
-    progress::{EvidenceSource, MasteryEvidenceInput},
-    task::{TaskEvaluationMethod, TaskReviewStatus, TaskSubmissionStatus},
-};
+use ame_api::auth::token::hash_secret;
+use ame_api::http::db::convert_pool_to_ame_app;
+use ame_api::http::{AppState, auth_extract_middleware, tasks};
 use ame_api::progress::ProgressRepository;
 use ame_api::progress_postgres::PgProgressRepository;
-use ame_api::task::{
-    ReviewTaskSubmission, StartTaskSubmission, TaskReviewOutcome, TaskSubmissionRepository,
-};
 use ame_api::task_postgres::PgTaskSubmissionRepository;
+use axum::{
+    Router, middleware,
+    routing::{patch, post},
+};
+use reqwest::StatusCode;
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
+use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
 
 static MIGRATOR: Migrator = sqlx::migrate!("../db/migrations");
@@ -115,59 +117,137 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
         .expect("link task objective");
     transaction.commit().await.expect("commit Flink fixture");
 
+    let admin = Uuid::now_v7();
+    let mut transaction = pool.begin().await.expect("begin admin fixture transaction");
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, email_canonical, display_name, role)
+         VALUES ($1, $2, $2, 'Flink Reviewer', 'admin')",
+    )
+    .bind(admin)
+    .bind(format!("flink-reviewer-{admin}@example.test"))
+    .execute(&mut *transaction)
+    .await
+    .expect("insert admin");
+    sqlx::query(
+        "INSERT INTO tb_identities (id, identity_type, owner_user_id, label)
+         VALUES ($1, 'human', $1, 'Flink Reviewer')",
+    )
+    .bind(admin)
+    .execute(&mut *transaction)
+    .await
+    .expect("insert admin identity");
+    let learner_secret = "flink-learner-secret";
+    let admin_secret = "flink-admin-secret";
+    let learner_session_id = Uuid::now_v7();
+    let admin_session_id = Uuid::now_v7();
+    for (session_id, user_id, secret) in [
+        (learner_session_id, subject, learner_secret),
+        (admin_session_id, admin, admin_secret),
+    ] {
+        sqlx::query(
+            "INSERT INTO tb_login_sessions (id, user_id, token_hash, expires_at)
+             VALUES ($1, $2, $3, $4)",
+        )
+        .bind(session_id)
+        .bind(user_id)
+        .bind(hash_secret(secret))
+        .bind(OffsetDateTime::now_utc() + Duration::hours(1))
+        .execute(&mut *transaction)
+        .await
+        .expect("insert test login session");
+    }
+    transaction.commit().await.expect("commit auth fixture");
+
+    let pool_for_state = convert_pool_to_ame_app(&pool);
+    let config = ame_api::config::Config::load().expect("load test config");
+    let valkey = ame_api::config::create_valkey_pool(&config).expect("create test valkey pool");
+    let state = AppState {
+        pool: pool_for_state,
+        config,
+        limiter: std::sync::Arc::new(ame_api::ratelimit::RateLimiter::new(valkey.clone())),
+        valkey,
+    };
+    let app = Router::new()
+        .route(
+            "/v1/tasks/{task_id}/submissions",
+            post(tasks::start_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/submit",
+            post(tasks::submit_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/review",
+            patch(tasks::review_submission),
+        )
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_extract_middleware,
+        ))
+        .with_state(state);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind test server");
+    let address = listener.local_addr().expect("read test server address");
+    tokio::spawn(async move {
+        axum::serve(listener, app.into_make_service())
+            .await
+            .expect("serve task test routes");
+    });
+    let client = reqwest::Client::new();
+    let base_url = format!("http://{address}");
+    let learner_token = format!("lgn_{learner_session_id}_{learner_secret}");
+    let admin_token = format!("lgn_{admin_session_id}_{admin_secret}");
+
+    let started = client
+        .post(format!("{base_url}/v1/tasks/{activity}/submissions"))
+        .bearer_auth(&learner_token)
+        .json(&serde_json::json!({
+            "contentVersion": 2,
+            "response": {"optionId": "event-time"},
+            "evaluationMethod": "agent"
+        }))
+        .send()
+        .await
+        .expect("start task over HTTP");
+    assert_eq!(started.status(), StatusCode::CREATED);
+    let started: serde_json::Value = started.json().await.expect("decode started task");
+    let submission_id = started["id"].as_str().expect("submission id");
+    let submitted = client
+        .post(format!(
+            "{base_url}/v1/task-submissions/{submission_id}/submit"
+        ))
+        .bearer_auth(&learner_token)
+        .send()
+        .await
+        .expect("submit task over HTTP");
+    assert_eq!(submitted.status(), StatusCode::OK);
+    let reviewed = client
+        .patch(format!(
+            "{base_url}/v1/task-submissions/{submission_id}/review"
+        ))
+        .bearer_auth(&admin_token)
+        .json(&serde_json::json!({
+            "outcome": "reviewed",
+            "score": 0.9,
+            "feedback": {"note": "Correct event-time reasoning"}
+        }))
+        .send()
+        .await
+        .expect("review task over HTTP");
+    assert_eq!(reviewed.status(), StatusCode::OK);
+    let reviewed: serde_json::Value = reviewed.json().await.expect("decode reviewed task");
+    assert_eq!(reviewed["reviewStatus"], "complete");
+    assert_eq!(reviewed["score"], 0.9);
+
     let tasks = PgTaskSubmissionRepository::new(pool.clone());
-    let started = tasks
-        .start(StartTaskSubmission {
-            subject_user_id: subject,
-            task_id: activity,
-            content_version: 2,
-            response: serde_json::json!({"optionId": "event-time"}),
-            evaluation_method: TaskEvaluationMethod::Agent,
-        })
-        .await
-        .expect("start task submission");
-    let submitted = tasks
-        .submit(subject, started.id)
-        .await
-        .expect("submit task");
-    assert_eq!(submitted.envelope.status, TaskSubmissionStatus::Submitted);
-    assert_eq!(submitted.envelope.review_status, TaskReviewStatus::Pending);
-    let reviewed = tasks
-        .review(ReviewTaskSubmission {
-            reviewer_user_id: subject,
-            submission_id: submitted.id,
-            outcome: TaskReviewOutcome::Reviewed,
-            score: Some(0.9),
-            feedback: Some(serde_json::json!({"note": "Correct event-time reasoning"})),
-        })
-        .await
-        .expect("review task submission");
+    let reviewed_id = Uuid::parse_str(submission_id).expect("parse submission id");
     let context = tasks
-        .evidence_context(reviewed.id)
+        .evidence_context(reviewed_id)
         .await
         .expect("resolve evidence context");
+    assert_eq!(context.score, 0.9);
     let progress = PgProgressRepository::new(pool);
-    let evidence = progress
-        .record_evidence(MasteryEvidenceInput {
-            subject_user_id: context.subject_user_id,
-            journey_id: context.journey_id,
-            objective_id: context.objective_ids[0],
-            activity_id: context.activity_id,
-            source: EvidenceSource::Task {
-                submission_id: reviewed.id,
-            },
-            content_version: context.content_version,
-            value: context.score,
-            derivation_version: 1,
-        })
-        .await
-        .expect("record task evidence");
-    assert_eq!(
-        evidence.input.source,
-        EvidenceSource::Task {
-            submission_id: reviewed.id
-        }
-    );
     let snapshot = progress
         .snapshot(subject, journey, objective)
         .await
