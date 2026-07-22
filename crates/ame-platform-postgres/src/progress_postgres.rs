@@ -22,6 +22,7 @@ impl PgProgressRepository {
         Self { pool }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn ensure_owned_target(
         &self,
         subject_user_id: Uuid,
@@ -303,8 +304,8 @@ impl ProgressRepository for PgProgressRepository {
             },
         )
         .await?;
-        if let EvidenceSource::Task { submission_id } = input.source {
-            if let Some(row) = sqlx::query(
+        if let EvidenceSource::Task { submission_id } = input.source
+            && let Some(row) = sqlx::query(
                 "SELECT id, created_at FROM tb_mastery_evidence
                  WHERE task_submission_id = $1 AND objective_id = $2",
             )
@@ -313,13 +314,12 @@ impl ProgressRepository for PgProgressRepository {
             .fetch_optional(&self.pool)
             .await
             .map_err(storage_error)?
-            {
-                return Ok(MasteryEvidence {
-                    id: row.get("id"),
-                    input,
-                    created_at: row.get("created_at"),
-                });
-            }
+        {
+            return Ok(MasteryEvidence {
+                id: row.get("id"),
+                input,
+                created_at: row.get("created_at"),
+            });
         }
         let row = sqlx::query(
             r#"INSERT INTO tb_mastery_evidence (
