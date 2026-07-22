@@ -209,7 +209,7 @@ mod tests {
     use sqlx::migrate::Migrator;
     use sqlx::postgres::PgPoolOptions;
 
-    static MIGRATOR: Migrator = sqlx::migrate!("../db/migrations");
+    static MIGRATOR: Migrator = sqlx::migrate!("../../db/migrations");
 
     #[tokio::test]
     async fn postgres_repository_satisfies_identity_contract_on_clean_database() {

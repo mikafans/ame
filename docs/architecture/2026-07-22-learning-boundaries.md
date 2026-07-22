@@ -20,9 +20,16 @@ ame-learning-postgres
   SQLx repository adapter, PostgreSQL row mapping, transactions, and adapter
   integration tests.
 
+ame-platform-application
+  Platform use cases, repository ports, in-memory implementations, and
+  application-level validation.
+
+ame-platform-postgres
+  SQLx adapters, PostgreSQL row mapping, transactions, and migrations.
+
 ame-api
-  HTTP routes, authentication, OpenAPI DTOs, runtime composition, and the
-  remaining platform adapters during the incremental extraction.
+  HTTP routes, authentication extraction, OpenAPI DTOs, and runtime
+  composition.
 ```
 
 Dependency direction:
@@ -37,9 +44,9 @@ ame-learning-postgres
 ame-api  → HTTP/runtime composition
 ```
 
-The API currently re-exports the learning crates through compatibility module
-paths. This keeps assessment, progress, onboarding, and HTTP consumers stable
-while the rest of the backend is extracted incrementally.
+The API re-exports the platform crates through compatibility module paths. This
+keeps existing HTTP consumers stable while removing business logic and SQLx
+adapters from the API crate.
 
 ## Rules
 
@@ -52,19 +59,8 @@ while the rest of the backend is extracted incrementally.
   before being added to migrations or browser renderers.
 - Each extraction or behavior milestone has its own conventional commit.
 
-## Follow-up extraction
+## Future growth
 
-The remaining platform modules can move through the same pattern after the
-learning boundary is stable:
-
-```text
-ame-content-domain / ame-content-application
-ame-agent-application
-ame-persistence-postgres
-ame-http
-ame-server
-```
-
-This is intentionally incremental. The current task establishes the boundary
-that M1 needs; it does not split every existing AME feature into a new crate at
-once.
+New bounded contexts may add dedicated domain/application crates when their
+contracts become substantial. They must preserve the same dependency direction
+and must not place SQLx or business state transitions back in `ame-api`.

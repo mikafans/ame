@@ -119,7 +119,7 @@ mod tests {
     use time::OffsetDateTime;
     use uuid::Uuid;
 
-    static MIGRATOR: Migrator = sqlx::migrate!("../db/migrations");
+    static MIGRATOR: Migrator = sqlx::migrate!("../../db/migrations");
 
     #[tokio::test]
     async fn postgres_authentication_uses_clean_baseline_schema() {

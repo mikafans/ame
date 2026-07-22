@@ -21,6 +21,7 @@ ame-learning-domain = { path = "../crates/ame-learning-domain" }
 ame-learning-postgres = { path = "../crates/ame-learning-postgres" }
 ame-platform-domain = { path = "../crates/ame-platform-domain" }
 ame-platform-application = { path = "../crates/ame-platform-application" }
+ame-platform-postgres = { path = "../crates/ame-platform-postgres" }
 anyhow = "1"
 async-trait = "0.1"
 axum = "0.8.1"
