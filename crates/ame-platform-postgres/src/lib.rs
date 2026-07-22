@@ -16,6 +16,7 @@ pub mod identity_postgres;
 pub mod progress_postgres;
 pub mod question_postgres;
 pub mod settings;
+pub mod task_postgres;
 pub mod timeline_postgres;
 
 pub mod assessment {
@@ -43,6 +44,9 @@ pub mod progress {
 }
 pub mod question {
     pub use ame_platform_application::question::*;
+}
+pub mod task {
+    pub use ame_platform_application::task::*;
 }
 
 pub mod domain {
