@@ -7,8 +7,14 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::admin::RequireAdmin, auth::extractor::AuthenticatedUser, domain::error::ApiError,
-    domain::task::TaskEvaluationMethod, http::AppState,
+    auth::admin::RequireAdmin,
+    auth::extractor::AuthenticatedUser,
+    domain::error::ApiError,
+    domain::progress::{EvidenceSource, MasteryEvidenceInput},
+    domain::task::TaskEvaluationMethod,
+    http::AppState,
+    progress::ProgressRepository,
+    progress_postgres::PgProgressRepository,
 };
 use ame_platform_application::task::TaskSubmissionRepository;
 
@@ -135,21 +141,47 @@ pub async fn review_submission(
     Path(submission_id): Path<Uuid>,
     Json(body): Json<ReviewTaskSubmissionBody>,
 ) -> Result<Json<TaskSubmissionResponse>, ApiError> {
+    let is_reviewed = matches!(body.outcome, ReviewTaskOutcome::Reviewed);
     let outcome = match body.outcome {
         ReviewTaskOutcome::Reviewed => ame_platform_application::task::TaskReviewOutcome::Reviewed,
         ReviewTaskOutcome::Rejected => ame_platform_application::task::TaskReviewOutcome::Rejected,
     };
-    let submission =
-        ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool.clone())
-            .review(ame_platform_application::task::ReviewTaskSubmission {
-                reviewer_user_id: _admin.0.user.id,
-                submission_id,
-                outcome,
-                score: body.score,
-                feedback: body.feedback,
-            })
+    let task_repository =
+        ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool.clone());
+    let submission = task_repository
+        .review(ame_platform_application::task::ReviewTaskSubmission {
+            reviewer_user_id: _admin.0.user.id,
+            submission_id,
+            outcome,
+            score: body.score,
+            feedback: body.feedback,
+        })
+        .await
+        .map_err(map_task_error)?;
+    if is_reviewed && submission.envelope.score.is_some() {
+        let context = task_repository
+            .evidence_context(submission.id)
             .await
             .map_err(map_task_error)?;
+        let progress = PgProgressRepository::new(state.pool.clone());
+        for objective_id in context.objective_ids {
+            progress
+                .record_evidence(MasteryEvidenceInput {
+                    subject_user_id: context.subject_user_id,
+                    journey_id: context.journey_id,
+                    objective_id,
+                    activity_id: context.activity_id,
+                    source: EvidenceSource::Task {
+                        submission_id: submission.id,
+                    },
+                    content_version: context.content_version,
+                    value: context.score,
+                    derivation_version: 1,
+                })
+                .await
+                .map_err(|error| ApiError::Internal(anyhow::anyhow!(error.to_string())))?;
+        }
+    }
     Ok(Json(response(submission)))
 }
 
