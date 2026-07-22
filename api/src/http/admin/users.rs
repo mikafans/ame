@@ -5,7 +5,6 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -60,65 +59,10 @@ pub async fn list_users(
     let limit = query.limit.unwrap_or(50).clamp(1, 200);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    // 1. Get total count
-    let mut count_qb = sqlx::QueryBuilder::new("SELECT COUNT(*) FROM tb_users");
-    if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
-        let search_pat = format!("%{}%", search.trim());
-        count_qb.push(" WHERE email ILIKE ");
-        count_qb.push_bind(search_pat.clone());
-        count_qb.push(" OR display_name ILIKE ");
-        count_qb.push_bind(search_pat);
-    }
-    let total: i64 = count_qb
-        .build_query_as::<(i64,)>()
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?
-        .0;
-
-    // 2. Get paginated users
-    let mut users_qb = sqlx::QueryBuilder::new(
-        "SELECT u.id, u.email_canonical AS email, u.display_name, u.role, u.status, u.created_at FROM tb_users u",
-    );
-    if let Some(search) = query.q.as_deref().filter(|s| !s.trim().is_empty()) {
-        let search_pat = format!("%{}%", search.trim());
-        users_qb.push(" WHERE u.email ILIKE ");
-        users_qb.push_bind(search_pat.clone());
-        users_qb.push(" OR u.display_name ILIKE ");
-        users_qb.push_bind(search_pat);
-    }
-    users_qb.push(" ORDER BY u.created_at DESC, u.id DESC LIMIT ");
-    users_qb.push_bind(limit);
-    users_qb.push(" OFFSET ");
-    users_qb.push_bind(offset);
-
-    let rows = users_qb
-        .build()
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-    let users = rows
-        .iter()
-        .map(|r| {
-            let role_str: String = r.get("role");
-            let role = match role_str.as_str() {
-                "admin" => crate::domain::user::Role::Admin,
-                _ => crate::domain::user::Role::User,
-            };
-            User {
-                id: r.get("id"),
-                email: r.get("email"),
-                display_name: r.get("display_name"),
-                role,
-                status: match r.get::<String, _>("status").as_str() {
-                    "deactivated" => crate::domain::user::UserStatus::Deactivated,
-                    _ => crate::domain::user::UserStatus::Active,
-                },
-                created_at: r.get("created_at"),
-            }
-        })
-        .collect();
+    let (users, total) =
+        ame_platform_postgres::admin_users::list(&state.pool, limit, offset, query.q.as_deref())
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
     Ok(Json(ListUsersResponse { users, total }))
 }
@@ -145,12 +89,9 @@ pub async fn patch_user_admin(
     Json(body): Json<PatchUserAdminBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     // 1. Verify user exists and fetch current clean role/status.
-    let current_user: Option<(String, String)> =
-        sqlx::query_as("SELECT role, status FROM tb_users WHERE id = $1")
-            .bind(user_id)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.into()))?;
+    let current_user = ame_platform_postgres::admin_users::role_status(&state.pool, user_id)
+        .await
+        .map_err(|e| ApiError::Internal(e.into()))?;
 
     let (current_role, current_status) = match current_user {
         Some(u) => u,
@@ -197,12 +138,10 @@ pub async fn patch_user_admin(
     let changing_to_deactivated = body.status.as_deref() == Some("deactivated");
 
     if is_active_admin && (changing_to_non_admin || changing_to_deactivated) {
-        let active_admin_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tb_users WHERE role = 'admin' AND status = 'active'",
-        )
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        let active_admin_count =
+            ame_platform_postgres::admin_users::active_admin_count(&state.pool)
+                .await
+                .map_err(|e| ApiError::Internal(e.into()))?;
 
         if active_admin_count <= 1 {
             let field = if changing_to_deactivated {
@@ -233,10 +172,7 @@ pub async fn patch_user_admin(
                 message: "must be 'active' or 'deactivated'".into(),
             }]));
         }
-        sqlx::query("UPDATE tb_users SET status = $1 WHERE id = $2")
-            .bind(status)
-            .bind(user_id)
-            .execute(&state.pool)
+        ame_platform_postgres::admin_users::update_status(&state.pool, user_id, status)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
         crate::audit::audit(
@@ -259,10 +195,7 @@ pub async fn patch_user_admin(
             }]));
         }
 
-        sqlx::query("UPDATE tb_users SET role = $1 WHERE id = $2")
-            .bind(role)
-            .bind(user_id)
-            .execute(&state.pool)
+        ame_platform_postgres::admin_users::update_role(&state.pool, user_id, role)
             .await
             .map_err(|e| ApiError::Internal(e.into()))?;
 

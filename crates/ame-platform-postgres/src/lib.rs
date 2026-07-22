@@ -1,5 +1,6 @@
 //! PostgreSQL adapters for the platform application contracts.
 
+pub mod admin_users;
 pub mod assessment_postgres;
 pub mod attempt_postgres;
 pub mod audit;
