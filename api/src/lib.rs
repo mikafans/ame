@@ -12,12 +12,11 @@ pub use ame_platform_postgres::{
 };
 pub mod audit;
 pub mod auth;
-pub mod authentication;
+pub use ame_platform_application::{authentication, session};
 pub mod config;
 pub mod domain;
 pub mod http;
 pub mod ratelimit;
-pub mod session;
 pub mod settings;
 
 pub use ame_learning_application as learning;

@@ -2,12 +2,14 @@
 
 pub mod assessment;
 pub mod attempt;
+pub mod authentication;
 pub mod deep_dive;
 pub mod generation;
 pub mod identity;
 pub mod onboarding;
 pub mod progress;
 pub mod question;
+pub mod session;
 pub mod templates;
 pub mod token;
 
