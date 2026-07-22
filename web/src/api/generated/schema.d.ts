@@ -844,10 +844,6 @@ export interface components {
             /** Format: uuid */
             triggeringEvidenceId: string;
         };
-        /**
-         * @description The effective platform settings: config defaults with `tb_settings` overrides
-         *     applied. Serialized both as the admin API response and as the cache blob.
-         */
         EffectiveSettings: {
             maintenanceMode: boolean;
             ratelimit: components["schemas"]["RateLimitSettings"];

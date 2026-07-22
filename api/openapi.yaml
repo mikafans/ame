@@ -1629,9 +1629,6 @@ components:
           format: uuid
     EffectiveSettings:
       type: object
-      description: |-
-        The effective platform settings: config defaults with `tb_settings` overrides
-        applied. Serialized both as the admin API response and as the cache blob.
       required:
       - maintenanceMode
       - ratelimit
