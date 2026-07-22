@@ -1,0 +1,24 @@
+[package]
+name = "ame-platform-application"
+version = "0.3.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+ame-learning-application = { path = "../ame-learning-application" }
+ame-learning-domain = { path = "../ame-learning-domain" }
+ame-platform-domain = { path = "../ame-platform-domain" }
+async-trait = "0.1"
+hex = "0.4"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+subtle = "2"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "macros", "parsing", "serde"] }
+tokio = { version = "1.43", features = ["full"] }
+uuid = { version = "1", features = ["v7", "v4", "serde", "js"] }
+
+[dev-dependencies]
+proptest = "1"

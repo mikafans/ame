@@ -30,6 +30,7 @@ dependencies = [
  "ame-learning-application",
  "ame-learning-domain",
  "ame-learning-postgres",
+ "ame-platform-application",
  "ame-platform-domain",
  "anyhow",
  "argon2",
@@ -103,6 +104,27 @@ dependencies = [
  "async-trait",
  "serde_json",
  "sqlx",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "ame-platform-application"
+version = "0.3.0"
+dependencies = [
+ "ame-learning-application",
+ "ame-learning-domain",
+ "ame-platform-domain",
+ "async-trait",
+ "hex",
+ "proptest",
+ "rand 0.8.7",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror",
  "time",
  "tokio",
  "uuid",
