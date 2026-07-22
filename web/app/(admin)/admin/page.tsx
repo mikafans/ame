@@ -1,9 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowRight, HeartPulse, History, Shield, Users } from "lucide-react";
+import {
+  ArrowRight,
+  ClipboardCheck,
+  HeartPulse,
+  History,
+  Shield,
+  Users,
+} from "lucide-react";
 
 const panels = [
+  {
+    title: "Task Review",
+    description:
+      "Review learner application tasks, provide feedback, and turn verified work into mastery evidence.",
+    icon: ClipboardCheck,
+    tone: "text-violet-500",
+    link: "/admin/tasks",
+    actionLabel: "Review Tasks",
+  },
   {
     title: "Manage Users",
     description:

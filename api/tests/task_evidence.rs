@@ -181,6 +181,10 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
             axum::routing::get(tasks::get_submission),
         )
         .route(
+            "/v1/admin/task-submissions",
+            axum::routing::get(tasks::list_pending_submissions),
+        )
+        .route(
             "/v1/task-submissions/{submission_id}/review",
             patch(tasks::review_submission),
         )
@@ -226,6 +230,19 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
         .await
         .expect("submit task over HTTP");
     assert_eq!(submitted.status(), StatusCode::OK);
+    let pending = client
+        .get(format!("{base_url}/v1/admin/task-submissions"))
+        .bearer_auth(&admin_token)
+        .send()
+        .await
+        .expect("list pending tasks over HTTP");
+    assert_eq!(pending.status(), StatusCode::OK);
+    let pending: Vec<serde_json::Value> = pending.json().await.expect("decode pending tasks");
+    assert!(
+        pending
+            .iter()
+            .any(|task| task["id"].as_str() == Some(submission_id))
+    );
     let reviewed = client
         .patch(format!(
             "{base_url}/v1/task-submissions/{submission_id}/review"

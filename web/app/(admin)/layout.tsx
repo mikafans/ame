@@ -29,6 +29,7 @@ export default function AdminLayout({
     if (pathname.startsWith("/admin/audit")) return "admin-audit";
     if (pathname.startsWith("/admin/health")) return "admin-health";
     if (pathname.startsWith("/admin/settings")) return "admin-settings";
+    if (pathname.startsWith("/admin/tasks")) return "admin-tasks";
     if (pathname.startsWith("/admin")) return "admin-dashboard";
     return "admin-dashboard";
   };
@@ -40,6 +41,7 @@ export default function AdminLayout({
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
       "admin-settings": "/admin/settings",
+      "admin-tasks": "/admin/tasks",
     };
     router.push(routeMap[route] || "/admin");
   };

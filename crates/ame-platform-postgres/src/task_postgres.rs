@@ -49,6 +49,21 @@ impl PgTaskSubmissionRepository {
         decode_submission(row)
     }
 
+    pub async fn list_pending_for_admin(&self) -> Result<Vec<TaskSubmission>, TaskSubmissionError> {
+        let rows = sqlx::query(
+            "SELECT id, journey_id, task_id, subject_user_id, content_version, response,
+                    evaluation_method, status, review_status, score::float4 AS score, feedback
+             FROM tb_task_submissions
+             WHERE status IN ('submitted', 'in_review') AND review_status = 'pending'
+             ORDER BY submitted_at ASC NULLS LAST, created_at ASC
+             LIMIT 100",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        rows.into_iter().map(decode_submission).collect()
+    }
+
     pub async fn evidence_context(
         &self,
         submission_id: Uuid,

@@ -148,6 +148,25 @@ pub async fn get_submission(
 }
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/admin/task-submissions",
+    responses((status = 200, body = [TaskSubmissionResponse])),
+    security(("bearer" = [])),
+    tag = "tasks"
+)]
+pub async fn list_pending_submissions(
+    State(state): State<AppState>,
+    _admin: RequireAdmin,
+) -> Result<Json<Vec<TaskSubmissionResponse>>, ApiError> {
+    let submissions =
+        ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool.clone())
+            .list_pending_for_admin()
+            .await
+            .map_err(map_task_error)?;
+    Ok(Json(submissions.into_iter().map(response).collect()))
+}
+
+#[utoipa::path(
     patch,
     path = "/api/v1/task-submissions/{submission_id}/review",
     params(("submission_id" = Uuid, Path, description = "Task submission ID")),

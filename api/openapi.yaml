@@ -121,6 +121,22 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
+  /api/v1/admin/task-submissions:
+    get:
+      tags:
+      - tasks
+      operationId: list_pending_submissions
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
   /api/v1/admin/users:
     get:
       tags:
