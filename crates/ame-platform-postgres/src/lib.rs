@@ -2,12 +2,14 @@
 
 pub mod assessment_postgres;
 pub mod attempt_postgres;
+pub mod audit;
 pub mod authentication_postgres;
 pub mod deep_dive_postgres;
 pub mod generation_postgres;
 pub mod identity_postgres;
 pub mod progress_postgres;
 pub mod question_postgres;
+pub mod settings;
 pub mod timeline_postgres;
 
 pub mod assessment {
@@ -38,9 +40,9 @@ pub mod question {
 }
 
 pub mod domain {
+    pub use ame_learning_domain as learning;
     pub use ame_platform_domain::{
         assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz, task,
         timeline, user,
     };
-    pub use ame_learning_domain as learning;
 }

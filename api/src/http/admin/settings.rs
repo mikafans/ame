@@ -67,18 +67,9 @@ pub async fn put_settings(
     }
 
     for (key, value) in &changed {
-        sqlx::query(
-            "INSERT INTO tb_settings (key, value, updated_by, updated_at) \
-             VALUES ($1, $2, $3, now()) \
-             ON CONFLICT (key) DO UPDATE \
-             SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()",
-        )
-        .bind(key)
-        .bind(value)
-        .bind(actor)
-        .execute(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
+        crate::settings::upsert(&state.pool, key, value, actor)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
         crate::audit::audit(
             state.pool.clone(),

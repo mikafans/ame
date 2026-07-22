@@ -156,10 +156,15 @@ dependencies = [
  "ame-platform-application",
  "ame-platform-domain",
  "async-trait",
+ "deadpool-redis",
+ "redis",
+ "serde",
  "serde_json",
  "sqlx",
  "time",
  "tokio",
+ "tracing",
+ "utoipa",
  "uuid",
 ]
 
