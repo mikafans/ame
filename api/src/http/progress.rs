@@ -31,6 +31,7 @@ pub struct EvidenceBody {
     pub objective_id: Uuid,
     pub activity_id: Uuid,
     pub attempt_id: Uuid,
+    pub content_version: u32,
     pub value: f32,
     pub derivation_version: u32,
 }
@@ -66,6 +67,7 @@ pub struct EvidenceResponse {
     pub objective_id: Uuid,
     pub activity_id: Uuid,
     pub attempt_id: Uuid,
+    pub content_version: u32,
     pub value: f32,
     pub derivation_version: u32,
 }
@@ -140,6 +142,7 @@ pub async fn record_evidence(
             objective_id: body.objective_id,
             activity_id: body.activity_id,
             attempt_id: body.attempt_id,
+            content_version: body.content_version,
             value: body.value,
             derivation_version: body.derivation_version,
         })
@@ -151,6 +154,7 @@ pub async fn record_evidence(
         objective_id: evidence.input.objective_id,
         activity_id: evidence.input.activity_id,
         attempt_id: body.attempt_id,
+        content_version: evidence.input.content_version,
         value: evidence.input.value,
         derivation_version: evidence.input.derivation_version,
     }))

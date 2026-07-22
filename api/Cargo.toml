@@ -19,6 +19,7 @@ path = "src/bin/gen_openapi.rs"
 ame-learning-application = { path = "../crates/ame-learning-application" }
 ame-learning-domain = { path = "../crates/ame-learning-domain" }
 ame-learning-postgres = { path = "../crates/ame-learning-postgres" }
+ame-platform-domain = { path = "../crates/ame-platform-domain" }
 anyhow = "1"
 async-trait = "0.1"
 axum = "0.8.1"

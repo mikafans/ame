@@ -858,6 +858,8 @@ export interface components {
             /** Format: uuid */
             attemptId: string;
             /** Format: int32 */
+            contentVersion: number;
+            /** Format: int32 */
             derivationVersion: number;
             /** Format: uuid */
             journeyId: string;
@@ -871,6 +873,8 @@ export interface components {
             activityId: string;
             /** Format: uuid */
             attemptId: string;
+            /** Format: int32 */
+            contentVersion: number;
             /** Format: int32 */
             derivationVersion: number;
             /** Format: uuid */

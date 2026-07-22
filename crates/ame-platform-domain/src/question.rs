@@ -6,6 +6,21 @@ use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct GradedAnswer {
+    pub correctness: Option<f32>,
+    pub awarded_points: f32,
+    pub status: AnswerEvaluationStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnswerEvaluationStatus {
+    Correct,
+    Incorrect,
+    Partial,
+    ManualReview,
+}
+
 use super::generation::GenerationError;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]

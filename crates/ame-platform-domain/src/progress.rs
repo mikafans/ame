@@ -11,6 +11,7 @@ pub struct MasteryEvidenceInput {
     pub objective_id: Uuid,
     pub activity_id: Uuid,
     pub attempt_id: Uuid,
+    pub content_version: u32,
     pub value: f32,
     pub derivation_version: u32,
 }
@@ -104,6 +105,11 @@ pub fn validate_evidence(input: &MasteryEvidenceInput) -> Result<(), ProgressErr
     if input.derivation_version == 0 {
         return Err(ProgressError::EmptyField {
             field: "derivation_version",
+        });
+    }
+    if input.content_version == 0 {
+        return Err(ProgressError::EmptyField {
+            field: "content_version",
         });
     }
     Ok(())

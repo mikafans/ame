@@ -28,6 +28,7 @@ impl PgProgressRepository {
         journey_id: Uuid,
         objective_id: Uuid,
         activity_id: Uuid,
+        content_version: Option<u32>,
         attempt_id: Option<Uuid>,
     ) -> Result<(), ProgressError> {
         let owned = sqlx::query_scalar::<_, bool>(
@@ -47,14 +48,15 @@ impl PgProgressRepository {
                        AND j.subject_user_id = $2
                        AND o.id = $3
                        AND a.id = $4
+                       AND ($5::integer IS NULL OR a.content_version = $5)
                        AND (
-                            $5::uuid IS NULL
+                            $6::uuid IS NULL
                             OR EXISTS (
                                 SELECT 1
                                   FROM tb_attempts at
                                   JOIN tb_learning_sessions ls
                                     ON ls.id = at.learning_session_id
-                                 WHERE at.id = $5
+                                 WHERE at.id = $6
                                    AND at.subject_user_id = $2
                                    AND at.activity_id = $4
                                    AND at.status = 'graded'
@@ -68,6 +70,7 @@ impl PgProgressRepository {
         .bind(subject_user_id)
         .bind(objective_id)
         .bind(activity_id)
+        .bind(content_version.map(|version| version as i32))
         .bind(attempt_id)
         .fetch_one(&self.pool)
         .await
@@ -266,15 +269,17 @@ impl ProgressRepository for PgProgressRepository {
             input.journey_id,
             input.objective_id,
             input.activity_id,
+            Some(input.content_version),
             Some(input.attempt_id),
         )
         .await?;
         let row = sqlx::query(
             r#"INSERT INTO tb_mastery_evidence (
                     subject_user_id, journey_id, objective_id, activity_id,
-                    attempt_id, evidence_type, value, derivation_version
+                    attempt_id, evidence_type, value, derivation_version,
+                    content_version
                 )
-                VALUES ($1, $2, $3, $4, $5, 'attempt', $6, $7)
+                VALUES ($1, $2, $3, $4, $5, 'attempt', $6, $7, $8)
                 RETURNING id, created_at"#,
         )
         .bind(input.subject_user_id)
@@ -284,6 +289,7 @@ impl ProgressRepository for PgProgressRepository {
         .bind(input.attempt_id)
         .bind(input.value)
         .bind(input.derivation_version as i32)
+        .bind(input.content_version as i32)
         .fetch_one(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -351,6 +357,7 @@ impl ProgressRepository for PgProgressRepository {
                 journey_id,
                 *objective_id,
                 *activity_id,
+                None,
                 None,
             )
             .await?;

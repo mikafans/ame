@@ -1,15 +1,8 @@
-//! Shared domain types. Grows with each subsequent plan.
+//! Compatibility exports for the platform domain crate.
 
-pub mod assessment;
-pub mod attempt;
-pub mod auth;
-pub mod deep_dive;
-pub mod error;
-pub mod generation;
-pub mod identity;
 pub use ame_learning_domain as learning;
-pub mod progress;
-pub mod question;
-pub mod task;
-pub mod timeline;
-pub mod user;
+pub use ame_platform_domain::{
+    assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz, task,
+    timeline, user,
+};
+pub mod error;

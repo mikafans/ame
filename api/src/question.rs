@@ -1,6 +1,7 @@
 //! Question repository contract and deterministic grading primitives.
 
 use crate::domain::generation::{GenerationError, GenerationRun, validate_content_run};
+pub use crate::domain::question::{AnswerEvaluationStatus, GradedAnswer};
 use crate::domain::question::{
     CreateQuestion, Question, QuestionKind, QuestionRepositoryError, QuestionVersion,
     validate_question,
@@ -192,21 +193,6 @@ fn question_version(
         source_references: input.source_references.clone(),
         created_at,
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct GradedAnswer {
-    pub correctness: Option<f32>,
-    pub awarded_points: f32,
-    pub status: AnswerEvaluationStatus,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AnswerEvaluationStatus {
-    Correct,
-    Incorrect,
-    Partial,
-    ManualReview,
 }
 
 pub fn grade_answer(question: &QuestionVersion, response: &serde_json::Value) -> GradedAnswer {

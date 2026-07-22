@@ -24,3 +24,5 @@ Task evaluation methods are explicit: `self_review`, `automatic`, `agent`, or `m
 ## Rubric and submission envelope
 
 Each task rubric is versioned and contains criteria linked to journey objectives. A criterion declares its description, maximum points, and whether it is required. A submission records the task content version, learner response, evaluation method, lifecycle state, review state, and optional feedback. This preserves the exact instructional version used when evidence is later evaluated.
+
+Mastery evidence now carries the activity `content_version` as well. The evidence write is rejected when it refers to a stale activity version, an ungraded attempt, pending review, an abandoned attempt, or another learner's journey.

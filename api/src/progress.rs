@@ -23,7 +23,7 @@ struct ProgressState {
     evidence: Vec<MasteryEvidence>,
     streak_events: HashMap<String, StreakEvent>,
     journey_owners: HashMap<Uuid, Uuid>,
-    completed_attempts: HashMap<(Uuid, Uuid, Uuid, Uuid), OffsetDateTime>,
+    completed_attempts: HashMap<(Uuid, Uuid, Uuid, Uuid), (OffsetDateTime, u32)>,
 }
 
 #[async_trait]
@@ -74,11 +74,30 @@ impl InMemoryProgressRepository {
         attempt_id: Uuid,
         graded_at: OffsetDateTime,
     ) {
+        self.register_completed_attempt_with_content_version(
+            subject_user_id,
+            journey_id,
+            activity_id,
+            attempt_id,
+            1,
+            graded_at,
+        );
+    }
+
+    pub fn register_completed_attempt_with_content_version(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+        attempt_id: Uuid,
+        content_version: u32,
+        graded_at: OffsetDateTime,
+    ) {
         if let Ok(mut state) = self.state.lock() {
             state.journey_owners.insert(journey_id, subject_user_id);
             state.completed_attempts.insert(
                 (subject_user_id, journey_id, activity_id, attempt_id),
-                graded_at,
+                (graded_at, content_version),
             );
         }
     }
@@ -97,12 +116,15 @@ impl InMemoryProgressRepository {
         {
             return Err(ProgressError::SubjectMismatch);
         }
-        if !state.completed_attempts.contains_key(&(
+        let Some((_, content_version)) = state.completed_attempts.get(&(
             input.subject_user_id,
             input.journey_id,
             input.activity_id,
             input.attempt_id,
-        )) {
+        )) else {
+            return Err(ProgressError::SubjectMismatch);
+        };
+        if *content_version != input.content_version {
             return Err(ProgressError::SubjectMismatch);
         }
         let evidence = MasteryEvidence {
@@ -220,7 +242,7 @@ impl InMemoryProgressRepository {
             return Err(ProgressError::SubjectMismatch);
         }
         let attempt_id = attempt_id_from_event_key(&input.qualifying_event_key)?;
-        let Some(graded_at) = state.completed_attempts.get(&(
+        let Some((graded_at, _)) = state.completed_attempts.get(&(
             input.subject_user_id,
             input.journey_id,
             input.activity_id,
@@ -339,6 +361,7 @@ mod tests {
             objective_id: objective,
             activity_id: Uuid::now_v7(),
             attempt_id: Uuid::now_v7(),
+            content_version: 1,
             value,
             derivation_version: 1,
         }
@@ -430,6 +453,38 @@ mod tests {
         assert_eq!(
             repository.snapshot(Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()),
             Err(ProgressError::NotFound)
+        );
+    }
+
+    #[test]
+    fn stale_content_version_cannot_create_objective_evidence() {
+        let repository = InMemoryProgressRepository::default();
+        let subject = Uuid::now_v7();
+        let journey = Uuid::now_v7();
+        let activity = Uuid::now_v7();
+        let objective = Uuid::now_v7();
+        let attempt = Uuid::now_v7();
+        repository.register_completed_attempt_with_content_version(
+            subject,
+            journey,
+            activity,
+            attempt,
+            2,
+            OffsetDateTime::now_utc(),
+        );
+        let input = MasteryEvidenceInput {
+            subject_user_id: subject,
+            journey_id: journey,
+            objective_id: objective,
+            activity_id: activity,
+            attempt_id: attempt,
+            content_version: 1,
+            value: 0.8,
+            derivation_version: 1,
+        };
+        assert_eq!(
+            repository.record_evidence(input),
+            Err(ProgressError::SubjectMismatch)
         );
     }
 

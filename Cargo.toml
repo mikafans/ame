@@ -4,5 +4,6 @@ members = [
   "crates/ame-learning-domain",
   "crates/ame-learning-application",
   "crates/ame-learning-postgres",
+  "crates/ame-platform-domain",
 ]
 resolver = "2"

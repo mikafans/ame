@@ -69,7 +69,7 @@ pub enum IdentityRepositoryError {
 }
 
 impl IdentityRepositoryError {
-    pub(crate) fn storage(error: impl Display) -> Self {
+    pub fn storage(error: impl Display) -> Self {
         Self::Storage(error.to_string())
     }
 }

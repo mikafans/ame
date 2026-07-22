@@ -3,11 +3,12 @@
 use crate::{
     domain::{
         assessment::{
-            Assessment, AssessmentRepositoryError, CreateAssessment, validate_assessment,
+            Assessment, AssessmentGrade, AssessmentRepositoryError, CreateAssessment,
+            validate_assessment,
         },
         question::QuestionVersion,
     },
-    question::{AnswerEvaluationStatus, GradedAnswer, grade_answer},
+    question::{AnswerEvaluationStatus, grade_answer},
 };
 use async_trait::async_trait;
 use std::{
@@ -127,15 +128,6 @@ impl AssessmentRepository for InMemoryAssessmentRepository {
             })
             .cloned())
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct AssessmentGrade {
-    pub item_grades: Vec<GradedAnswer>,
-    pub awarded_points: f32,
-    pub max_points: f32,
-    pub pending_manual_review: bool,
-    pub score: Option<f32>,
 }
 
 pub fn grade_assessment(

@@ -1647,6 +1647,7 @@ components:
       - objectiveId
       - activityId
       - attemptId
+      - contentVersion
       - value
       - derivationVersion
       properties:
@@ -1656,6 +1657,10 @@ components:
         attemptId:
           type: string
           format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
         derivationVersion:
           type: integer
           format: int32
@@ -1677,6 +1682,7 @@ components:
       - objectiveId
       - activityId
       - attemptId
+      - contentVersion
       - value
       - derivationVersion
       properties:
@@ -1686,6 +1692,10 @@ components:
         attemptId:
           type: string
           format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
         derivationVersion:
           type: integer
           format: int32

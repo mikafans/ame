@@ -1,6 +1,6 @@
 //! Domain contracts for versioned practice and graded assessments.
 
-use crate::domain::question::QuestionRepositoryError;
+use crate::domain::question::{GradedAnswer, QuestionRepositoryError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use time::OffsetDateTime;
@@ -53,6 +53,15 @@ pub struct Assessment {
     pub items: Vec<AssessmentItemInput>,
     pub status: AssessmentStatus,
     pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AssessmentGrade {
+    pub item_grades: Vec<GradedAnswer>,
+    pub awarded_points: f32,
+    pub max_points: f32,
+    pub pending_manual_review: bool,
+    pub score: Option<f32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

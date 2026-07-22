@@ -286,6 +286,10 @@ export default function LearningJourneyPage() {
           objectiveId: journey?.objectives[0]?.id ?? "",
           activityId: session.activityId,
           attemptId: attempt.id,
+          contentVersion:
+            journey?.activities.find(
+              (activity) => activity.id === session.activityId,
+            )?.contentVersion ?? 1,
           value: finishedAttempt.data.score ?? 0,
           derivationVersion: 1,
         },
