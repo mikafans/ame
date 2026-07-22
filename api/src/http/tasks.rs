@@ -127,6 +127,27 @@ fn response(submission: ame_platform_application::task::TaskSubmission) -> TaskS
 }
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/task-submissions/{submission_id}",
+    params(("submission_id" = Uuid, Path, description = "Task submission ID")),
+    responses((status = 200, body = TaskSubmissionResponse)),
+    security(("bearer" = [])),
+    tag = "tasks"
+)]
+pub async fn get_submission(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(submission_id): Path<Uuid>,
+) -> Result<Json<TaskSubmissionResponse>, ApiError> {
+    let submission =
+        ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool.clone())
+            .get_for_subject(auth.owner_id(), submission_id)
+            .await
+            .map_err(map_task_error)?;
+    Ok(Json(response(submission)))
+}
+
+#[utoipa::path(
     patch,
     path = "/api/v1/task-submissions/{submission_id}/review",
     params(("submission_id" = Uuid, Path, description = "Task submission ID")),

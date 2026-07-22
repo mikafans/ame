@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { MarkdownView, MermaidView } from "@/components/MarkdownView";
 import { api } from "@/api/client";
+import type { components } from "@/api/generated/schema.d.ts";
+
+type TaskSubmission = components["schemas"]["TaskSubmissionResponse"];
 
 export type ActivityContent =
   | {
@@ -122,6 +125,27 @@ export function ActivityContentRenderer({
   const [taskStatus, setTaskStatus] = useState<
     "idle" | "submitting" | "submitted" | "error"
   >("idle");
+  const [taskSubmission, setTaskSubmission] = useState<TaskSubmission | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!taskId || typeof window === "undefined") return;
+    const submissionId = window.localStorage.getItem(
+      `ame-task-submission:${taskId}`,
+    );
+    if (!submissionId) return;
+    void api
+      .GET("/api/v1/task-submissions/{submission_id}", {
+        params: { path: { submission_id: submissionId } },
+      })
+      .then(({ data, response }) => {
+        if (response.ok && data) {
+          setTaskSubmission(data);
+          setTaskStatus("submitted");
+        }
+      });
+  }, [taskId]);
 
   if (!parsed) {
     const unknown = content as UnknownContent | null;
@@ -217,10 +241,26 @@ export function ActivityContentRenderer({
           {selectedOption && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                {taskStatus === "submitted"
-                  ? "Task submitted. Your answer is now part of this journey."
-                  : "Submit your choice as evidence of applying the concept."}
+                {taskSubmission?.status === "reviewed" &&
+                typeof taskSubmission.score === "number"
+                  ? `Reviewed · ${Math.round(taskSubmission.score * 100)}%`
+                  : taskSubmission?.status === "rejected"
+                    ? "Needs another attempt · this task was rejected."
+                    : taskSubmission?.reviewStatus === "pending"
+                      ? "Submitted · awaiting reviewer feedback."
+                      : taskStatus === "submitted"
+                        ? "Task submitted. Your answer is now part of this journey."
+                        : "Submit your choice as evidence of applying the concept."}
               </p>
+              {taskSubmission?.feedback != null && (
+                <p className="rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6">
+                  {typeof taskSubmission.feedback === "object" &&
+                  taskSubmission.feedback !== null &&
+                  "note" in taskSubmission.feedback
+                    ? String(taskSubmission.feedback.note)
+                    : "Reviewer feedback is available for this submission."}
+                </p>
+              )}
               {taskId && taskStatus !== "submitted" && (
                 <button
                   type="button"
@@ -246,9 +286,16 @@ export function ActivityContentRenderer({
                       "/api/v1/task-submissions/{submission_id}/submit",
                       { params: { path: { submission_id: started.data.id } } },
                     );
-                    setTaskStatus(
-                      submitted.response.ok ? "submitted" : "error",
-                    );
+                    if (submitted.response.ok && submitted.data) {
+                      setTaskSubmission(submitted.data);
+                      window.localStorage.setItem(
+                        `ame-task-submission:${taskId}`,
+                        submitted.data.id,
+                      );
+                      setTaskStatus("submitted");
+                    } else {
+                      setTaskStatus("error");
+                    }
                   }}
                   className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
                 >

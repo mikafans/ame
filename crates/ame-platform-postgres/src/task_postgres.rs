@@ -30,6 +30,25 @@ impl PgTaskSubmissionRepository {
         Self { pool }
     }
 
+    pub async fn get_for_subject(
+        &self,
+        subject_user_id: Uuid,
+        submission_id: Uuid,
+    ) -> Result<TaskSubmission, TaskSubmissionError> {
+        let row = sqlx::query(
+            "SELECT id, journey_id, task_id, subject_user_id, content_version, response,
+                    evaluation_method, status, review_status, score::float4 AS score, feedback
+             FROM tb_task_submissions WHERE id = $1 AND subject_user_id = $2",
+        )
+        .bind(submission_id)
+        .bind(subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(TaskSubmissionError::NotFound)?;
+        decode_submission(row)
+    }
+
     pub async fn evidence_context(
         &self,
         submission_id: Uuid,

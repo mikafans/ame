@@ -82,6 +82,7 @@ use crate::http::{
         crate::http::admin::get_settings,
         crate::http::admin::put_settings,
         crate::http::tasks::start_submission,
+        crate::http::tasks::get_submission,
         crate::http::tasks::submit_submission,
         crate::http::tasks::review_submission
     ),
