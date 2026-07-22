@@ -10,5 +10,6 @@ pub mod identity;
 pub use ame_learning_domain as learning;
 pub mod progress;
 pub mod question;
+pub mod task;
 pub mod timeline;
 pub mod user;
