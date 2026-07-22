@@ -59,9 +59,9 @@ async fn main() -> anyhow::Result<()> {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
         loop {
             interval.tick().await;
-            if let Err(e) = sqlx::query("DELETE FROM tb_login_sessions WHERE expires_at < now()")
-                .execute(&sweep_pool)
-                .await
+            if let Err(e) =
+                ame_platform_postgres::authentication_http::sweep_expired_sessions(&sweep_pool)
+                    .await
             {
                 tracing::warn!("login-session sweep failed: {e}");
             }

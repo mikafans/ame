@@ -110,3 +110,10 @@ pub async fn revoke_login_session(pool: &PgPool, token_id: Uuid) -> Result<(), s
         .await
         .map(|_| ())
 }
+
+pub async fn sweep_expired_sessions(pool: &PgPool) -> Result<u64, sqlx::Error> {
+    sqlx::query("DELETE FROM tb_login_sessions WHERE expires_at < now()")
+        .execute(pool)
+        .await
+        .map(|result| result.rows_affected())
+}
