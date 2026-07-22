@@ -10,6 +10,7 @@ pub mod onboarding;
 pub mod progress;
 pub mod question;
 pub mod session;
+pub mod task;
 pub mod templates;
 pub mod token;
 
@@ -20,11 +21,11 @@ pub mod auth {
 }
 
 pub mod domain {
+    pub use ame_learning_domain as learning;
     pub use ame_platform_domain::{
         assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz, task,
         timeline, user,
     };
-    pub use ame_learning_domain as learning;
 }
 
 pub mod learning {
