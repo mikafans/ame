@@ -296,6 +296,97 @@ test("learner can answer the first application task in a journey", async ({
   ).toBeVisible();
 });
 
+test("admin can review a pending learner task from the console", async ({
+  page,
+}) => {
+  const prompt = "I would like to learn Flink checkpointing";
+  const email = `review-queue-uiux-${Date.now()}@example.com`;
+
+  await page.goto("/start");
+  await page.getByLabel("What would you like to learn?").fill(prompt);
+  await page.getByLabel("Your name").fill("Queue Learner");
+  await page.getByLabel("Email identifier").fill(email);
+  await page.getByLabel("Password").fill("queue-local-2026");
+  await page.getByRole("button", { name: "Create my journey" }).click();
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+  const journeyId = page
+    .url()
+    .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
+  expect(journeyId).toBeTruthy();
+  const apiBase = process.env.E2E_API_URL ?? "";
+
+  const journeyResponse = await page.request.get(
+    `${apiBase}/api/v1/learning/journeys/${journeyId}`,
+  );
+  expect(journeyResponse.ok()).toBeTruthy();
+  const journey = await journeyResponse.json();
+  for (const activity of journey.activities.slice(0, 3)) {
+    const started = await page.request.post(
+      `${apiBase}/api/v1/learning/journeys/${journeyId}/activities/${activity.id}/start`,
+    );
+    expect(started.ok()).toBeTruthy();
+    const session = await started.json();
+    const finished = await page.request.post(
+      `${apiBase}/api/v1/learning/sessions/${session.id}/finish`,
+      { data: { completed: true, responses: [] } },
+    );
+    expect(finished.ok()).toBeTruthy();
+  }
+
+  const refreshed = await page.request.get(
+    `${apiBase}/api/v1/learning/journeys/${journeyId}`,
+  );
+  const packageAfterProgress = await refreshed.json();
+  const task = packageAfterProgress.activities.find(
+    (activity: { kind: string; status: string }) =>
+      activity.kind === "diagnostic" && activity.status === "ready",
+  );
+  expect(task).toBeTruthy();
+  if (!task) throw new Error("pending review task was not ready");
+
+  const startedTask = await page.request.post(
+    `${apiBase}/api/v1/tasks/${task.id}/submissions`,
+    {
+      data: {
+        contentVersion: task.contentVersion,
+        response: { optionId: "make_model" },
+        evaluationMethod: "agent",
+      },
+    },
+  );
+  expect(startedTask.ok()).toBeTruthy();
+  const submission = await startedTask.json();
+  const submittedTask = await page.request.post(
+    `${apiBase}/api/v1/task-submissions/${submission.id}/submit`,
+  );
+  expect(submittedTask.ok()).toBeTruthy();
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  const adminLogin = await page.request.post(
+    `${apiBase}/public/v1/auth/login`,
+    { data: { email: "admin@example.com", password: "password123" } },
+  );
+  expect(adminLogin.ok()).toBeTruthy();
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/admin/tasks");
+  await expect(
+    page.getByRole("heading", { name: "Task review queue" }),
+  ).toBeVisible();
+  await expect(page.getByText(submission.id, { exact: true })).toBeVisible();
+  await page.getByLabel(`Score ${submission.id}`).fill("0.9");
+  await page
+    .getByLabel(`Feedback ${submission.id}`)
+    .fill("Strong checkpointing reasoning.");
+  await page
+    .getByRole("article")
+    .filter({ hasText: submission.id })
+    .getByRole("button", { name: "Review task" })
+    .click();
+  await expect(page.getByText(submission.id, { exact: true })).toHaveCount(0);
+});
+
 test("learner can complete an agent-provided assessment and open its deep dive", async ({
   page,
 }) => {
