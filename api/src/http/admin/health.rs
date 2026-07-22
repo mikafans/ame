@@ -31,17 +31,15 @@ pub async fn get_admin_health(
     State(state): State<AppState>,
     _admin: RequireAdmin,
 ) -> Result<Json<AdminHealthResponse>, ApiError> {
-    let database = if sqlx::query("SELECT 1").execute(&state.pool).await.is_ok() {
+    let database = if ame_platform_postgres::health::postgres_ready(&state.pool).await {
         "ok"
     } else {
         "down"
     };
-    let valkey = match state.valkey.get().await {
-        Ok(mut connection) => {
-            let result: Result<(), _> = redis::cmd("PING").query_async(&mut *connection).await;
-            if result.is_ok() { "ok" } else { "degraded" }
-        }
-        Err(_) => "degraded",
+    let valkey = if ame_platform_postgres::health::valkey_ready(&state.valkey).await {
+        "ok"
+    } else {
+        "degraded"
     };
 
     let users_count = count(&state, "tb_users").await;
@@ -63,8 +61,5 @@ pub async fn get_admin_health(
 
 async fn count(state: &AppState, table: &str) -> i64 {
     // Table names are fixed above; they are not user input.
-    sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {table}"))
-        .fetch_one(&state.pool)
-        .await
-        .unwrap_or(0)
+    ame_platform_postgres::health::table_count(&state.pool, table).await
 }
