@@ -19,8 +19,6 @@ pub mod generation_postgres;
 pub mod http;
 pub mod identity;
 pub mod identity_postgres;
-pub mod learning;
-pub mod learning_postgres;
 pub mod onboarding;
 pub mod progress;
 pub mod progress_postgres;
@@ -31,3 +29,6 @@ pub mod session;
 pub mod settings;
 pub mod templates;
 pub mod timeline_postgres;
+
+pub use ame_learning_application as learning;
+pub use ame_learning_postgres as learning_postgres;

@@ -1041,6 +1041,13 @@ components:
       - milestone
       - timed_practice
       - recommendation
+    ActivityPublicationStatus:
+      type: string
+      enum:
+      - draft
+      - review
+      - published
+      - retired
     ActivityStatus:
       type: string
       enum:
@@ -1788,12 +1795,22 @@ components:
       - title
       - orderIndex
       - payloadSchemaVersion
+      - contentVersion
+      - publicationStatus
       - payload
       - objectiveIds
       - status
       - createdAt
       - updatedAt
       properties:
+        chapterId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
         createdAt:
           type: string
           format: date-time
@@ -1818,6 +1835,8 @@ components:
         payloadSchemaVersion:
           type: integer
           format: int32
+        publicationStatus:
+          $ref: '#/components/schemas/ActivityPublicationStatus'
         sourceActorId:
           type: string
           format: uuid
@@ -1831,6 +1850,41 @@ components:
         updatedAt:
           type: string
           format: date-time
+    LearningChapterResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - subjectUserId
+      - title
+      - summary
+      - orderIndex
+      - activities
+      - createdAt
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        subjectUserId:
+          type: string
+          format: uuid
+        summary:
+          type: string
+        title:
+          type: string
     LearningGoalResponse:
       type: object
       required:
@@ -1877,12 +1931,18 @@ components:
       - createdAt
       - goal
       - objectives
+      - chapters
       - activities
       properties:
         activities:
           type: array
           items:
             $ref: '#/components/schemas/LearningActivityResponse'
+          description: Flat compatibility view; new clients should use chapters.activities.
+        chapters:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningChapterResponse'
         createdAt:
           type: string
           format: date-time

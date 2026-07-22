@@ -1,12 +1,13 @@
 //! PostgreSQL implementation of the learning repository contract.
 
-use crate::domain::learning::{
-    ActivityKind, ActivityStatus, AuthorActivityContent, CreateActivity, CreateGoal, CreateJourney,
-    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
-    LearningActivity, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
+use ame_learning_domain::{
+    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
+    CreateActivity, CreateChapter, CreateGoal, CreateJourney, CreateLearningSession,
+    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
+    LearningChapter, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
     LearningRepositoryError, LearningSession, LearningSessionStatus, ObjectiveStatus,
-    validate_activity, validate_activity_content, validate_goal, validate_journey,
-    validate_objective,
+    validate_activity, validate_activity_content, validate_chapter, validate_goal,
+    validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -300,6 +301,65 @@ impl LearningRepository for PgLearningRepository {
         Ok(objective_from_row(row))
     }
 
+    async fn create_chapter(
+        &self,
+        input: CreateChapter,
+    ) -> Result<LearningChapter, LearningRepositoryError> {
+        validate_chapter(&input)?;
+        let journey = self
+            .get_journey(input.subject_user_id, input.journey_id)
+            .await?;
+        let row = sqlx::query(
+            r#"
+            INSERT INTO tb_journey_chapters (
+                journey_id, subject_user_id, title, summary, order_index
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, journey_id, subject_user_id, title, summary, order_index, created_at
+            "#,
+        )
+        .bind(journey.id)
+        .bind(input.subject_user_id)
+        .bind(&input.title)
+        .bind(&input.summary)
+        .bind(input.order_index)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|error| {
+            if let sqlx::Error::Database(database) = &error
+                && database.constraint() == Some("tb_journey_chapters_journey_id_order_index_key")
+            {
+                return LearningRepositoryError::OrderConflict {
+                    resource: "chapter",
+                };
+            }
+            storage_error(error)
+        })?;
+        Ok(chapter_from_row(row))
+    }
+
+    async fn list_chapters(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let rows = sqlx::query(
+            r#"
+            SELECT id, journey_id, subject_user_id, title, summary, order_index, created_at
+            FROM tb_journey_chapters
+            WHERE journey_id = $1 AND subject_user_id = $2
+            ORDER BY order_index ASC
+            "#,
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows.into_iter().map(chapter_from_row).collect())
+    }
+
     async fn list_objectives(
         &self,
         subject_user_id: Uuid,
@@ -331,6 +391,21 @@ impl LearningRepository for PgLearningRepository {
         let journey = self
             .get_journey(input.subject_user_id, input.journey_id)
             .await?;
+        if let Some(chapter_id) = input.chapter_id {
+            let chapter = sqlx::query(
+                "SELECT journey_id, subject_user_id FROM tb_journey_chapters WHERE id = $1",
+            )
+            .bind(chapter_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(storage_error)?
+            .ok_or(LearningRepositoryError::NotFound { resource: "chapter" })?;
+            if chapter.get::<Uuid, _>("journey_id") != journey.id
+                || chapter.get::<Uuid, _>("subject_user_id") != input.subject_user_id
+            {
+                return Err(LearningRepositoryError::SubjectMismatch);
+            }
+        }
         for objective_id in &input.objective_ids {
             let row = sqlx::query(
                 "SELECT 1 FROM tb_journey_objectives WHERE id = $1 AND journey_id = $2 AND subject_user_id = $3",
@@ -351,28 +426,33 @@ impl LearningRepository for PgLearningRepository {
             r#"
             INSERT INTO tb_activities (
                 journey_id, subject_user_id, source_actor_id,
-                kind, title, order_index, payload_schema_version, payload, status
+                chapter_id, kind, title, order_index, payload_schema_version,
+                content_version, publication_status, payload, status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id, journey_id, subject_user_id, source_actor_id,
-                      kind, title, order_index, payload_schema_version, payload,
+                      chapter_id, kind, title, order_index, payload_schema_version,
+                      content_version, publication_status, payload,
                       status, created_at, updated_at
             "#,
         )
         .bind(journey.id)
         .bind(input.subject_user_id)
         .bind(input.source_actor_id)
+        .bind(input.chapter_id)
         .bind(activity_kind_value(input.kind))
         .bind(&input.title)
         .bind(input.order_index)
         .bind(input.payload_schema_version)
+        .bind(input.content_version)
+        .bind(publication_status_value(input.publication_status))
         .bind(&input.payload)
         .bind(activity_status_value(input.status))
         .fetch_one(&mut *transaction)
         .await
         .map_err(|error| {
             if let sqlx::Error::Database(database) = &error
-                && database.constraint() == Some("tb_activities_journey_id_order_index_key")
+                && database.constraint() == Some("tb_activities_chapter_order")
             {
                 return LearningRepositoryError::OrderConflict {
                     resource: "activity",
@@ -404,15 +484,16 @@ impl LearningRepository for PgLearningRepository {
         let rows = sqlx::query(
             r#"
             SELECT a.id, a.journey_id, a.subject_user_id, a.source_actor_id,
-                   a.kind, a.title, a.order_index,
-                   a.payload_schema_version, a.payload, a.status,
+                   a.chapter_id, a.kind, a.title, a.order_index,
+                   a.payload_schema_version, a.content_version,
+                   a.publication_status, a.payload, a.status,
                    a.created_at, a.updated_at,
                    COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids
             FROM tb_activities a
             LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id
             WHERE a.journey_id = $1 AND a.subject_user_id = $2
             GROUP BY a.id
-            ORDER BY a.order_index ASC
+            ORDER BY COALESCE((SELECT c.order_index FROM tb_journey_chapters c WHERE c.id = a.chapter_id), 2147483647), a.order_index ASC
             "#,
         )
         .bind(journey_id)
@@ -749,6 +830,18 @@ fn journey_from_row(row: sqlx::postgres::PgRow) -> LearningJourney {
     }
 }
 
+fn chapter_from_row(row: sqlx::postgres::PgRow) -> LearningChapter {
+    LearningChapter {
+        id: row.get("id"),
+        journey_id: row.get("journey_id"),
+        subject_user_id: row.get("subject_user_id"),
+        title: row.get("title"),
+        summary: row.get("summary"),
+        order_index: row.get("order_index"),
+        created_at: row.get("created_at"),
+    }
+}
+
 fn goal_status(value: &str) -> GoalStatus {
     match value {
         "active" => GoalStatus::Active,
@@ -799,10 +892,15 @@ fn activity_from_row(row: sqlx::postgres::PgRow, objective_ids: Vec<Uuid>) -> Le
         journey_id: row.get("journey_id"),
         subject_user_id: row.get("subject_user_id"),
         source_actor_id: row.get("source_actor_id"),
+        chapter_id: row.get("chapter_id"),
         kind: activity_kind(row.get::<String, _>("kind").as_str()),
         title: row.get("title"),
         order_index: row.get("order_index"),
         payload_schema_version: row.get("payload_schema_version"),
+        content_version: row.get("content_version"),
+        publication_status: activity_publication_status(
+            row.get::<String, _>("publication_status").as_str(),
+        ),
         payload: row.get("payload"),
         objective_ids,
         status: activity_status(row.get::<String, _>("status").as_str()),
@@ -869,6 +967,24 @@ fn activity_status_value(status: ActivityStatus) -> &'static str {
     }
 }
 
+fn activity_publication_status(value: &str) -> ActivityPublicationStatus {
+    match value {
+        "review" => ActivityPublicationStatus::Review,
+        "published" => ActivityPublicationStatus::Published,
+        "retired" => ActivityPublicationStatus::Retired,
+        _ => ActivityPublicationStatus::Draft,
+    }
+}
+
+fn publication_status_value(status: ActivityPublicationStatus) -> &'static str {
+    match status {
+        ActivityPublicationStatus::Draft => "draft",
+        ActivityPublicationStatus::Review => "review",
+        ActivityPublicationStatus::Published => "published",
+        ActivityPublicationStatus::Retired => "retired",
+    }
+}
+
 fn learning_session_from_row(row: sqlx::postgres::PgRow) -> LearningSession {
     LearningSession {
         id: row.get("id"),
@@ -895,7 +1011,7 @@ fn learning_session_status(value: &str) -> LearningSessionStatus {
 #[cfg(test)]
 mod tests {
     use super::PgLearningRepository;
-    use crate::learning::{LearningContractFixtures, exercise_goal_and_journey_contract};
+    use ame_learning_application::{LearningContractFixtures, exercise_goal_and_journey_contract};
     use sqlx::migrate::Migrator;
     use sqlx::postgres::PgPoolOptions;
 

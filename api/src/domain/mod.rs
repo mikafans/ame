@@ -7,7 +7,7 @@ pub mod deep_dive;
 pub mod error;
 pub mod generation;
 pub mod identity;
-pub mod learning;
+pub use ame_learning_domain as learning;
 pub mod progress;
 pub mod question;
 pub mod timeline;

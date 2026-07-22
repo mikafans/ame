@@ -22,8 +22,8 @@ use crate::{
         learning::{
             ActivityKind, ActivityStatus, AuthorActivityContent, CreateLearningSession,
             FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyStatus,
-            LearningActivity, LearningObjective, LearningRepository, LearningSession,
-            LearningSessionStatus, ObjectiveStatus,
+            LearningActivity, LearningChapter, LearningObjective, LearningRepository,
+            LearningSession, LearningSessionStatus, ObjectiveStatus,
         },
     },
     http::AppState,
@@ -62,17 +62,20 @@ pub struct LearningObjectiveResponse {
     pub created_at: OffsetDateTime,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LearningActivityResponse {
     pub id: Uuid,
     pub journey_id: Uuid,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
+    pub chapter_id: Option<Uuid>,
     pub kind: ActivityKind,
     pub title: String,
     pub order_index: i32,
     pub payload_schema_version: i32,
+    pub content_version: i32,
+    pub publication_status: crate::domain::learning::ActivityPublicationStatus,
     #[schema(value_type = Object)]
     pub payload: serde_json::Value,
     pub objective_ids: Vec<Uuid>,
@@ -83,6 +86,21 @@ pub struct LearningActivityResponse {
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningChapterResponse {
+    pub id: Uuid,
+    pub journey_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub title: String,
+    pub summary: String,
+    pub order_index: i32,
+    pub activities: Vec<LearningActivityResponse>,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: OffsetDateTime,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -146,6 +164,8 @@ pub struct LearningJourneyResponse {
     pub created_at: OffsetDateTime,
     pub goal: LearningGoalResponse,
     pub objectives: Vec<LearningObjectiveResponse>,
+    pub chapters: Vec<LearningChapterResponse>,
+    /// Flat compatibility view; new clients should use chapters.activities.
     pub activities: Vec<LearningActivityResponse>,
     pub recommendation: Option<LearningRecommendationResponse>,
 }
@@ -322,6 +342,10 @@ pub async fn get_journey(
         .list_objectives(auth.owner_id(), journey.id)
         .await
         .map_err(map_learning_error)?;
+    let chapters = repository
+        .list_chapters(auth.owner_id(), journey.id)
+        .await
+        .map_err(map_learning_error)?;
     let activities = repository
         .list_activities(auth.owner_id(), journey.id)
         .await
@@ -331,6 +355,10 @@ pub async fn get_journey(
         .await
         .map_err(map_learning_error)?;
     let activity_responses: Vec<_> = activities.into_iter().map(activity_response).collect();
+    let chapter_responses = chapters
+        .into_iter()
+        .map(|chapter| chapter_response(chapter, &activity_responses))
+        .collect();
     let recommendation = next_recommendation(
         progress_pool,
         auth.owner_id(),
@@ -359,6 +387,7 @@ pub async fn get_journey(
             created_at: goal.created_at,
         },
         objectives: objectives.into_iter().map(objective_response).collect(),
+        chapters: chapter_responses,
         activities: activity_responses,
         recommendation,
     }))
@@ -563,15 +592,38 @@ fn activity_response(activity: LearningActivity) -> LearningActivityResponse {
         journey_id: activity.journey_id,
         subject_user_id: activity.subject_user_id,
         source_actor_id: activity.source_actor_id,
+        chapter_id: activity.chapter_id,
         kind: activity.kind,
         title: activity.title,
         order_index: activity.order_index,
         payload_schema_version: activity.payload_schema_version,
+        content_version: activity.content_version,
+        publication_status: activity.publication_status,
         payload: activity.payload,
         objective_ids: activity.objective_ids,
         status: activity.status,
         created_at: activity.created_at,
         updated_at: activity.updated_at,
+    }
+}
+
+fn chapter_response(
+    chapter: LearningChapter,
+    activities: &[LearningActivityResponse],
+) -> LearningChapterResponse {
+    LearningChapterResponse {
+        id: chapter.id,
+        journey_id: chapter.journey_id,
+        subject_user_id: chapter.subject_user_id,
+        title: chapter.title,
+        summary: chapter.summary,
+        order_index: chapter.order_index,
+        activities: activities
+            .iter()
+            .filter(|activity| activity.chapter_id == Some(chapter.id))
+            .cloned()
+            .collect(),
+        created_at: chapter.created_at,
     }
 }
 

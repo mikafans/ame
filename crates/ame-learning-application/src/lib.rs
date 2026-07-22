@@ -1,12 +1,13 @@
 //! Learning repositories and their contract tests.
 
-use crate::domain::learning::{
-    ActivityKind, ActivityStatus, AuthorActivityContent, CreateActivity, CreateGoal, CreateJourney,
-    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
-    LearningActivity, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
+use ame_learning_domain::{
+    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
+    CreateActivity, CreateChapter, CreateGoal, CreateJourney, CreateLearningSession,
+    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
+    LearningChapter, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
     LearningRepositoryError, LearningSession, LearningSessionStatus, ObjectiveStatus,
-    validate_activity, validate_activity_content, validate_goal, validate_journey,
-    validate_objective,
+    validate_activity, validate_activity_content, validate_chapter, validate_goal,
+    validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -41,6 +42,7 @@ struct State {
     goals: HashMap<Uuid, LearningGoal>,
     journeys: HashMap<Uuid, LearningJourney>,
     objectives: HashMap<Uuid, LearningObjective>,
+    chapters: HashMap<Uuid, LearningChapter>,
     activities: HashMap<Uuid, LearningActivity>,
     sessions: HashMap<Uuid, LearningSession>,
 }
@@ -287,6 +289,17 @@ impl LearningRepository for InMemoryLearningRepository {
         if journey.subject_user_id != input.subject_user_id {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
+        if let Some(chapter_id) = input.chapter_id {
+            let chapter = state
+                .chapters
+                .get(&chapter_id)
+                .ok_or(LearningRepositoryError::NotFound { resource: "chapter" })?;
+            if chapter.journey_id != input.journey_id
+                || chapter.subject_user_id != input.subject_user_id
+            {
+                return Err(LearningRepositoryError::SubjectMismatch);
+            }
+        }
         if state.activities.values().any(|activity| {
             activity.journey_id == input.journey_id && activity.order_index == input.order_index
         }) {
@@ -314,10 +327,13 @@ impl LearningRepository for InMemoryLearningRepository {
             journey_id: input.journey_id,
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
+            chapter_id: input.chapter_id,
             kind: input.kind,
             title: input.title,
             order_index: input.order_index,
             payload_schema_version: input.payload_schema_version,
+            content_version: input.content_version,
+            publication_status: input.publication_status,
             payload: input.payload,
             objective_ids: input.objective_ids,
             status: input.status,
@@ -326,6 +342,68 @@ impl LearningRepository for InMemoryLearningRepository {
         };
         state.activities.insert(activity.id, activity.clone());
         Ok(activity)
+    }
+
+    async fn create_chapter(
+        &self,
+        input: CreateChapter,
+    ) -> Result<LearningChapter, LearningRepositoryError> {
+        validate_chapter(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let journey = state
+            .journeys
+            .get(&input.journey_id)
+            .ok_or(LearningRepositoryError::NotFound { resource: "journey" })?;
+        if journey.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if state.chapters.values().any(|chapter| {
+            chapter.journey_id == input.journey_id && chapter.order_index == input.order_index
+        }) {
+            return Err(LearningRepositoryError::OrderConflict {
+                resource: "chapter",
+            });
+        }
+        let chapter = LearningChapter {
+            id: Uuid::now_v7(),
+            journey_id: input.journey_id,
+            subject_user_id: input.subject_user_id,
+            title: input.title,
+            summary: input.summary,
+            order_index: input.order_index,
+            created_at: OffsetDateTime::now_utc(),
+        };
+        state.chapters.insert(chapter.id, chapter.clone());
+        Ok(chapter)
+    }
+
+    async fn list_chapters(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let journey = state
+            .journeys
+            .get(&journey_id)
+            .ok_or(LearningRepositoryError::NotFound { resource: "journey" })?;
+        if journey.subject_user_id != subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        let mut chapters: Vec<_> = state
+            .chapters
+            .values()
+            .filter(|chapter| chapter.journey_id == journey_id)
+            .cloned()
+            .collect();
+        chapters.sort_by_key(|chapter| chapter.order_index);
+        Ok(chapters)
     }
 
     async fn list_activities(
@@ -691,10 +769,13 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             journey_id: journey.id,
             subject_user_id: subject,
             source_actor_id: actor,
-            kind: crate::domain::learning::ActivityKind::Diagnostic,
+            chapter_id: None,
+            kind: ame_learning_domain::ActivityKind::Diagnostic,
             title: "Interval diagnostic".to_string(),
             order_index: 0,
             payload_schema_version: 1,
+            content_version: 1,
+            publication_status: ActivityPublicationStatus::Published,
             payload: serde_json::json!({"count": 10}),
             objective_ids: vec![objective.id],
             status: ActivityStatus::Ready,
@@ -706,10 +787,13 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             journey_id: journey.id,
             subject_user_id: subject,
             source_actor_id: actor,
-            kind: crate::domain::learning::ActivityKind::Practice,
+            chapter_id: None,
+            kind: ame_learning_domain::ActivityKind::Practice,
             title: "Interval practice".to_string(),
             order_index: 1,
             payload_schema_version: 1,
+            content_version: 1,
+            publication_status: ActivityPublicationStatus::Published,
             payload: serde_json::json!({"count": 5}),
             objective_ids: vec![objective.id],
             status: ActivityStatus::Proposed,
@@ -841,7 +925,7 @@ mod contract_tests {
     use super::{
         InMemoryLearningRepository, LearningContractFixtures, exercise_goal_and_journey_contract,
     };
-    use crate::domain::learning::{CreateGoal, LearningRepository, LearningRepositoryError};
+    use ame_learning_domain::{CreateGoal, LearningRepository, LearningRepositoryError};
     use uuid::Uuid;
 
     #[tokio::test]

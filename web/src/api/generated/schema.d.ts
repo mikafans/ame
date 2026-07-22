@@ -627,6 +627,8 @@ export interface components {
         /** @enum {string} */
         ActivityKind: "explanation" | "example" | "diagnostic" | "practice" | "feedback" | "application" | "reflection" | "milestone" | "timed_practice" | "recommendation";
         /** @enum {string} */
+        ActivityPublicationStatus: "draft" | "review" | "published" | "retired";
+        /** @enum {string} */
         ActivityStatus: "proposed" | "ready" | "in_progress" | "completed" | "failed";
         AdminHealthResponse: {
             /** Format: int64 */
@@ -910,6 +912,10 @@ export interface components {
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
         LearningActivityResponse: {
+            /** Format: uuid */
+            chapterId?: string | null;
+            /** Format: int32 */
+            contentVersion: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -923,6 +929,7 @@ export interface components {
             payload: Record<string, never>;
             /** Format: int32 */
             payloadSchemaVersion: number;
+            publicationStatus: components["schemas"]["ActivityPublicationStatus"];
             /** Format: uuid */
             sourceActorId: string;
             status: components["schemas"]["ActivityStatus"];
@@ -931,6 +938,21 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        LearningChapterResponse: {
+            activities: components["schemas"]["LearningActivityResponse"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: int32 */
+            orderIndex: number;
+            /** Format: uuid */
+            subjectUserId: string;
+            summary: string;
+            title: string;
         };
         LearningGoalResponse: {
             /** Format: date-time */
@@ -948,7 +970,9 @@ export interface components {
             templateVersionId?: string | null;
         };
         LearningJourneyResponse: {
+            /** @description Flat compatibility view; new clients should use chapters.activities. */
             activities: components["schemas"]["LearningActivityResponse"][];
+            chapters: components["schemas"]["LearningChapterResponse"][];
             /** Format: date-time */
             createdAt: string;
             goal: components["schemas"]["LearningGoalResponse"];

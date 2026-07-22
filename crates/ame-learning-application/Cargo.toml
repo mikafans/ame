@@ -1,0 +1,12 @@
+[package]
+name = "ame-learning-application"
+version = "0.3.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+ame-learning-domain = { path = "../ame-learning-domain" }
+async-trait = "0.1"
+serde_json = "1"
+time = { version = "0.3", features = ["serde"] }
+uuid = { version = "1", features = ["v7", "v4", "serde", "js"] }
