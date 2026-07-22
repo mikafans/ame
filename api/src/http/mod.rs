@@ -2,7 +2,7 @@ use axum::{
     Router,
     extract::State,
     middleware,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use axum_prometheus::PrometheusMetricLayer;
 use sqlx::PgPool;
@@ -188,6 +188,10 @@ pub fn router(pool: PgPool) -> Router {
         .route(
             "/v1/task-submissions/{submission_id}/submit",
             post(tasks::submit_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/review",
+            patch(tasks::review_submission),
         )
         .route("/v1/auth/logout", post(auth::logout))
         .merge(logged_router)

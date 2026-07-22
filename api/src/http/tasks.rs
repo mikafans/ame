@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::extractor::AuthenticatedUser, domain::error::ApiError,
+    auth::admin::RequireAdmin, auth::extractor::AuthenticatedUser, domain::error::ApiError,
     domain::task::TaskEvaluationMethod, http::AppState,
 };
 use ame_platform_application::task::TaskSubmissionRepository;
@@ -36,7 +36,23 @@ pub struct TaskSubmissionResponse {
     pub evaluation_method: TaskEvaluationMethod,
     pub status: crate::domain::task::TaskSubmissionStatus,
     pub review_status: crate::domain::task::TaskReviewStatus,
+    pub score: Option<f32>,
     pub feedback: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewTaskSubmissionBody {
+    pub outcome: ReviewTaskOutcome,
+    pub score: Option<f32>,
+    pub feedback: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewTaskOutcome {
+    Reviewed,
+    Rejected,
 }
 
 #[utoipa::path(
@@ -99,8 +115,42 @@ fn response(submission: ame_platform_application::task::TaskSubmission) -> TaskS
         evaluation_method: submission.envelope.evaluation_method,
         status: submission.envelope.status,
         review_status: submission.envelope.review_status,
+        score: submission.envelope.score,
         feedback: submission.envelope.feedback,
     }
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/task-submissions/{submission_id}/review",
+    params(("submission_id" = Uuid, Path, description = "Task submission ID")),
+    request_body = ReviewTaskSubmissionBody,
+    responses((status = 200, body = TaskSubmissionResponse)),
+    security(("bearer" = [])),
+    tag = "tasks"
+)]
+pub async fn review_submission(
+    State(state): State<AppState>,
+    _admin: RequireAdmin,
+    Path(submission_id): Path<Uuid>,
+    Json(body): Json<ReviewTaskSubmissionBody>,
+) -> Result<Json<TaskSubmissionResponse>, ApiError> {
+    let outcome = match body.outcome {
+        ReviewTaskOutcome::Reviewed => ame_platform_application::task::TaskReviewOutcome::Reviewed,
+        ReviewTaskOutcome::Rejected => ame_platform_application::task::TaskReviewOutcome::Rejected,
+    };
+    let submission =
+        ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool.clone())
+            .review(ame_platform_application::task::ReviewTaskSubmission {
+                subject_user_id: _admin.0.user.id,
+                submission_id,
+                outcome,
+                score: body.score,
+                feedback: body.feedback,
+            })
+            .await
+            .map_err(map_task_error)?;
+    Ok(Json(response(submission)))
 }
 
 fn map_task_error(error: ame_platform_application::task::TaskSubmissionError) -> ApiError {
