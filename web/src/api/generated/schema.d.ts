@@ -552,6 +552,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/task-submissions/{submission_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_submission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start_submission"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/v1/auth/login": {
         parameters: {
             query?: never;
@@ -1217,6 +1249,12 @@ export interface components {
             /** Format: uuid */
             userId: string;
         };
+        StartTaskSubmissionBody: {
+            /** Format: int32 */
+            contentVersion: number;
+            evaluationMethod?: components["schemas"]["TaskEvaluationMethod"];
+            response: unknown;
+        };
         StreakBody: {
             /** Format: uuid */
             activityId: string;
@@ -1236,6 +1274,27 @@ export interface components {
             qualifyingDay: string;
             qualifyingEventKey: string;
         };
+        /** @enum {string} */
+        TaskEvaluationMethod: "self_review" | "automatic" | "agent" | "manual";
+        /** @enum {string} */
+        TaskReviewStatus: "not_required" | "pending" | "complete";
+        TaskSubmissionResponse: {
+            /** Format: int32 */
+            contentVersion: number;
+            evaluationMethod: components["schemas"]["TaskEvaluationMethod"];
+            feedback?: unknown;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            response: unknown;
+            reviewStatus: components["schemas"]["TaskReviewStatus"];
+            status: components["schemas"]["TaskSubmissionStatus"];
+            /** Format: uuid */
+            taskId: string;
+        };
+        /** @enum {string} */
+        TaskSubmissionStatus: "in_progress" | "submitted" | "in_review" | "reviewed" | "rejected" | "abandoned";
         TierLimit: {
             /** Format: int32 */
             burst: number;
@@ -2381,6 +2440,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestionResponse"];
+                };
+            };
+        };
+    };
+    submit_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task submission ID */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
+            };
+        };
+    };
+    start_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Application task activity ID */
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartTaskSubmissionBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
                 };
             };
         };

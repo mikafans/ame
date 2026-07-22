@@ -938,6 +938,56 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
+  /api/v1/task-submissions/{submission_id}/submit:
+    post:
+      tags:
+      - tasks
+      operationId: submit_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/tasks/{task_id}/submissions:
+    post:
+      tags:
+      - tasks
+      operationId: start_submission
+      parameters:
+      - name: task_id
+        in: path
+        description: Application task activity ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartTaskSubmissionBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
   /public/v1/auth/login:
     post:
       tags:
@@ -2557,6 +2607,19 @@ components:
         userId:
           type: string
           format: uuid
+    StartTaskSubmissionBody:
+      type: object
+      required:
+      - contentVersion
+      - response
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        evaluationMethod:
+          $ref: '#/components/schemas/TaskEvaluationMethod'
+        response: {}
     StreakBody:
       type: object
       required:
@@ -2600,6 +2663,61 @@ components:
           type: string
         qualifyingEventKey:
           type: string
+    TaskEvaluationMethod:
+      type: string
+      enum:
+      - self_review
+      - automatic
+      - agent
+      - manual
+    TaskReviewStatus:
+      type: string
+      enum:
+      - not_required
+      - pending
+      - complete
+    TaskSubmissionResponse:
+      type: object
+      required:
+      - id
+      - taskId
+      - journeyId
+      - contentVersion
+      - response
+      - evaluationMethod
+      - status
+      - reviewStatus
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        evaluationMethod:
+          $ref: '#/components/schemas/TaskEvaluationMethod'
+        feedback: {}
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        response: {}
+        reviewStatus:
+          $ref: '#/components/schemas/TaskReviewStatus'
+        status:
+          $ref: '#/components/schemas/TaskSubmissionStatus'
+        taskId:
+          type: string
+          format: uuid
+    TaskSubmissionStatus:
+      type: string
+      enum:
+      - in_progress
+      - submitted
+      - in_review
+      - reviewed
+      - rejected
+      - abandoned
     TierLimit:
       type: object
       required:
