@@ -595,7 +595,11 @@ export default function LearningJourneyPage() {
               !assessmentLoading &&
               !assessment &&
               !isStarterContent(activeContent) && (
-                <ActivityContentRenderer content={activeContent} />
+                <ActivityContentRenderer
+                  content={activeContent}
+                  taskId={activeActivity?.id}
+                  contentVersion={activeActivity?.contentVersion}
+                />
               )}
             {activeProvenance?.sourceReferences && (
               <ActivityProvenance

@@ -7,6 +7,8 @@ describe("ActivityContentRenderer", () => {
   it("renders rich text and code capabilities", () => {
     const html = renderToString(
       <ActivityContentRenderer
+        taskId="task-1"
+        contentVersion={2}
         content={{
           type: "rich_text",
           heading: "Checkpointing",

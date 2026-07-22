@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { HighlightedCode } from "@/components/HighlightedCode";
 import { MarkdownView, MermaidView } from "@/components/MarkdownView";
+import { api } from "@/api/client";
 
 export type ActivityContent =
   | {
@@ -107,9 +108,20 @@ function parseContent(value: unknown): ActivityContent | null {
   return null;
 }
 
-export function ActivityContentRenderer({ content }: { content: unknown }) {
+export function ActivityContentRenderer({
+  content,
+  taskId,
+  contentVersion = 1,
+}: {
+  content: unknown;
+  taskId?: string;
+  contentVersion?: number;
+}) {
   const parsed = parseContent(content);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [taskStatus, setTaskStatus] = useState<
+    "idle" | "submitting" | "submitted" | "error"
+  >("idle");
 
   if (!parsed) {
     const unknown = content as UnknownContent | null;
@@ -203,10 +215,52 @@ export function ActivityContentRenderer({ content }: { content: unknown }) {
             ))}
           </div>
           {selectedOption && (
-            <p className="text-sm text-muted-foreground">
-              Choice recorded locally. Assessment and feedback for scenarios
-              will be connected in the task milestone.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {taskStatus === "submitted"
+                  ? "Task submitted. Your answer is now part of this journey."
+                  : "Submit your choice as evidence of applying the concept."}
+              </p>
+              {taskId && taskStatus !== "submitted" && (
+                <button
+                  type="button"
+                  disabled={taskStatus === "submitting"}
+                  onClick={async () => {
+                    setTaskStatus("submitting");
+                    const started = await api.POST(
+                      "/api/v1/tasks/{task_id}/submissions",
+                      {
+                        params: { path: { task_id: taskId } },
+                        body: {
+                          contentVersion,
+                          response: { optionId: selectedOption },
+                          evaluationMethod: "self_review",
+                        },
+                      },
+                    );
+                    if (!started.response.ok || !started.data) {
+                      setTaskStatus("error");
+                      return;
+                    }
+                    const submitted = await api.POST(
+                      "/api/v1/task-submissions/{submission_id}/submit",
+                      { params: { path: { submission_id: started.data.id } } },
+                    );
+                    setTaskStatus(
+                      submitted.response.ok ? "submitted" : "error",
+                    );
+                  }}
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                >
+                  {taskStatus === "submitting" ? "Submitting…" : "Submit task"}
+                </button>
+              )}
+              {taskStatus === "error" && (
+                <p className="text-sm text-destructive">
+                  Could not submit this task. Try again.
+                </p>
+              )}
+            </div>
           )}
         </>
       )}
