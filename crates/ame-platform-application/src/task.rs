@@ -25,6 +25,21 @@ pub struct StartTaskSubmission {
     pub evaluation_method: TaskEvaluationMethod,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReviewTaskSubmission {
+    pub subject_user_id: Uuid,
+    pub submission_id: Uuid,
+    pub outcome: TaskReviewOutcome,
+    pub score: Option<f32>,
+    pub feedback: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskReviewOutcome {
+    Reviewed,
+    Rejected,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskSubmissionError {
     NotFound,
@@ -65,6 +80,11 @@ pub trait TaskSubmissionRepository: Send + Sync {
         &self,
         subject_user_id: Uuid,
         submission_id: Uuid,
+    ) -> Result<TaskSubmission, TaskSubmissionError>;
+
+    async fn review(
+        &self,
+        input: ReviewTaskSubmission,
     ) -> Result<TaskSubmission, TaskSubmissionError>;
 }
 
@@ -140,6 +160,7 @@ impl TaskSubmissionRepository for InMemoryTaskSubmissionRepository {
             evaluation_method: input.evaluation_method,
             status: TaskSubmissionStatus::InProgress,
             review_status: TaskReviewStatus::NotRequired,
+            score: None,
             feedback: None,
         };
         validate_task_submission(&envelope)
@@ -181,6 +202,42 @@ impl TaskSubmissionRepository for InMemoryTaskSubmissionRepository {
         } else {
             submission.envelope.review_status = TaskReviewStatus::Pending;
         }
+        Ok(submission.clone())
+    }
+
+    async fn review(
+        &self,
+        input: ReviewTaskSubmission,
+    ) -> Result<TaskSubmission, TaskSubmissionError> {
+        if input
+            .score
+            .is_some_and(|score| !(0.0..=1.0).contains(&score))
+        {
+            return Err(TaskSubmissionError::InvalidContract(
+                "score must be between zero and one".into(),
+            ));
+        }
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|error| TaskSubmissionError::Storage(error.to_string()))?;
+        let submission = state
+            .submissions
+            .get_mut(&input.submission_id)
+            .ok_or(TaskSubmissionError::NotFound)?;
+        if submission.envelope.subject_user_id != input.subject_user_id {
+            return Err(TaskSubmissionError::SubjectMismatch);
+        }
+        let next_status = match input.outcome {
+            TaskReviewOutcome::Reviewed => TaskSubmissionStatus::Reviewed,
+            TaskReviewOutcome::Rejected => TaskSubmissionStatus::Rejected,
+        };
+        validate_task_submission_transition(submission.envelope.status, next_status)
+            .map_err(TaskSubmissionError::InvalidTransition)?;
+        submission.envelope.status = next_status;
+        submission.envelope.review_status = TaskReviewStatus::Complete;
+        submission.envelope.score = input.score;
+        submission.envelope.feedback = input.feedback;
         Ok(submission.clone())
     }
 }
@@ -240,5 +297,39 @@ mod tests {
             .expect("submit task");
         assert_eq!(submitted.envelope.status, TaskSubmissionStatus::Reviewed);
         assert_eq!(submitted.envelope.review_status, TaskReviewStatus::Complete);
+    }
+
+    #[tokio::test]
+    async fn agent_review_records_score_and_feedback() {
+        let repository = InMemoryTaskSubmissionRepository::default();
+        let owner = Uuid::now_v7();
+        let task = Uuid::now_v7();
+        repository.register_task(task, owner, Uuid::now_v7(), 1);
+        let submission = repository
+            .start(StartTaskSubmission {
+                subject_user_id: owner,
+                task_id: task,
+                content_version: 1,
+                response: serde_json::json!({"artifact": "watermark analysis"}),
+                evaluation_method: TaskEvaluationMethod::Agent,
+            })
+            .await
+            .expect("start submission");
+        let submitted = repository
+            .submit(owner, submission.id)
+            .await
+            .expect("submit task");
+        let reviewed = repository
+            .review(ReviewTaskSubmission {
+                subject_user_id: owner,
+                submission_id: submitted.id,
+                outcome: TaskReviewOutcome::Reviewed,
+                score: Some(0.9),
+                feedback: Some(serde_json::json!({"note": "Good diagnosis"})),
+            })
+            .await
+            .expect("review task");
+        assert_eq!(reviewed.envelope.status, TaskSubmissionStatus::Reviewed);
+        assert_eq!(reviewed.envelope.score, Some(0.9));
     }
 }

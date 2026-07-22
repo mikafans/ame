@@ -78,6 +78,7 @@ pub struct TaskSubmissionEnvelope {
     pub evaluation_method: TaskEvaluationMethod,
     pub status: TaskSubmissionStatus,
     pub review_status: TaskReviewStatus,
+    pub score: Option<f32>,
     pub feedback: Option<serde_json::Value>,
 }
 
@@ -293,6 +294,7 @@ mod tests {
             evaluation_method: TaskEvaluationMethod::Agent,
             status: TaskSubmissionStatus::Submitted,
             review_status: TaskReviewStatus::Pending,
+            score: None,
             feedback: None,
         };
         assert!(validate_task_submission(&submission).is_ok());
@@ -326,6 +328,7 @@ mod tests {
             evaluation_method: TaskEvaluationMethod::SelfReview,
             status: TaskSubmissionStatus::InProgress,
             review_status: TaskReviewStatus::NotRequired,
+            score: None,
             feedback: None,
         };
         assert!(matches!(
