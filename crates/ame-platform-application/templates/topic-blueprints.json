@@ -4,9 +4,21 @@
     "template_id": "understand-a-subject",
     "aliases": [],
     "objectives": [
-      {"verb": "identify", "statement": "Identify the core concepts of {{goal}}", "success_criteria": "Name the essential ideas and how they relate"},
-      {"verb": "explain", "statement": "Explain one concept from {{goal}} clearly", "success_criteria": "Give an accurate explanation with a useful example"},
-      {"verb": "apply", "statement": "Apply {{goal}} in practice", "success_criteria": "Use the ideas in a new but bounded situation"}
+      {
+        "verb": "identify",
+        "statement": "Identify the core concepts of {{goal}}",
+        "success_criteria": "Name the essential ideas and how they relate"
+      },
+      {
+        "verb": "explain",
+        "statement": "Explain one concept from {{goal}} clearly",
+        "success_criteria": "Give an accurate explanation with a useful example"
+      },
+      {
+        "verb": "apply",
+        "statement": "Apply {{goal}} in practice",
+        "success_criteria": "Use the ideas in a new but bounded situation"
+      }
     ],
     "first_activity": {
       "kind": "explanation",
@@ -16,17 +28,95 @@
       "context": "Start with a small signal about your current understanding of {{goal}} and the outcome you want. AME will use it to choose a useful next step.",
       "instructions": "Give AME a quick starting signal about {{goal}} so the next step can fit you.",
       "questions": [
-        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with {{goal}}?", "options": ["new_to_me", "some_exposure", "comfortable"]},
-        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to be able to do with {{goal}} first?"}
+        {
+          "id": "familiarity",
+          "kind": "single_choice",
+          "prompt": "How familiar are you with {{goal}}?",
+          "options": ["new_to_me", "some_exposure", "comfortable"]
+        },
+        {
+          "id": "outcome",
+          "kind": "short_text",
+          "prompt": "What would you like to be able to do with {{goal}} first?"
+        }
       ],
       "objective_orders": [0],
       "status": "ready"
     },
     "follow_up_activities": [
-      {"kind": "explanation", "title": "Build a clear starting model for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "first_explanation", "estimated_minutes": 8, "content": {"type": "explanation", "heading": "A clear model for {{goal}}", "body": "Begin by putting {{goal}} into your own words. A useful first model has three parts: what it is, why it matters, and one situation where you would use it.", "key_points": ["Name what {{goal}} is for.", "Connect one core idea to the outcome you want.", "State one question your first example should answer."]}}, "status": "proposed"},
-      {"kind": "example", "title": "Walk through a worked example for {{goal}}", "objective_orders": [1, 2], "payload": {"purpose": "worked_example", "estimated_minutes": 8, "content": {"type": "worked_example", "heading": "A small example of {{goal}}", "prompt": "Choose one bounded situation involving {{goal}}.", "steps": ["State the situation and desired outcome.", "Choose the one idea from {{goal}} that applies.", "Explain what you would observe if the idea worked."], "reflection": "What would you try next if the result surprised you?"}}, "status": "proposed"},
-      {"kind": "diagnostic", "title": "Try a short first task for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
-      {"kind": "recommendation", "title": "Review your {{goal}} result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
+      {
+        "kind": "explanation",
+        "title": "Build a clear starting model for {{goal}}",
+        "objective_orders": [0, 1],
+        "payload": {
+          "purpose": "first_explanation",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "explanation",
+            "heading": "A clear model for {{goal}}",
+            "body": "Begin by putting {{goal}} into your own words. A useful first model has three parts: what it is, why it matters, and one situation where you would use it.",
+            "key_points": [
+              "Name what {{goal}} is for.",
+              "Connect one core idea to the outcome you want.",
+              "State one question your first example should answer."
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "example",
+        "title": "Walk through a worked example for {{goal}}",
+        "objective_orders": [1, 2],
+        "payload": {
+          "purpose": "worked_example",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "worked_example",
+            "heading": "A small example of {{goal}}",
+            "prompt": "Choose one bounded situation involving {{goal}}.",
+            "steps": [
+              "State the situation and desired outcome.",
+              "Choose the one idea from {{goal}} that applies.",
+              "Explain what you would observe if the idea worked."
+            ],
+            "reflection": "What would you try next if the result surprised you?"
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "diagnostic",
+        "title": "Try a short first task for {{goal}}",
+        "objective_orders": [0, 1],
+        "payload": {
+          "purpose": "diagnose_starting_point",
+          "estimated_minutes": 10,
+          "content": {
+            "type": "scenario",
+            "context": "A small situation calls for applying {{goal}}.",
+            "prompt": "What is the best first move when applying {{goal}}?",
+            "options": [
+              {
+                "id": "make_model",
+                "label": "Make the core idea explicit before acting"
+              },
+              {
+                "id": "guess",
+                "label": "Act immediately without checking the idea"
+              }
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "recommendation",
+        "title": "Review your {{goal}} result and choose the next step",
+        "objective_orders": [2],
+        "payload": { "purpose": "next_action", "estimated_minutes": 5 },
+        "status": "proposed"
+      }
     ]
   },
   {
@@ -34,9 +124,21 @@
     "template_id": "prepare-for-an-exam",
     "aliases": [],
     "objectives": [
-      {"verb": "map", "statement": "Map the target syllabus for {{goal}}", "success_criteria": "Name the main domains and their expected weight"},
-      {"verb": "solve", "statement": "Solve representative {{goal}} problems", "success_criteria": "Complete a bounded set with explained reasoning"},
-      {"verb": "review", "statement": "Review the weakest {{goal}} domain", "success_criteria": "Choose one evidence-backed review target"}
+      {
+        "verb": "map",
+        "statement": "Map the target syllabus for {{goal}}",
+        "success_criteria": "Name the main domains and their expected weight"
+      },
+      {
+        "verb": "solve",
+        "statement": "Solve representative {{goal}} problems",
+        "success_criteria": "Complete a bounded set with explained reasoning"
+      },
+      {
+        "verb": "review",
+        "statement": "Review the weakest {{goal}} domain",
+        "success_criteria": "Choose one evidence-backed review target"
+      }
     ],
     "first_activity": {
       "kind": "explanation",
@@ -46,17 +148,80 @@
       "context": "Begin by identifying your target in {{goal}} and your current confidence. This keeps the first practice step bounded and relevant.",
       "instructions": "Give AME a quick starting signal about {{goal}} so the first practice step can fit your target.",
       "questions": [
-        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with {{goal}}?", "options": ["new_to_me", "some_exposure", "comfortable"]},
-        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to be able to solve in {{goal}} first?"}
+        {
+          "id": "familiarity",
+          "kind": "single_choice",
+          "prompt": "How familiar are you with {{goal}}?",
+          "options": ["new_to_me", "some_exposure", "comfortable"]
+        },
+        {
+          "id": "outcome",
+          "kind": "short_text",
+          "prompt": "What would you like to be able to solve in {{goal}} first?"
+        }
       ],
       "objective_orders": [0],
       "status": "ready"
     },
     "follow_up_activities": [
-      {"kind": "explanation", "title": "Build a clear target model for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "first_explanation", "estimated_minutes": 8, "content": {"type": "explanation", "heading": "A clear model for {{goal}}", "body": "Begin by putting {{goal}} into your own words. A useful target model has three parts: what it covers, how it is evaluated, and one question you must be able to solve.", "key_points": ["Name the domains covered by {{goal}}.", "Connect one domain to the outcome you want.", "State one question your first practice should answer."]}}, "status": "proposed"},
-      {"kind": "example", "title": "Walk through a worked problem for {{goal}}", "objective_orders": [1, 2], "payload": {"purpose": "worked_example", "estimated_minutes": 8, "content": {"type": "worked_example", "heading": "A small example of {{goal}}", "prompt": "Choose one bounded problem from {{goal}}.", "steps": ["State the problem and constraints.", "Choose the relevant idea from {{goal}}.", "Explain each step and inspect the result."], "reflection": "Which part would you review if your answer were wrong?"}}, "status": "proposed"},
-      {"kind": "timed_practice", "title": "Try a short first task for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
-      {"kind": "recommendation", "title": "Review your {{goal}} result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
+      {
+        "kind": "explanation",
+        "title": "Build a clear target model for {{goal}}",
+        "objective_orders": [0, 1],
+        "payload": {
+          "purpose": "first_explanation",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "explanation",
+            "heading": "A clear model for {{goal}}",
+            "body": "Begin by putting {{goal}} into your own words. A useful target model has three parts: what it covers, how it is evaluated, and one question you must be able to solve.",
+            "key_points": [
+              "Name the domains covered by {{goal}}.",
+              "Connect one domain to the outcome you want.",
+              "State one question your first practice should answer."
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "example",
+        "title": "Walk through a worked problem for {{goal}}",
+        "objective_orders": [1, 2],
+        "payload": {
+          "purpose": "worked_example",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "worked_example",
+            "heading": "A small example of {{goal}}",
+            "prompt": "Choose one bounded problem from {{goal}}.",
+            "steps": [
+              "State the problem and constraints.",
+              "Choose the relevant idea from {{goal}}.",
+              "Explain each step and inspect the result."
+            ],
+            "reflection": "Which part would you review if your answer were wrong?"
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "timed_practice",
+        "title": "Try a short first task for {{goal}}",
+        "objective_orders": [0, 1],
+        "payload": {
+          "purpose": "diagnose_starting_point",
+          "estimated_minutes": 10
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "recommendation",
+        "title": "Review your {{goal}} result and choose the next step",
+        "objective_orders": [2],
+        "payload": { "purpose": "next_action", "estimated_minutes": 5 },
+        "status": "proposed"
+      }
     ]
   },
   {
@@ -64,9 +229,21 @@
     "template_id": "build-a-project",
     "aliases": [],
     "objectives": [
-      {"verb": "define", "statement": "Define the first {{goal}} artifact", "success_criteria": "Describe a small usable result and its constraints"},
-      {"verb": "apply", "statement": "Apply the core concept in {{goal}}", "success_criteria": "Use the concept in a concrete implementation step"},
-      {"verb": "ship", "statement": "Complete the first {{goal}} milestone", "success_criteria": "Produce and inspect a small working increment"}
+      {
+        "verb": "define",
+        "statement": "Define the first {{goal}} artifact",
+        "success_criteria": "Describe a small usable result and its constraints"
+      },
+      {
+        "verb": "apply",
+        "statement": "Apply the core concept in {{goal}}",
+        "success_criteria": "Use the concept in a concrete implementation step"
+      },
+      {
+        "verb": "ship",
+        "statement": "Complete the first {{goal}} milestone",
+        "success_criteria": "Produce and inspect a small working increment"
+      }
     ],
     "first_activity": {
       "kind": "explanation",
@@ -76,17 +253,80 @@
       "context": "Start by making the desired {{goal}} artifact concrete enough to attempt. A small milestone gives AME evidence for the next implementation step.",
       "instructions": "Give AME a quick starting signal about the {{goal}} artifact and the first result you want to produce.",
       "questions": [
-        {"id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with building {{goal}}?", "options": ["new_to_me", "some_exposure", "comfortable"]},
-        {"id": "outcome", "kind": "short_text", "prompt": "What would you like to build for {{goal}} first?"}
+        {
+          "id": "familiarity",
+          "kind": "single_choice",
+          "prompt": "How familiar are you with building {{goal}}?",
+          "options": ["new_to_me", "some_exposure", "comfortable"]
+        },
+        {
+          "id": "outcome",
+          "kind": "short_text",
+          "prompt": "What would you like to build for {{goal}} first?"
+        }
       ],
       "objective_orders": [0],
       "status": "ready"
     },
     "follow_up_activities": [
-      {"kind": "explanation", "title": "Define a clear starting model for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "first_explanation", "estimated_minutes": 8, "content": {"type": "explanation", "heading": "A clear model for {{goal}}", "body": "Begin by putting {{goal}} into your own words. A useful project model has three parts: what you will make, who it helps, and how you will know it works.", "key_points": ["Name the smallest useful result for {{goal}}.", "Connect one core idea to the result.", "State one risk your first milestone should expose."]}}, "status": "proposed"},
-      {"kind": "example", "title": "Walk through a worked milestone for {{goal}}", "objective_orders": [1, 2], "payload": {"purpose": "worked_example", "estimated_minutes": 8, "content": {"type": "worked_example", "heading": "A small milestone for {{goal}}", "prompt": "Choose one bounded result you can produce for {{goal}}.", "steps": ["State the result and its constraints.", "Choose the idea from {{goal}} that enables it.", "Inspect the result against one success criterion."], "reflection": "What would you reduce if the milestone were too large?"}}, "status": "proposed"},
-      {"kind": "application", "title": "Try a short first task for {{goal}}", "objective_orders": [0, 1], "payload": {"purpose": "diagnose_starting_point", "estimated_minutes": 10}, "status": "proposed"},
-      {"kind": "recommendation", "title": "Review your {{goal}} result and choose the next step", "objective_orders": [2], "payload": {"purpose": "next_action", "estimated_minutes": 5}, "status": "proposed"}
+      {
+        "kind": "explanation",
+        "title": "Define a clear starting model for {{goal}}",
+        "objective_orders": [0, 1],
+        "payload": {
+          "purpose": "first_explanation",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "explanation",
+            "heading": "A clear model for {{goal}}",
+            "body": "Begin by putting {{goal}} into your own words. A useful project model has three parts: what you will make, who it helps, and how you will know it works.",
+            "key_points": [
+              "Name the smallest useful result for {{goal}}.",
+              "Connect one core idea to the result.",
+              "State one risk your first milestone should expose."
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "example",
+        "title": "Walk through a worked milestone for {{goal}}",
+        "objective_orders": [1, 2],
+        "payload": {
+          "purpose": "worked_example",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "worked_example",
+            "heading": "A small milestone for {{goal}}",
+            "prompt": "Choose one bounded result you can produce for {{goal}}.",
+            "steps": [
+              "State the result and its constraints.",
+              "Choose the idea from {{goal}} that enables it.",
+              "Inspect the result against one success criterion."
+            ],
+            "reflection": "What would you reduce if the milestone were too large?"
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "application",
+        "title": "Try a short first task for {{goal}}",
+        "objective_orders": [0, 1],
+        "payload": {
+          "purpose": "diagnose_starting_point",
+          "estimated_minutes": 10
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "recommendation",
+        "title": "Review your {{goal}} result and choose the next step",
+        "objective_orders": [2],
+        "payload": { "purpose": "next_action", "estimated_minutes": 5 },
+        "status": "proposed"
+      }
     ]
   }
 ]

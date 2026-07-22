@@ -221,6 +221,81 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("learner can answer the first application task in a journey", async ({
+  page,
+}) => {
+  const prompt = "I would like to learn Flink event-time processing";
+  const email = `task-uiux-${Date.now()}@example.com`;
+
+  await page.goto("/start");
+  await page.getByLabel("What would you like to learn?").fill(prompt);
+  await page.getByLabel("Your name").fill("Task Learner");
+  await page.getByLabel("Email identifier").fill(email);
+  await page.getByLabel("Password").fill("task-local-2026");
+  await page.getByRole("button", { name: "Create my journey" }).click();
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+
+  await page.getByRole("button", { name: "Begin" }).click();
+  await page.getByRole("button", { name: "new to me" }).click();
+  await page
+    .getByLabel(/What would you like to .+\?/)
+    .fill("Understand event time and watermarks");
+  await page.getByRole("button", { name: "Mark activity complete" }).click();
+  await expect(
+    page.getByText("Complete. Your next activity is now ready."),
+  ).toBeVisible();
+
+  const explanationTitle =
+    "Build a clear starting model for Flink event-time processing";
+  await expect(
+    page.getByRole("heading", { name: explanationTitle }).first(),
+  ).toBeVisible();
+  await page
+    .getByRole("article")
+    .filter({ hasText: explanationTitle })
+    .getByRole("button", { name: "Begin" })
+    .click();
+  await expect(page.getByText("Explanation", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Mark activity complete" }).click();
+  await expect(
+    page.getByText("Complete. Your next activity is now ready."),
+  ).toBeVisible();
+
+  const exampleTitle =
+    "Walk through a worked example for Flink event-time processing";
+  await expect(
+    page.getByRole("heading", { name: exampleTitle }).first(),
+  ).toBeVisible();
+  await page
+    .getByRole("article")
+    .filter({ hasText: exampleTitle })
+    .getByRole("button", { name: "Begin" })
+    .click();
+  await expect(page.getByText("Worked example", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Mark activity complete" }).click();
+  await expect(
+    page.getByText("Complete. Your next activity is now ready."),
+  ).toBeVisible();
+
+  const taskTitle = "Try a short first task for Flink event-time processing";
+  await expect(
+    page.getByRole("heading", { name: taskTitle }).first(),
+  ).toBeVisible();
+  await page
+    .getByRole("article")
+    .filter({ hasText: taskTitle })
+    .getByRole("button", { name: "Begin" })
+    .click();
+  await expect(page.getByText("Scenario", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Make the core idea explicit before acting" })
+    .click();
+  await page.getByRole("button", { name: "Submit task" }).click();
+  await expect(
+    page.getByText("Task submitted. Your answer is now part of this journey."),
+  ).toBeVisible();
+});
+
 test("learner can complete an agent-provided assessment and open its deep dive", async ({
   page,
 }) => {
