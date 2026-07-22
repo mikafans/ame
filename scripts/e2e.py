@@ -30,7 +30,10 @@ def main() -> int:
         if not ready():
             env = {
                 **os.environ,
-                "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/ame",
+                "AME_DATABASE_URL": os.environ.get(
+                    "AME_DATABASE_URL",
+                    "postgres://postgres:postgres@localhost:5432/ame",
+                ),
                 "AME_PORT": API_PORT,
                 "AME_CORS_ORIGINS": f"http://{API_HOST}:{WEB_PORT}",
                 "AME_CONFIG_PATH": "ame.dev.toml",
