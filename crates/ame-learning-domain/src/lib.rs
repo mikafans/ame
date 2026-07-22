@@ -209,6 +209,48 @@ pub struct AuthorActivityContent {
     pub review_status: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ActivityCapability {
+    Explanation {
+        heading: String,
+        body: String,
+        key_points: Vec<String>,
+    },
+    WorkedExample {
+        heading: String,
+        prompt: String,
+        steps: Vec<String>,
+        reflection: String,
+    },
+    RichText {
+        heading: String,
+        body: String,
+    },
+    Diagram {
+        title: String,
+        source: String,
+        alt_text: String,
+    },
+    CodeExample {
+        title: String,
+        language: String,
+        code: String,
+        explanation: String,
+    },
+    Scenario {
+        context: String,
+        prompt: String,
+        options: Vec<ScenarioOption>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct ScenarioOption {
+    pub id: String,
+    pub label: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreateLearningSession {
     pub journey_id: Uuid,
@@ -476,37 +518,115 @@ pub fn validate_activity_content(
     let Some(object) = input.content.as_object() else {
         return Err(LearningRepositoryError::InvalidActivityContent);
     };
-    let Some(content_type) = object.get("type").and_then(serde_json::Value::as_str) else {
+    let Some(_content_type) = object.get("type").and_then(serde_json::Value::as_str) else {
         return Err(LearningRepositoryError::InvalidActivityContent);
     };
-    let (expected_type, text_fields, list_field) = match activity_kind {
-        ActivityKind::Explanation => ("explanation", &["heading", "body"][..], "key_points"),
-        ActivityKind::Example => (
-            "worked_example",
-            &["heading", "prompt", "reflection"][..],
-            "steps",
-        ),
-        _ => return Err(LearningRepositoryError::InvalidActivityContent),
-    };
-    if content_type != expected_type
-        || text_fields.iter().any(|field| {
-            object
-                .get(*field)
-                .and_then(serde_json::Value::as_str)
-                .is_none_or(|text| text.trim().is_empty())
-        })
-    {
-        return Err(LearningRepositoryError::InvalidActivityContent);
-    }
-    let Some(items) = object.get(list_field).and_then(serde_json::Value::as_array) else {
-        return Err(LearningRepositoryError::InvalidActivityContent);
-    };
-    if items.is_empty()
-        || items
-            .iter()
-            .any(|item| item.as_str().is_none_or(|text| text.trim().is_empty()))
-    {
+    let capability: ActivityCapability = serde_json::from_value(input.content.clone())
+        .map_err(|_| LearningRepositoryError::InvalidActivityContent)?;
+    let valid_for_kind = matches!((&activity_kind, &capability),
+        (ActivityKind::Explanation, ActivityCapability::Explanation { .. })
+        | (ActivityKind::Explanation, ActivityCapability::RichText { .. })
+        | (ActivityKind::Explanation, ActivityCapability::Diagram { .. })
+        | (ActivityKind::Example, ActivityCapability::WorkedExample { .. })
+        | (ActivityKind::Example, ActivityCapability::CodeExample { .. })
+        | (ActivityKind::Practice, ActivityCapability::Scenario { .. })
+        | (ActivityKind::Application, ActivityCapability::Scenario { .. }));
+    if !valid_for_kind || !capability_has_content(&capability) {
         return Err(LearningRepositoryError::InvalidActivityContent);
     }
     Ok(())
+}
+
+fn capability_has_content(capability: &ActivityCapability) -> bool {
+    let non_empty = |value: &str| !value.trim().is_empty();
+    match capability {
+        ActivityCapability::Explanation {
+            heading,
+            body,
+            key_points,
+        } => non_empty(heading) && non_empty(body) && non_empty_list(key_points),
+        ActivityCapability::WorkedExample {
+            heading,
+            prompt,
+            steps,
+            reflection,
+        } => non_empty(heading) && non_empty(prompt) && non_empty(reflection) && non_empty_list(steps),
+        ActivityCapability::RichText { heading, body } => non_empty(heading) && non_empty(body),
+        ActivityCapability::Diagram {
+            title,
+            source,
+            alt_text,
+        } => non_empty(title) && non_empty(source) && non_empty(alt_text),
+        ActivityCapability::CodeExample {
+            title,
+            language,
+            code,
+            explanation,
+        } => non_empty(title) && non_empty(language) && non_empty(code) && non_empty(explanation),
+        ActivityCapability::Scenario {
+            context,
+            prompt,
+            options,
+        } => non_empty(context)
+            && non_empty(prompt)
+            && options.len() >= 2
+            && options.iter().all(|option| non_empty(&option.id) && non_empty(&option.label)),
+    }
+}
+
+fn non_empty_list(values: &[String]) -> bool {
+    !values.is_empty() && values.iter().all(|value| !value.trim().is_empty())
+}
+
+#[cfg(test)]
+mod capability_tests {
+    use super::*;
+
+    fn authored(content: serde_json::Value) -> AuthorActivityContent {
+        AuthorActivityContent {
+            subject_user_id: Uuid::now_v7(),
+            activity_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
+            content,
+            source_references: vec!["https://example.com/flink".to_string()],
+            review_status: "approved".to_string(),
+        }
+    }
+
+    #[test]
+    fn accepts_versioned_learning_capabilities_for_matching_activity_kinds() {
+        let cases = [
+            (ActivityKind::Explanation, serde_json::json!({
+                "type": "rich_text", "heading": "State", "body": "State is durable."
+            })),
+            (ActivityKind::Explanation, serde_json::json!({
+                "type": "diagram", "title": "Flow", "source": "graph TD; A-->B", "alt_text": "A flows to B"
+            })),
+            (ActivityKind::Example, serde_json::json!({
+                "type": "code_example", "title": "Job", "language": "java", "code": "env.execute();", "explanation": "Runs the job."
+            })),
+            (ActivityKind::Practice, serde_json::json!({
+                "type": "scenario", "context": "A task fails.", "prompt": "What do you inspect first?",
+                "options": [{"id": "logs", "label": "Inspect logs"}, {"id": "retry", "label": "Retry immediately"}]
+            })),
+        ];
+
+        for (kind, content) in cases {
+            assert!(validate_activity_content(kind, &authored(content)).is_ok());
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_or_malformed_capabilities() {
+        for content in [
+            serde_json::json!({"type": "interactive_lab", "title": "Run it"}),
+            serde_json::json!({"type": "diagram", "title": "Flow", "source": "graph TD", "alt_text": ""}),
+            serde_json::json!({"type": "scenario", "context": "Context", "prompt": "Choose", "options": [{"id": "only", "label": "Only choice"}]}),
+        ] {
+            assert_eq!(
+                validate_activity_content(ActivityKind::Explanation, &authored(content)),
+                Err(LearningRepositoryError::InvalidActivityContent)
+            );
+        }
+    }
 }
