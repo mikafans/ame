@@ -47,6 +47,43 @@ def main() -> None:
         started.raise_for_status()
         journey_id = started.json()["journeyId"]
 
+        journey = client.get(
+            f"/api/v1/learning/journeys/{journey_id}", headers=headers
+        )
+        journey.raise_for_status()
+        journey_body = journey.json()
+        assert journey_body["goal"]["rawIntent"] == prompt
+        recommendation = journey_body["recommendation"]
+        assert recommendation is not None
+        candidates = [
+            {"objectiveId": objective_id, "activityId": activity["id"]}
+            for activity in journey_body["activities"]
+            if activity["status"] in {"ready", "in_progress"}
+            for objective_id in activity["objectiveIds"]
+        ]
+        recommendation_read = client.post(
+            f"/api/v1/progress/{journey_id}/recommendation",
+            headers=headers,
+            json={"objectives": candidates},
+        )
+        recommendation_read.raise_for_status()
+        recommendation_body = recommendation_read.json()
+        assert recommendation_body["activityId"] == recommendation["activityId"]
+        assert recommendation_body["objectiveId"] == recommendation["objectiveId"]
+        assert recommendation_body["evidenceIds"] == recommendation["evidenceIds"]
+
+        session_start = client.post(
+            f"/api/v1/learning/journeys/{journey_id}/activities/{recommendation['activityId']}/start",
+            headers=headers,
+        )
+        session_start.raise_for_status()
+        session_id = session_start.json()["id"]
+        session_before = client.get(
+            f"/api/v1/learning/sessions/{session_id}", headers=headers
+        )
+        session_before.raise_for_status()
+        assert session_before.json()["status"] == "in_progress"
+
     run_stack("down")
     run_stack("up")
 
@@ -62,8 +99,37 @@ def main() -> None:
             headers={"Authorization": f"Bearer {token}"},
         )
         journey.raise_for_status()
-        assert journey.json()["id"] == journey_id
-        assert journey.json()["goal"]["rawIntent"] == prompt
+        journey_body = journey.json()
+        assert journey_body["id"] == journey_id
+        assert journey_body["goal"]["rawIntent"] == prompt
+        recommendation = journey_body["recommendation"]
+        assert recommendation is not None
+        candidates = [
+            {"objectiveId": objective_id, "activityId": activity["id"]}
+            for activity in journey_body["activities"]
+            if activity["status"] in {"ready", "in_progress"}
+            for objective_id in activity["objectiveIds"]
+        ]
+        recommendation_read = client.post(
+            f"/api/v1/progress/{journey_id}/recommendation",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"objectives": candidates},
+        )
+        recommendation_read.raise_for_status()
+        recommendation_body = recommendation_read.json()
+        assert recommendation_body["activityId"] == recommendation["activityId"]
+        assert recommendation_body["objectiveId"] == recommendation["objectiveId"]
+        assert recommendation_body["evidenceIds"] == recommendation["evidenceIds"]
+
+        resumed_session = client.get(
+            f"/api/v1/learning/sessions/{session_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resumed_session.raise_for_status()
+        assert resumed_session.json()["id"] == session_id
+        assert resumed_session.json()["journeyId"] == journey_id
+        assert resumed_session.json()["activityId"] == recommendation["activityId"]
+        assert resumed_session.json()["status"] == "in_progress"
 
 
 if __name__ == "__main__":
