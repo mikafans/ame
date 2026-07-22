@@ -552,6 +552,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/task-submissions/{submission_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["review_submission"];
+        trace?: never;
+    };
     "/api/v1/task-submissions/{submission_id}/submit": {
         parameters: {
             query?: never;
@@ -1197,6 +1213,14 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
+        ReviewTaskOutcome: "reviewed" | "rejected";
+        ReviewTaskSubmissionBody: {
+            feedback?: unknown;
+            outcome: components["schemas"]["ReviewTaskOutcome"];
+            /** Format: float */
+            score?: number | null;
+        };
+        /** @enum {string} */
         Role: "user" | "admin";
         SaveAnswerBody: {
             /** Format: uuid */
@@ -1289,6 +1313,8 @@ export interface components {
             journeyId: string;
             response: unknown;
             reviewStatus: components["schemas"]["TaskReviewStatus"];
+            /** Format: float */
+            score?: number | null;
             status: components["schemas"]["TaskSubmissionStatus"];
             /** Format: uuid */
             taskId: string;
@@ -2440,6 +2466,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestionResponse"];
+                };
+            };
+        };
+    };
+    review_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task submission ID */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewTaskSubmissionBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
                 };
             };
         };

@@ -938,6 +938,34 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
+  /api/v1/task-submissions/{submission_id}/review:
+    patch:
+      tags:
+      - tasks
+      operationId: review_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewTaskSubmissionBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
   /api/v1/task-submissions/{submission_id}/submit:
     post:
       tags:
@@ -2484,6 +2512,24 @@ components:
           type: string
         password:
           type: string
+    ReviewTaskOutcome:
+      type: string
+      enum:
+      - reviewed
+      - rejected
+    ReviewTaskSubmissionBody:
+      type: object
+      required:
+      - outcome
+      properties:
+        feedback: {}
+        outcome:
+          $ref: '#/components/schemas/ReviewTaskOutcome'
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
     Role:
       type: string
       enum:
@@ -2704,6 +2750,11 @@ components:
         response: {}
         reviewStatus:
           $ref: '#/components/schemas/TaskReviewStatus'
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
         status:
           $ref: '#/components/schemas/TaskSubmissionStatus'
         taskId:
