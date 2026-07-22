@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -47,6 +48,126 @@ pub enum TaskEvaluationMethod {
     Automatic,
     Agent,
     Manual,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRubricCriterion {
+    pub id: String,
+    pub objective_id: Uuid,
+    pub description: String,
+    pub max_points: u32,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRubric {
+    pub version: u32,
+    pub criteria: Vec<TaskRubricCriterion>,
+    pub passing_score: Option<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskSubmissionEnvelope {
+    pub task_id: Uuid,
+    pub subject_user_id: Uuid,
+    pub content_version: u32,
+    pub response: serde_json::Value,
+    pub evaluation_method: TaskEvaluationMethod,
+    pub status: TaskSubmissionStatus,
+    pub review_status: TaskReviewStatus,
+    pub feedback: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskContractError {
+    EmptyRubric,
+    InvalidRubric(String),
+    InvalidSubmission(String),
+}
+
+impl Display for TaskContractError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyRubric => {
+                write!(formatter, "task rubric must contain at least one criterion")
+            }
+            Self::InvalidRubric(message) => write!(formatter, "invalid task rubric: {message}"),
+            Self::InvalidSubmission(message) => {
+                write!(formatter, "invalid task submission: {message}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TaskContractError {}
+
+pub fn validate_task_rubric(rubric: &TaskRubric) -> Result<(), TaskContractError> {
+    if rubric.version == 0 {
+        return Err(TaskContractError::InvalidRubric(
+            "version must be greater than zero".to_string(),
+        ));
+    }
+    if rubric.criteria.is_empty() {
+        return Err(TaskContractError::EmptyRubric);
+    }
+    if rubric
+        .passing_score
+        .is_some_and(|score| !(0.0..=1.0).contains(&score))
+    {
+        return Err(TaskContractError::InvalidRubric(
+            "passing score must be between zero and one".to_string(),
+        ));
+    }
+    let mut criterion_ids = std::collections::HashSet::new();
+    for criterion in &rubric.criteria {
+        if criterion.id.trim().is_empty() {
+            return Err(TaskContractError::InvalidRubric(
+                "criterion id must not be empty".to_string(),
+            ));
+        }
+        if !criterion_ids.insert(&criterion.id) {
+            return Err(TaskContractError::InvalidRubric(
+                "criterion ids must be unique".to_string(),
+            ));
+        }
+        if criterion.description.trim().is_empty() {
+            return Err(TaskContractError::InvalidRubric(
+                "criterion description must not be empty".to_string(),
+            ));
+        }
+        if criterion.max_points == 0 {
+            return Err(TaskContractError::InvalidRubric(
+                "criterion max points must be greater than zero".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_task_submission(
+    submission: &TaskSubmissionEnvelope,
+) -> Result<(), TaskContractError> {
+    if submission.content_version == 0 {
+        return Err(TaskContractError::InvalidSubmission(
+            "content version must be greater than zero".to_string(),
+        ));
+    }
+    if submission.response.is_null() {
+        return Err(TaskContractError::InvalidSubmission(
+            "response must be present".to_string(),
+        ));
+    }
+    if submission.status == TaskSubmissionStatus::InProgress
+        && submission.review_status != TaskReviewStatus::NotRequired
+    {
+        return Err(TaskContractError::InvalidSubmission(
+            "an in-progress submission cannot be under review".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -146,5 +267,70 @@ mod tests {
                 validate_task_submission_transition(from, TaskSubmissionStatus::Submitted).is_err()
             );
         }
+    }
+
+    #[test]
+    fn rubric_and_submission_capture_verifiable_work() {
+        let objective_id = uuid::Uuid::now_v7();
+        let rubric = TaskRubric {
+            version: 1,
+            criteria: vec![TaskRubricCriterion {
+                id: "explain-tradeoff".to_string(),
+                objective_id,
+                description: "Explains the operational tradeoff".to_string(),
+                max_points: 4,
+                required: true,
+            }],
+            passing_score: Some(0.75),
+        };
+        assert!(validate_task_rubric(&rubric).is_ok());
+
+        let submission = TaskSubmissionEnvelope {
+            task_id: uuid::Uuid::now_v7(),
+            subject_user_id: uuid::Uuid::now_v7(),
+            content_version: 3,
+            response: serde_json::json!({"answer": "Use event time."}),
+            evaluation_method: TaskEvaluationMethod::Agent,
+            status: TaskSubmissionStatus::Submitted,
+            review_status: TaskReviewStatus::Pending,
+            feedback: None,
+        };
+        assert!(validate_task_submission(&submission).is_ok());
+    }
+
+    #[test]
+    fn rubric_rejects_duplicate_criteria_and_submission_rejects_null_response() {
+        let objective_id = uuid::Uuid::now_v7();
+        let criterion = TaskRubricCriterion {
+            id: "same".to_string(),
+            objective_id,
+            description: "Criterion".to_string(),
+            max_points: 1,
+            required: false,
+        };
+        let rubric = TaskRubric {
+            version: 1,
+            criteria: vec![criterion.clone(), criterion],
+            passing_score: None,
+        };
+        assert!(matches!(
+            validate_task_rubric(&rubric),
+            Err(TaskContractError::InvalidRubric(_))
+        ));
+
+        let submission = TaskSubmissionEnvelope {
+            task_id: uuid::Uuid::now_v7(),
+            subject_user_id: uuid::Uuid::now_v7(),
+            content_version: 1,
+            response: serde_json::Value::Null,
+            evaluation_method: TaskEvaluationMethod::SelfReview,
+            status: TaskSubmissionStatus::InProgress,
+            review_status: TaskReviewStatus::NotRequired,
+            feedback: None,
+        };
+        assert!(matches!(
+            validate_task_submission(&submission),
+            Err(TaskContractError::InvalidSubmission(_))
+        ));
     }
 }
