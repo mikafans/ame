@@ -14,7 +14,7 @@ use crate::{
     domain::{
         error::{ApiError, FieldError},
         learning::LearningRepository,
-        progress::{MasteryEvidenceInput, ProgressError, StreakEventInput},
+        progress::{EvidenceSource, MasteryEvidenceInput, ProgressError, StreakEventInput},
         timeline::TimelineRepository,
     },
     http::AppState,
@@ -30,7 +30,8 @@ pub struct EvidenceBody {
     pub journey_id: Uuid,
     pub objective_id: Uuid,
     pub activity_id: Uuid,
-    pub attempt_id: Uuid,
+    pub attempt_id: Option<Uuid>,
+    pub task_submission_id: Option<Uuid>,
     pub content_version: u32,
     pub value: f32,
     pub derivation_version: u32,
@@ -66,7 +67,8 @@ pub struct EvidenceResponse {
     pub journey_id: Uuid,
     pub objective_id: Uuid,
     pub activity_id: Uuid,
-    pub attempt_id: Uuid,
+    pub attempt_id: Option<Uuid>,
+    pub task_submission_id: Option<Uuid>,
     pub content_version: u32,
     pub value: f32,
     pub derivation_version: u32,
@@ -135,13 +137,23 @@ pub async fn record_evidence(
     auth: AuthenticatedUser,
     Json(body): Json<EvidenceBody>,
 ) -> Result<Json<EvidenceResponse>, ApiError> {
+    let source = match (body.attempt_id, body.task_submission_id) {
+        (Some(attempt_id), None) => EvidenceSource::Assessment { attempt_id },
+        (None, Some(submission_id)) => EvidenceSource::Task { submission_id },
+        _ => {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "source".into(),
+                message: "provide exactly one of attemptId or taskSubmissionId".into(),
+            }]));
+        }
+    };
     let evidence = PgProgressRepository::new(state.pool)
         .record_evidence(MasteryEvidenceInput {
             subject_user_id: auth.owner_id(),
             journey_id: body.journey_id,
             objective_id: body.objective_id,
             activity_id: body.activity_id,
-            attempt_id: body.attempt_id,
+            source,
             content_version: body.content_version,
             value: body.value,
             derivation_version: body.derivation_version,
@@ -153,7 +165,14 @@ pub async fn record_evidence(
         journey_id: evidence.input.journey_id,
         objective_id: evidence.input.objective_id,
         activity_id: evidence.input.activity_id,
-        attempt_id: body.attempt_id,
+        attempt_id: match evidence.input.source {
+            EvidenceSource::Assessment { attempt_id } => Some(attempt_id),
+            EvidenceSource::Task { .. } => None,
+        },
+        task_submission_id: match evidence.input.source {
+            EvidenceSource::Assessment { .. } => None,
+            EvidenceSource::Task { submission_id } => Some(submission_id),
+        },
         content_version: evidence.input.content_version,
         value: evidence.input.value,
         derivation_version: evidence.input.derivation_version,

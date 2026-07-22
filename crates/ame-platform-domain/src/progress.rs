@@ -5,12 +5,18 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum EvidenceSource {
+    Assessment { attempt_id: Uuid },
+    Task { submission_id: Uuid },
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct MasteryEvidenceInput {
     pub subject_user_id: Uuid,
     pub journey_id: Uuid,
     pub objective_id: Uuid,
     pub activity_id: Uuid,
-    pub attempt_id: Uuid,
+    pub source: EvidenceSource,
     pub content_version: u32,
     pub value: f32,
     pub derivation_version: u32,

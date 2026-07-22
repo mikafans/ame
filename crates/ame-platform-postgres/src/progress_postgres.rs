@@ -2,9 +2,9 @@
 
 use crate::{
     domain::progress::{
-        MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError, Recommendation,
-        StreakEvent, StreakEventInput, attempt_id_from_event_key, qualifying_day_for_attempt,
-        validate_evidence, validate_streak_event,
+        EvidenceSource, MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError,
+        Recommendation, StreakEvent, StreakEventInput, attempt_id_from_event_key,
+        qualifying_day_for_attempt, validate_evidence, validate_streak_event,
     },
     progress::ProgressRepository,
 };
@@ -30,6 +30,8 @@ impl PgProgressRepository {
         activity_id: Uuid,
         content_version: Option<u32>,
         attempt_id: Option<Uuid>,
+        task_submission_id: Option<Uuid>,
+        task_score: Option<f32>,
     ) -> Result<(), ProgressError> {
         let owned = sqlx::query_scalar::<_, bool>(
             r#"SELECT EXISTS (
@@ -64,6 +66,21 @@ impl PgProgressRepository {
                                    AND ls.journey_id = $1
                             )
                        )
+                       AND (
+                            $7::uuid IS NULL
+                            OR EXISTS (
+                                SELECT 1
+                                  FROM tb_task_submissions ts
+                                 WHERE ts.id = $7
+                                   AND ts.task_id = $4
+                                   AND ts.subject_user_id = $2
+                                   AND ts.journey_id = $1
+                                   AND ts.content_version = $5
+                                   AND ts.status = 'reviewed'
+                                   AND ts.review_status = 'complete'
+                                   AND ts.score = $8
+                            )
+                       )
                 )"#,
         )
         .bind(journey_id)
@@ -72,6 +89,8 @@ impl PgProgressRepository {
         .bind(activity_id)
         .bind(content_version.map(|version| version as i32))
         .bind(attempt_id)
+        .bind(task_submission_id)
+        .bind(task_score)
         .fetch_one(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -270,23 +289,45 @@ impl ProgressRepository for PgProgressRepository {
             input.objective_id,
             input.activity_id,
             Some(input.content_version),
-            Some(input.attempt_id),
+            match input.source {
+                EvidenceSource::Assessment { attempt_id } => Some(attempt_id),
+                EvidenceSource::Task { .. } => None,
+            },
+            match input.source {
+                EvidenceSource::Assessment { .. } => None,
+                EvidenceSource::Task { submission_id } => Some(submission_id),
+            },
+            match input.source {
+                EvidenceSource::Assessment { .. } => None,
+                EvidenceSource::Task { .. } => Some(input.value),
+            },
         )
         .await?;
         let row = sqlx::query(
             r#"INSERT INTO tb_mastery_evidence (
                     subject_user_id, journey_id, objective_id, activity_id,
-                    attempt_id, evidence_type, value, derivation_version,
+                    attempt_id, task_submission_id, evidence_type, value, derivation_version,
                     content_version
                 )
-                VALUES ($1, $2, $3, $4, $5, 'attempt', $6, $7, $8)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id, created_at"#,
         )
         .bind(input.subject_user_id)
         .bind(input.journey_id)
         .bind(input.objective_id)
         .bind(input.activity_id)
-        .bind(input.attempt_id)
+        .bind(match input.source {
+            EvidenceSource::Assessment { attempt_id } => Some(attempt_id),
+            EvidenceSource::Task { .. } => None,
+        })
+        .bind(match input.source {
+            EvidenceSource::Assessment { .. } => None,
+            EvidenceSource::Task { submission_id } => Some(submission_id),
+        })
+        .bind(match input.source {
+            EvidenceSource::Assessment { .. } => "attempt",
+            EvidenceSource::Task { .. } => "task",
+        })
         .bind(input.value)
         .bind(input.derivation_version as i32)
         .bind(input.content_version as i32)
@@ -357,6 +398,8 @@ impl ProgressRepository for PgProgressRepository {
                 journey_id,
                 *objective_id,
                 *activity_id,
+                None,
+                None,
                 None,
                 None,
             )

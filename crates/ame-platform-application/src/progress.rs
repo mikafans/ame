@@ -1,9 +1,9 @@
 //! Evidence-backed mastery, recommendations, and streak contracts.
 
 use crate::domain::progress::{
-    MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError, Recommendation,
-    StreakEvent, StreakEventInput, attempt_id_from_event_key, qualifying_day_for_attempt,
-    validate_evidence, validate_streak_event,
+    EvidenceSource, MasteryEvidence, MasteryEvidenceInput, MasterySnapshot, ProgressError,
+    Recommendation, StreakEvent, StreakEventInput, attempt_id_from_event_key,
+    qualifying_day_for_attempt, validate_evidence, validate_streak_event,
 };
 use async_trait::async_trait;
 use std::{
@@ -24,6 +24,7 @@ struct ProgressState {
     streak_events: HashMap<String, StreakEvent>,
     journey_owners: HashMap<Uuid, Uuid>,
     completed_attempts: HashMap<(Uuid, Uuid, Uuid, Uuid), (OffsetDateTime, u32)>,
+    completed_tasks: HashMap<(Uuid, Uuid, Uuid, Uuid), (u32, f32)>,
 }
 
 #[async_trait]
@@ -102,6 +103,24 @@ impl InMemoryProgressRepository {
         }
     }
 
+    pub fn register_reviewed_task(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        activity_id: Uuid,
+        submission_id: Uuid,
+        content_version: u32,
+        score: f32,
+    ) {
+        if let Ok(mut state) = self.state.lock() {
+            state.journey_owners.insert(journey_id, subject_user_id);
+            state.completed_tasks.insert(
+                (subject_user_id, journey_id, activity_id, submission_id),
+                (content_version, score),
+            );
+        }
+    }
+
     pub fn record_evidence(
         &self,
         input: MasteryEvidenceInput,
@@ -116,15 +135,29 @@ impl InMemoryProgressRepository {
         {
             return Err(ProgressError::SubjectMismatch);
         }
-        let Some((_, content_version)) = state.completed_attempts.get(&(
-            input.subject_user_id,
-            input.journey_id,
-            input.activity_id,
-            input.attempt_id,
-        )) else {
-            return Err(ProgressError::SubjectMismatch);
+        let valid = match input.source {
+            EvidenceSource::Assessment { attempt_id } => state
+                .completed_attempts
+                .get(&(
+                    input.subject_user_id,
+                    input.journey_id,
+                    input.activity_id,
+                    attempt_id,
+                ))
+                .is_some_and(|(_, content_version)| *content_version == input.content_version),
+            EvidenceSource::Task { submission_id } => state
+                .completed_tasks
+                .get(&(
+                    input.subject_user_id,
+                    input.journey_id,
+                    input.activity_id,
+                    submission_id,
+                ))
+                .is_some_and(|(content_version, score)| {
+                    *content_version == input.content_version && *score == input.value
+                }),
         };
-        if *content_version != input.content_version {
+        if !valid {
             return Err(ProgressError::SubjectMismatch);
         }
         let evidence = MasteryEvidence {
@@ -354,13 +387,21 @@ impl ProgressRepository for InMemoryProgressRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn attempt_id(input: &MasteryEvidenceInput) -> Uuid {
+        match input.source {
+            EvidenceSource::Assessment { attempt_id } => attempt_id,
+            EvidenceSource::Task { submission_id } => submission_id,
+        }
+    }
     fn evidence(subject: Uuid, objective: Uuid, value: f32) -> MasteryEvidenceInput {
         MasteryEvidenceInput {
             subject_user_id: subject,
             journey_id: Uuid::now_v7(),
             objective_id: objective,
             activity_id: Uuid::now_v7(),
-            attempt_id: Uuid::now_v7(),
+            source: EvidenceSource::Assessment {
+                attempt_id: Uuid::now_v7(),
+            },
             content_version: 1,
             value,
             derivation_version: 1,
@@ -380,7 +421,7 @@ mod tests {
             subject,
             journey,
             weak_input.activity_id,
-            weak_input.attempt_id,
+            attempt_id(&weak_input),
             OffsetDateTime::now_utc(),
         );
         repository
@@ -392,7 +433,7 @@ mod tests {
             subject,
             journey,
             strong_input.activity_id,
-            strong_input.attempt_id,
+            attempt_id(&strong_input),
             OffsetDateTime::now_utc(),
         );
         repository
@@ -437,7 +478,7 @@ mod tests {
             owner,
             journey,
             invalid.activity_id,
-            invalid.attempt_id,
+            attempt_id(&invalid),
             OffsetDateTime::now_utc(),
         );
         repository
@@ -477,7 +518,9 @@ mod tests {
             journey_id: journey,
             objective_id: objective,
             activity_id: activity,
-            attempt_id: attempt,
+            source: EvidenceSource::Assessment {
+                attempt_id: attempt,
+            },
             content_version: 1,
             value: 0.8,
             derivation_version: 1,
@@ -485,6 +528,37 @@ mod tests {
         assert_eq!(
             repository.record_evidence(input),
             Err(ProgressError::SubjectMismatch)
+        );
+    }
+
+    #[test]
+    fn reviewed_task_submission_can_create_task_sourced_evidence() {
+        let repository = InMemoryProgressRepository::default();
+        let subject = Uuid::now_v7();
+        let journey = Uuid::now_v7();
+        let activity = Uuid::now_v7();
+        let objective = Uuid::now_v7();
+        let submission = Uuid::now_v7();
+        repository.register_reviewed_task(subject, journey, activity, submission, 3, 0.85);
+        let evidence = repository
+            .record_evidence(MasteryEvidenceInput {
+                subject_user_id: subject,
+                journey_id: journey,
+                objective_id: objective,
+                activity_id: activity,
+                source: EvidenceSource::Task {
+                    submission_id: submission,
+                },
+                content_version: 3,
+                value: 0.85,
+                derivation_version: 1,
+            })
+            .expect("reviewed task records evidence");
+        assert_eq!(
+            evidence.input.source,
+            EvidenceSource::Task {
+                submission_id: submission
+            }
         );
     }
 
