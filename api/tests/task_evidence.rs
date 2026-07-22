@@ -177,6 +177,10 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
             post(tasks::submit_submission),
         )
         .route(
+            "/v1/task-submissions/{submission_id}",
+            axum::routing::get(tasks::get_submission),
+        )
+        .route(
             "/v1/task-submissions/{submission_id}/review",
             patch(tasks::review_submission),
         )
@@ -239,6 +243,19 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
     let reviewed: serde_json::Value = reviewed.json().await.expect("decode reviewed task");
     assert_eq!(reviewed["reviewStatus"], "complete");
     assert_eq!(reviewed["score"], 0.9);
+    let learner_read = client
+        .get(format!("{base_url}/v1/task-submissions/{submission_id}"))
+        .bearer_auth(&learner_token)
+        .send()
+        .await
+        .expect("read reviewed task over HTTP");
+    assert_eq!(learner_read.status(), StatusCode::OK);
+    let learner_read: serde_json::Value =
+        learner_read.json().await.expect("decode learner task read");
+    assert_eq!(
+        learner_read["feedback"]["note"],
+        "Correct event-time reasoning"
+    );
 
     let tasks = PgTaskSubmissionRepository::new(pool.clone());
     let reviewed_id = Uuid::parse_str(submission_id).expect("parse submission id");
