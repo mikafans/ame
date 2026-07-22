@@ -429,7 +429,7 @@ impl LearningRepository for PgLearningRepository {
                 chapter_id, kind, title, order_index, payload_schema_version,
                 content_version, publication_status, payload, status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id, journey_id, subject_user_id, source_actor_id,
                       chapter_id, kind, title, order_index, payload_schema_version,
                       content_version, publication_status, payload,
@@ -452,7 +452,11 @@ impl LearningRepository for PgLearningRepository {
         .await
         .map_err(|error| {
             if let sqlx::Error::Database(database) = &error
-                && database.constraint() == Some("tb_activities_chapter_order")
+                && matches!(
+                    database.constraint(),
+                    Some("tb_activities_chapter_order")
+                        | Some("tb_activities_journey_order_ungrouped")
+                )
             {
                 return LearningRepositoryError::OrderConflict {
                     resource: "activity",
@@ -1015,7 +1019,7 @@ mod tests {
     use sqlx::migrate::Migrator;
     use sqlx::postgres::PgPoolOptions;
 
-    static MIGRATOR: Migrator = sqlx::migrate!("../db/migrations");
+    static MIGRATOR: Migrator = sqlx::migrate!("../../db/migrations");
 
     #[tokio::test]
     async fn postgres_repository_satisfies_contract_on_clean_database() {

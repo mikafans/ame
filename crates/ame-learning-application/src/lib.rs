@@ -27,6 +27,60 @@ pub struct LearningContractFixtures {
     pub source_actor_id: Uuid,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningJourneyManifest {
+    pub journey: LearningJourney,
+    pub goal: LearningGoal,
+    pub objectives: Vec<LearningObjective>,
+    pub chapters: Vec<LearningChapterManifest>,
+    pub ungrouped_activities: Vec<LearningActivity>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningChapterManifest {
+    pub chapter: LearningChapter,
+    pub activities: Vec<LearningActivity>,
+}
+
+pub async fn load_journey_manifest<R: LearningRepository>(
+    repository: &R,
+    subject_user_id: Uuid,
+    journey_id: Uuid,
+) -> Result<LearningJourneyManifest, LearningRepositoryError> {
+    let journey = repository.get_journey(subject_user_id, journey_id).await?;
+    let goal = repository.get_goal(subject_user_id, journey.goal_id).await?;
+    let objectives = repository.list_objectives(subject_user_id, journey.id).await?;
+    let chapters = repository.list_chapters(subject_user_id, journey.id).await?;
+    let activities = repository.list_activities(subject_user_id, journey.id).await?;
+    let mut chapter_manifests = Vec::with_capacity(chapters.len());
+    let mut grouped_activity_ids = std::collections::HashSet::new();
+    for chapter in chapters {
+        let chapter_activities = activities
+            .iter()
+            .filter(|activity| activity.chapter_id == Some(chapter.id))
+            .cloned()
+            .inspect(|activity| {
+                grouped_activity_ids.insert(activity.id);
+            })
+            .collect();
+        chapter_manifests.push(LearningChapterManifest {
+            chapter,
+            activities: chapter_activities,
+        });
+    }
+    let ungrouped_activities = activities
+        .into_iter()
+        .filter(|activity| !grouped_activity_ids.contains(&activity.id))
+        .collect();
+    Ok(LearningJourneyManifest {
+        journey,
+        goal,
+        objectives,
+        chapters: chapter_manifests,
+        ungrouped_activities,
+    })
+}
+
 impl Default for LearningContractFixtures {
     fn default() -> Self {
         Self {
@@ -301,7 +355,9 @@ impl LearningRepository for InMemoryLearningRepository {
             }
         }
         if state.activities.values().any(|activity| {
-            activity.journey_id == input.journey_id && activity.order_index == input.order_index
+            activity.journey_id == input.journey_id
+                && activity.chapter_id == input.chapter_id
+                && activity.order_index == input.order_index
         }) {
             return Err(LearningRepositoryError::OrderConflict {
                 resource: "activity",
@@ -764,12 +820,30 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         vec![objective.clone()]
     );
 
+    let chapter = repository
+        .create_chapter(CreateChapter {
+            journey_id: journey.id,
+            subject_user_id: subject,
+            title: "Interval foundations".to_string(),
+            summary: "Learn how intervals are represented and analyzed.".to_string(),
+            order_index: 0,
+        })
+        .await
+        .expect("chapter creates");
+    assert_eq!(
+        repository
+            .list_chapters(subject, journey.id)
+            .await
+            .expect("chapters list"),
+        vec![chapter.clone()]
+    );
+
     let activity = repository
         .create_activity(CreateActivity {
             journey_id: journey.id,
             subject_user_id: subject,
             source_actor_id: actor,
-            chapter_id: None,
+            chapter_id: Some(chapter.id),
             kind: ame_learning_domain::ActivityKind::Diagnostic,
             title: "Interval diagnostic".to_string(),
             order_index: 0,
@@ -787,7 +861,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             journey_id: journey.id,
             subject_user_id: subject,
             source_actor_id: actor,
-            chapter_id: None,
+            chapter_id: Some(chapter.id),
             kind: ame_learning_domain::ActivityKind::Practice,
             title: "Interval practice".to_string(),
             order_index: 1,
@@ -924,8 +998,12 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
 mod contract_tests {
     use super::{
         InMemoryLearningRepository, LearningContractFixtures, exercise_goal_and_journey_contract,
+        load_journey_manifest,
     };
-    use ame_learning_domain::{CreateGoal, LearningRepository, LearningRepositoryError};
+    use ame_learning_domain::{
+        ActivityKind, ActivityPublicationStatus, ActivityStatus, CreateActivity, CreateChapter,
+        CreateGoal, CreateJourney, CreateObjective, LearningRepository, LearningRepositoryError,
+    };
     use uuid::Uuid;
 
     #[tokio::test]
@@ -935,6 +1013,93 @@ mod contract_tests {
             LearningContractFixtures::default(),
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn journey_manifest_groups_ordered_chapter_activities_and_preserves_ungrouped() {
+        let repository = InMemoryLearningRepository::default();
+        let subject = Uuid::now_v7();
+        let actor = Uuid::now_v7();
+        let goal = repository
+            .create_goal(CreateGoal {
+                subject_user_id: subject,
+                source_actor_id: actor,
+                template_version_id: None,
+                raw_intent: "Learn indexing".to_string(),
+                normalized_statement: "Learn database indexing".to_string(),
+                idempotency_key: None,
+            })
+            .await
+            .expect("goal creates");
+        let journey = repository
+            .ensure_journey(CreateJourney {
+                goal_id: goal.id,
+                subject_user_id: subject,
+                source_actor_id: actor,
+                promise: "Read query plans and choose useful indexes".to_string(),
+            })
+            .await
+            .expect("journey creates");
+        let chapter = repository
+            .create_chapter(CreateChapter {
+                journey_id: journey.id,
+                subject_user_id: subject,
+                title: "Index model".to_string(),
+                summary: "Understand what an index changes.".to_string(),
+                order_index: 0,
+            })
+            .await
+            .expect("chapter creates");
+        let objective = repository
+            .create_objective(CreateObjective {
+                journey_id: journey.id,
+                subject_user_id: subject,
+                verb: "Explain".to_string(),
+                statement: "Explain index lookup cost".to_string(),
+                success_criteria: "Names lookup and write tradeoffs".to_string(),
+                order_index: 0,
+            })
+            .await
+            .expect("objective creates");
+        for (chapter_id, order_index, title) in [
+            (Some(chapter.id), 1, "Quiz"),
+            (Some(chapter.id), 0, "Lesson"),
+            (None, 0, "Legacy ungrouped activity"),
+        ] {
+            repository
+                .create_activity(CreateActivity {
+                    journey_id: journey.id,
+                    subject_user_id: subject,
+                    source_actor_id: actor,
+                    chapter_id,
+                    kind: ActivityKind::Explanation,
+                    title: title.to_string(),
+                    order_index,
+                    payload_schema_version: 1,
+                    content_version: 1,
+                    publication_status: ActivityPublicationStatus::Published,
+                    payload: serde_json::json!({}),
+                    objective_ids: vec![objective.id],
+                    status: ActivityStatus::Ready,
+                })
+                .await
+                .expect("activity creates");
+        }
+
+        let manifest = load_journey_manifest(&repository, subject, journey.id)
+            .await
+            .expect("manifest loads");
+        assert_eq!(manifest.chapters.len(), 1);
+        assert_eq!(
+            manifest.chapters[0]
+                .activities
+                .iter()
+                .map(|activity| activity.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Lesson", "Quiz"]
+        );
+        assert_eq!(manifest.ungrouped_activities.len(), 1);
+        assert_eq!(manifest.ungrouped_activities[0].title, "Legacy ungrouped activity");
     }
 
     #[tokio::test]

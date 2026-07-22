@@ -5,8 +5,8 @@ use crate::domain::identity::{
     RegistrationMode,
 };
 use crate::domain::learning::{
-    ActivityKind, ActivityStatus, CreateActivity, CreateGoal, CreateJourney, CreateObjective,
-    LearningGoal, LearningJourney, LearningRepository, LearningRepositoryError,
+    ActivityKind, ActivityStatus, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
+    CreateObjective, LearningGoal, LearningJourney, LearningRepository, LearningRepositoryError,
 };
 use crate::templates::{builtin_catalog, find_template_blueprint, find_topic_blueprint};
 use async_trait::async_trait;
@@ -257,6 +257,34 @@ where
             }
         }
 
+        let mut chapters = self
+            .repository
+            .list_chapters(journey.subject_user_id, journey.id)
+            .await?;
+        if chapters.is_empty() {
+            self.repository
+                .create_chapter(CreateChapter {
+                    journey_id: journey.id,
+                    subject_user_id: journey.subject_user_id,
+                    title: "Foundations".to_string(),
+                    summary: format!(
+                        "Build the core concepts and vocabulary for {}.",
+                        plan.normalized_statement
+                    ),
+                    order_index: 0,
+                })
+                .await?;
+            chapters = self
+                .repository
+                .list_chapters(journey.subject_user_id, journey.id)
+                .await?;
+        }
+        let chapter_id = chapters.first().map(|chapter| chapter.id).ok_or(
+            LearningRepositoryError::NotFound {
+                resource: "chapter",
+            },
+        )?;
+
         let mut activities = self
             .repository
             .list_activities(journey.subject_user_id, journey.id)
@@ -286,7 +314,7 @@ where
                     journey_id: journey.id,
                     subject_user_id: journey.subject_user_id,
                     source_actor_id: plan.source_actor_id,
-                    chapter_id: None,
+                    chapter_id: Some(chapter_id),
                     kind: activity.kind,
                     title: activity.title,
                     order_index: activity.order_index,

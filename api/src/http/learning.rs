@@ -27,6 +27,7 @@ use crate::{
         },
     },
     http::AppState,
+    learning::load_journey_manifest,
     learning_postgres::PgLearningRepository,
     progress::ProgressRepository,
 };
@@ -165,6 +166,7 @@ pub struct LearningJourneyResponse {
     pub goal: LearningGoalResponse,
     pub objectives: Vec<LearningObjectiveResponse>,
     pub chapters: Vec<LearningChapterResponse>,
+    pub ungrouped_activities: Vec<LearningActivityResponse>,
     /// Flat compatibility view; new clients should use chapters.activities.
     pub activities: Vec<LearningActivityResponse>,
     pub recommendation: Option<LearningRecommendationResponse>,
@@ -330,34 +332,27 @@ pub async fn get_journey(
 ) -> Result<Json<LearningJourneyResponse>, ApiError> {
     let progress_pool = state.pool.clone();
     let repository = PgLearningRepository::new(state.pool);
-    let journey = repository
-        .get_journey(auth.owner_id(), id)
+    let manifest = load_journey_manifest(&repository, auth.owner_id(), id)
         .await
         .map_err(map_learning_error)?;
-    let goal = repository
-        .get_goal(auth.owner_id(), journey.goal_id)
-        .await
-        .map_err(map_learning_error)?;
-    let objectives = repository
-        .list_objectives(auth.owner_id(), journey.id)
-        .await
-        .map_err(map_learning_error)?;
-    let chapters = repository
-        .list_chapters(auth.owner_id(), journey.id)
-        .await
-        .map_err(map_learning_error)?;
-    let activities = repository
-        .list_activities(auth.owner_id(), journey.id)
-        .await
-        .map_err(map_learning_error)?;
+    let journey = manifest.journey;
+    let goal = manifest.goal;
+    let objectives = manifest.objectives;
+    let ungrouped_activities = manifest.ungrouped_activities;
+    let chapter_manifests = manifest.chapters;
+    let activities = chapter_manifests
+        .iter()
+        .flat_map(|chapter| chapter.activities.iter().cloned())
+        .chain(ungrouped_activities.iter().cloned())
+        .collect::<Vec<_>>();
     let latest_session = repository
         .latest_finished_learning_session(auth.owner_id(), journey.id)
         .await
         .map_err(map_learning_error)?;
     let activity_responses: Vec<_> = activities.into_iter().map(activity_response).collect();
-    let chapter_responses = chapters
+    let chapter_responses = chapter_manifests
         .into_iter()
-        .map(|chapter| chapter_response(chapter, &activity_responses))
+        .map(|chapter| chapter_response(chapter.chapter, &activity_responses))
         .collect();
     let recommendation = next_recommendation(
         progress_pool,
@@ -388,6 +383,10 @@ pub async fn get_journey(
         },
         objectives: objectives.into_iter().map(objective_response).collect(),
         chapters: chapter_responses,
+        ungrouped_activities: ungrouped_activities
+            .into_iter()
+            .map(activity_response)
+            .collect(),
         activities: activity_responses,
         recommendation,
     }))

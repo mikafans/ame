@@ -1932,6 +1932,7 @@ components:
       - goal
       - objectives
       - chapters
+      - ungroupedActivities
       - activities
       properties:
         activities:
@@ -1972,6 +1973,10 @@ components:
         subjectUserId:
           type: string
           format: uuid
+        ungroupedActivities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
     LearningJourneySummaryResponse:
       type: object
       required:

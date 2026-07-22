@@ -59,10 +59,11 @@ stores the exact version used so later template edits cannot rewrite history.
 
 | Table | Purpose | Required invariants |
 | --- | --- | --- |
+| `tb_journey_chapters` | Ordered course/module grouping | Belongs to one journey and subject; chapter order is unique within a journey |
 | `tb_skills` | Subject-scoped normalized topics/skills | Unique per subject and normalized name; provenance recorded |
 | `tb_journey_objectives` | Observable outcome | Ordered within a journey; has statement, verb, success criteria, and status |
 | `tb_objective_skills` | Objective-to-skill relation | Composite key prevents duplicate links |
-| `tb_activities` | Ordered learner action | Typed kind, lifecycle, position, schema version, subject, and provenance |
+| `tb_activities` | Ordered learner action | Typed kind, chapter-local position, lifecycle, content version, publication state, schema version, subject, and provenance |
 | `tb_activity_objectives` | Activity-to-objective relation | Published diagnostic/practice/application/deep-dive activities have objective links |
 | `tb_deep_dives` | Grounded explanatory content | Linked to objective/evidence; content version, source references, review status, and application task are explicit |
 | `tb_recommendations` | Next-action proposal | Stores reason, supporting evidence, target activity, source generation run, status, and version |
@@ -112,6 +113,9 @@ mastery or streak update directly.
 The clean baseline must enforce or support:
 
 - unique canonical email and subject-scoped normalized skills;
+- ordered chapters and chapter-local activities, with an explicit compatibility
+  path for legacy ungrouped activities;
+- separate learner activity status from content publication status;
 - immutable template, question, assessment, and content versions;
 - foreign keys preventing resources, attempts, evidence, and recommendations
   from crossing subjects;

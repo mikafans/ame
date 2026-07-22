@@ -988,6 +988,7 @@ export interface components {
             status: components["schemas"]["JourneyStatus"];
             /** Format: uuid */
             subjectUserId: string;
+            ungroupedActivities: components["schemas"]["LearningActivityResponse"][];
         };
         LearningJourneySummaryResponse: {
             /** Format: date-time */

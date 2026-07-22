@@ -29,5 +29,8 @@ ADD CONSTRAINT tb_activities_publication_status_check CHECK (
 CREATE UNIQUE INDEX tb_activities_chapter_order
 ON tb_activities (chapter_id, order_index)
 WHERE chapter_id IS NOT NULL;
+CREATE UNIQUE INDEX tb_activities_journey_order_ungrouped
+ON tb_activities (journey_id, order_index)
+WHERE chapter_id IS NULL;
 CREATE INDEX tb_activities_journey_chapter_order
 ON tb_activities (journey_id, chapter_id, order_index);
