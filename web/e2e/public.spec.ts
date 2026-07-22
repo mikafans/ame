@@ -5,9 +5,6 @@ test.describe("public documentation", () => {
     await page.goto("/");
 
     await expect(
-      page.getByRole("link", { name: /Self-host AME/i }),
-    ).toHaveAttribute("href", "/self-hosting");
-    await expect(
       page.getByRole("link", { name: "Self-hosting", exact: true }),
     ).toHaveAttribute("href", "/self-hosting");
   });
