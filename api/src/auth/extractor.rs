@@ -100,53 +100,6 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
     }
 }
 
-pub async fn invalidate_token(valkey: &deadpool_redis::Pool, token_id: Uuid) {
-    if let Ok(mut conn) = valkey.get().await {
-        use redis::AsyncCommands;
-        let _: Result<(), _> = conn.del(format!("ame:login:{token_id}")).await;
-    }
-}
-
-pub async fn invalidate_user_caches(
-    pool: &sqlx::PgPool,
-    valkey: &deadpool_redis::Pool,
-    user_id: Uuid,
-) {
-    let login_ids: Vec<Uuid> =
-        sqlx::query_scalar("SELECT id FROM tb_login_sessions WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default();
-    if let Ok(mut conn) = valkey.get().await {
-        use redis::AsyncCommands;
-        for id in login_ids {
-            let _: Result<(), _> = conn.del(format!("ame:login:{id}")).await;
-        }
-        let _: Result<(), _> = conn.del(format!("ame:limiter:owner:{user_id}")).await;
-    }
-}
-
-pub async fn invalidate_user_tokens(
-    pool: &sqlx::PgPool,
-    valkey: &deadpool_redis::Pool,
-    user_id: Uuid,
-) {
-    let login_ids: Vec<Uuid> =
-        sqlx::query_scalar("SELECT id FROM tb_login_sessions WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default();
-    let _ = sqlx::query("DELETE FROM tb_login_sessions WHERE user_id = $1")
-        .bind(user_id)
-        .execute(pool)
-        .await;
-    if let Ok(mut conn) = valkey.get().await {
-        use redis::AsyncCommands;
-        for id in login_ids {
-            let _: Result<(), _> = conn.del(format!("ame:login:{id}")).await;
-        }
-        let _: Result<(), _> = conn.del(format!("ame:limiter:owner:{user_id}")).await;
-    }
-}
+pub use ame_platform_postgres::auth_cache::{
+    invalidate_token, invalidate_user_caches, invalidate_user_tokens,
+};
