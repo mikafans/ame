@@ -1,5 +1,6 @@
 use ame_platform_application::task::{
-    StartTaskSubmission, TaskSubmission, TaskSubmissionError, TaskSubmissionRepository,
+    ReviewTaskSubmission, StartTaskSubmission, TaskReviewOutcome, TaskSubmission,
+    TaskSubmissionError, TaskSubmissionRepository,
 };
 use ame_platform_domain::task::{
     TaskEvaluationMethod, TaskReviewStatus, TaskSubmissionEnvelope, TaskSubmissionStatus,
@@ -51,7 +52,7 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                  (task_id, subject_user_id, journey_id, content_version, response, evaluation_method)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                       evaluation_method, status, review_status, feedback",
+                       evaluation_method, status, review_status, score, feedback",
         )
         .bind(input.task_id)
         .bind(input.subject_user_id)
@@ -72,7 +73,7 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
     ) -> Result<TaskSubmission, TaskSubmissionError> {
         let current = sqlx::query(
             "SELECT id, journey_id, task_id, subject_user_id, content_version, response,
-                    evaluation_method, status, review_status, feedback
+                    evaluation_method, status, review_status, score, feedback
              FROM tb_task_submissions WHERE id = $1",
         )
         .bind(submission_id)
@@ -100,11 +101,58 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                     updated_at = now()
               WHERE id = $1
               RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                        evaluation_method, status, review_status, feedback",
+                        evaluation_method, status, review_status, score, feedback",
         )
         .bind(submission_id)
         .bind(task_submission_status_name(next_status))
         .bind(task_review_status_name(review_status))
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        decode_submission(row)
+    }
+
+    async fn review(
+        &self,
+        input: ReviewTaskSubmission,
+    ) -> Result<TaskSubmission, TaskSubmissionError> {
+        if input
+            .score
+            .is_some_and(|score| !(0.0..=1.0).contains(&score))
+        {
+            return Err(TaskSubmissionError::InvalidContract(
+                "score must be between zero and one".into(),
+            ));
+        }
+        let current =
+            sqlx::query("SELECT status, subject_user_id FROM tb_task_submissions WHERE id = $1")
+                .bind(input.submission_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(storage_error)?
+                .ok_or(TaskSubmissionError::NotFound)?;
+        if current.get::<Uuid, _>("subject_user_id") != input.subject_user_id {
+            return Err(TaskSubmissionError::SubjectMismatch);
+        }
+        let current_status = task_submission_status(current.get("status"))?;
+        let next_status = match input.outcome {
+            TaskReviewOutcome::Reviewed => TaskSubmissionStatus::Reviewed,
+            TaskReviewOutcome::Rejected => TaskSubmissionStatus::Rejected,
+        };
+        validate_task_submission_transition(current_status, next_status)
+            .map_err(TaskSubmissionError::InvalidTransition)?;
+        let row = sqlx::query(
+            "UPDATE tb_task_submissions
+                SET status = $2, review_status = 'complete', score = $3,
+                    feedback = $4, reviewed_at = now(), updated_at = now()
+              WHERE id = $1
+              RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
+                        evaluation_method, status, review_status, score, feedback",
+        )
+        .bind(input.submission_id)
+        .bind(task_submission_status_name(next_status))
+        .bind(input.score)
+        .bind(input.feedback)
         .fetch_one(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -124,6 +172,7 @@ fn decode_submission(row: sqlx::postgres::PgRow) -> Result<TaskSubmission, TaskS
             evaluation_method: task_evaluation_method(row.get("evaluation_method"))?,
             status: task_submission_status(row.get("status"))?,
             review_status: task_review_status(row.get("review_status"))?,
+            score: row.get("score"),
             feedback: row.get("feedback"),
         },
     })
