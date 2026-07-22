@@ -131,9 +131,6 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                 .await
                 .map_err(storage_error)?
                 .ok_or(TaskSubmissionError::NotFound)?;
-        if current.get::<Uuid, _>("subject_user_id") != input.subject_user_id {
-            return Err(TaskSubmissionError::SubjectMismatch);
-        }
         let current_status = task_submission_status(current.get("status"))?;
         let next_status = match input.outcome {
             TaskReviewOutcome::Reviewed => TaskSubmissionStatus::Reviewed,

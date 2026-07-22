@@ -27,7 +27,7 @@ pub struct StartTaskSubmission {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReviewTaskSubmission {
-    pub subject_user_id: Uuid,
+    pub reviewer_user_id: Uuid,
     pub submission_id: Uuid,
     pub outcome: TaskReviewOutcome,
     pub score: Option<f32>,
@@ -225,9 +225,6 @@ impl TaskSubmissionRepository for InMemoryTaskSubmissionRepository {
             .submissions
             .get_mut(&input.submission_id)
             .ok_or(TaskSubmissionError::NotFound)?;
-        if submission.envelope.subject_user_id != input.subject_user_id {
-            return Err(TaskSubmissionError::SubjectMismatch);
-        }
         let next_status = match input.outcome {
             TaskReviewOutcome::Reviewed => TaskSubmissionStatus::Reviewed,
             TaskReviewOutcome::Rejected => TaskSubmissionStatus::Rejected,
@@ -321,7 +318,7 @@ mod tests {
             .expect("submit task");
         let reviewed = repository
             .review(ReviewTaskSubmission {
-                subject_user_id: owner,
+                reviewer_user_id: owner,
                 submission_id: submitted.id,
                 outcome: TaskReviewOutcome::Reviewed,
                 score: Some(0.9),

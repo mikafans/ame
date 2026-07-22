@@ -142,7 +142,7 @@ pub async fn review_submission(
     let submission =
         ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool.clone())
             .review(ame_platform_application::task::ReviewTaskSubmission {
-                subject_user_id: _admin.0.user.id,
+                reviewer_user_id: _admin.0.user.id,
                 submission_id,
                 outcome,
                 score: body.score,
