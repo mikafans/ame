@@ -15,9 +15,49 @@ pub struct PgTaskSubmissionRepository {
     pool: PgPool,
 }
 
+#[derive(Debug, Clone)]
+pub struct TaskEvidenceContext {
+    pub subject_user_id: Uuid,
+    pub journey_id: Uuid,
+    pub activity_id: Uuid,
+    pub content_version: u32,
+    pub score: f32,
+    pub objective_ids: Vec<Uuid>,
+}
+
 impl PgTaskSubmissionRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    pub async fn evidence_context(
+        &self,
+        submission_id: Uuid,
+    ) -> Result<TaskEvidenceContext, TaskSubmissionError> {
+        let rows = sqlx::query(
+            "SELECT s.subject_user_id, s.journey_id, s.task_id, s.content_version,
+                    s.score::float4 AS score, ao.objective_id
+             FROM tb_task_submissions s
+             JOIN tb_activity_objectives ao ON ao.activity_id = s.task_id
+             WHERE s.id = $1 AND s.status = 'reviewed'
+               AND s.review_status = 'complete' AND s.score IS NOT NULL",
+        )
+        .bind(submission_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        let first = rows.first().ok_or(TaskSubmissionError::NotFound)?;
+        Ok(TaskEvidenceContext {
+            subject_user_id: first.get("subject_user_id"),
+            journey_id: first.get("journey_id"),
+            activity_id: first.get("task_id"),
+            content_version: first.get::<i32, _>("content_version") as u32,
+            score: first.get("score"),
+            objective_ids: rows
+                .into_iter()
+                .map(|row| row.get("objective_id"))
+                .collect(),
+        })
     }
 }
 
