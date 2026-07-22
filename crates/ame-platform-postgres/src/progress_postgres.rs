@@ -79,7 +79,7 @@ impl PgProgressRepository {
                                    AND ts.content_version = $5
                                    AND ts.status = 'reviewed'
                                    AND ts.review_status = 'complete'
-                                   AND ts.score = $8
+                                   AND ts.score::float4 = $8
                             )
                        )
                 )"#,

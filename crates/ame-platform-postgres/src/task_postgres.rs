@@ -92,7 +92,7 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                  (task_id, subject_user_id, journey_id, content_version, response, evaluation_method)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                       evaluation_method, status, review_status, score, feedback",
+                       evaluation_method, status, review_status, score::float4 AS score, feedback",
         )
         .bind(input.task_id)
         .bind(input.subject_user_id)
@@ -141,7 +141,7 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                     updated_at = now()
               WHERE id = $1
               RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                        evaluation_method, status, review_status, score, feedback",
+                        evaluation_method, status, review_status, score::float4 AS score, feedback",
         )
         .bind(submission_id)
         .bind(task_submission_status_name(next_status))
@@ -184,7 +184,7 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                     feedback = $4, reviewed_at = now(), updated_at = now()
               WHERE id = $1
               RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                        evaluation_method, status, review_status, score, feedback",
+                        evaluation_method, status, review_status, score::float4 AS score, feedback",
         )
         .bind(input.submission_id)
         .bind(task_submission_status_name(next_status))
