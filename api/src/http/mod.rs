@@ -93,6 +93,7 @@ pub mod onboarding;
 pub mod openapi;
 pub mod progress;
 pub mod questions;
+pub mod tasks;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
     let (layer, handle) = PrometheusMetricLayer::pair();
@@ -180,6 +181,14 @@ pub fn router(pool: PgPool) -> Router {
         .merge(progress::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
+        .route(
+            "/v1/tasks/{task_id}/submissions",
+            post(tasks::start_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/submit",
+            post(tasks::submit_submission),
+        )
         .route("/v1/auth/logout", post(auth::logout))
         .merge(logged_router)
         .layer(middleware::from_fn_with_state(

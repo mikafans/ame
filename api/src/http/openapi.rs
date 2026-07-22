@@ -31,6 +31,7 @@ use crate::http::{
         TimelineEventResponse,
     },
     questions::{CreateQuestionBody, QuestionResponse},
+    tasks::{StartTaskSubmissionBody, TaskSubmissionResponse},
 };
 
 #[derive(OpenApi)]
@@ -76,7 +77,9 @@ use crate::http::{
         crate::http::admin::list_audit_logs,
         crate::http::admin::get_admin_health,
         crate::http::admin::get_settings,
-        crate::http::admin::put_settings
+        crate::http::admin::put_settings,
+        crate::http::tasks::start_submission,
+        crate::http::tasks::submit_submission
     ),
     components(schemas(
         crate::domain::error::ApiError,
@@ -138,7 +141,9 @@ use crate::http::{
         UpdateSettingsBody,
         crate::settings::EffectiveSettings,
         crate::settings::RateLimitSettings,
-        crate::settings::TierLimit
+        crate::settings::TierLimit,
+        StartTaskSubmissionBody,
+        TaskSubmissionResponse
     )),
     info(
         title = "ame API",
