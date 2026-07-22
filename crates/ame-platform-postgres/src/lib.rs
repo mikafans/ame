@@ -7,6 +7,7 @@ pub mod auth_cache;
 pub mod authentication_postgres;
 pub mod deep_dive_postgres;
 pub mod generation_postgres;
+pub mod idempotency;
 pub mod identity_postgres;
 pub mod progress_postgres;
 pub mod question_postgres;
