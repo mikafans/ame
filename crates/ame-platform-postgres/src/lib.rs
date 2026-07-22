@@ -6,6 +6,7 @@ pub mod attempt_postgres;
 pub mod audit;
 pub mod audit_query;
 pub mod auth_cache;
+pub mod authentication_http;
 pub mod authentication_postgres;
 pub mod deep_dive_postgres;
 pub mod generation_postgres;

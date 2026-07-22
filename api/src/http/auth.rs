@@ -4,7 +4,6 @@ use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -117,44 +116,19 @@ pub async fn register(
     let password_hash = hash_password(&body.password)?;
     let user_id = Uuid::now_v7();
     let email = crate::auth::token::canonical_email(trimmed_email);
-    let mut transaction = state
-        .pool
-        .begin()
-        .await
-        .map_err(|error| ApiError::Internal(error.into()))?;
-    sqlx::query("SET CONSTRAINTS ALL DEFERRED")
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| ApiError::Internal(error.into()))?;
-    let result = sqlx::query(
-        "INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
-         VALUES ($1, $2, $2, $3, 'learner', $4)
-         RETURNING id, email_canonical, display_name, role",
+    let registered = ame_platform_postgres::authentication_http::register_user(
+        &state.pool,
+        user_id,
+        &email,
+        body.name.trim(),
+        &password_hash,
     )
-    .bind(user_id)
-    .bind(&email)
-    .bind(body.name.trim())
-    .bind(&password_hash)
-    .fetch_one(&mut *transaction)
     .await
     .map_err(registration_error)?;
-    sqlx::query(
-        "INSERT INTO tb_identities (id, identity_type, owner_user_id, label)
-         VALUES ($1, 'human', $1, $2)",
-    )
-    .bind(user_id)
-    .bind(body.name.trim())
-    .execute(&mut *transaction)
-    .await
-    .map_err(|error| ApiError::Internal(error.into()))?;
-    transaction
-        .commit()
-        .await
-        .map_err(|error| ApiError::Internal(error.into()))?;
-    let user_id: Uuid = result.get("id");
-    let email: String = result.get("email_canonical");
-    let display_name: String = result.get("display_name");
-    let role: String = result.get("role");
+    let user_id = registered.id;
+    let email = registered.email;
+    let display_name = registered.display_name;
+    let role = registered.role;
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
@@ -210,26 +184,21 @@ pub async fn login(
 
     // Fetch only clean user columns. Identity status is checked by the
     // authentication repository on the subsequent request.
-    let user_row = sqlx::query(
-        "SELECT u.id, u.email_canonical, u.display_name, u.role, u.password_hash, u.status, \
-                i.status AS identity_status \
-         FROM tb_users u JOIN tb_identities i ON i.id = u.id \
-         WHERE u.email_canonical = $1",
-    )
-    .bind(&canonical)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    let user_row =
+        ame_platform_postgres::authentication_http::find_login_user(&state.pool, &canonical)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
     // A valid dummy hash to equalize timing on the miss path
     let dummy_hash = "$argon2id$v=19$m=19456,t=2,p=1$fgRxq3Ut+2IcRLdMp41ROw$xzZcJdQfimlft7Byw21EMnT/p4TcRAJa68gHeUK2EZ4";
 
     let (hash_to_verify, is_valid_user) = match &user_row {
         Some(row) => {
-            let hash: Option<String> = row.get("password_hash");
-            let status: String = row.get("status");
-            let identity_status: String = row.get("identity_status");
-            match (hash, status.as_str(), identity_status.as_str()) {
+            match (
+                row.password_hash.clone(),
+                row.status.as_str(),
+                row.identity_status.as_str(),
+            ) {
                 (Some(h), "active", "active") => (h.to_string(), true),
                 _ => (dummy_hash.to_string(), false),
             }
@@ -244,18 +213,18 @@ pub async fn login(
         return Err(ApiError::Unauthorized);
     }
 
-    let user_row = match user_row {
-        Some(row) => row,
+    let user = match user_row {
+        Some(user) => user,
         None => {
             metrics::counter!("login_total", "result" => "failure").increment(1);
             return Err(ApiError::Unauthorized);
         }
     };
 
-    let user_id: Uuid = user_row.get("id");
-    let email: String = user_row.get("email_canonical");
-    let display_name: String = user_row.get("display_name");
-    let role: String = user_row.get("role");
+    let user_id = user.id;
+    let email = user.email;
+    let display_name = user.display_name;
+    let role = user.role;
 
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
@@ -289,15 +258,13 @@ async fn issue_token(
     let token_hash = hash_secret(&secret);
     let expires_at = time::OffsetDateTime::now_utc() + time::Duration::seconds(ttl_seconds as i64);
     // Insert the session row into the clean baseline (source of truth, fail closed).
-    sqlx::query(
-        "INSERT INTO tb_login_sessions (id, user_id, token_hash, expires_at) \
-         VALUES ($1, $2, $3, $4)",
+    ame_platform_postgres::authentication_http::issue_login_session(
+        pool,
+        token_id,
+        user_id,
+        &token_hash,
+        expires_at,
     )
-    .bind(token_id)
-    .bind(user_id)
-    .bind(&token_hash)
-    .bind(expires_at)
-    .execute(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -360,10 +327,11 @@ pub async fn logout(
         })
         && parsed.kind == crate::auth::token::TokenKind::Login
     {
-        let _ = sqlx::query("UPDATE tb_login_sessions SET revoked_at = NOW() WHERE id = $1")
-            .bind(parsed.id)
-            .execute(&state.pool)
-            .await;
+        let _ = ame_platform_postgres::authentication_http::revoke_login_session(
+            &state.pool,
+            parsed.id,
+        )
+        .await;
     }
 
     (
