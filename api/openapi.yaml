@@ -1721,7 +1721,6 @@ components:
       - journeyId
       - objectiveId
       - activityId
-      - attemptId
       - contentVersion
       - value
       - derivationVersion
@@ -1730,7 +1729,9 @@ components:
           type: string
           format: uuid
         attemptId:
-          type: string
+          type:
+          - string
+          - 'null'
           format: uuid
         contentVersion:
           type: integer
@@ -1746,6 +1747,11 @@ components:
         objectiveId:
           type: string
           format: uuid
+        taskSubmissionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         value:
           type: number
           format: float
@@ -1756,7 +1762,6 @@ components:
       - journeyId
       - objectiveId
       - activityId
-      - attemptId
       - contentVersion
       - value
       - derivationVersion
@@ -1765,7 +1770,9 @@ components:
           type: string
           format: uuid
         attemptId:
-          type: string
+          type:
+          - string
+          - 'null'
           format: uuid
         contentVersion:
           type: integer
@@ -1783,6 +1790,11 @@ components:
           format: uuid
         objectiveId:
           type: string
+          format: uuid
+        taskSubmissionId:
+          type:
+          - string
+          - 'null'
           format: uuid
         value:
           type: number

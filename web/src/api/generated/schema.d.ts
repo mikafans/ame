@@ -900,7 +900,7 @@ export interface components {
             /** Format: uuid */
             activityId: string;
             /** Format: uuid */
-            attemptId: string;
+            attemptId?: string | null;
             /** Format: int32 */
             contentVersion: number;
             /** Format: int32 */
@@ -909,6 +909,8 @@ export interface components {
             journeyId: string;
             /** Format: uuid */
             objectiveId: string;
+            /** Format: uuid */
+            taskSubmissionId?: string | null;
             /** Format: float */
             value: number;
         };
@@ -916,7 +918,7 @@ export interface components {
             /** Format: uuid */
             activityId: string;
             /** Format: uuid */
-            attemptId: string;
+            attemptId?: string | null;
             /** Format: int32 */
             contentVersion: number;
             /** Format: int32 */
@@ -927,6 +929,8 @@ export interface components {
             journeyId: string;
             /** Format: uuid */
             objectiveId: string;
+            /** Format: uuid */
+            taskSubmissionId?: string | null;
             /** Format: float */
             value: number;
         };
