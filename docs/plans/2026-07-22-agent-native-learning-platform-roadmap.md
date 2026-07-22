@@ -32,6 +32,11 @@ learner intent
   -> durable progress and resume
 ```
 
+The first executable stories are defined in
+[`2026-07-22-m0-golden-stories.md`](./2026-07-22-m0-golden-stories.md), with
+semantic fixtures in
+[`2026-07-22-m0-story-fixtures.json`](./2026-07-22-m0-story-fixtures.json).
+
 The browser is the learner workspace. External agents are authorized clients
 and curriculum operators. Both use the same durable resource model.
 
