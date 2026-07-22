@@ -7,6 +7,7 @@ import { api } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
 import { Button } from "@/components/ui/button";
 import { ActivityContentRenderer } from "@/components/learning/ActivityContentRenderer";
+import { AssessmentResultFeedback } from "@/components/learning/AssessmentResultFeedback";
 
 type Journey = components["schemas"]["LearningJourneyResponse"];
 type LearningSession = components["schemas"]["LearningSessionResponse"];
@@ -630,37 +631,7 @@ export default function LearningJourneyPage() {
                 Complete. Your next activity is now ready.
               </p>
             )}
-            {(attempt?.status === "graded" ||
-              attempt?.status === "submitted") && (
-              <div className="mt-4 space-y-3 border-t border-primary/20 pt-4">
-                <p className="text-sm font-medium text-primary">
-                  {attempt.status === "submitted"
-                    ? "Assessment submitted · pending review"
-                    : `Assessment complete · ${Math.round((attempt.score ?? 0) * 100)}%`}
-                </p>
-                {attempt.items.length > 0 && (
-                  <ul className="space-y-2 text-sm">
-                    {attempt.items.map((item) => (
-                      <li
-                        key={item.assessmentItemId}
-                        className="flex items-center justify-between gap-4 rounded-lg bg-background/60 px-3 py-2"
-                      >
-                        <span>Question result</span>
-                        <span
-                          className={
-                            item.evaluationStatus === "correct"
-                              ? "font-semibold text-primary"
-                              : "font-semibold text-destructive"
-                          }
-                        >
-                          {item.evaluationStatus.replaceAll("_", " ")}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+            {attempt && <AssessmentResultFeedback attempt={attempt} />}
           </section>
         )}
         {deepDive && (
