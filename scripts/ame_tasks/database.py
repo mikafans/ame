@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import time
+from urllib.parse import urlparse
 from pathlib import Path
 
 from .common import API_PORT, DB_URL, ROOT, compose, run
@@ -72,7 +73,23 @@ END
 $$;
 COMMIT;
 """
-    return compose("exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "ame", "-v", "ON_ERROR_STOP=1", "-c", sql)
+    database = urlparse(DB_URL).path.removeprefix("/")
+    if not database:
+        raise SystemExit("AME_DATABASE_URL must include a database name")
+    return compose(
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        database,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        sql,
+    )
 
 
 def seed() -> int:

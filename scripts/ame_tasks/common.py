@@ -11,7 +11,10 @@ API_HOST = os.environ.get("API_HOST", "localhost")
 API_PORT = os.environ.get("API_PORT", "28080")
 WEB_PORT = os.environ.get("WEB_PORT", "23000")
 PREVIEW_PORT = os.environ.get("PREVIEW_PORT", "28900")
-DB_URL = "postgres://postgres:postgres@localhost:5432/ame"
+DB_URL = os.environ.get(
+    "AME_DATABASE_URL",
+    "postgres://postgres:postgres@localhost:5432/ame",
+)
 
 
 def run(*args: str, cwd: Path = ROOT, env: dict[str, str] | None = None) -> int:

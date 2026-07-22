@@ -7,8 +7,12 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 
+function apiUrl(path: string) {
+  return `${process.env.E2E_API_URL ?? "http://localhost:28080"}${path}`;
+}
+
 async function publishedGenerationRun(page: Page, operation: string) {
-  const response = await page.request.post("/api/v1/generation-runs", {
+  const response = await page.request.post(apiUrl("/api/v1/generation-runs"), {
     data: {
       operation,
       provider: "test-provider",
@@ -20,7 +24,7 @@ async function publishedGenerationRun(page: Page, operation: string) {
   const run = await response.json();
   for (const status of ["running", "published"]) {
     const transition = await page.request.patch(
-      `/api/v1/generation-runs/${run.id}`,
+      apiUrl(`/api/v1/generation-runs/${run.id}`),
       { data: { status } },
     );
     expect(transition.ok()).toBeTruthy();
@@ -91,7 +95,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
       .first(),
   ).toBeVisible();
   const refreshedAfterStarter = await page.request.get(
-    `/api/v1/learning/journeys/${journeyId}`,
+    apiUrl(`/api/v1/learning/journeys/${journeyId}`),
   );
   expect(refreshedAfterStarter.ok()).toBeTruthy();
   const packageAfterStarter = await refreshedAfterStarter.json();
@@ -115,7 +119,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     "learning.activity.content.compose",
   );
   const kindMismatchResponse = await page.request.patch(
-    `/api/v1/learning/activities/${explanation.id}/content`,
+    apiUrl(`/api/v1/learning/activities/${explanation.id}/content`),
     {
       data: {
         generationRunId: contentGenerationRunId,
@@ -139,7 +143,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     key_points: ["Start with one observable mechanism."],
   };
   const groundedContentResponse = await page.request.patch(
-    `/api/v1/learning/activities/${explanation.id}/content`,
+    apiUrl(`/api/v1/learning/activities/${explanation.id}/content`),
     {
       data: {
         generationRunId: contentGenerationRunId,
@@ -171,7 +175,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     reflection: "What would you try next?",
   };
   const workedExampleResponse = await page.request.patch(
-    `/api/v1/learning/activities/${workedExample.id}/content`,
+    apiUrl(`/api/v1/learning/activities/${workedExample.id}/content`),
     {
       data: {
         generationRunId: contentGenerationRunId,
@@ -192,7 +196,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await page.goto("/learning");
   await expect(page.getByText(/Recent:/)).toBeVisible();
   const journeyDetailResponse = await page.request.get(
-    `/api/v1/learning/journeys/${journeyId}`,
+    apiUrl(`/api/v1/learning/journeys/${journeyId}`),
   );
   expect(journeyDetailResponse.ok()).toBeTruthy();
   const journeyDetail = await journeyDetailResponse.json();
@@ -407,14 +411,16 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   expect(journeyId).toBeTruthy();
 
   const journeyResponse = await page.request.get(
-    `/api/v1/learning/journeys/${journeyId}`,
+    apiUrl(`/api/v1/learning/journeys/${journeyId}`),
   );
   expect(journeyResponse.ok()).toBeTruthy();
   const journey = await journeyResponse.json();
   const activity = journey.activities[0];
   const objective = journey.objectives[0];
   const sessionResponse = await page.request.post(
-    `/api/v1/learning/journeys/${journeyId}/activities/${activity.id}/start`,
+    apiUrl(
+      `/api/v1/learning/journeys/${journeyId}/activities/${activity.id}/start`,
+    ),
   );
   expect(sessionResponse.ok()).toBeTruthy();
   const session = await sessionResponse.json();
@@ -423,50 +429,56 @@ test("learner can complete an agent-provided assessment and open its deep dive",
     "question.compose",
   );
 
-  const questionResponse = await page.request.post("/api/v1/questions", {
-    data: {
-      generationRunId: questionGenerationRunId,
-      kind: "multiple_choice",
-      prompt: "Which layer coordinates distributed work?",
-      options: [
-        { id: "wrong", text: "A local text editor", is_correct: false },
-        { id: "right", text: "A coordinator", is_correct: true },
-      ],
-      points: 1,
-      reviewStatus: "approved",
-      sourceReferences: ["https://example.com/distributed-systems"],
+  const questionResponse = await page.request.post(
+    apiUrl("/api/v1/questions"),
+    {
+      data: {
+        generationRunId: questionGenerationRunId,
+        kind: "multiple_choice",
+        prompt: "Which layer coordinates distributed work?",
+        options: [
+          { id: "wrong", text: "A local text editor", is_correct: false },
+          { id: "right", text: "A coordinator", is_correct: true },
+        ],
+        points: 1,
+        reviewStatus: "approved",
+        sourceReferences: ["https://example.com/distributed-systems"],
+      },
     },
-  });
+  );
   expect(questionResponse.ok()).toBeTruthy();
   const question = await questionResponse.json();
 
-  const assessmentResponse = await page.request.post("/api/v1/assessments", {
-    data: {
-      activityId: activity.id,
-      mode: "practice",
-      status: "published",
-      items: [
-        {
-          objectiveId: objective.id,
-          questionId: question.questionId,
-          questionVersion: question.version,
-          orderIndex: 0,
-          points: 1,
-        },
-      ],
+  const assessmentResponse = await page.request.post(
+    apiUrl("/api/v1/assessments"),
+    {
+      data: {
+        activityId: activity.id,
+        mode: "practice",
+        status: "published",
+        items: [
+          {
+            objectiveId: objective.id,
+            questionId: question.questionId,
+            questionVersion: question.version,
+            orderIndex: 0,
+            points: 1,
+          },
+        ],
+      },
     },
-  });
+  );
   expect(assessmentResponse.ok()).toBeTruthy();
   const assessment = await assessmentResponse.json();
   const attemptResponse = await page.request.post(
-    `/api/v1/assessments/${assessment.id}/attempts`,
+    apiUrl(`/api/v1/assessments/${assessment.id}/attempts`),
     { data: { learningSessionId: session.id } },
   );
   expect(attemptResponse.ok()).toBeTruthy();
   const attempt = await attemptResponse.json();
   const item = assessment.items[0];
   const answerResponse = await page.request.post(
-    `/api/v1/attempts/${attempt.id}/answers`,
+    apiUrl(`/api/v1/attempts/${attempt.id}/answers`),
     {
       data: {
         assessmentItemId: item.id,
@@ -477,18 +489,19 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   );
   expect(answerResponse.ok()).toBeTruthy();
   const finishResponse = await page.request.post(
-    `/api/v1/attempts/${attempt.id}/finish`,
+    apiUrl(`/api/v1/attempts/${attempt.id}/finish`),
   );
   expect(finishResponse.ok()).toBeTruthy();
 
   const evidenceResponse = await page.request.post(
-    "/api/v1/progress/evidence",
+    apiUrl("/api/v1/progress/evidence"),
     {
       data: {
         journeyId,
         objectiveId: objective.id,
         activityId: activity.id,
         attemptId: attempt.id,
+        contentVersion: 1,
         value: 0.5,
         derivationVersion: 1,
       },
@@ -501,23 +514,26 @@ test("learner can complete an agent-provided assessment and open its deep dive",
     "deep_dive.create",
   );
 
-  const deepDiveResponse = await page.request.post("/api/v1/deep-dives", {
-    data: {
-      generationRunId: deepDiveGenerationRunId,
-      journeyId,
-      activityId: activity.id,
-      objectiveId: objective.id,
-      triggeringEvidenceId: evidence.id,
-      title: "A coordinator gives the system a shared decision point",
-      body: "A coordinator tracks shared work and helps workers agree on progress.",
-      example: "A scheduler assigns work while workers execute it.",
-      caveats: ["The exact responsibilities vary by system design."],
-      sourceReferences: ["https://example.com/distributed-systems"],
-      applicationTask:
-        "Describe which component coordinates your next example.",
-      reviewStatus: "approved",
+  const deepDiveResponse = await page.request.post(
+    apiUrl("/api/v1/deep-dives"),
+    {
+      data: {
+        generationRunId: deepDiveGenerationRunId,
+        journeyId,
+        activityId: activity.id,
+        objectiveId: objective.id,
+        triggeringEvidenceId: evidence.id,
+        title: "A coordinator gives the system a shared decision point",
+        body: "A coordinator tracks shared work and helps workers agree on progress.",
+        example: "A scheduler assigns work while workers execute it.",
+        caveats: ["The exact responsibilities vary by system design."],
+        sourceReferences: ["https://example.com/distributed-systems"],
+        applicationTask:
+          "Describe which component coordinates your next example.",
+        reviewStatus: "approved",
+      },
     },
-  });
+  );
   expect(deepDiveResponse.ok()).toBeTruthy();
 
   await page.getByRole("button", { name: "Begin" }).click();
@@ -536,7 +552,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   await page.getByRole("button", { name: "A coordinator" }).click();
   await page.getByRole("button", { name: "Submit assessment" }).click();
 
-  await expect(page.getByText("Assessment complete")).toBeVisible();
+  await expect(page.getByText("Graded · 100%", { exact: true })).toBeVisible();
   await expect(
     page.getByText("correct", { exact: true }).first(),
   ).toBeVisible();
@@ -562,7 +578,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   ).toBeVisible();
 
   const refreshedJourneyResponse = await page.request.get(
-    `/api/v1/learning/journeys/${journeyId}`,
+    apiUrl(`/api/v1/learning/journeys/${journeyId}`),
   );
   expect(refreshedJourneyResponse.ok()).toBeTruthy();
   const refreshedJourney = await refreshedJourneyResponse.json();
@@ -571,7 +587,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   );
   expect(nextActivity).toBeTruthy();
   const gradedAssessmentResponse = await page.request.post(
-    "/api/v1/assessments",
+    apiUrl("/api/v1/assessments"),
     {
       data: {
         activityId: nextActivity.id,
@@ -596,7 +612,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
   ).toBeVisible();
   await page.getByRole("button", { name: "A coordinator" }).click();
   await page.getByRole("button", { name: "Submit assessment" }).click();
-  await expect(page.getByText("Assessment complete")).toBeVisible();
+  await expect(page.getByText("Graded · 100%", { exact: true })).toBeVisible();
 });
 
 test("learner can finish a manual-review assessment without false progress", async ({
@@ -618,7 +634,7 @@ test("learner can finish a manual-review assessment without false progress", asy
     .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
   expect(journeyId).toBeTruthy();
   const journeyResponse = await page.request.get(
-    `/api/v1/learning/journeys/${journeyId}`,
+    apiUrl(`/api/v1/learning/journeys/${journeyId}`),
   );
   expect(journeyResponse.ok()).toBeTruthy();
   const journey = await journeyResponse.json();
@@ -628,34 +644,40 @@ test("learner can finish a manual-review assessment without false progress", asy
     page,
     "question.compose",
   );
-  const questionResponse = await page.request.post("/api/v1/questions", {
-    data: {
-      generationRunId,
-      kind: "essay",
-      prompt: "Explain the first principle in your own words.",
-      points: 2,
-      reviewStatus: "approved",
-      sourceReferences: ["https://example.com/learning"],
+  const questionResponse = await page.request.post(
+    apiUrl("/api/v1/questions"),
+    {
+      data: {
+        generationRunId,
+        kind: "essay",
+        prompt: "Explain the first principle in your own words.",
+        points: 2,
+        reviewStatus: "approved",
+        sourceReferences: ["https://example.com/learning"],
+      },
     },
-  });
+  );
   expect(questionResponse.ok()).toBeTruthy();
   const question = await questionResponse.json();
-  const assessmentResponse = await page.request.post("/api/v1/assessments", {
-    data: {
-      activityId: activity.id,
-      mode: "graded",
-      status: "published",
-      items: [
-        {
-          objectiveId: objective.id,
-          questionId: question.questionId,
-          questionVersion: question.version,
-          orderIndex: 0,
-          points: 2,
-        },
-      ],
+  const assessmentResponse = await page.request.post(
+    apiUrl("/api/v1/assessments"),
+    {
+      data: {
+        activityId: activity.id,
+        mode: "graded",
+        status: "published",
+        items: [
+          {
+            objectiveId: objective.id,
+            questionId: question.questionId,
+            questionVersion: question.version,
+            orderIndex: 0,
+            points: 2,
+          },
+        ],
+      },
     },
-  });
+  );
   expect(assessmentResponse.ok()).toBeTruthy();
 
   await page.getByRole("button", { name: "Begin" }).click();
@@ -668,7 +690,7 @@ test("learner can finish a manual-review assessment without false progress", asy
   await page.getByRole("button", { name: "Submit assessment" }).click();
 
   await expect(
-    page.getByText("Assessment submitted · pending review"),
+    page.getByText("Submitted · pending review", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Complete. Your next activity is now ready."),
