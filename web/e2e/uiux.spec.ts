@@ -70,6 +70,9 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
   expect(journeyId).toBeTruthy();
   await expect(page.getByText(prompt, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Foundations", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Your first activity is ready")).toBeVisible();
   await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
 

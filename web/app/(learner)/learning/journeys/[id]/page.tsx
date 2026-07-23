@@ -80,6 +80,41 @@ function ActivityProvenance({
   );
 }
 
+function ActivityRow({
+  activity,
+  startingActivity,
+  onStart,
+}: {
+  activity: Journey["activities"][number];
+  startingActivity: string | null;
+  onStart: (activityId: string) => void;
+}) {
+  return (
+    <article
+      className="flex items-center justify-between gap-4 border-b border-border py-5 last:border-b-0"
+      data-testid={"learning-activity-" + activity.id}
+    >
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+          {activity.kind} · {activity.status}
+        </p>
+        <h4 className="mt-1 font-medium">{activity.title}</h4>
+      </div>
+      {activity.status === "ready" && (
+        <Button
+          type="button"
+          disabled={startingActivity !== null}
+          onClick={() => onStart(activity.id)}
+          className="shrink-0 rounded-full"
+        >
+          {startingActivity === activity.id ? "Starting…" : "Begin"}
+          <ArrowRight className="size-4" />
+        </Button>
+      )}
+    </article>
+  );
+}
+
 export default function LearningJourneyPage() {
   const params = useParams<{ id: string }>();
   const [journey, setJourney] = useState<Journey | null>(null);
@@ -362,6 +397,10 @@ export default function LearningJourneyPage() {
     | undefined;
   const activeContent = activePayload?.content ?? null;
   const activeProvenance = activePayload?.contentProvenance ?? null;
+  const ungroupedActivities = journey.activities.filter(
+    (activity) =>
+      activity.chapterId === null || activity.chapterId === undefined,
+  );
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-6 sm:p-10 lg:grid-cols-[260px_1fr]">
@@ -414,34 +453,71 @@ export default function LearningJourneyPage() {
           <div>
             <h2 className="text-lg font-semibold">Your path</h2>
             <p className="text-sm text-muted-foreground">
-              One focused step at a time.
+              Move through each chapter, then use the next recommendation to
+              keep going.
             </p>
           </div>
-          <div className="space-y-3">
-            {journey.activities.map((activity) => (
-              <article
-                key={activity.id}
-                className="flex items-center justify-between gap-4 border-b border-border py-5 first:border-t"
-              >
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                    {activity.kind} · {activity.status}
+          <div className="space-y-5">
+            {journey.chapters.map((chapter, index) => {
+              const completedActivities = chapter.activities.filter(
+                (activity) => activity.status === "completed",
+              ).length;
+              return (
+                <section
+                  key={chapter.id}
+                  className="rounded-2xl border border-border bg-card px-5 py-2"
+                  data-testid={"learning-chapter-" + chapter.id}
+                >
+                  <div className="border-b border-border py-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                          Chapter {index + 1}
+                        </p>
+                        <h3 className="mt-1 text-lg font-semibold">
+                          {chapter.title}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {completedActivities}/{chapter.activities.length}{" "}
+                        complete
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {chapter.summary}
+                    </p>
+                  </div>
+                  {chapter.activities.map((activity) => (
+                    <ActivityRow
+                      key={activity.id}
+                      activity={activity}
+                      startingActivity={startingActivity}
+                      onStart={startActivity}
+                    />
+                  ))}
+                </section>
+              );
+            })}
+            {ungroupedActivities.length > 0 && (
+              <section className="rounded-2xl border border-border bg-card px-5 py-2">
+                <div className="border-b border-border py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                    Additional activities
                   </p>
-                  <h3 className="mt-1 font-medium">{activity.title}</h3>
+                  <h3 className="mt-1 text-lg font-semibold">
+                    Outside the chapter sequence
+                  </h3>
                 </div>
-                {activity.status === "ready" && (
-                  <Button
-                    type="button"
-                    disabled={startingActivity !== null}
-                    onClick={() => startActivity(activity.id)}
-                    className="shrink-0 rounded-full"
-                  >
-                    {startingActivity === activity.id ? "Starting…" : "Begin"}
-                    <ArrowRight className="size-4" />
-                  </Button>
-                )}
-              </article>
-            ))}
+                {ungroupedActivities.map((activity) => (
+                  <ActivityRow
+                    key={activity.id}
+                    activity={activity}
+                    startingActivity={startingActivity}
+                    onStart={startActivity}
+                  />
+                ))}
+              </section>
+            )}
           </div>
         </section>
 
