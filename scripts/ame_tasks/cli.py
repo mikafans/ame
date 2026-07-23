@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from .common import PREVIEW_PORT, ROOT, mise, run, web_ready
+from .common import PREVIEW_PORT, ROOT, run, tool, web_ready
 from .database import admin, down, migrate, reset, seed, up
 from .quality import format_project, lint, test, test_db
 from container_runtime import engine
@@ -22,16 +22,16 @@ def dispatch(target: str) -> int:
     if target == "db-admin": return admin()
     if target == "db-seed": return seed()
     if target == "openapi":
-        status = mise("cargo", "run", "--quiet", "--bin", "gen-openapi", cwd=ROOT / "api")
+        status = tool("cargo", "run", "--quiet", "--bin", "gen-openapi", cwd=ROOT / "api")
         if status != 0 or not web_ready(): return status
-        status = mise("bun", "run", "api:gen", cwd=ROOT / "web")
+        status = tool("bun", "run", "api:gen", cwd=ROOT / "web")
         if status != 0: return status
         return 0
-    if target == "public-docs": return mise("cargo", "run", "--quiet", "--bin", "gen-public-docs", cwd=ROOT / "api")
+    if target == "public-docs": return tool("cargo", "run", "--quiet", "--bin", "gen-public-docs", cwd=ROOT / "api")
     if target == "init-env": return init_env()
     if target == "dev": return dev()
     if target == "stop": return stop()
-    if target == "preview": return mise("uv", "run", "--no-project", "python", "-m", "http.server", PREVIEW_PORT, "--bind", "0.0.0.0", "--directory", "design/preview")
+    if target == "preview": return tool("uv", "run", "--no-project", "python", "-m", "http.server", PREVIEW_PORT, "--bind", "0.0.0.0", "--directory", "design/preview")
     if target.startswith("docker-"):
         action = target.removeprefix("docker-")
         args = (*engine(), "-f", "docker-compose.prod.yml", action)

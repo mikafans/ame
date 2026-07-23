@@ -4,7 +4,7 @@ import os
 import signal
 import subprocess
 
-from .common import API_HOST, API_PORT, ROOT, WEB_PORT, compose, mise, run
+from .common import API_HOST, API_PORT, ROOT, WEB_PORT, compose, run, tool
 from .database import migrate
 
 
@@ -12,9 +12,9 @@ def dev() -> int:
     if compose("up", "-d") != 0 or migrate() != 0:
         return 1
     env = {**os.environ, "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/ame", "AME_PORT": API_PORT, "AME_CORS_ORIGINS": f"http://{API_HOST}:{WEB_PORT}", "AME_CONFIG_PATH": "ame.dev.toml", "RUST_LOG": "ame_api=debug,tower_http=info,sqlx=warn"}
-    api = subprocess.Popen(["mise", "exec", "--", "cargo", "run", "--manifest-path", "api/Cargo.toml", "--bin", "ame-api"], cwd=ROOT, env=env, start_new_session=True)
+    api = subprocess.Popen(["cargo", "run", "--manifest-path", "api/Cargo.toml", "--bin", "ame-api"], cwd=ROOT, env=env, start_new_session=True)
     try:
-        return mise("bun", "run", "dev", "--port", WEB_PORT, cwd=ROOT / "web", env={**env, "PORT": WEB_PORT, "NEXT_PUBLIC_API_URL": f"http://{API_HOST}:{API_PORT}"})
+        return tool("bun", "run", "dev", "--port", WEB_PORT, cwd=ROOT / "web", env={**env, "PORT": WEB_PORT, "NEXT_PUBLIC_API_URL": f"http://{API_HOST}:{API_PORT}"})
     finally:
         os.killpg(api.pid, signal.SIGTERM)
         api.wait(timeout=10)
@@ -26,9 +26,11 @@ def stop() -> int:
 
 
 def init_env() -> int:
-    commands = [("mise", "install", ROOT), ("cargo", "install", "sqlx-cli", "--no-default-features", "--features", "postgres", ROOT), ("bun", "install", ROOT / "web"), ("bunx", "playwright", "install", "--with-deps", ROOT / "web")]
+    # Language runtimes and sqlx-cli come from the nix devShell; init-env only
+    # installs project-local deps that nix does not manage.
+    commands = [("bun", "install", ROOT / "web"), ("bunx", "playwright", "install", "--with-deps", ROOT / "web")]
     for *args, cwd in commands:
-        status = mise(*args, cwd=cwd)
+        status = tool(*args, cwd=cwd)
         if status != 0:
             return status
     return 0

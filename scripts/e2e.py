@@ -41,9 +41,6 @@ def main() -> int:
             }
             api = subprocess.Popen(
                 [
-                    "mise",
-                    "exec",
-                    "--",
                     "cargo",
                     "run",
                     "--manifest-path",
@@ -75,7 +72,7 @@ def main() -> int:
             "E2E_BASE_URL": f"http://{API_HOST}:{WEB_PORT}",
         }
         return subprocess.run(
-            ["mise", "exec", "--", "bun", "run", "e2e"],
+            ["bun", "run", "e2e"],
             cwd=ROOT / "web",
             env=env,
             check=False,

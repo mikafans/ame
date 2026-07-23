@@ -19,6 +19,7 @@ next-env.d.ts
 # Nix
 result
 result-*
+.direnv/
 
 # Docker / db
 db/data/

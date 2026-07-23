@@ -21,9 +21,6 @@ env = {
 raise SystemExit(
     subprocess.run(
         [
-            "mise",
-            "exec",
-            "--",
             "bunx",
             "playwright",
             "test",

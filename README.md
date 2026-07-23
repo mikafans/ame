@@ -8,8 +8,11 @@ Agent-friendly learning platform with one owner-scoped journey API. Rust (Axum) 
 
 ## Quick start
 
+The toolchain is provided by the Nix devShell — run `direnv allow` (auto-loads
+via `.envrc`) or `nix develop` first, then:
+
 ```bash
-make init-env       # mise install + sqlx-cli + web deps + Playwright
+make init-env       # web deps + Playwright browsers (toolchain comes from nix)
 make db-up          # start Postgres in Docker or Podman
 make dev            # API on :28080, frontend on :23000
 make db-seed        # seed the current learner journey fixture (requires API running)

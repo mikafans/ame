@@ -1,7 +1,0 @@
-[tools]
-rust = { version = "stable", components = "rustfmt,clippy" }
-bun = "latest"
-uv = "latest"
-
-[env]
-RUST_BACKTRACE = "1"

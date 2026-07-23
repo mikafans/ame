@@ -123,9 +123,6 @@ def run_uiux() -> None:
     }
     subprocess.run(
         [
-            "mise",
-            "exec",
-            "--",
             "bunx",
             "playwright",
             "test",

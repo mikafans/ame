@@ -22,7 +22,7 @@ specs were fine. It was *validate the need* and *test-first the refactor*.
 
 **Always use `make` — never raw commands.**
 
-- `make init-env` — one-time setup on a fresh checkout: `mise install` (rust, bun, uv) + `sqlx-cli` + web deps + Playwright browsers
+- `make init-env` — one-time setup on a fresh checkout: web deps + Playwright browsers (language runtimes and `sqlx-cli` come from the Nix devShell, not this target)
 - `make dev` — start the full stack (kills stale procs, migrates, starts API + frontend)
 - `make stop` — stop everything
 - `make check` — pre-commit gate (fmt-check + lint + test)
@@ -49,7 +49,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - Access remotely via Tailscale: `make dev API_HOST=harus-mini` → http://harus-mini:23000
 - **DB**: Postgres 18 via docker/podman compose (`db/docker-compose.yml`)
 - **Schema**: OpenAPI at `api/openapi.yaml`; regenerate with `make openapi`
-- **Toolchain**: Rust edition 2024, Axum 0.8, Tokio, sqlx; Next.js 16 / React 19 / MUI 7. `mise` provides language runtimes (rust, bun, uv). Migrations: `sqlx migrate run`; SQL lint: `uvx sqlfluff`; SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`.
+- **Toolchain**: Rust edition 2024, Axum 0.8, Tokio, sqlx; Next.js 16 / React 19 / Tailwind CSS 4 + shadcn/ui. The Nix devShell (`flake.nix`, pinned to `nixpkgs-unstable`) provides the toolchain — rust, bun, uv, python 3.14, sqlx-cli. Enter it with `direnv allow` (auto-loads via `.envrc`) or `nix develop`; in non-interactive shells prefix targets with `nix develop -c make <target>`. Migrations: `sqlx migrate run`; SQL lint: `uvx sqlfluff`; SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`.
 - **Canonical spec**: `docs/specs/2026-05-20-harus-platform-design.md` (replaces the `2026-05-19-question-exam-platform-design.md`, kept only as historical reference). Implementation plans in `docs/plans/`.
 
 ## Architecture
@@ -59,10 +59,10 @@ After making code changes, **always restart the dev server** via `make dev` to p
 
 ## UI Conventions
 
-- Use MUI Dialog for confirmations — never `window.confirm`
-- Destructive actions (delete, discard) require a MUI Dialog with Cancel + red confirmed action button
-- All pages use MUI components — no Tailwind for new UI work
-- Placeholder buttons (no backend) must be removed, not left as no-ops
+- Build UI with the shadcn/ui + Radix primitives in `web/src/components/ui/` and Tailwind CSS 4 — no MUI.
+- Confirmations use a modal dialog built from those primitives — never `window.confirm`.
+- Destructive actions (delete, discard) require a confirmation dialog with a Cancel and a red confirmed action button.
+- Placeholder buttons (no backend) must be removed, not left as no-ops.
 
 ## Data Model Constraints
 
