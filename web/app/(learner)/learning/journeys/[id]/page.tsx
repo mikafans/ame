@@ -147,12 +147,14 @@ function ChapterSection({
   chapter,
   index,
   completedActivities,
+  isComplete,
   isCurrent,
   children,
 }: {
   chapter: Journey["chapters"][number];
   index: number;
   completedActivities: number;
+  isComplete: boolean;
   isCurrent: boolean;
   children: ReactNode;
 }) {
@@ -170,12 +172,18 @@ function ChapterSection({
           : "rounded-2xl border border-border bg-card px-5 py-2"
       }
       data-current={isCurrent ? "true" : "false"}
+      data-complete={isComplete ? "true" : "false"}
       data-testid={"learning-chapter-" + chapter.id}
     >
       <div className="flex items-center justify-between gap-3 py-4">
         <div>
           <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-primary">
             Chapter {index + 1}
+            {isComplete && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] tracking-[0.08em]">
+                Complete
+              </span>
+            )}
             {isCurrent && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] tracking-[0.08em]">
                 Current
@@ -529,6 +537,23 @@ export default function LearningJourneyPage() {
       chapter.activities.some((activity) => activity.status !== "completed"),
     )?.id ??
     null;
+  const completedActivityChapter =
+    session?.status === "finished"
+      ? journey.chapters.find((chapter) =>
+          chapter.activities.some(
+            (activity) => activity.id === session.activityId,
+          ),
+        )
+      : null;
+  const nextChapter = journey.chapters.find(
+    (chapter) => chapter.id === currentChapterId,
+  );
+  const chapterHandoff =
+    completedActivityChapter &&
+    nextChapter &&
+    completedActivityChapter.id !== nextChapter.id
+      ? { completed: completedActivityChapter, next: nextChapter }
+      : null;
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-6 sm:p-10 lg:grid-cols-[260px_1fr]">
@@ -574,6 +599,23 @@ export default function LearningJourneyPage() {
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {journey.recommendation.rationale}
+            </p>
+          </section>
+        )}
+        {chapterHandoff && (
+          <section
+            className="rounded-2xl border border-primary/30 bg-primary/5 p-5"
+            data-testid="chapter-handoff"
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+              Chapter complete
+            </p>
+            <h2 className="mt-2 text-xl font-semibold">
+              {chapterHandoff.completed.title} is complete.
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Next up: {chapterHandoff.next.title}. Continue when you are ready
+              to build on this foundation.
             </p>
           </section>
         )}
@@ -638,6 +680,7 @@ export default function LearningJourneyPage() {
                   chapter={chapter}
                   index={index}
                   completedActivities={completedActivities}
+                  isComplete={completedActivities === chapter.activities.length}
                   isCurrent={chapter.id === currentChapterId}
                 >
                   {chapter.activities.map((activity) => (

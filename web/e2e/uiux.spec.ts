@@ -279,6 +279,60 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("learner sees a completed chapter state", async ({ page }) => {
+  const email = `completed-chapter-uiux-${Date.now()}@example.com`;
+  await page.goto("/start");
+  await page
+    .getByLabel("What would you like to learn?")
+    .fill("I would like to learn Flink checkpointing");
+  await page.getByLabel("Your name").fill("Chapter Learner");
+  await page.getByLabel("Email identifier").fill(email);
+  await page.getByLabel("Password").fill("chapter-local-2026");
+  await page.getByRole("button", { name: "Create my journey" }).click();
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+  const journeyId = page
+    .url()
+    .match(/\/learning\/journeys\/([0-9a-f-]+)$/)?.[1];
+  expect(journeyId).toBeTruthy();
+  const apiBase = process.env.E2E_API_URL ?? "";
+
+  let journeyResponse = await page.request.get(
+    `${apiBase}/api/v1/learning/journeys/${journeyId}`,
+  );
+  const initialJourney = await journeyResponse.json();
+  for (let index = 0; index < initialJourney.activities.length; index += 1) {
+    journeyResponse = await page.request.get(
+      `${apiBase}/api/v1/learning/journeys/${journeyId}`,
+    );
+    const currentJourney = await journeyResponse.json();
+    const readyActivity = currentJourney.activities.find(
+      (activity: { status: string }) => activity.status === "ready",
+    );
+    if (!readyActivity) break;
+    const started = await page.request.post(
+      `${apiBase}/api/v1/learning/journeys/${journeyId}/activities/${readyActivity.id}/start`,
+    );
+    expect(started.ok()).toBeTruthy();
+    const session = await started.json();
+    const finished = await page.request.post(
+      `${apiBase}/api/v1/learning/sessions/${session.id}/finish`,
+      { data: { completed: true, responses: [] } },
+    );
+    expect(finished.ok()).toBeTruthy();
+  }
+
+  await page.goto(`/learning/journeys/${journeyId}`);
+  await expect(page.getByTestId("journey-detail-progress")).toContainText(
+    "100%",
+  );
+  await expect(page.locator('[data-complete="true"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-complete="true"]').getByText("Complete", {
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
 test("learner can answer the first application task in a journey", async ({
   page,
 }) => {
