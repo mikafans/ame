@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowRight, Check, Clock3, History } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Clock3, History } from "lucide-react";
 import { api } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
 import { Button } from "@/components/ui/button";
@@ -140,6 +140,81 @@ function ActivityRow({
         </span>
       )}
     </article>
+  );
+}
+
+function ChapterSection({
+  chapter,
+  index,
+  completedActivities,
+  isCurrent,
+  children,
+}: {
+  chapter: Journey["chapters"][number];
+  index: number;
+  completedActivities: number;
+  isCurrent: boolean;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(isCurrent);
+
+  useEffect(() => {
+    if (isCurrent) setExpanded(true);
+  }, [isCurrent]);
+
+  return (
+    <section
+      className={
+        isCurrent
+          ? "rounded-2xl border border-primary/60 bg-card px-5 py-2 shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]"
+          : "rounded-2xl border border-border bg-card px-5 py-2"
+      }
+      data-current={isCurrent ? "true" : "false"}
+      data-testid={"learning-chapter-" + chapter.id}
+    >
+      <div className="flex items-center justify-between gap-3 py-4">
+        <div>
+          <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-primary">
+            Chapter {index + 1}
+            {isCurrent && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] tracking-[0.08em]">
+                Current
+              </span>
+            )}
+          </span>
+          <h3 className="mt-1 text-lg font-semibold">{chapter.title}</h3>
+        </div>
+        <button
+          type="button"
+          aria-label={`${expanded ? "Collapse" : "Expand"} Chapter ${index + 1}: ${chapter.title}`}
+          aria-controls={"chapter-content-" + chapter.id}
+          aria-expanded={expanded}
+          className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <span>
+            {completedActivities}/{chapter.activities.length} complete
+          </span>
+          <ChevronDown
+            className={
+              expanded
+                ? "size-5 rotate-180 transition-transform"
+                : "size-5 transition-transform"
+            }
+          />
+        </button>
+      </div>
+      {expanded && (
+        <div id={"chapter-content-" + chapter.id}>
+          <div className="border-t border-border py-4">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {chapter.summary}
+            </p>
+          </div>
+          {children}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -443,6 +518,17 @@ export default function LearningJourneyPage() {
     : 0;
   const continueActivity =
     activeActivityId && activeActivity ? activeActivity : readyActivity;
+  const currentChapterId =
+    journey.chapters.find((chapter) =>
+      chapter.activities.some((activity) => activity.id === activeActivityId),
+    )?.id ??
+    journey.chapters.find((chapter) =>
+      chapter.activities.some((activity) => activity.id === readyActivity?.id),
+    )?.id ??
+    journey.chapters.find((chapter) =>
+      chapter.activities.some((activity) => activity.status !== "completed"),
+    )?.id ??
+    null;
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-6 sm:p-10 lg:grid-cols-[260px_1fr]">
@@ -547,30 +633,13 @@ export default function LearningJourneyPage() {
                 (activity) => activity.status === "completed",
               ).length;
               return (
-                <section
+                <ChapterSection
                   key={chapter.id}
-                  className="rounded-2xl border border-border bg-card px-5 py-2"
-                  data-testid={"learning-chapter-" + chapter.id}
+                  chapter={chapter}
+                  index={index}
+                  completedActivities={completedActivities}
+                  isCurrent={chapter.id === currentChapterId}
                 >
-                  <div className="border-b border-border py-4">
-                    <div className="flex flex-wrap items-baseline justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
-                          Chapter {index + 1}
-                        </p>
-                        <h3 className="mt-1 text-lg font-semibold">
-                          {chapter.title}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {completedActivities}/{chapter.activities.length}{" "}
-                        complete
-                      </p>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {chapter.summary}
-                    </p>
-                  </div>
                   {chapter.activities.map((activity) => (
                     <ActivityRow
                       key={activity.id}
@@ -580,7 +649,7 @@ export default function LearningJourneyPage() {
                       onStart={startActivity}
                     />
                   ))}
-                </section>
+                </ChapterSection>
               );
             })}
             {ungroupedActivities.length > 0 && (

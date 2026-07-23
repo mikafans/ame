@@ -73,6 +73,16 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(
     page.getByRole("heading", { name: "Foundations", exact: true }),
   ).toBeVisible();
+  const currentChapter = page.locator('[data-current="true"]');
+  await expect(currentChapter).toContainText("Current");
+  const currentChapterToggle = currentChapter.locator(
+    'button[aria-controls^="chapter-content-"]',
+  );
+  await expect(currentChapterToggle).toHaveAttribute("aria-expanded", "true");
+  await currentChapterToggle.click();
+  await expect(currentChapterToggle).toHaveAttribute("aria-expanded", "false");
+  await currentChapterToggle.click();
+  await expect(currentChapterToggle).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByText("Your first activity is ready")).toBeVisible();
   await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
   await expect(page.getByTestId("journey-detail-progress")).toContainText(
