@@ -255,6 +255,49 @@ pub fn grade_answer(question: &QuestionVersion, response: &serde_json::Value) ->
                 },
             }
         }
+        QuestionKind::Numeric => {
+            // accepted_answers[0] = target; optional accepted_answers[1] = tolerance
+            // ("0.5" absolute or "2%" relative to |target|). Absent tolerance = exact.
+            let target = question
+                .accepted_answers
+                .first()
+                .and_then(|value| value.trim().parse::<f64>().ok());
+            let tolerance = match (target, question.accepted_answers.get(1)) {
+                (Some(target), Some(spec)) => {
+                    let spec = spec.trim();
+                    match spec.strip_suffix('%') {
+                        Some(percent) => percent
+                            .trim()
+                            .parse::<f64>()
+                            .ok()
+                            .map(|pct| (pct / 100.0) * target.abs()),
+                        None => spec.parse::<f64>().ok(),
+                    }
+                }
+                _ => Some(0.0),
+            };
+            let submitted = response.get("value").and_then(|value| {
+                value.as_f64().or_else(|| {
+                    value
+                        .as_str()
+                        .and_then(|text| text.trim().parse::<f64>().ok())
+                })
+            });
+            let correct = matches!(
+                (target, tolerance, submitted),
+                (Some(target), Some(tolerance), Some(submitted))
+                    if (submitted - target).abs() <= tolerance + f64::EPSILON
+            );
+            GradedAnswer {
+                correctness: Some(if correct { 1.0 } else { 0.0 }),
+                awarded_points: if correct { question.points as f32 } else { 0.0 },
+                status: if correct {
+                    AnswerEvaluationStatus::Correct
+                } else {
+                    AnswerEvaluationStatus::Incorrect
+                },
+            }
+        }
         QuestionKind::Essay | QuestionKind::Code => GradedAnswer {
             correctness: None,
             awarded_points: 0.0,
@@ -406,6 +449,76 @@ mod contract_tests {
         assert_eq!(
             grade_answer(&version, &serde_json::json!({"value": "answer"})).status,
             AnswerEvaluationStatus::ManualReview
+        );
+    }
+
+    fn numeric_version(accepted_answers: Vec<String>) -> QuestionVersion {
+        QuestionVersion {
+            id: Uuid::now_v7(),
+            question_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
+            version: 1,
+            kind: QuestionKind::Numeric,
+            prompt: "What is the value?".into(),
+            options: vec![],
+            accepted_answers,
+            explanation: None,
+            rationale: None,
+            difficulty: None,
+            points: 3,
+            review_status: ContentReviewStatus::Approved,
+            source_references: vec![],
+            created_at: OffsetDateTime::now_utc(),
+        }
+    }
+
+    #[test]
+    fn numeric_relative_tolerance_accepts_close_values_and_string_forms() {
+        let version = numeric_version(vec!["93000000".into(), "2%".into()]);
+        // exact and equivalent scientific notation
+        assert_eq!(
+            grade_answer(&version, &serde_json::json!({"value": 93000000.0})).status,
+            AnswerEvaluationStatus::Correct
+        );
+        assert_eq!(
+            grade_answer(&version, &serde_json::json!({"value": "9.3e7"})).status,
+            AnswerEvaluationStatus::Correct
+        );
+        // within 2% (91.14M..94.86M)
+        assert_eq!(
+            grade_answer(&version, &serde_json::json!({"value": 92000000.0})).status,
+            AnswerEvaluationStatus::Correct
+        );
+        // outside tolerance, and missing answer
+        assert_eq!(
+            grade_answer(&version, &serde_json::json!({"value": 80000000.0})).status,
+            AnswerEvaluationStatus::Incorrect
+        );
+        assert_eq!(
+            grade_answer(&version, &serde_json::json!({})).status,
+            AnswerEvaluationStatus::Incorrect
+        );
+    }
+
+    #[test]
+    fn numeric_absolute_tolerance_and_exact_match() {
+        let absolute = numeric_version(vec!["10".into(), "0.5".into()]);
+        assert_eq!(
+            grade_answer(&absolute, &serde_json::json!({"value": 10.4})).status,
+            AnswerEvaluationStatus::Correct
+        );
+        assert_eq!(
+            grade_answer(&absolute, &serde_json::json!({"value": 10.6})).status,
+            AnswerEvaluationStatus::Incorrect
+        );
+
+        let exact = numeric_version(vec!["42".into()]);
+        let graded = grade_answer(&exact, &serde_json::json!({"value": 42}));
+        assert_eq!(graded.status, AnswerEvaluationStatus::Correct);
+        assert_eq!(graded.awarded_points, 3.0);
+        assert_eq!(
+            grade_answer(&exact, &serde_json::json!({"value": 42.1})).status,
+            AnswerEvaluationStatus::Incorrect
         );
     }
 }

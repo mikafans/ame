@@ -29,6 +29,7 @@ pub enum QuestionKind {
     MultipleChoice,
     TrueFalse,
     ShortAnswer,
+    Numeric,
     Essay,
     Code,
 }
@@ -181,6 +182,31 @@ pub fn validate_question(input: &CreateQuestion) -> Result<(), QuestionRepositor
                 return Err(QuestionRepositoryError::InvalidQuestion(
                     "short-answer questions need at least one accepted answer".to_string(),
                 ));
+            }
+        }
+        QuestionKind::Numeric => {
+            // accepted_answers[0] is the numeric target; an optional
+            // accepted_answers[1] is the tolerance ("0.5" absolute or "2%" relative).
+            let target = input.accepted_answers.first().ok_or_else(|| {
+                QuestionRepositoryError::InvalidQuestion(
+                    "numeric questions need a target value in accepted_answers[0]".to_string(),
+                )
+            })?;
+            if target.trim().parse::<f64>().is_err() {
+                return Err(QuestionRepositoryError::InvalidQuestion(
+                    "numeric target must be a number".to_string(),
+                ));
+            }
+            if let Some(tolerance) = input.accepted_answers.get(1) {
+                let raw = tolerance
+                    .trim()
+                    .strip_suffix('%')
+                    .unwrap_or(tolerance.trim());
+                if raw.parse::<f64>().is_err() {
+                    return Err(QuestionRepositoryError::InvalidQuestion(
+                        "numeric tolerance must be a number or percentage".to_string(),
+                    ));
+                }
             }
         }
         QuestionKind::Essay | QuestionKind::Code => {}

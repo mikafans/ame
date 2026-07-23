@@ -259,6 +259,7 @@ fn kind_value(kind: QuestionKind) -> &'static str {
         QuestionKind::MultipleChoice => "multiple_choice",
         QuestionKind::TrueFalse => "true_false",
         QuestionKind::ShortAnswer => "short_answer",
+        QuestionKind::Numeric => "numeric",
         QuestionKind::Essay => "essay",
         QuestionKind::Code => "code",
     }
@@ -269,6 +270,7 @@ fn parse_kind(value: &str) -> Result<QuestionKind, QuestionRepositoryError> {
         "multiple_choice" => Ok(QuestionKind::MultipleChoice),
         "true_false" => Ok(QuestionKind::TrueFalse),
         "short_answer" => Ok(QuestionKind::ShortAnswer),
+        "numeric" => Ok(QuestionKind::Numeric),
         "essay" => Ok(QuestionKind::Essay),
         "code" => Ok(QuestionKind::Code),
         _ => Err(QuestionRepositoryError::Storage(format!(

@@ -114,7 +114,7 @@ pub fn build_skill_manifest() -> Value {
             "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
             "POST",
             "/api/v1/questions",
-            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
+            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","numeric","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
         ),
         endpoint(
             "learning.question.get",
