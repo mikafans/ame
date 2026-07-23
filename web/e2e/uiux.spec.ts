@@ -255,22 +255,46 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   await expect(
     page.getByText("I would like to learn a new subject", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Course path", { exact: true })).toBeVisible();
+  const currentJourneyCard = page
+    .locator("article")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "I would like to learn a new subject",
+        exact: true,
+      }),
+    })
+    .first();
   await expect(
-    page.getByText("Course progress", { exact: true }),
+    currentJourneyCard.getByText("Course path", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("progressbar", { name: "Course progress" }),
+    currentJourneyCard.getByText("Course progress", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Continue learning" }),
+    currentJourneyCard.getByRole("progressbar", { name: "Course progress" }),
+  ).toHaveAttribute("aria-valuenow", "0");
+  await expect(
+    currentJourneyCard.getByRole("link", { name: "Continue learning" }),
   ).toHaveAttribute("href", /#activity-[0-9a-f-]+$/);
-  await expect(page.getByText("1. Foundations", { exact: true })).toBeVisible();
-  const firstDeskActivity = page
+  await expect(
+    currentJourneyCard.getByText("1. Foundations", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    currentJourneyCard.getByText("2. Practice and application", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const firstDeskActivity = currentJourneyCard
     .locator('[data-testid^="desk-activity-"]')
     .first();
   await expect(firstDeskActivity).toBeVisible();
-  await firstDeskActivity.click();
+  await expect(firstDeskActivity).toHaveAttribute(
+    "href",
+    /\/learning\/journeys\/[0-9a-f-]+#activity-[0-9a-f-]+$/,
+  );
+  await currentJourneyCard
+    .getByRole("link", { name: "Continue learning" })
+    .click();
   await expect(page).toHaveURL(
     /\/learning\/journeys\/[0-9a-f-]+#activity-[0-9a-f-]+$/,
   );

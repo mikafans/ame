@@ -185,7 +185,7 @@ def main() -> int:
         # The web source and its node_modules live in separate mounts. Recreate
         # the web container on each start so a changed package manifest cannot
         # leave a stale dependency volume behind.
-        compose("up", "-d", "--build", "--force-recreate", "web", "caddy")
+        compose("up", "-d", "--build", "--force-recreate", "api", "web", "caddy")
         wait_for_api()
         wait_for_web()
         seed_stack()
