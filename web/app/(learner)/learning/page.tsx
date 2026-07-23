@@ -45,6 +45,13 @@ type TimelineEvent = {
   occurredAt: string;
 };
 
+function activityStatusLabel(status: string) {
+  if (status === "completed") return "Complete";
+  if (status === "ready") return "Ready";
+  if (status === "proposed") return "Planned";
+  return status.replaceAll("_", " ");
+}
+
 export default function LearningHomePage() {
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -291,7 +298,7 @@ export default function LearningHomePage() {
                                         {activity.title}
                                       </span>
                                       <span className="shrink-0 text-[0.68rem] uppercase tracking-[0.08em]">
-                                        {activity.status.replaceAll("_", " ")}
+                                        {activityStatusLabel(activity.status)}
                                       </span>
                                     </Link>
                                   </li>

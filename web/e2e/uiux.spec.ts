@@ -81,6 +81,12 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     page.getByRole("heading", { name: `Get oriented on ${topic}` }).first(),
   ).toBeVisible();
   await expect(page.getByText(/How familiar are you with .+\?/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: `Get oriented on ${topic}` }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
   await page.getByRole("button", { name: "new to me" }).click();
   await page
     .getByLabel(/What would you like to .+\?/)

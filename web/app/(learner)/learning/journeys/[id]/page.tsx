@@ -83,12 +83,25 @@ function ActivityProvenance({
 function ActivityRow({
   activity,
   startingActivity,
+  activeActivityId,
   onStart,
 }: {
   activity: Journey["activities"][number];
   startingActivity: string | null;
+  activeActivityId: string | null;
   onStart: (activityId: string) => void;
 }) {
+  const isActive = activeActivityId === activity.id;
+  const isReady = activity.status === "ready";
+  const isCompleted = activity.status === "completed";
+  const statusLabel = isActive
+    ? "In progress"
+    : isCompleted
+      ? "Complete"
+      : activity.status === "proposed"
+        ? "Planned"
+        : activity.status.replaceAll("_", " ");
+
   return (
     <article
       className="scroll-mt-6 flex items-center justify-between gap-4 border-b border-border py-5 last:border-b-0"
@@ -97,20 +110,34 @@ function ActivityRow({
     >
       <div className="min-w-0">
         <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-          {activity.kind} · {activity.status}
+          {activity.kind} · {statusLabel}
         </p>
         <h4 className="mt-1 font-medium">{activity.title}</h4>
       </div>
-      {activity.status === "ready" && (
+      {isReady && (
         <Button
           type="button"
           disabled={startingActivity !== null}
           onClick={() => onStart(activity.id)}
           className="shrink-0 rounded-full"
         >
-          {startingActivity === activity.id ? "Starting…" : "Begin"}
+          {startingActivity === activity.id
+            ? "Starting…"
+            : isActive
+              ? "Resume"
+              : "Begin"}
           <ArrowRight className="size-4" />
         </Button>
+      )}
+      {isCompleted && (
+        <span className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-primary">
+          <Check className="size-4" /> Done
+        </span>
+      )}
+      {!isReady && !isCompleted && (
+        <span className="shrink-0 text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+          {statusLabel}
+        </span>
       )}
     </article>
   );
@@ -393,6 +420,8 @@ export default function LearningJourneyPage() {
   const activeActivity = session
     ? journey.activities.find((activity) => activity.id === session.activityId)
     : null;
+  const activeActivityId =
+    session?.status === "in_progress" ? session.activityId : null;
   const activePayload = activeActivity?.payload as unknown as
     | ActivityPayload
     | undefined;
@@ -493,6 +522,7 @@ export default function LearningJourneyPage() {
                       key={activity.id}
                       activity={activity}
                       startingActivity={startingActivity}
+                      activeActivityId={activeActivityId}
                       onStart={startActivity}
                     />
                   ))}
@@ -514,6 +544,7 @@ export default function LearningJourneyPage() {
                     key={activity.id}
                     activity={activity}
                     startingActivity={startingActivity}
+                    activeActivityId={activeActivityId}
                     onStart={startActivity}
                   />
                 ))}
