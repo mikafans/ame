@@ -49,8 +49,16 @@ pub struct TopicBlueprint {
     pub template_id: String,
     pub aliases: Vec<String>,
     pub objectives: Vec<TopicObjective>,
+    pub chapters: Vec<TopicChapter>,
     pub first_activity: TopicFirstActivity,
     pub follow_up_activities: Vec<TopicActivity>,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct TopicChapter {
+    pub title: String,
+    pub summary: String,
+    pub activity_orders: Vec<i32>,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -92,14 +100,42 @@ pub fn builtin_catalog() -> Result<TemplateCatalog, String> {
 pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
     let topics: Vec<TopicBlueprint> = serde_json::from_str(TOPIC_BLUEPRINTS)
         .map_err(|error| format!("invalid topic blueprints: {error}"))?;
-    if topics.iter().any(|topic| {
-        topic.id.trim().is_empty()
+    for topic in &topics {
+        if topic.id.trim().is_empty()
             || topic.template_id.trim().is_empty()
             || topic.objectives.is_empty()
+            || topic.chapters.is_empty()
             || topic.first_activity.questions.is_empty()
             || topic.follow_up_activities.is_empty()
-    }) {
-        return Err("topic blueprints must contain identity, objectives, and questions".into());
+        {
+            return Err(
+                "topic blueprints must contain identity, objectives, chapters, and questions"
+                    .into(),
+            );
+        }
+
+        let mut activity_orders: Vec<i32> = topic
+            .chapters
+            .iter()
+            .flat_map(|chapter| chapter.activity_orders.iter().copied())
+            .collect();
+        activity_orders.sort_unstable();
+        let expected_orders: Vec<i32> = (0..=(topic.follow_up_activities.len() as i32)).collect();
+        if topic
+            .chapters
+            .iter()
+            .any(|chapter| {
+                chapter.title.trim().is_empty()
+                    || chapter.summary.trim().is_empty()
+                    || chapter.activity_orders.is_empty()
+            })
+            || activity_orders != expected_orders
+        {
+            return Err(format!(
+                "topic blueprint {} must assign each activity to exactly one valid chapter",
+                topic.id
+            ));
+        }
     }
     Ok(topics)
 }

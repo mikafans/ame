@@ -537,22 +537,19 @@ export default function LearningJourneyPage() {
       chapter.activities.some((activity) => activity.status !== "completed"),
     )?.id ??
     null;
-  const completedActivityChapter =
-    session?.status === "finished"
-      ? journey.chapters.find((chapter) =>
-          chapter.activities.some(
-            (activity) => activity.id === session.activityId,
-          ),
-        )
-      : null;
-  const nextChapter = journey.chapters.find(
+  const currentChapterIndex = journey.chapters.findIndex(
     (chapter) => chapter.id === currentChapterId,
   );
+  const completedChapterBeforeCurrent =
+    currentChapterIndex > 0 ? journey.chapters[currentChapterIndex - 1] : null;
   const chapterHandoff =
-    completedActivityChapter &&
-    nextChapter &&
-    completedActivityChapter.id !== nextChapter.id
-      ? { completed: completedActivityChapter, next: nextChapter }
+    completedChapterBeforeCurrent?.activities.every(
+      (activity) => activity.status === "completed",
+    ) && currentChapterIndex > 0
+      ? {
+          completed: completedChapterBeforeCurrent,
+          next: journey.chapters[currentChapterIndex],
+        }
       : null;
 
   return (

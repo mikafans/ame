@@ -296,12 +296,8 @@ test("learner sees a completed chapter state", async ({ page }) => {
   expect(journeyId).toBeTruthy();
   const apiBase = process.env.E2E_API_URL ?? "";
 
-  let journeyResponse = await page.request.get(
-    `${apiBase}/api/v1/learning/journeys/${journeyId}`,
-  );
-  const initialJourney = await journeyResponse.json();
-  for (let index = 0; index < initialJourney.activities.length; index += 1) {
-    journeyResponse = await page.request.get(
+  for (let index = 0; index < 2; index += 1) {
+    const journeyResponse = await page.request.get(
       `${apiBase}/api/v1/learning/journeys/${journeyId}`,
     );
     const currentJourney = await journeyResponse.json();
@@ -323,7 +319,7 @@ test("learner sees a completed chapter state", async ({ page }) => {
 
   await page.goto(`/learning/journeys/${journeyId}`);
   await expect(page.getByTestId("journey-detail-progress")).toContainText(
-    "100%",
+    "40%",
   );
   await expect(page.locator('[data-complete="true"]')).toHaveCount(1);
   await expect(
@@ -331,6 +327,9 @@ test("learner sees a completed chapter state", async ({ page }) => {
       exact: true,
     }),
   ).toBeVisible();
+  await expect(page.getByTestId("chapter-handoff")).toContainText(
+    "Next up: Practice and application",
+  );
 });
 
 test("learner can answer the first application task in a journey", async ({

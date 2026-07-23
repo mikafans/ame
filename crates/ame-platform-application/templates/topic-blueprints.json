@@ -20,6 +20,18 @@
         "success_criteria": "Use the ideas in a new but bounded situation"
       }
     ],
+    "chapters": [
+      {
+        "title": "Foundations",
+        "summary": "Build the essential model and vocabulary for {{goal}}.",
+        "activity_orders": [0, 1]
+      },
+      {
+        "title": "Practice and application",
+        "summary": "Use the model in examples and a bounded task for {{goal}}.",
+        "activity_orders": [2, 3, 4]
+      }
+    ],
     "first_activity": {
       "kind": "explanation",
       "title": "Get oriented on {{goal}}",
@@ -140,6 +152,18 @@
         "success_criteria": "Choose one evidence-backed review target"
       }
     ],
+    "chapters": [
+      {
+        "title": "Foundations",
+        "summary": "Build the essential model and vocabulary for {{goal}}.",
+        "activity_orders": [0, 1]
+      },
+      {
+        "title": "Practice and application",
+        "summary": "Use the model in examples and a bounded task for {{goal}}.",
+        "activity_orders": [2, 3, 4]
+      }
+    ],
     "first_activity": {
       "kind": "explanation",
       "title": "Orient on {{goal}} and estimate your starting point",
@@ -243,6 +267,18 @@
         "verb": "ship",
         "statement": "Complete the first {{goal}} milestone",
         "success_criteria": "Produce and inspect a small working increment"
+      }
+    ],
+    "chapters": [
+      {
+        "title": "Foundations",
+        "summary": "Build the essential model and vocabulary for {{goal}}.",
+        "activity_orders": [0, 1]
+      },
+      {
+        "title": "Practice and application",
+        "summary": "Use the model in examples and a bounded task for {{goal}}.",
+        "activity_orders": [2, 3, 4]
       }
     ],
     "first_activity": {

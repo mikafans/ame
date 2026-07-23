@@ -261,17 +261,20 @@ where
             .repository
             .list_chapters(journey.subject_user_id, journey.id)
             .await?;
-        if chapters.is_empty() {
+        for chapter in &blueprint.chapters {
+            if chapters
+                .iter()
+                .any(|existing| existing.order_index == chapter.order_index)
+            {
+                continue;
+            }
             self.repository
                 .create_chapter(CreateChapter {
                     journey_id: journey.id,
                     subject_user_id: journey.subject_user_id,
-                    title: "Foundations".to_string(),
-                    summary: format!(
-                        "Build the core concepts and vocabulary for {}.",
-                        plan.normalized_statement
-                    ),
-                    order_index: 0,
+                    title: render_goal_text(&chapter.title, &plan.normalized_statement),
+                    summary: render_goal_text(&chapter.summary, &plan.normalized_statement),
+                    order_index: chapter.order_index,
                 })
                 .await?;
             chapters = self
@@ -279,11 +282,6 @@ where
                 .list_chapters(journey.subject_user_id, journey.id)
                 .await?;
         }
-        let chapter_id = chapters.first().map(|chapter| chapter.id).ok_or(
-            LearningRepositoryError::NotFound {
-                resource: "chapter",
-            },
-        )?;
 
         let mut activities = self
             .repository
@@ -309,6 +307,14 @@ where
                         })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            let chapter_id = chapters
+                .iter()
+                .find(|chapter| chapter.order_index == activity.chapter_order)
+                .map(|chapter| chapter.id)
+                .ok_or(BootstrapError::InvalidTopicBlueprint(format!(
+                    "activity {} references missing chapter {}",
+                    activity.title, activity.chapter_order
+                )))?;
             self.repository
                 .create_activity(CreateActivity {
                     journey_id: journey.id,
@@ -344,13 +350,21 @@ where
 
 struct StarterBlueprint {
     objectives: Vec<CreateObjective>,
+    chapters: Vec<StarterChapter>,
     activities: Vec<StarterActivity>,
+}
+
+struct StarterChapter {
+    title: String,
+    summary: String,
+    order_index: i32,
 }
 
 struct StarterActivity {
     kind: ActivityKind,
     title: String,
     order_index: i32,
+    chapter_order: i32,
     objective_orders: Vec<i32>,
     payload: serde_json::Value,
     status: ActivityStatus,
@@ -423,6 +437,29 @@ fn starter_blueprint(
             },
         )
         .collect();
+    let chapters = topic
+        .chapters
+        .iter()
+        .enumerate()
+        .map(|(order_index, chapter)| StarterChapter {
+            title: chapter.title.clone(),
+            summary: chapter.summary.clone(),
+            order_index: order_index as i32,
+        })
+        .collect::<Vec<_>>();
+    let chapter_for_activity = |activity_order: i32| {
+        topic
+            .chapters
+            .iter()
+            .enumerate()
+            .find(|(_, chapter)| chapter.activity_orders.contains(&activity_order))
+            .map(|(order_index, _)| order_index as i32)
+            .ok_or_else(|| {
+                BootstrapError::InvalidTopicBlueprint(format!(
+                    "activity {activity_order} is not assigned to a chapter"
+                ))
+            })
+    };
     let goal = plan.normalized_statement.as_str();
     let first_activity = &topic.first_activity;
     let first_payload = serde_json::json!({
@@ -448,11 +485,13 @@ fn starter_blueprint(
         kind: first_kind,
         title: render_goal_text(&first_activity.title, goal),
         order_index: 0,
+        chapter_order: chapter_for_activity(0)?,
         objective_orders: first_activity.objective_orders.clone(),
         payload: first_payload,
         status: first_status,
     }];
     for activity in topic.follow_up_activities {
+        let order_index = activities.len() as i32;
         let kind = serde_json::from_value(serde_json::Value::String(activity.kind))
             .map_err(|error| BootstrapError::InvalidTopicBlueprint(error.to_string()))?;
         let status = serde_json::from_value(serde_json::Value::String(activity.status))
@@ -460,7 +499,8 @@ fn starter_blueprint(
         activities.push(StarterActivity {
             kind,
             title: render_goal_text(&activity.title, goal),
-            order_index: activities.len() as i32,
+            order_index,
+            chapter_order: chapter_for_activity(order_index)?,
             objective_orders: activity.objective_orders,
             payload: render_goal_value(activity.payload, goal),
             status,
@@ -468,6 +508,7 @@ fn starter_blueprint(
     }
     Ok(StarterBlueprint {
         objectives,
+        chapters,
         activities,
     })
 }
@@ -890,8 +931,19 @@ mod tests {
             .list_activities(first.goal.subject_user_id, first.journey.id)
             .await
             .expect("starter activities exist");
+        let chapters = repository
+            .list_chapters(first.goal.subject_user_id, first.journey.id)
+            .await
+            .expect("starter chapters exist");
         assert_eq!(objectives.len(), 3);
         assert_eq!(activities.len(), 5);
+        assert_eq!(chapters.len(), 2);
+        assert_eq!(chapters[0].title, "Foundations");
+        assert_eq!(chapters[1].title, "Practice and application");
+        assert_eq!(activities[0].chapter_id, Some(chapters[0].id));
+        assert_eq!(activities[1].chapter_id, Some(chapters[0].id));
+        assert_eq!(activities[2].chapter_id, Some(chapters[1].id));
+        assert_eq!(activities[4].chapter_id, Some(chapters[1].id));
         assert_eq!(
             activities[0].status,
             crate::domain::learning::ActivityStatus::Ready
