@@ -785,8 +785,11 @@ mod tests {
             InMemoryIdentityRepository::default(),
             InMemoryLearningRepository::default(),
         );
-        let prompt = "I would like to learn Flink and the Flink Kubernetes Operator";
-        let topic = "Flink and the Flink Kubernetes Operator";
+        // A topic without a curated field blueprint falls through to the generic
+        // template, so this still exercises {{goal}} rendering. (Flink now routes
+        // to a curated CS blueprint with literal content.)
+        let prompt = "I would like to learn photosynthesis";
+        let topic = "photosynthesis";
 
         let preview = service
             .preview_from_prompt(prompt, &CatalogPromptInterpreter)
@@ -963,6 +966,38 @@ mod tests {
             activities
                 .iter()
                 .all(|activity| !activity.objective_ids.is_empty())
+        );
+    }
+
+    #[tokio::test]
+    async fn bootstrap_flink_prompt_produces_multi_chapter_cs_journey() {
+        let repository = InMemoryLearningRepository::default();
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            repository.clone(),
+        );
+        let result = service
+            .start_from_prompt(
+                StartLearningPromptRequest {
+                    raw_prompt: "I would like to learn Apache Flink".to_string(),
+                    ..start_learning_prompt_request()
+                },
+                &CatalogPromptInterpreter,
+            )
+            .await
+            .expect("flink onboarding succeeds");
+
+        let chapters = repository
+            .list_chapters(
+                result.bootstrap.goal.subject_user_id,
+                result.bootstrap.journey.id,
+            )
+            .await
+            .expect("flink chapters exist");
+        assert!(
+            chapters.len() >= 4,
+            "Flink (CS field) journey should have >=4 chapters, got {}",
+            chapters.len()
         );
     }
 

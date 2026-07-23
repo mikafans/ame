@@ -47,6 +47,8 @@ pub struct TemplateRecommendation {
 pub struct TopicBlueprint {
     pub id: String,
     pub template_id: String,
+    #[serde(default)]
+    pub field: String,
     pub aliases: Vec<String>,
     pub objectives: Vec<TopicObjective>,
     pub chapters: Vec<TopicChapter>,
@@ -121,15 +123,11 @@ pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
             .collect();
         activity_orders.sort_unstable();
         let expected_orders: Vec<i32> = (0..=(topic.follow_up_activities.len() as i32)).collect();
-        if topic
-            .chapters
-            .iter()
-            .any(|chapter| {
-                chapter.title.trim().is_empty()
-                    || chapter.summary.trim().is_empty()
-                    || chapter.activity_orders.is_empty()
-            })
-            || activity_orders != expected_orders
+        if topic.chapters.iter().any(|chapter| {
+            chapter.title.trim().is_empty()
+                || chapter.summary.trim().is_empty()
+                || chapter.activity_orders.is_empty()
+        }) || activity_orders != expected_orders
         {
             return Err(format!(
                 "topic blueprint {} must assign each activity to exactly one valid chapter",
