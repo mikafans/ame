@@ -1,13 +1,17 @@
 # ame — study, sweetened
 
-ame is an agent-friendly, self-hostable learning platform. People and agents
-use the same owner-scoped learning API. The first journey needs one learner
-prompt, one email identifier, and one bearer session.
+ame is a self-hostable, agent-friendly learning platform. People and agents
+use the same owner-scoped learner API. An agent can start a journey, compose a
+course-like path, help the learner study and demonstrate knowledge, and read
+the same progress that appears in the browser.
 
-## Start with one learner prompt
+This is the concise agent entry guide. Use `/public/skill.json` to discover
+named operations and `/public/openapi.yaml` for complete request and response
+schemas.
 
-For an agent-managed account, register once and retain the returned bearer
-token:
+## Start a learner journey
+
+Register once and retain the returned bearer token:
 
 ```http
 POST /public/v1/auth/register
@@ -16,134 +20,148 @@ Content-Type: application/json
 {"email":"learner@example.com","name":"Learner","password":"at-least-8-chars"}
 ```
 
-For an existing account, use the same public origin to sign in:
+Existing learners can use `POST /public/v1/auth/login`. Both operations return
+`token` and `user`. Send the token as `Authorization: Bearer <token>` on
+authenticated `/api/v1/*` requests. In self-host mode, email is an account
+identifier; AME does not send email.
 
-```http
-POST /public/v1/auth/login
-Content-Type: application/json
-
-{"email":"learner@example.com","password":"at-least-8-chars"}
-```
-
-Both responses return `token` and `user`. Use the token as
-`Authorization: Bearer <token>` on authenticated `/api/v1/*` requests.
-
-Preview without creating data:
+Preview a prompt without creating state:
 
 ```http
 POST /public/v1/onboarding/preview
-Content-Type: application/json
-
-{"prompt":"I'd like to learn the topic I name"}
+{"prompt":"I want to learn Apache Flink checkpointing"}
 ```
 
-Create or resume the learner and bootstrap a first journey:
+Create or resume the learner journey with a stable idempotency key:
 
 ```http
 POST /public/v1/onboarding/start
-Content-Type: application/json
-
 {
   "email":"learner@example.com",
   "displayName":"Learner",
-  "prompt":"I'd like to learn the topic I name",
-  "idempotencyKey":"first-topic-journey"
+  "prompt":"I want to learn Apache Flink checkpointing",
+  "idempotencyKey":"flink-checkpointing-v1"
 }
 ```
 
-Self-host mode does not send email. The email is an account identifier. The
-response returns a bearer token and the new journey id. Store the token as
-`Authorization: Bearer <token>` or let the browser use its session cookie.
+## The learning model
 
-## Learning loop
+`GET /api/v1/learning/journeys/{id}` returns one resumable manifest:
 
-With the learner token:
-
-```http
-GET /api/v1/learning/journeys
-GET /api/v1/learning/journeys/{id}
-POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
-GET /api/v1/learning/sessions/{id}
-POST /api/v1/learning/sessions/{id}/finish
-PATCH /api/v1/learning/activities/{activity_id}/content
-POST /api/v1/generation-runs
-GET /api/v1/generation-runs/{id}
-PATCH /api/v1/generation-runs/{id}
-POST /api/v1/questions
-GET /api/v1/questions/{question_id}/versions/{version}
-POST /api/v1/questions/{question_id}/versions
-POST /api/v1/assessments
-GET /api/v1/assessments/{assessment_id}
-POST /api/v1/assessments/{assessment_id}/attempts
-GET /api/v1/learning/journeys/{journey_id}/attempts
-GET /api/v1/attempts/{attempt_id}
-POST /api/v1/attempts/{attempt_id}/answers
-POST /api/v1/attempts/{attempt_id}/finish
-POST /api/v1/progress/evidence
-GET /api/v1/progress/{journey_id}/objectives/{objective_id}
-POST /api/v1/progress/{journey_id}/recommendation
-POST /api/v1/progress/streaks
-GET /api/v1/progress/{journey_id}/streaks
-GET /api/v1/progress/{journey_id}/timeline
+```text
+journey
+  └─ chapters/modules
+       ├─ lesson or explanation
+       ├─ worked example or code example
+       ├─ interactive scenario
+       ├─ quiz or assessment
+       ├─ application task
+       └─ review/recommendation
 ```
 
-The journey contains the learner's intent, promise, objectives, activities,
-and persisted evidence. `GET /api/v1/learning/journeys/{id}` returns one
-evidence-backed recommendation with `objectiveId`, `activityId`, and
-server-derived `evidenceIds`; this is the same recommendation shown by the web
-app and returned by `POST /api/v1/progress/{journey_id}/recommendation`. Agents
-choose the next useful activity and record the result; the web app presents the
-same state. Every evidence request requires an
-`attemptId` and must reference a graded attempt owned by the learner; an
-evidence record without attempt provenance is invalid. Streak events use
-`attempt:<completed-attempt-id>` as their
-qualifying event key. The submitted `qualifyingDay` must match that attempt's
-graded timestamp in the supplied IANA `learnerTimezone`; arbitrary historical
-or future days are rejected. Before creating generated content, start a
-generation run with the matching operation (`question.compose` or
-`deep_dive.create`), transition it to `published`, and send its
-`generationRunId`. Questions, immutable question versions, and deep dives
-reject missing, failed, cross-owner, and operation-mismatched provenance. A
-deep dive must also reference existing evidence owned by the same learner and
-matching its journey, objective, and activity; include at least one source
-reference. Deep dives carry an explicit `reviewStatus`; `draft`, `review`, and
-`rejected` content may be stored for the authoring/review workflow but are not
-returned by learner deep-dive reads. Only `approved` deep dives appear through
-`GET /api/v1/deep-dives?activityId=...` or `GET /api/v1/deep-dives/{id}`.
+The response includes the learner's raw intent, promise, objectives, ordered
+chapters, activities, immutable content versions, activity status, and the
+evidence-backed recommendation. The flat `activities` field remains a
+compatibility view; new clients should prefer `chapters[].activities`.
 
-Provider generation runs are owner-scoped and retryable. Reusing the same
-`retryKey` for the same operation returns the existing run. A run may move
-through `requested`, `running`, `review_required`, `published`, or `failed`;
-failed runs require an error and cannot be published without a new retry key.
+Activity content is typed by `payload.content.type`. Current capabilities are
+`explanation`, `worked_example`, `rich_text`, `diagram`, `code_example`, and
+`scenario`. The server validates that a capability matches the activity kind;
+the browser renders known capabilities and shows a safe fallback for unknown
+future capabilities. Content is versioned and approved before it is learner
+visible. Text fields may contain Markdown, but an activity is not limited to
+plain text.
 
-To ground the first explanation or worked example for the learner's actual
-topic, start and publish a `learning.activity.content.compose` generation run,
-then call `PATCH /api/v1/learning/activities/{activity_id}/content` with the
-matching `generationRunId`, an `explanation` or `worked_example` content object,
-at least one `sourceReferences` entry, and `reviewStatus: "approved"`. The
-content type must match the activity kind, prose fields and steps/key points
-must be non-empty strings, and the content is stored in the existing activity
-payload. No database migration is required; completed activities cannot be
-rewritten.
+## Learner loop
 
-Attempt responses include `assessmentMode` (`practice` or `graded`) and
-`reviewStatus` (`not_required`, `complete`, or `pending`). Deterministic
-practice and exam attempts return a score with `complete`; an attempt containing
-essay or code work returns `submitted`, a null score, and `pending` until manual
-review. Do not treat a practice score as an exam result.
+Use these operations with the learner token:
 
-## Discovery
+```http
+GET    /api/v1/learning/journeys
+GET    /api/v1/learning/journeys/{id}
+POST   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
+GET    /api/v1/learning/sessions/{id}
+POST   /api/v1/learning/sessions/{id}/finish
+PATCH  /api/v1/learning/activities/{activity_id}/content
 
-- `GET /public/skill.json` — machine-readable endpoint descriptions.
-- `GET /public/openapi.yaml` — complete current HTTP contract.
-- `GET /public/llms.txt` — this concise agent entry document.
-- `GET /self-hosting` — operator documentation.
+POST   /api/v1/questions
+GET    /api/v1/questions/{question_id}/versions/{version}
+POST   /api/v1/questions/{question_id}/versions
+POST   /api/v1/assessments
+GET    /api/v1/assessments/{assessment_id}
+GET    /api/v1/assessments?activityId={activity_id}
+POST   /api/v1/assessments/{assessment_id}/attempts
+GET    /api/v1/attempts/{attempt_id}
+POST   /api/v1/attempts/{attempt_id}/answers
+POST   /api/v1/attempts/{attempt_id}/finish
+GET    /api/v1/learning/journeys/{journey_id}/attempts
 
-## Rules
+POST   /api/v1/tasks/{task_id}/submissions
+POST   /api/v1/task-submissions/{submission_id}/submit
+GET    /api/v1/task-submissions/{submission_id}
 
-- Use the bearer token returned by onboarding or normal login.
-- Every journey and session is scoped to that learner.
-- Use a stable `idempotencyKey` when starting onboarding.
-- There is no SMTP dependency in the self-host flow.
-- Rate limiting, request IDs, authentication, and audit logging are platform
-  concerns applied equally to browser and agent requests.
+POST   /api/v1/progress/evidence
+GET    /api/v1/progress/{journey_id}/objectives/{objective_id}
+POST   /api/v1/progress/{journey_id}/recommendation
+POST   /api/v1/progress/streaks
+GET    /api/v1/progress/{journey_id}/streaks
+GET    /api/v1/progress/{journey_id}/timeline
+```
+
+Starting a session does not prove mastery. Finishing an instructional activity
+records completion, while a quiz attempt or application-task submission
+records demonstrable work. Practice and automatically graded assessments may
+return a score. Essay/code answers can finish as `submitted` with
+`reviewStatus: pending`; do not invent a score or evidence while review is
+pending. Abandoned work never creates mastery evidence.
+
+Task submissions carry the exact activity `contentVersion`, response, review
+state, evaluation method, optional score, and feedback. A task contributes
+evidence only after its declared evaluation reaches a reviewed terminal state.
+Learners can read their result with
+`GET /api/v1/task-submissions/{submission_id}`.
+
+Evidence must identify exactly one graded assessment attempt or reviewed task
+submission, and must match the same learner, journey, objective, activity, and
+content version. Recommendations, timeline events, and streak events are
+derived from durable activity and evidence state rather than from generated
+text alone.
+
+## Agent authoring and adaptation
+
+Agents may inspect the journey, create versioned questions and assessments,
+author approved activity content, create source-backed deep dives, and inspect
+progress. Generated content requires an owner-scoped generation run with a
+matching operation and published status:
+
+```http
+POST  /api/v1/generation-runs
+GET   /api/v1/generation-runs/{id}
+PATCH /api/v1/generation-runs/{id}
+```
+
+Use `question.compose` for questions, `deep_dive.create` for deep dives, and
+`learning.activity.content.compose` for reviewed activity content. Reuse a
+stable `retryKey` for retryable generation. Failed, cross-owner, stale, or
+operation-mismatched provenance is rejected. Deep dives require matching
+existing evidence and at least one source reference; only approved deep dives
+are learner-readable. Use these deep-dive operations to create or read them:
+
+```http
+POST /api/v1/deep-dives
+GET  /api/v1/deep-dives?activityId={activity_id}
+GET  /api/v1/deep-dives/{id}
+```
+
+## Discovery and rules
+
+- `GET /public/skill.json` — named agent operations and lightweight input schemas.
+- `GET /public/openapi.yaml` — complete HTTP contract for code generation and validation.
+- `GET /public/llms.txt` — this concise agent entry guide.
+- `GET /agent` — human-readable agent integration guide.
+- `GET /self-hosting` — human-readable operator deployment guide.
+
+Use the bearer token returned by registration, login, or onboarding. Keep every
+journey and session owner-scoped. Use a stable `idempotencyKey` for onboarding.
+Do not treat generated content, a selected scenario option, an unfinished
+session, a practice score, or pending manual review as proof of mastery.

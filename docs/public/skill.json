@@ -207,6 +207,78 @@
       "path": "/api/v1/learning/sessions/{id}"
     },
     {
+      "description": "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
+      "input_schema": {
+        "properties": {
+          "contentVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "evaluationMethod": {
+            "enum": [
+              "self_review",
+              "automatic",
+              "agent",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "response": {
+            "type": "object"
+          },
+          "taskId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "contentVersion",
+          "response"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.task.submission.start",
+      "path": "/api/v1/tasks/{task_id}/submissions"
+    },
+    {
+      "description": "Submit an application-task response for evaluation. It may become pending review rather than immediately producing a score.",
+      "input_schema": {
+        "properties": {
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submissionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.task.submission.submit",
+      "path": "/api/v1/task-submissions/{submission_id}/submit"
+    },
+    {
+      "description": "Read the learner's task submission status, score, and reviewer or agent feedback.",
+      "input_schema": {
+        "properties": {
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submissionId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.task.submission.get",
+      "path": "/api/v1/task-submissions/{submission_id}"
+    },
+    {
       "description": "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
       "input_schema": {
         "properties": {

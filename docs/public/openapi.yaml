@@ -121,6 +121,22 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
+  /api/v1/admin/task-submissions:
+    get:
+      tags:
+      - tasks
+      operationId: list_pending_submissions
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
   /api/v1/admin/users:
     get:
       tags:
@@ -938,6 +954,106 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
+  /api/v1/task-submissions/{submission_id}:
+    get:
+      tags:
+      - tasks
+      operationId: get_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/task-submissions/{submission_id}/review:
+    patch:
+      tags:
+      - tasks
+      operationId: review_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewTaskSubmissionBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/task-submissions/{submission_id}/submit:
+    post:
+      tags:
+      - tasks
+      operationId: submit_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/tasks/{task_id}/submissions:
+    post:
+      tags:
+      - tasks
+      operationId: start_submission
+      parameters:
+      - name: task_id
+        in: path
+        description: Application task activity ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartTaskSubmissionBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
   /public/v1/auth/login:
     post:
       tags:
@@ -1041,6 +1157,13 @@ components:
       - milestone
       - timed_practice
       - recommendation
+    ActivityPublicationStatus:
+      type: string
+      enum:
+      - draft
+      - review
+      - published
+      - retired
     ActivityStatus:
       type: string
       enum:
@@ -1622,9 +1745,6 @@ components:
           format: uuid
     EffectiveSettings:
       type: object
-      description: |-
-        The effective platform settings: config defaults with `tb_settings` overrides
-        applied. Serialized both as the admin API response and as the cache blob.
       required:
       - maintenanceMode
       - ratelimit
@@ -1639,7 +1759,7 @@ components:
       - journeyId
       - objectiveId
       - activityId
-      - attemptId
+      - contentVersion
       - value
       - derivationVersion
       properties:
@@ -1647,8 +1767,14 @@ components:
           type: string
           format: uuid
         attemptId:
-          type: string
+          type:
+          - string
+          - 'null'
           format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
         derivationVersion:
           type: integer
           format: int32
@@ -1658,6 +1784,11 @@ components:
           format: uuid
         objectiveId:
           type: string
+          format: uuid
+        taskSubmissionId:
+          type:
+          - string
+          - 'null'
           format: uuid
         value:
           type: number
@@ -1669,7 +1800,7 @@ components:
       - journeyId
       - objectiveId
       - activityId
-      - attemptId
+      - contentVersion
       - value
       - derivationVersion
       properties:
@@ -1677,8 +1808,14 @@ components:
           type: string
           format: uuid
         attemptId:
-          type: string
+          type:
+          - string
+          - 'null'
           format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
         derivationVersion:
           type: integer
           format: int32
@@ -1691,6 +1828,11 @@ components:
           format: uuid
         objectiveId:
           type: string
+          format: uuid
+        taskSubmissionId:
+          type:
+          - string
+          - 'null'
           format: uuid
         value:
           type: number
@@ -1788,12 +1930,22 @@ components:
       - title
       - orderIndex
       - payloadSchemaVersion
+      - contentVersion
+      - publicationStatus
       - payload
       - objectiveIds
       - status
       - createdAt
       - updatedAt
       properties:
+        chapterId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
         createdAt:
           type: string
           format: date-time
@@ -1818,6 +1970,8 @@ components:
         payloadSchemaVersion:
           type: integer
           format: int32
+        publicationStatus:
+          $ref: '#/components/schemas/ActivityPublicationStatus'
         sourceActorId:
           type: string
           format: uuid
@@ -1831,6 +1985,41 @@ components:
         updatedAt:
           type: string
           format: date-time
+    LearningChapterResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - subjectUserId
+      - title
+      - summary
+      - orderIndex
+      - activities
+      - createdAt
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        subjectUserId:
+          type: string
+          format: uuid
+        summary:
+          type: string
+        title:
+          type: string
     LearningGoalResponse:
       type: object
       required:
@@ -1877,12 +2066,19 @@ components:
       - createdAt
       - goal
       - objectives
+      - chapters
+      - ungroupedActivities
       - activities
       properties:
         activities:
           type: array
           items:
             $ref: '#/components/schemas/LearningActivityResponse'
+          description: Flat compatibility view; new clients should use chapters.activities.
+        chapters:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningChapterResponse'
         createdAt:
           type: string
           format: date-time
@@ -1912,6 +2108,10 @@ components:
         subjectUserId:
           type: string
           format: uuid
+        ungroupedActivities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
     LearningJourneySummaryResponse:
       type: object
       required:
@@ -2362,6 +2562,24 @@ components:
           type: string
         password:
           type: string
+    ReviewTaskOutcome:
+      type: string
+      enum:
+      - reviewed
+      - rejected
+    ReviewTaskSubmissionBody:
+      type: object
+      required:
+      - outcome
+      properties:
+        feedback: {}
+        outcome:
+          $ref: '#/components/schemas/ReviewTaskOutcome'
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
     Role:
       type: string
       enum:
@@ -2485,6 +2703,19 @@ components:
         userId:
           type: string
           format: uuid
+    StartTaskSubmissionBody:
+      type: object
+      required:
+      - contentVersion
+      - response
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        evaluationMethod:
+          $ref: '#/components/schemas/TaskEvaluationMethod'
+        response: {}
     StreakBody:
       type: object
       required:
@@ -2528,6 +2759,66 @@ components:
           type: string
         qualifyingEventKey:
           type: string
+    TaskEvaluationMethod:
+      type: string
+      enum:
+      - self_review
+      - automatic
+      - agent
+      - manual
+    TaskReviewStatus:
+      type: string
+      enum:
+      - not_required
+      - pending
+      - complete
+    TaskSubmissionResponse:
+      type: object
+      required:
+      - id
+      - taskId
+      - journeyId
+      - contentVersion
+      - response
+      - evaluationMethod
+      - status
+      - reviewStatus
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        evaluationMethod:
+          $ref: '#/components/schemas/TaskEvaluationMethod'
+        feedback: {}
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        response: {}
+        reviewStatus:
+          $ref: '#/components/schemas/TaskReviewStatus'
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
+        status:
+          $ref: '#/components/schemas/TaskSubmissionStatus'
+        taskId:
+          type: string
+          format: uuid
+    TaskSubmissionStatus:
+      type: string
+      enum:
+      - in_progress
+      - submitted
+      - in_review
+      - reviewed
+      - rejected
+      - abandoned
     TierLimit:
       type: object
       required:

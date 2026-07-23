@@ -82,6 +82,27 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.task.submission.start",
+            "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
+            "POST",
+            "/api/v1/tasks/{task_id}/submissions",
+            json!({"type":"object","required":["taskId","contentVersion","response"],"properties":{"taskId":{"type":"string","format":"uuid"},"contentVersion":{"type":"integer","minimum":1},"response":{"type":"object"},"evaluationMethod":{"type":"string","enum":["self_review","automatic","agent","manual"]}}}),
+        ),
+        endpoint(
+            "learning.task.submission.submit",
+            "Submit an application-task response for evaluation. It may become pending review rather than immediately producing a score.",
+            "POST",
+            "/api/v1/task-submissions/{submission_id}/submit",
+            json!({"type":"object","required":["submissionId"],"properties":{"submissionId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.task.submission.get",
+            "Read the learner's task submission status, score, and reviewer or agent feedback.",
+            "GET",
+            "/api/v1/task-submissions/{submission_id}",
+            json!({"type":"object","required":["submissionId"],"properties":{"submissionId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.activity.content.author",
             "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
             "PATCH",
