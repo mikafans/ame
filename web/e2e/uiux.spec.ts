@@ -226,6 +226,8 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   await expect(
     page.getByText("I would like to learn a new subject", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("Course path", { exact: true })).toBeVisible();
+  await expect(page.getByText("1. Foundations", { exact: true })).toBeVisible();
 });
 
 test("learner can answer the first application task in a journey", async ({

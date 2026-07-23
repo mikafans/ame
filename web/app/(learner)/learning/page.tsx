@@ -24,6 +24,17 @@ type JourneySummary = {
   createdAt: string;
 };
 
+type JourneyChapter = {
+  id: string;
+  title: string;
+  summary: string;
+  activities: {
+    id: string;
+    title: string;
+    status: string;
+  }[];
+};
+
 type Snapshot = { mastery: number; confidence: number; evidenceCount: number };
 type Objective = { id: string; statement: string };
 type ObjectiveProgress = { objective: Objective; snapshot: Snapshot | null };
@@ -37,6 +48,9 @@ type TimelineEvent = {
 export default function LearningHomePage() {
   const [journeys, setJourneys] = useState<JourneySummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chapters, setChapters] = useState<Record<string, JourneyChapter[]>>(
+    {},
+  );
   const [snapshots, setSnapshots] = useState<Record<string, Snapshot>>({});
   const [objectiveProgress, setObjectiveProgress] = useState<
     Record<string, ObjectiveProgress[]>
@@ -84,6 +98,7 @@ export default function LearningHomePage() {
               : [],
           );
           if (!response.ok) return null;
+          const journeyDetail = data as { chapters?: JourneyChapter[] };
           const objectives =
             (data as { objectives?: Objective[] }).objectives ?? [];
           const objectiveProgress = await Promise.all(
@@ -110,6 +125,7 @@ export default function LearningHomePage() {
           );
           return {
             journeyId: journey.id,
+            chapters: journeyDetail.chapters ?? [],
             snapshot: objectiveProgress[0]?.snapshot ?? null,
             objectiveProgress,
             streakDays,
@@ -119,6 +135,15 @@ export default function LearningHomePage() {
                 : [],
           };
         }),
+      );
+      setChapters(
+        Object.fromEntries(
+          results
+            .filter(
+              (value): value is NonNullable<typeof value> => value !== null,
+            )
+            .map((value) => [value.journeyId, value.chapters]),
+        ),
       );
       setSnapshots(
         Object.fromEntries(
@@ -217,6 +242,48 @@ export default function LearningHomePage() {
                       ? `Next: ${journey.nextActivityTitle}`
                       : journey.promise}
                   </p>
+                  {(chapters[journey.id] ?? []).length > 0 && (
+                    <div
+                      className="mt-4 space-y-2 border-t border-border/70 pt-3"
+                      data-testid={"journey-chapters-" + journey.id}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                        Course path
+                      </p>
+                      <ul className="space-y-2">
+                        {chapters[journey.id].map((chapter, index) => {
+                          const completed = chapter.activities.filter(
+                            (activity) => activity.status === "completed",
+                          ).length;
+                          const nextActivity = chapter.activities.find(
+                            (activity) => activity.status === "ready",
+                          );
+                          return (
+                            <li
+                              key={chapter.id}
+                              className="rounded-xl bg-muted/40 px-3 py-2 text-xs"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="font-medium">
+                                  {index + 1}. {chapter.title}
+                                </span>
+                                <span className="shrink-0 text-muted-foreground">
+                                  {completed}/{chapter.activities.length}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-muted-foreground">
+                                {nextActivity
+                                  ? "Next: " + nextActivity.title
+                                  : completed === chapter.activities.length
+                                    ? "Complete"
+                                    : chapter.summary}
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                   {(snapshots[journey.id] ||
                     streaks[journey.id] !== undefined) && (
                     <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
