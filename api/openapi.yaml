@@ -2428,6 +2428,7 @@ components:
       - multiple_choice
       - true_false
       - short_answer
+      - numeric
       - essay
       - code
     QuestionOption:

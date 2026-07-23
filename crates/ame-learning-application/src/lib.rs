@@ -1,13 +1,13 @@
 //! Learning repositories and their contract tests.
 
 use ame_learning_domain::{
-    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
-    CreateActivity, CreateChapter, CreateGoal, CreateJourney, CreateLearningSession,
-    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
-    LearningChapter, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
-    LearningRepositoryError, LearningSession, LearningSessionStatus, ObjectiveStatus,
-    validate_activity, validate_activity_content, validate_chapter, validate_goal,
-    validate_journey, validate_objective,
+    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent, CreateActivity,
+    CreateChapter, CreateGoal, CreateJourney, CreateLearningSession, CreateObjective,
+    FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity, LearningChapter,
+    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
+    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity,
+    validate_activity_content, validate_chapter, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -48,10 +48,18 @@ pub async fn load_journey_manifest<R: LearningRepository>(
     journey_id: Uuid,
 ) -> Result<LearningJourneyManifest, LearningRepositoryError> {
     let journey = repository.get_journey(subject_user_id, journey_id).await?;
-    let goal = repository.get_goal(subject_user_id, journey.goal_id).await?;
-    let objectives = repository.list_objectives(subject_user_id, journey.id).await?;
-    let chapters = repository.list_chapters(subject_user_id, journey.id).await?;
-    let activities = repository.list_activities(subject_user_id, journey.id).await?;
+    let goal = repository
+        .get_goal(subject_user_id, journey.goal_id)
+        .await?;
+    let objectives = repository
+        .list_objectives(subject_user_id, journey.id)
+        .await?;
+    let chapters = repository
+        .list_chapters(subject_user_id, journey.id)
+        .await?;
+    let activities = repository
+        .list_activities(subject_user_id, journey.id)
+        .await?;
     let mut chapter_manifests = Vec::with_capacity(chapters.len());
     let mut grouped_activity_ids = std::collections::HashSet::new();
     for chapter in chapters {
@@ -344,10 +352,13 @@ impl LearningRepository for InMemoryLearningRepository {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
         if let Some(chapter_id) = input.chapter_id {
-            let chapter = state
-                .chapters
-                .get(&chapter_id)
-                .ok_or(LearningRepositoryError::NotFound { resource: "chapter" })?;
+            let chapter =
+                state
+                    .chapters
+                    .get(&chapter_id)
+                    .ok_or(LearningRepositoryError::NotFound {
+                        resource: "chapter",
+                    })?;
             if chapter.journey_id != input.journey_id
                 || chapter.subject_user_id != input.subject_user_id
             {
@@ -409,10 +420,13 @@ impl LearningRepository for InMemoryLearningRepository {
             .state
             .lock()
             .map_err(LearningRepositoryError::storage)?;
-        let journey = state
-            .journeys
-            .get(&input.journey_id)
-            .ok_or(LearningRepositoryError::NotFound { resource: "journey" })?;
+        let journey =
+            state
+                .journeys
+                .get(&input.journey_id)
+                .ok_or(LearningRepositoryError::NotFound {
+                    resource: "journey",
+                })?;
         if journey.subject_user_id != input.subject_user_id {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
@@ -448,7 +462,9 @@ impl LearningRepository for InMemoryLearningRepository {
         let journey = state
             .journeys
             .get(&journey_id)
-            .ok_or(LearningRepositoryError::NotFound { resource: "journey" })?;
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "journey",
+            })?;
         if journey.subject_user_id != subject_user_id {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
@@ -1099,7 +1115,10 @@ mod contract_tests {
             vec!["Lesson", "Quiz"]
         );
         assert_eq!(manifest.ungrouped_activities.len(), 1);
-        assert_eq!(manifest.ungrouped_activities[0].title, "Legacy ungrouped activity");
+        assert_eq!(
+            manifest.ungrouped_activities[0].title,
+            "Legacy ungrouped activity"
+        );
     }
 
     #[tokio::test]

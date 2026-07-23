@@ -1,13 +1,13 @@
 //! PostgreSQL implementation of the learning repository contract.
 
 use ame_learning_domain::{
-    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
-    CreateActivity, CreateChapter, CreateGoal, CreateJourney, CreateLearningSession,
-    CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity,
-    LearningChapter, LearningGoal, LearningJourney, LearningObjective, LearningRepository,
-    LearningRepositoryError, LearningSession, LearningSessionStatus, ObjectiveStatus,
-    validate_activity, validate_activity_content, validate_chapter, validate_goal,
-    validate_journey, validate_objective,
+    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent, CreateActivity,
+    CreateChapter, CreateGoal, CreateJourney, CreateLearningSession, CreateObjective,
+    FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity, LearningChapter,
+    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
+    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity,
+    validate_activity_content, validate_chapter, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -399,7 +399,9 @@ impl LearningRepository for PgLearningRepository {
             .fetch_optional(&self.pool)
             .await
             .map_err(storage_error)?
-            .ok_or(LearningRepositoryError::NotFound { resource: "chapter" })?;
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "chapter",
+            })?;
             if chapter.get::<Uuid, _>("journey_id") != journey.id
                 || chapter.get::<Uuid, _>("subject_user_id") != input.subject_user_id
             {

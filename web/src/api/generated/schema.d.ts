@@ -1199,7 +1199,7 @@ export interface components {
             verb: string;
         };
         /** @enum {string} */
-        QuestionKind: "multiple_choice" | "true_false" | "short_answer" | "essay" | "code";
+        QuestionKind: "multiple_choice" | "true_false" | "short_answer" | "numeric" | "essay" | "code";
         QuestionOption: {
             id: string;
             is_correct: boolean;

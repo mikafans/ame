@@ -460,8 +460,10 @@ pub fn validate_objective(input: &CreateObjective) -> Result<(), LearningReposit
 }
 
 pub fn validate_chapter(input: &CreateChapter) -> Result<(), LearningRepositoryError> {
-    for (field, value) in [("title", input.title.as_str()), ("summary", input.summary.as_str())]
-    {
+    for (field, value) in [
+        ("title", input.title.as_str()),
+        ("summary", input.summary.as_str()),
+    ] {
         if value.trim().is_empty() {
             return Err(LearningRepositoryError::EmptyField { field });
         }
@@ -523,14 +525,29 @@ pub fn validate_activity_content(
     };
     let capability: ActivityCapability = serde_json::from_value(input.content.clone())
         .map_err(|_| LearningRepositoryError::InvalidActivityContent)?;
-    let valid_for_kind = matches!((&activity_kind, &capability),
-        (ActivityKind::Explanation, ActivityCapability::Explanation { .. })
-        | (ActivityKind::Explanation, ActivityCapability::RichText { .. })
-        | (ActivityKind::Explanation, ActivityCapability::Diagram { .. })
-        | (ActivityKind::Example, ActivityCapability::WorkedExample { .. })
-        | (ActivityKind::Example, ActivityCapability::CodeExample { .. })
-        | (ActivityKind::Practice, ActivityCapability::Scenario { .. })
-        | (ActivityKind::Application, ActivityCapability::Scenario { .. }));
+    let valid_for_kind = matches!(
+        (&activity_kind, &capability),
+        (
+            ActivityKind::Explanation,
+            ActivityCapability::Explanation { .. }
+        ) | (
+            ActivityKind::Explanation,
+            ActivityCapability::RichText { .. }
+        ) | (
+            ActivityKind::Explanation,
+            ActivityCapability::Diagram { .. }
+        ) | (
+            ActivityKind::Example,
+            ActivityCapability::WorkedExample { .. }
+        ) | (
+            ActivityKind::Example,
+            ActivityCapability::CodeExample { .. }
+        ) | (ActivityKind::Practice, ActivityCapability::Scenario { .. })
+            | (
+                ActivityKind::Application,
+                ActivityCapability::Scenario { .. }
+            )
+    );
     if !valid_for_kind || !capability_has_content(&capability) {
         return Err(LearningRepositoryError::InvalidActivityContent);
     }
@@ -550,7 +567,12 @@ fn capability_has_content(capability: &ActivityCapability) -> bool {
             prompt,
             steps,
             reflection,
-        } => non_empty(heading) && non_empty(prompt) && non_empty(reflection) && non_empty_list(steps),
+        } => {
+            non_empty(heading)
+                && non_empty(prompt)
+                && non_empty(reflection)
+                && non_empty_list(steps)
+        }
         ActivityCapability::RichText { heading, body } => non_empty(heading) && non_empty(body),
         ActivityCapability::Diagram {
             title,
@@ -567,10 +589,14 @@ fn capability_has_content(capability: &ActivityCapability) -> bool {
             context,
             prompt,
             options,
-        } => non_empty(context)
-            && non_empty(prompt)
-            && options.len() >= 2
-            && options.iter().all(|option| non_empty(&option.id) && non_empty(&option.label)),
+        } => {
+            non_empty(context)
+                && non_empty(prompt)
+                && options.len() >= 2
+                && options
+                    .iter()
+                    .all(|option| non_empty(&option.id) && non_empty(&option.label))
+        }
     }
 }
 
@@ -596,19 +622,31 @@ mod capability_tests {
     #[test]
     fn accepts_versioned_learning_capabilities_for_matching_activity_kinds() {
         let cases = [
-            (ActivityKind::Explanation, serde_json::json!({
-                "type": "rich_text", "heading": "State", "body": "State is durable."
-            })),
-            (ActivityKind::Explanation, serde_json::json!({
-                "type": "diagram", "title": "Flow", "source": "graph TD; A-->B", "alt_text": "A flows to B"
-            })),
-            (ActivityKind::Example, serde_json::json!({
-                "type": "code_example", "title": "Job", "language": "java", "code": "env.execute();", "explanation": "Runs the job."
-            })),
-            (ActivityKind::Practice, serde_json::json!({
-                "type": "scenario", "context": "A task fails.", "prompt": "What do you inspect first?",
-                "options": [{"id": "logs", "label": "Inspect logs"}, {"id": "retry", "label": "Retry immediately"}]
-            })),
+            (
+                ActivityKind::Explanation,
+                serde_json::json!({
+                    "type": "rich_text", "heading": "State", "body": "State is durable."
+                }),
+            ),
+            (
+                ActivityKind::Explanation,
+                serde_json::json!({
+                    "type": "diagram", "title": "Flow", "source": "graph TD; A-->B", "alt_text": "A flows to B"
+                }),
+            ),
+            (
+                ActivityKind::Example,
+                serde_json::json!({
+                    "type": "code_example", "title": "Job", "language": "java", "code": "env.execute();", "explanation": "Runs the job."
+                }),
+            ),
+            (
+                ActivityKind::Practice,
+                serde_json::json!({
+                    "type": "scenario", "context": "A task fails.", "prompt": "What do you inspect first?",
+                    "options": [{"id": "logs", "label": "Inspect logs"}, {"id": "retry", "label": "Retry immediately"}]
+                }),
+            ),
         ];
 
         for (kind, content) in cases {
