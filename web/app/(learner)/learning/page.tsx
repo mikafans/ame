@@ -230,131 +230,176 @@ export default function LearningHomePage() {
         </section>
       ) : (
         <section className="grid gap-4">
-          {journeys.map((journey) => (
-            <article
-              key={journey.id}
-              className="group rounded-2xl border border-border bg-card p-6 transition hover:border-primary hover:shadow-sm"
-            >
-              <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-                <div>
-                  <p className="font-mono text-xs uppercase tracking-[0.12em] text-primary">
-                    {journey.status}
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold">
-                    {journey.rawIntent}
-                  </h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {journey.nextActivityTitle
-                      ? `Next: ${journey.nextActivityTitle}`
-                      : journey.promise}
-                  </p>
-                  {(chapters[journey.id] ?? []).length > 0 && (
-                    <div
-                      className="mt-4 space-y-2 border-t border-border/70 pt-3"
-                      data-testid={"journey-chapters-" + journey.id}
+          {journeys.map((journey) => {
+            const journeyChapters = chapters[journey.id] ?? [];
+            const chapterActivities = journeyChapters.flatMap(
+              (chapter) => chapter.activities,
+            );
+            const completedActivities = chapterActivities.filter(
+              (activity) => activity.status === "completed",
+            ).length;
+            const progressPercent = chapterActivities.length
+              ? Math.round(
+                  (completedActivities / chapterActivities.length) * 100,
+                )
+              : 0;
+            const continueHref = journey.nextActivityId
+              ? `/learning/journeys/${journey.id}#activity-${journey.nextActivityId}`
+              : `/learning/journeys/${journey.id}`;
+            return (
+              <article
+                key={journey.id}
+                className="group rounded-2xl border border-border bg-card p-6 transition hover:border-primary hover:shadow-sm"
+              >
+                <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-[0.12em] text-primary">
+                      {journey.status}
+                    </p>
+                    <h2 className="mt-2 text-xl font-bold">
+                      {journey.rawIntent}
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {journey.nextActivityTitle
+                        ? `Next: ${journey.nextActivityTitle}`
+                        : journey.promise}
+                    </p>
+                    {journeyChapters.length > 0 && (
+                      <div
+                        className="mt-4 space-y-2 border-t border-border/70 pt-3"
+                        data-testid={"journey-chapters-" + journey.id}
+                      >
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                          Course path
+                        </p>
+                        <div
+                          className="space-y-2"
+                          data-testid={"journey-progress-" + journey.id}
+                        >
+                          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                            <span>Course progress</span>
+                            <span>
+                              {completedActivities}/{chapterActivities.length}{" "}
+                              complete · {progressPercent}%
+                            </span>
+                          </div>
+                          <div
+                            className="h-2 overflow-hidden rounded-full bg-border"
+                            role="progressbar"
+                            aria-label="Course progress"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={progressPercent}
+                          >
+                            <div
+                              className="h-full rounded-full bg-primary transition-[width]"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                        <ul className="space-y-2">
+                          {journeyChapters.map((chapter, index) => {
+                            const completed = chapter.activities.filter(
+                              (activity) => activity.status === "completed",
+                            ).length;
+                            const nextActivity = chapter.activities.find(
+                              (activity) => activity.status === "ready",
+                            );
+                            return (
+                              <li
+                                key={chapter.id}
+                                className="rounded-xl bg-muted/40 px-3 py-2 text-xs"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="font-medium">
+                                    {index + 1}. {chapter.title}
+                                  </span>
+                                  <span className="shrink-0 text-muted-foreground">
+                                    {completed}/{chapter.activities.length}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-muted-foreground">
+                                  {nextActivity
+                                    ? "Next: " + nextActivity.title
+                                    : completed === chapter.activities.length
+                                      ? "Complete"
+                                      : chapter.summary}
+                                </p>
+                                <ul className="mt-3 space-y-1 border-t border-border/60 pt-2">
+                                  {chapter.activities.map((activity) => (
+                                    <li key={activity.id}>
+                                      <Link
+                                        href={`/learning/journeys/${journey.id}#activity-${activity.id}`}
+                                        className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-muted-foreground transition hover:bg-background hover:text-foreground"
+                                        data-testid={
+                                          "desk-activity-" + activity.id
+                                        }
+                                      >
+                                        <span className="truncate">
+                                          {activity.title}
+                                        </span>
+                                        <span className="shrink-0 text-[0.68rem] uppercase tracking-[0.08em]">
+                                          {activityStatusLabel(activity.status)}
+                                        </span>
+                                      </Link>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                    {(snapshots[journey.id] ||
+                      streaks[journey.id] !== undefined) && (
+                      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                        {snapshots[journey.id] && (
+                          <span className="inline-flex items-center gap-2">
+                            <BarChart3 className="size-4 text-primary" />
+                            {Math.round(snapshots[journey.id].mastery * 100)}%
+                            signal · {snapshots[journey.id].evidenceCount}{" "}
+                            evidence
+                          </span>
+                        )}
+                        {streaks[journey.id] !== undefined && (
+                          <span className="inline-flex items-center gap-2">
+                            <Flame className="size-4 text-primary" />
+                            {streaks[journey.id]} qualifying{" "}
+                            {streaks[journey.id] === 1 ? "day" : "days"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {timelines[journey.id]?.length > 0 && (
+                      <div className="mt-4 flex items-start gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+                        <History className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <span>
+                          Recent:{" "}
+                          {timelines[journey.id]
+                            .slice(-3)
+                            .map((event) => event.title)
+                            .join(" · ")}
+                        </span>
+                      </div>
+                    )}
+                    <Link
+                      href={continueHref}
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
                     >
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                        Course path
-                      </p>
-                      <ul className="space-y-2">
-                        {chapters[journey.id].map((chapter, index) => {
-                          const completed = chapter.activities.filter(
-                            (activity) => activity.status === "completed",
-                          ).length;
-                          const nextActivity = chapter.activities.find(
-                            (activity) => activity.status === "ready",
-                          );
-                          return (
-                            <li
-                              key={chapter.id}
-                              className="rounded-xl bg-muted/40 px-3 py-2 text-xs"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="font-medium">
-                                  {index + 1}. {chapter.title}
-                                </span>
-                                <span className="shrink-0 text-muted-foreground">
-                                  {completed}/{chapter.activities.length}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-muted-foreground">
-                                {nextActivity
-                                  ? "Next: " + nextActivity.title
-                                  : completed === chapter.activities.length
-                                    ? "Complete"
-                                    : chapter.summary}
-                              </p>
-                              <ul className="mt-3 space-y-1 border-t border-border/60 pt-2">
-                                {chapter.activities.map((activity) => (
-                                  <li key={activity.id}>
-                                    <Link
-                                      href={`/learning/journeys/${journey.id}#activity-${activity.id}`}
-                                      className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-muted-foreground transition hover:bg-background hover:text-foreground"
-                                      data-testid={
-                                        "desk-activity-" + activity.id
-                                      }
-                                    >
-                                      <span className="truncate">
-                                        {activity.title}
-                                      </span>
-                                      <span className="shrink-0 text-[0.68rem] uppercase tracking-[0.08em]">
-                                        {activityStatusLabel(activity.status)}
-                                      </span>
-                                    </Link>
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                  {(snapshots[journey.id] ||
-                    streaks[journey.id] !== undefined) && (
-                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                      {snapshots[journey.id] && (
-                        <span className="inline-flex items-center gap-2">
-                          <BarChart3 className="size-4 text-primary" />
-                          {Math.round(snapshots[journey.id].mastery * 100)}%
-                          signal · {snapshots[journey.id].evidenceCount}{" "}
-                          evidence
-                        </span>
-                      )}
-                      {streaks[journey.id] !== undefined && (
-                        <span className="inline-flex items-center gap-2">
-                          <Flame className="size-4 text-primary" />
-                          {streaks[journey.id]} qualifying{" "}
-                          {streaks[journey.id] === 1 ? "day" : "days"}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {timelines[journey.id]?.length > 0 && (
-                    <div className="mt-4 flex items-start gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
-                      <History className="mt-0.5 size-4 shrink-0 text-primary" />
-                      <span>
-                        Recent:{" "}
-                        {timelines[journey.id]
-                          .slice(-3)
-                          .map((event) => event.title)
-                          .join(" · ")}
-                      </span>
-                    </div>
-                  )}
-                  <Link
-                    href={`/learning/journeys/${journey.id}`}
-                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                  >
-                    Open journey <ArrowRight className="size-4" />
-                  </Link>
+                      {journey.nextActivityId
+                        ? "Continue learning"
+                        : "Review journey"}{" "}
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </div>
+                  <div className="hidden shrink-0 text-primary transition group-hover:translate-x-1 sm:block">
+                    <ArrowRight className="size-5" />
+                  </div>
                 </div>
-                <div className="hidden shrink-0 text-primary transition group-hover:translate-x-1 sm:block">
-                  <ArrowRight className="size-5" />
-                </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
       )}
 

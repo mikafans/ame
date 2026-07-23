@@ -431,6 +431,18 @@ export default function LearningJourneyPage() {
     (activity) =>
       activity.chapterId === null || activity.chapterId === undefined,
   );
+  const pathActivities = [
+    ...journey.chapters.flatMap((chapter) => chapter.activities),
+    ...ungroupedActivities,
+  ];
+  const completedPathActivities = pathActivities.filter(
+    (activity) => activity.status === "completed",
+  ).length;
+  const pathProgressPercent = pathActivities.length
+    ? Math.round((completedPathActivities / pathActivities.length) * 100)
+    : 0;
+  const continueActivity =
+    activeActivityId && activeActivity ? activeActivity : readyActivity;
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-8 p-6 sm:p-10 lg:grid-cols-[260px_1fr]">
@@ -480,12 +492,54 @@ export default function LearningJourneyPage() {
           </section>
         )}
         <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">Your path</h2>
-            <p className="text-sm text-muted-foreground">
-              Move through each chapter, then use the next recommendation to
-              keep going.
-            </p>
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="text-lg font-semibold">Your path</h2>
+              <p className="text-sm text-muted-foreground">
+                Move through each chapter, then use the next recommendation to
+                keep going.
+              </p>
+            </div>
+            {continueActivity && (
+              <Button
+                type="button"
+                disabled={startingActivity !== null}
+                onClick={() => void startActivity(continueActivity.id)}
+                className="shrink-0 rounded-full"
+              >
+                {startingActivity === continueActivity.id
+                  ? "Opening…"
+                  : activeActivityId
+                    ? "Resume learning"
+                    : "Continue learning"}
+                <ArrowRight className="size-4" />
+              </Button>
+            )}
+          </div>
+          <div
+            className="space-y-2 rounded-xl border border-border bg-card px-4 py-3"
+            data-testid="journey-detail-progress"
+          >
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>Course progress</span>
+              <span>
+                {completedPathActivities}/{pathActivities.length} complete ·{" "}
+                {pathProgressPercent}%
+              </span>
+            </div>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-border"
+              role="progressbar"
+              aria-label="Course progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pathProgressPercent}
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{ width: `${pathProgressPercent}%` }}
+              />
+            </div>
           </div>
           <div className="space-y-5">
             {journey.chapters.map((chapter, index) => {

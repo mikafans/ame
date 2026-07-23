@@ -75,18 +75,28 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   ).toBeVisible();
   await expect(page.getByText("Your first activity is ready")).toBeVisible();
   await expect(page.getByRole("button", { name: "Begin" })).toBeVisible();
+  await expect(page.getByTestId("journey-detail-progress")).toContainText(
+    /0\/\d+ complete · 0%/,
+  );
+  await expect(
+    page.getByRole("button", { name: "Continue learning" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Begin" }).click();
   await expect(
     page.getByRole("heading", { name: `Get oriented on ${topic}` }).first(),
   ).toBeVisible();
   await expect(page.getByText(/How familiar are you with .+\?/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByRole("heading", { name: `Get oriented on ${topic}` }).first(),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "new to me" }).click();
   await page
     .getByLabel(/What would you like to .+\?/)
@@ -96,6 +106,9 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(
     page.getByText("Complete. Your next activity is now ready."),
   ).toBeVisible();
+  await expect(page.getByTestId("journey-detail-progress")).toContainText(
+    /1\/\d+ complete · \d+%/,
+  );
   await expect(
     page
       .getByRole("heading", {
@@ -233,6 +246,15 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
     page.getByText("I would like to learn a new subject", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Course path", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Course progress", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("progressbar", { name: "Course progress" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Continue learning" }),
+  ).toHaveAttribute("href", /#activity-[0-9a-f-]+$/);
   await expect(page.getByText("1. Foundations", { exact: true })).toBeVisible();
   const firstDeskActivity = page
     .locator('[data-testid^="desk-activity-"]')
