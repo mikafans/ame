@@ -48,6 +48,13 @@ const faqs = [
   },
 ];
 
+const agentResources = [
+  { href: "/agent", label: "Agent guide" },
+  { href: "/public/llms.txt", label: "llms.txt" },
+  { href: "/public/skill.json", label: "Skill manifest" },
+  { href: "/public/openapi.yaml", label: "OpenAPI" },
+];
+
 function QuizPreview() {
   return (
     <div
@@ -353,11 +360,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {[
-                "/public/llms.txt",
-                "/public/skill.json",
-                "/public/openapi.yaml",
-              ].map((href) => (
+              {agentResources.map(({ href, label }) => (
                 <Button
                   key={href}
                   asChild
@@ -365,7 +368,7 @@ export default function LandingPage() {
                   size="sm"
                   className="rounded-full border-border font-mono text-xs font-normal"
                 >
-                  <Link href={href}>{href}</Link>
+                  <Link href={href}>{label}</Link>
                 </Button>
               ))}
             </div>
@@ -413,11 +416,8 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
           <span>© 2026 AME</span>
           <div className="flex gap-5">
-            <Link
-              href="/public/llms.txt"
-              className="transition hover:text-primary"
-            >
-              Docs
+            <Link href="/agent" className="transition hover:text-primary">
+              Agent API
             </Link>
             <a
               href="https://github.com/mikafans/ame"
