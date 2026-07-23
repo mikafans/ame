@@ -1002,6 +1002,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn bootstrap_physics_prompt_produces_multi_chapter_journey() {
+        let repository = InMemoryLearningRepository::default();
+        let service = SelfHostOnboardingService::new(
+            InMemoryIdentityRepository::default(),
+            repository.clone(),
+        );
+        let result = service
+            .start_from_prompt(
+                StartLearningPromptRequest {
+                    raw_prompt: "I would like to learn physics".to_string(),
+                    ..start_learning_prompt_request()
+                },
+                &CatalogPromptInterpreter,
+            )
+            .await
+            .expect("physics onboarding succeeds");
+
+        let chapters = repository
+            .list_chapters(
+                result.bootstrap.goal.subject_user_id,
+                result.bootstrap.journey.id,
+            )
+            .await
+            .expect("physics chapters exist");
+        assert!(
+            chapters.len() >= 4,
+            "physics journey should have >=4 chapters, got {}",
+            chapters.len()
+        );
+    }
+
+    #[tokio::test]
     async fn bootstrap_rejects_unknown_template_before_writing() {
         let service = OnboardingService::new(InMemoryLearningRepository::default());
         let mut plan = learner_topic_plan();

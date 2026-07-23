@@ -598,5 +598,214 @@
         "status": "proposed"
       }
     ]
+  },
+  {
+    "id": "physics-mechanics-starter",
+    "template_id": "understand-a-subject",
+    "field": "physics",
+    "aliases": ["physics", "classical mechanics", "kinematics", "newtonian"],
+    "objectives": [
+      {
+        "verb": "describe",
+        "statement": "Describe motion with kinematics",
+        "success_criteria": "Relate position, velocity, and acceleration over time"
+      },
+      {
+        "verb": "apply",
+        "statement": "Apply Newton's laws to forces",
+        "success_criteria": "Predict motion from the net force on an object"
+      },
+      {
+        "verb": "solve",
+        "statement": "Use energy and work to solve problems",
+        "success_criteria": "Apply conservation of energy to a bounded system"
+      },
+      {
+        "verb": "analyze",
+        "statement": "Analyze momentum and collisions",
+        "success_criteria": "Use conservation of momentum in a one-dimensional collision"
+      }
+    ],
+    "chapters": [
+      {
+        "title": "Kinematics",
+        "summary": "Describing motion with position, velocity, and acceleration.",
+        "activity_orders": [0, 1]
+      },
+      {
+        "title": "Forces and Newton's laws",
+        "summary": "How net force determines motion.",
+        "activity_orders": [2, 3]
+      },
+      {
+        "title": "Energy and work",
+        "summary": "Work, kinetic and potential energy, and conservation.",
+        "activity_orders": [4, 5]
+      },
+      {
+        "title": "Momentum and collisions",
+        "summary": "Momentum conservation in interactions.",
+        "activity_orders": [6, 7]
+      }
+    ],
+    "first_activity": {
+      "kind": "explanation",
+      "title": "Get oriented on classical mechanics",
+      "purpose": "orientation",
+      "estimated_minutes": 5,
+      "context": "Start with a small signal about your comfort with algebra and motion, so the first step fits you.",
+      "instructions": "Tell AME your current comfort with physics and the first thing you want to understand.",
+      "questions": [
+        {
+          "id": "familiarity",
+          "kind": "single_choice",
+          "prompt": "How comfortable are you with algebra-based physics?",
+          "options": ["new_to_me", "some_exposure", "comfortable"]
+        },
+        {
+          "id": "outcome",
+          "kind": "short_text",
+          "prompt": "What physics idea would you like to understand first?"
+        }
+      ],
+      "objective_orders": [0],
+      "status": "ready"
+    },
+    "follow_up_activities": [
+      {
+        "kind": "explanation",
+        "title": "Position, velocity, and acceleration",
+        "objective_orders": [0],
+        "payload": {
+          "purpose": "first_explanation",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "explanation",
+            "heading": "Describing motion",
+            "body": "Kinematics describes how objects move without asking why. Position tells you where an object is; velocity is how fast position changes; acceleration is how fast velocity changes. For constant acceleration, v = v0 + a*t.",
+            "key_points": [
+              "Velocity is the rate of change of position.",
+              "Acceleration is the rate of change of velocity.",
+              "Constant acceleration gives linear velocity in time."
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "explanation",
+        "title": "Newton's three laws",
+        "objective_orders": [1],
+        "payload": {
+          "purpose": "explanation",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "explanation",
+            "heading": "Force and motion",
+            "body": "Newton's laws connect force to motion: an object keeps its velocity unless a net force acts (1st); net force equals mass times acceleration, F = m*a (2nd); forces come in equal and opposite pairs (3rd).",
+            "key_points": [
+              "No net force means constant velocity.",
+              "F = m*a relates net force to acceleration.",
+              "Forces act in pairs between two bodies."
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "example",
+        "title": "Work a force problem",
+        "objective_orders": [1],
+        "payload": {
+          "purpose": "worked_example",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "worked_example",
+            "heading": "Acceleration from a net force",
+            "prompt": "A 2 kg cart feels a net force of 6 N.",
+            "steps": [
+              "Identify the net force (6 N) and mass (2 kg).",
+              "Apply F = m*a, so a = F / m.",
+              "Compute a = 6 / 2 = 3 m/s^2."
+            ],
+            "reflection": "What happens to the acceleration if the mass doubles?"
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "explanation",
+        "title": "Work and energy",
+        "objective_orders": [2],
+        "payload": {
+          "purpose": "explanation",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "explanation",
+            "heading": "Conservation of energy",
+            "body": "Work transfers energy; kinetic energy is energy of motion (1/2 m v^2) and potential energy is stored (e.g. m*g*h). In an isolated system without friction, total mechanical energy is conserved.",
+            "key_points": [
+              "Work is force applied over a distance.",
+              "Kinetic energy grows with the square of speed.",
+              "Total mechanical energy is conserved without losses."
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "example",
+        "title": "Solve an energy problem",
+        "objective_orders": [2],
+        "payload": {
+          "purpose": "worked_example",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "worked_example",
+            "heading": "Speed at the bottom of a ramp",
+            "prompt": "A block slides from rest down a frictionless 1.8 m height.",
+            "steps": [
+              "Set potential energy at the top equal to kinetic energy at the bottom.",
+              "m*g*h = 1/2 m v^2, so v = sqrt(2*g*h).",
+              "Compute v = sqrt(2 * 9.8 * 1.8) ~= 5.9 m/s."
+            ],
+            "reflection": "How would friction change the result?"
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "diagnostic",
+        "title": "Check your momentum model",
+        "objective_orders": [3],
+        "payload": {
+          "purpose": "diagnose_starting_point",
+          "estimated_minutes": 8,
+          "content": {
+            "type": "scenario",
+            "context": "Two carts collide and stick together on a frictionless track.",
+            "prompt": "What is conserved through the collision?",
+            "options": [
+              {
+                "id": "momentum",
+                "label": "Total momentum is conserved"
+              },
+              {
+                "id": "kinetic",
+                "label": "Total kinetic energy is conserved"
+              }
+            ]
+          }
+        },
+        "status": "proposed"
+      },
+      {
+        "kind": "recommendation",
+        "title": "Review your physics progress and choose the next step",
+        "objective_orders": [3],
+        "payload": { "purpose": "next_action", "estimated_minutes": 5 },
+        "status": "proposed"
+      }
+    ]
   }
 ]
