@@ -84,7 +84,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - **No decorative `echo`** — never insert `echo "=== label ==="` separators or commentary between commands. Run the real commands plainly (one per Bash call when they're unrelated); the tool output is already labeled. Echo only when the literal text is the actual deliverable.
 - **Search with `rg`, find with `fd`** — never `grep -r` or `find`.
 - **Read files directly** — if `rg` gives you a path, use the Read tool. Never pipe into `xargs rg`.
-- **Long `make` output** — redirect to a file (`make check > /tmp/check.log 2>&1`) then Read it. `grep` on rtk-truncated output silently misses content.
+- **Long `make` output** — redirect to a file (`make check > .tmp/check.log 2>&1`) then Read it. `grep` on terminal-truncated output silently misses content.
 - **Migration checksum mismatch** (sqlfluff reformatted a migration after it was applied) — fix with `make db-reset` then `make dev`, not manual DB surgery.
 - **JS runtime** — use `bun`, never `node`. Playwright: `bunx @playwright/cli`.
 - **Verifier scripts** — write to `.claude/scripts/` for reuse, run with `bun .claude/scripts/<name>.js`.
