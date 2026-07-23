@@ -18,6 +18,25 @@ impl PgAuthenticationRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    /// Slide the session window forward: extend a live (unrevoked) session's
+    /// expiry so active learners are not logged out mid-session. A no-op if the
+    /// session is already revoked or gone.
+    pub async fn renew_login_session(
+        &self,
+        session_id: Uuid,
+        expires_at: OffsetDateTime,
+    ) -> Result<(), AuthenticationRepositoryError> {
+        sqlx::query(
+            "UPDATE tb_login_sessions SET expires_at = $2 WHERE id = $1 AND revoked_at IS NULL",
+        )
+        .bind(session_id)
+        .bind(expires_at)
+        .execute(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(())
+    }
 }
 
 #[async_trait]

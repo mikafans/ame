@@ -86,8 +86,10 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .filter(|token| token.kind == TokenKind::Login)
             .ok_or(ApiError::Unauthorized)?;
 
-        let principal = PgAuthenticationRepository::new(state.pool.clone())
-            .authenticate_login_session(parsed.id, &parsed.secret, time::OffsetDateTime::now_utc())
+        let now = time::OffsetDateTime::now_utc();
+        let repository = PgAuthenticationRepository::new(state.pool.clone());
+        let principal = repository
+            .authenticate_login_session(parsed.id, &parsed.secret, now)
             .await
             .map_err(|error| match error {
                 crate::domain::auth::AuthenticationRepositoryError::Storage(error) => {
@@ -95,6 +97,14 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                 }
                 _ => ApiError::Unauthorized,
             })?;
+
+        // Sliding-window sessions: each authenticated request extends the
+        // session TTL so active learners are not logged out mid-session.
+        let renewed_expiry = now + time::Duration::seconds(state.config.login.ttl_seconds as i64);
+        repository
+            .renew_login_session(parsed.id, renewed_expiry)
+            .await
+            .map_err(|error| ApiError::Internal(anyhow::anyhow!(format!("{error:?}"))))?;
 
         Ok(Self::from_principal(principal))
     }

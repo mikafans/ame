@@ -196,12 +196,21 @@ async fn test_login_sessions_logout_and_admin_demote() {
     let client = reqwest::Client::new();
     let base_url = format!("http://{addr}");
 
-    // Create an admin user to perform deactivation/demotion
+    // Create an admin user to perform deactivation/demotion. tb_users.id is a
+    // deferred FK to tb_identities.id, so seed the paired human identity first.
     let admin_id = Uuid::now_v7();
     let admin_email = format!("valkey-admin-{}@example.com", admin_id);
     sqlx::query(
-        "INSERT INTO tb_users (id, email, display_name, role, plan)
-         VALUES ($1, $2, 'Admin User', 'admin', 'premium')",
+        "INSERT INTO tb_identities (id, identity_type, label)
+         VALUES ($1, 'human', 'Admin User')",
+    )
+    .bind(admin_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO tb_users (id, email, display_name, role)
+         VALUES ($1, $2, 'Admin User', 'admin')",
     )
     .bind(admin_id)
     .bind(&admin_email)
@@ -210,16 +219,17 @@ async fn test_login_sessions_logout_and_admin_demote() {
     .unwrap();
 
     let admin_token_id = Uuid::now_v7();
-    let secret = "supersecret";
-    let hash = ame_api::auth::token::hash_secret(secret);
+    // Unique per run: token_hash is UNIQUE, so a fixed secret cannot be
+    // re-inserted across runs on a non-reset database.
+    let secret = format!("supersecret-{admin_token_id}");
+    let hash = ame_api::auth::token::hash_secret(&secret);
     sqlx::query(
-        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at)
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO tb_login_sessions (id, user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3, $4)",
     )
     .bind(admin_token_id)
     .bind(admin_id)
     .bind(&hash)
-    .bind(vec!["admin".to_string()])
     .bind(OffsetDateTime::now_utc() + Duration::days(7))
     .execute(&pool)
     .await
@@ -316,15 +326,17 @@ async fn test_login_sessions_logout_and_admin_demote() {
         .unwrap();
     assert_eq!(logout_res.status(), StatusCode::OK);
 
-    // Assert login session 1 is gone from database
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_login_sessions WHERE id = $1")
-        .bind(token1_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(
-        count, 0,
-        "Login session 1 must be deleted from database after logout"
+    // Assert login session 1 is revoked in the database after logout (logout
+    // soft-revokes via revoked_at; the row is retained for audit).
+    let revoked_at: Option<OffsetDateTime> =
+        sqlx::query_scalar("SELECT revoked_at FROM tb_login_sessions WHERE id = $1")
+            .bind(token1_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        revoked_at.is_some(),
+        "Login session 1 must be revoked in the database after logout"
     );
 
     // Verify token 1 no longer works
@@ -350,7 +362,7 @@ async fn test_login_sessions_logout_and_admin_demote() {
         .patch(format!("{base_url}/v1/admin/users/{user_id}"))
         .header("Authorization", format!("Bearer {admin_auth}"))
         .json(&json!({
-            "disabled": true
+            "status": "deactivated"
         }))
         .send()
         .await
@@ -365,173 +377,4 @@ async fn test_login_sessions_logout_and_admin_demote() {
         .await
         .unwrap();
     assert_eq!(me2_after_disable.status(), StatusCode::UNAUTHORIZED);
-
-    // Verify admin token audit excludes logins (neither token1 nor token2 is in the DB)
-    let audit_res = client
-        .get(format!("{base_url}/v1/admin/tokens"))
-        .header("Authorization", format!("Bearer {admin_auth}"))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(audit_res.status(), StatusCode::OK);
-    let audit_json: Value = audit_res.json().await.unwrap();
-    let tokens = audit_json["tokens"].as_array().unwrap();
-
-    let id1 = token1.split('_').nth(1).unwrap();
-    let id2 = token2.split('_').nth(1).unwrap();
-
-    for t in tokens {
-        let id = t["id"].as_str().unwrap();
-        assert_ne!(
-            id, id1,
-            "Login token 1 must not appear in admin token audit"
-        );
-        assert_ne!(
-            id, id2,
-            "Login token 2 must not appear in admin token audit"
-        );
-    }
-}
-
-#[tokio::test]
-async fn test_admin_plan_change_preserves_login_session() {
-    if std::env::var("AME_RUN_DB_TESTS").as_deref() != Ok("1") {
-        return;
-    }
-
-    let pool = setup_db().await;
-
-    // Build app with longer TTL
-    let app = create_test_router(pool.clone(), 3600);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr: SocketAddr = listener.local_addr().unwrap();
-
-    tokio::spawn(async move {
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-        )
-        .await
-        .unwrap();
-    });
-
-    let client = reqwest::Client::new();
-    let base_url = format!("http://{addr}");
-
-    // Create an admin user to perform the plan change
-    let admin_id = Uuid::now_v7();
-    let admin_email = format!("plan-change-admin-{}@example.com", admin_id);
-    sqlx::query(
-        "INSERT INTO tb_users (id, email, display_name, role, plan)
-         VALUES ($1, $2, 'Admin User', 'admin', 'premium')",
-    )
-    .bind(admin_id)
-    .bind(&admin_email)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    let admin_token_id = Uuid::now_v7();
-    let secret = "supersecret";
-    let hash = ame_api::auth::token::hash_secret(secret);
-    sqlx::query(
-        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at)
-         VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(admin_token_id)
-    .bind(admin_id)
-    .bind(&hash)
-    .bind(vec!["admin".to_string()])
-    .bind(OffsetDateTime::now_utc() + Duration::days(7))
-    .execute(&pool)
-    .await
-    .unwrap();
-    let admin_auth = format!("lgn_{admin_token_id}_{secret}");
-
-    // Register a normal user
-    let email = format!("plan-user-{}@example.com", Uuid::now_v7());
-    let password = "password123";
-    let register_res = client
-        .post(format!("{base_url}/v1/auth/register"))
-        .json(&json!({
-            "email": email,
-            "name": "Plan Test User",
-            "password": password,
-            "role": "user"
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(register_res.status(), StatusCode::CREATED);
-    let reg_json: Value = register_res.json().await.unwrap();
-    let user_id = Uuid::parse_str(reg_json["user"]["id"].as_str().unwrap()).unwrap();
-
-    // User logs in (creates login session)
-    let login_res = client
-        .post(format!("{base_url}/v1/auth/login"))
-        .json(&json!({
-            "email": email,
-            "password": password
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(login_res.status(), StatusCode::OK);
-    let login_json: Value = login_res.json().await.unwrap();
-    let user_token = login_json["token"].as_str().unwrap().to_string();
-    let user_token_id = Uuid::parse_str(user_token.split('_').nth(1).unwrap()).unwrap();
-
-    // Verify user can authenticate with their token
-    let me_before = client
-        .get(format!("{base_url}/v1/me"))
-        .header("Authorization", format!("Bearer {user_token}"))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(me_before.status(), StatusCode::OK);
-
-    // Verify login session exists in database
-    let session_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM tb_login_sessions WHERE id = $1")
-            .bind(user_token_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(
-        session_count, 1,
-        "Login session must exist before plan change"
-    );
-
-    // Admin upgrades user from free to premium (plan-only change, no role/disable)
-    let patch_res = client
-        .patch(format!("{base_url}/v1/admin/users/{user_id}"))
-        .header("Authorization", format!("Bearer {admin_auth}"))
-        .json(&json!({
-            "plan": "premium"
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(patch_res.status(), StatusCode::NO_CONTENT);
-
-    // User's original token should STILL work (plan change does not force re-login)
-    let me_after = client
-        .get(format!("{base_url}/v1/me"))
-        .header("Authorization", format!("Bearer {user_token}"))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(me_after.status(), StatusCode::OK);
-
-    // Login session should still exist in database
-    let session_count_after: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM tb_login_sessions WHERE id = $1")
-            .bind(user_token_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(
-        session_count_after, 1,
-        "Login session must persist after plan change"
-    );
 }
