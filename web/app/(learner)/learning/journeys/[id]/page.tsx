@@ -91,8 +91,9 @@ function ActivityRow({
 }) {
   return (
     <article
-      className="flex items-center justify-between gap-4 border-b border-border py-5 last:border-b-0"
+      className="scroll-mt-6 flex items-center justify-between gap-4 border-b border-border py-5 last:border-b-0"
       data-testid={"learning-activity-" + activity.id}
+      id={"activity-" + activity.id}
     >
       <div className="min-w-0">
         <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">

@@ -228,6 +228,17 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("Course path", { exact: true })).toBeVisible();
   await expect(page.getByText("1. Foundations", { exact: true })).toBeVisible();
+  const firstDeskActivity = page
+    .locator('[data-testid^="desk-activity-"]')
+    .first();
+  await expect(firstDeskActivity).toBeVisible();
+  await firstDeskActivity.click();
+  await expect(page).toHaveURL(
+    /\/learning\/journeys\/[0-9a-f-]+#activity-[0-9a-f-]+$/,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Foundations", exact: true }),
+  ).toBeVisible();
 });
 
 test("learner can answer the first application task in a journey", async ({

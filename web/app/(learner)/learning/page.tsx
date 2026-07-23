@@ -224,9 +224,8 @@ export default function LearningHomePage() {
       ) : (
         <section className="grid gap-4">
           {journeys.map((journey) => (
-            <Link
+            <article
               key={journey.id}
-              href={`/learning/journeys/${journey.id}`}
               className="group rounded-2xl border border-border bg-card p-6 transition hover:border-primary hover:shadow-sm"
             >
               <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
@@ -278,6 +277,26 @@ export default function LearningHomePage() {
                                     ? "Complete"
                                     : chapter.summary}
                               </p>
+                              <ul className="mt-3 space-y-1 border-t border-border/60 pt-2">
+                                {chapter.activities.map((activity) => (
+                                  <li key={activity.id}>
+                                    <Link
+                                      href={`/learning/journeys/${journey.id}#activity-${activity.id}`}
+                                      className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-muted-foreground transition hover:bg-background hover:text-foreground"
+                                      data-testid={
+                                        "desk-activity-" + activity.id
+                                      }
+                                    >
+                                      <span className="truncate">
+                                        {activity.title}
+                                      </span>
+                                      <span className="shrink-0 text-[0.68rem] uppercase tracking-[0.08em]">
+                                        {activity.status.replaceAll("_", " ")}
+                                      </span>
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
                             </li>
                           );
                         })}
@@ -316,10 +335,18 @@ export default function LearningHomePage() {
                       </span>
                     </div>
                   )}
+                  <Link
+                    href={`/learning/journeys/${journey.id}`}
+                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                  >
+                    Open journey <ArrowRight className="size-4" />
+                  </Link>
                 </div>
-                <ArrowRight className="size-5 shrink-0 text-primary transition group-hover:translate-x-1" />
+                <div className="hidden shrink-0 text-primary transition group-hover:translate-x-1 sm:block">
+                  <ArrowRight className="size-5" />
+                </div>
               </div>
-            </Link>
+            </article>
           ))}
         </section>
       )}
