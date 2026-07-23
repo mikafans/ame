@@ -93,8 +93,7 @@ async fn test_login_sessions_flow() {
         .json(&json!({
             "email": email,
             "name": "Test Login User",
-            "password": password,
-            "role": "user"
+            "password": password
         }))
         .send()
         .await
@@ -244,8 +243,7 @@ async fn test_login_sessions_logout_and_admin_demote() {
         .json(&json!({
             "email": email,
             "name": "Test Logout User",
-            "password": password,
-            "role": "user"
+            "password": password
         }))
         .send()
         .await
