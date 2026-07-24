@@ -110,6 +110,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["activityId","generationRunId","content","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"content":{"type":"object","required":["type"],"description":"The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings."},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved content is learner-visible."}}}),
         ),
         endpoint(
+            "learning.activity.rubric.author",
+            "Attach a structured scoring rubric to a task/application activity from a published learning.activity.rubric.compose generation run. Criteria and points guide manual/agent review; learners see the criteria. Provenance is mandatory.",
+            "PATCH",
+            "/api/v1/learning/activities/{activity_id}/rubric",
+            json!({"type":"object","required":["activityId","generationRunId","rubric","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"rubric":{"type":"object","required":["version","criteria"],"description":"Structured rubric: version, criteria[] (each id, objectiveId, description, maxPoints>=1, required), optional passingScore 0..1.","properties":{"version":{"type":"integer","minimum":1},"criteria":{"type":"array","minItems":1,"items":{"type":"object","required":["id","objectiveId","description","maxPoints","required"],"properties":{"id":{"type":"string"},"objectiveId":{"type":"string","format":"uuid"},"description":{"type":"string"},"maxPoints":{"type":"integer","minimum":1},"required":{"type":"boolean"}}}},"passingScore":{"type":"number","minimum":0,"maximum":1}}},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved rubrics are learner-visible."}}}),
+        ),
+        endpoint(
             "learning.question.create",
             "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
             "POST",

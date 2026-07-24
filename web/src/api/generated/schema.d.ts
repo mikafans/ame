@@ -306,6 +306,23 @@ export interface paths {
         patch: operations["author_activity_content"];
         trace?: never;
     };
+    "/api/v1/learning/activities/{activity_id}/rubric": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH /api/v1/learning/activities/{activity_id}/rubric — attach a reviewed, source-backed scoring rubric to a task activity. */
+        patch: operations["author_activity_rubric"];
+        trace?: never;
+    };
     "/api/v1/learning/journeys": {
         parameters: {
             query?: never;
@@ -854,6 +871,13 @@ export interface components {
             reviewStatus: string;
             sourceReferences: string[];
         };
+        AuthorActivityRubricBody: {
+            /** Format: uuid */
+            generationRunId: string;
+            reviewStatus: string;
+            rubric: components["schemas"]["TaskRubric"];
+            sourceReferences: string[];
+        };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
         CreateAssessmentBody: {
@@ -1014,6 +1038,7 @@ export interface components {
             /** Format: int32 */
             payloadSchemaVersion: number;
             publicationStatus: components["schemas"]["ActivityPublicationStatus"];
+            rubric?: null | components["schemas"]["TaskRubric"];
             /** Format: uuid */
             sourceActorId: string;
             status: components["schemas"]["ActivityStatus"];
@@ -1338,6 +1363,22 @@ export interface components {
         TaskEvaluationMethod: "self_review" | "automatic" | "agent" | "manual";
         /** @enum {string} */
         TaskReviewStatus: "not_required" | "pending" | "complete";
+        TaskRubric: {
+            criteria: components["schemas"]["TaskRubricCriterion"][];
+            /** Format: float */
+            passingScore?: number | null;
+            /** Format: int32 */
+            version: number;
+        };
+        TaskRubricCriterion: {
+            description: string;
+            id: string;
+            /** Format: int32 */
+            maxPoints: number;
+            /** Format: uuid */
+            objectiveId: string;
+            required: boolean;
+        };
         TaskSubmissionResponse: {
             /** Format: int32 */
             contentVersion: number;
@@ -2047,6 +2088,61 @@ export interface operations {
                 content?: never;
             };
             /** @description Content, provenance, or review status is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    author_activity_rubric: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task activity to attach a rubric to */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorActivityRubricBody"];
+            };
+        };
+        responses: {
+            /** @description Activity with its attached rubric */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity or generation run does not belong to this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generation is not published or activity is completed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rubric, provenance, or review status is invalid */
             422: {
                 headers: {
                     [name: string]: unknown;

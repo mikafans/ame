@@ -331,6 +331,7 @@ where
                     payload: activity.payload,
                     objective_ids,
                     status: activity.status,
+                    rubric: None,
                 })
                 .await?;
             activities = self

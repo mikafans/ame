@@ -20,11 +20,12 @@ use crate::{
         error::ApiError,
         generation::{GenerationRepository, validate_content_run},
         learning::{
-            ActivityKind, ActivityStatus, AuthorActivityContent, CreateLearningSession,
-            FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyStatus,
-            LearningActivity, LearningChapter, LearningObjective, LearningRepository,
-            LearningSession, LearningSessionStatus, ObjectiveStatus,
+            ActivityKind, ActivityStatus, AuthorActivityContent, AuthorActivityRubric,
+            CreateLearningSession, FinishLearningSession as FinishLearningSessionInput, GoalStatus,
+            JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
+            LearningRepository, LearningSession, LearningSessionStatus, ObjectiveStatus,
         },
+        task::{TaskRubric, validate_task_rubric},
     },
     http::AppState,
     learning::load_journey_manifest,
@@ -81,6 +82,9 @@ pub struct LearningActivityResponse {
     pub payload: serde_json::Value,
     pub objective_ids: Vec<Uuid>,
     pub status: ActivityStatus,
+    /// Structured scoring rubric for task/application activities, if authored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rubric: Option<TaskRubric>,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: OffsetDateTime,
@@ -203,6 +207,10 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/learning/activities/{activity_id}/content",
             axum::routing::patch(author_activity_content),
         )
+        .route(
+            "/v1/learning/activities/{activity_id}/rubric",
+            axum::routing::patch(author_activity_rubric),
+        )
         .with_state(state)
 }
 
@@ -212,6 +220,15 @@ pub struct AuthorActivityContentBody {
     pub generation_run_id: Uuid,
     #[schema(value_type = Object)]
     pub content: Value,
+    pub source_references: Vec<String>,
+    pub review_status: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorActivityRubricBody {
+    pub generation_run_id: Uuid,
+    pub rubric: TaskRubric,
     pub source_references: Vec<String>,
     pub review_status: String,
 }
@@ -304,6 +321,60 @@ pub async fn author_activity_content(
             activity_id,
             generation_run_id: body.generation_run_id,
             content: body.content,
+            source_references: body.source_references,
+            review_status: body.review_status,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(activity_response(activity)))
+}
+
+/// PATCH /api/v1/learning/activities/{activity_id}/rubric — attach a reviewed, source-backed scoring rubric to a task activity.
+#[utoipa::path(
+    patch,
+    path = "/api/v1/learning/activities/{activity_id}/rubric",
+    params(("activity_id" = Uuid, Path, description = "Task activity to attach a rubric to")),
+    request_body = AuthorActivityRubricBody,
+    responses(
+        (status = 200, description = "Activity with its attached rubric", body = LearningActivityResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Activity or generation run does not belong to this learner"),
+        (status = 409, description = "Generation is not published or activity is completed"),
+        (status = 422, description = "Rubric, provenance, or review status is invalid")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn author_activity_rubric(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(activity_id): Path<Uuid>,
+    Json(body): Json<AuthorActivityRubricBody>,
+) -> Result<Json<LearningActivityResponse>, ApiError> {
+    validate_task_rubric(&body.rubric).map_err(|error| {
+        ApiError::Validation(vec![crate::domain::error::FieldError {
+            field: "rubric".to_string(),
+            message: error.to_string(),
+        }])
+    })?;
+    let generation = crate::generation_postgres::PgGenerationRepository::new(state.pool.clone())
+        .get(auth.owner_id(), body.generation_run_id)
+        .await
+        .map_err(crate::http::generation::map_error)?;
+    validate_content_run(
+        &generation,
+        auth.owner_id(),
+        "learning.activity.rubric.compose",
+    )
+    .map_err(crate::http::generation::map_error)?;
+    let rubric = serde_json::to_value(&body.rubric)
+        .map_err(|error| ApiError::Internal(anyhow::anyhow!(error)))?;
+    let activity = PgLearningRepository::new(state.pool)
+        .author_activity_rubric(AuthorActivityRubric {
+            subject_user_id: auth.owner_id(),
+            activity_id,
+            generation_run_id: body.generation_run_id,
+            rubric,
             source_references: body.source_references,
             review_status: body.review_status,
         })
@@ -601,6 +672,9 @@ fn activity_response(activity: LearningActivity) -> LearningActivityResponse {
         payload: activity.payload,
         objective_ids: activity.objective_ids,
         status: activity.status,
+        rubric: activity
+            .rubric
+            .and_then(|value| serde_json::from_value(value).ok()),
         created_at: activity.created_at,
         updated_at: activity.updated_at,
     }
@@ -665,6 +739,12 @@ fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -
             ApiError::Validation(vec![crate::domain::error::FieldError {
                 field: "content".to_string(),
                 message: "does not match the activity content contract".to_string(),
+            }])
+        }
+        crate::domain::learning::LearningRepositoryError::InvalidRubric => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "rubric".to_string(),
+                message: "does not match the rubric contract".to_string(),
             }])
         }
         crate::domain::learning::LearningRepositoryError::ActivityContentCompleted => {

@@ -8,6 +8,7 @@ import { api } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
 
 type TaskSubmission = components["schemas"]["TaskSubmissionResponse"];
+type TaskRubric = components["schemas"]["TaskRubric"];
 
 export type ActivityContent =
   | {
@@ -115,10 +116,12 @@ export function ActivityContentRenderer({
   content,
   taskId,
   contentVersion = 1,
+  rubric,
 }: {
   content: unknown;
   taskId?: string;
   contentVersion?: number;
+  rubric?: TaskRubric | null;
 }) {
   const parsed = parseContent(content);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -151,14 +154,17 @@ export function ActivityContentRenderer({
     const unknown = content as UnknownContent | null;
     const type = isNonEmptyString(unknown?.type) ? unknown.type : "unknown";
     return (
-      <div className="mt-5 rounded-xl border border-dashed border-primary/40 bg-background/70 p-5">
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
-          Activity capability unavailable
-        </p>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          This activity uses the <code>{type}</code> format. The content is
-          preserved, but this learner client does not support it yet.
-        </p>
+      <div className="mt-5 space-y-5">
+        <div className="rounded-xl border border-dashed border-primary/40 bg-background/70 p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+            Activity capability unavailable
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            This activity uses the <code>{type}</code> format. The content is
+            preserved, but this learner client does not support it yet.
+          </p>
+        </div>
+        {rubric && <RubricSection rubric={rubric} />}
       </div>
     );
   }
@@ -311,6 +317,42 @@ export function ActivityContentRenderer({
           )}
         </>
       )}
+      {rubric && <RubricSection rubric={rubric} />}
+    </div>
+  );
+}
+
+function RubricSection({ rubric }: { rubric: TaskRubric }) {
+  return (
+    <div className="space-y-3 border-t border-primary/20 pt-5">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+        Scoring rubric
+      </p>
+      {typeof rubric.passingScore === "number" && (
+        <p className="text-sm text-muted-foreground">
+          {`Passing score: ${Math.round(rubric.passingScore * 100)}%`}
+        </p>
+      )}
+      <ul className="space-y-2 rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6">
+        {rubric.criteria.map((criterion) => (
+          <li
+            key={criterion.id}
+            className="flex items-start justify-between gap-3"
+          >
+            <span>
+              {criterion.description}
+              {criterion.required && (
+                <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                  Required
+                </span>
+              )}
+            </span>
+            <span className="shrink-0 font-mono text-muted-foreground">
+              {`${criterion.maxPoints} pts`}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

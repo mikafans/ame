@@ -326,6 +326,98 @@
       "path": "/api/v1/learning/activities/{activity_id}/content"
     },
     {
+      "description": "Attach a structured scoring rubric to a task/application activity from a published learning.activity.rubric.compose generation run. Criteria and points guide manual/agent review; learners see the criteria. Provenance is mandatory.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "generationRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "Only approved rubrics are learner-visible.",
+            "enum": [
+              "approved"
+            ],
+            "type": "string"
+          },
+          "rubric": {
+            "description": "Structured rubric: version, criteria[] (each id, objectiveId, description, maxPoints>=1, required), optional passingScore 0..1.",
+            "properties": {
+              "criteria": {
+                "items": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "maxPoints": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "objectiveId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objectiveId",
+                    "description",
+                    "maxPoints",
+                    "required"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "passingScore": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "version": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "version",
+              "criteria"
+            ],
+            "type": "object"
+          },
+          "sourceReferences": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "activityId",
+          "generationRunId",
+          "rubric",
+          "sourceReferences",
+          "reviewStatus"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.activity.rubric.author",
+      "path": "/api/v1/learning/activities/{activity_id}/rubric"
+    },
+    {
       "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
       "input_schema": {
         "properties": {
@@ -350,6 +442,7 @@
               "multiple_choice",
               "true_false",
               "short_answer",
+              "numeric",
               "essay",
               "code"
             ],

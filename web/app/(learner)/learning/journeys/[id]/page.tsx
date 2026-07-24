@@ -870,6 +870,7 @@ export default function LearningJourneyPage() {
                   content={activeContent}
                   taskId={activeActivity?.id}
                   contentVersion={activeActivity?.contentVersion}
+                  rubric={activeActivity?.rubric}
                 />
               )}
             {activeProvenance?.sourceReferences && (

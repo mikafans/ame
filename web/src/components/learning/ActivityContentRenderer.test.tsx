@@ -59,4 +59,57 @@ describe("ActivityContentRenderer", () => {
     expect(unknown).toContain("Activity capability unavailable");
     expect(unknown).toContain("interactive_lab");
   });
+
+  it("renders a scoring rubric when one is present", () => {
+    const html = renderToString(
+      <ActivityContentRenderer
+        content={{
+          type: "rich_text",
+          heading: "Checkpointing",
+          body: "Durable state protects progress.",
+        }}
+        rubric={{
+          version: 1,
+          passingScore: 0.75,
+          criteria: [
+            {
+              id: "c1",
+              objectiveId: "00000000-0000-0000-0000-000000000001",
+              description: "Explains checkpoint durability",
+              maxPoints: 5,
+              required: true,
+            },
+            {
+              id: "c2",
+              objectiveId: "00000000-0000-0000-0000-000000000002",
+              description: "Notes recovery trade-offs",
+              maxPoints: 3,
+              required: false,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(html).toContain("Scoring rubric");
+    expect(html).toContain("Explains checkpoint durability");
+    expect(html).toContain("5 pts");
+    expect(html).toContain("Notes recovery trade-offs");
+    expect(html).toContain("3 pts");
+    expect(html).toContain("Required");
+    expect(html).toContain("Passing score: 75%");
+  });
+
+  it("renders nothing rubric-related when rubric is absent", () => {
+    const html = renderToString(
+      <ActivityContentRenderer
+        content={{
+          type: "rich_text",
+          heading: "Checkpointing",
+          body: "Durable state protects progress.",
+        }}
+      />,
+    );
+    expect(html).not.toContain("Scoring rubric");
+    expect(html).not.toContain("Passing score");
+  });
 });

@@ -547,6 +547,43 @@ paths:
           description: Content, provenance, or review status is invalid
       security:
       - bearer_auth: []
+  /api/v1/learning/activities/{activity_id}/rubric:
+    patch:
+      tags:
+      - learning
+      summary: PATCH /api/v1/learning/activities/{activity_id}/rubric — attach a reviewed, source-backed scoring rubric to a task activity.
+      operationId: author_activity_rubric
+      parameters:
+      - name: activity_id
+        in: path
+        description: Task activity to attach a rubric to
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorActivityRubricBody'
+        required: true
+      responses:
+        '200':
+          description: Activity with its attached rubric
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity or generation run does not belong to this learner
+        '409':
+          description: Generation is not published or activity is completed
+        '422':
+          description: Rubric, provenance, or review status is invalid
+      security:
+      - bearer_auth: []
   /api/v1/learning/journeys:
     get:
       tags:
@@ -1558,6 +1595,25 @@ components:
           type: array
           items:
             type: string
+    AuthorActivityRubricBody:
+      type: object
+      required:
+      - generationRunId
+      - rubric
+      - sourceReferences
+      - reviewStatus
+      properties:
+        generationRunId:
+          type: string
+          format: uuid
+        reviewStatus:
+          type: string
+        rubric:
+          $ref: '#/components/schemas/TaskRubric'
+        sourceReferences:
+          type: array
+          items:
+            type: string
     ContentReviewStatus:
       type: string
       enum:
@@ -1972,6 +2028,11 @@ components:
           format: int32
         publicationStatus:
           $ref: '#/components/schemas/ActivityPublicationStatus'
+        rubric:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TaskRubric'
+            description: Structured scoring rubric for task/application activities, if authored.
         sourceActorId:
           type: string
           format: uuid
@@ -2428,6 +2489,7 @@ components:
       - multiple_choice
       - true_false
       - short_answer
+      - numeric
       - essay
       - code
     QuestionOption:
@@ -2772,6 +2834,47 @@ components:
       - not_required
       - pending
       - complete
+    TaskRubric:
+      type: object
+      required:
+      - version
+      - criteria
+      properties:
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskRubricCriterion'
+        passingScore:
+          type:
+          - number
+          - 'null'
+          format: float
+        version:
+          type: integer
+          format: int32
+          minimum: 0
+    TaskRubricCriterion:
+      type: object
+      required:
+      - id
+      - objectiveId
+      - description
+      - maxPoints
+      - required
+      properties:
+        description:
+          type: string
+        id:
+          type: string
+        maxPoints:
+          type: integer
+          format: int32
+          minimum: 0
+        objectiveId:
+          type: string
+          format: uuid
+        required:
+          type: boolean
     TaskSubmissionResponse:
       type: object
       required:

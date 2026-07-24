@@ -1,13 +1,13 @@
 //! PostgreSQL implementation of the learning repository contract.
 
 use ame_learning_domain::{
-    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent, CreateActivity,
-    CreateChapter, CreateGoal, CreateJourney, CreateLearningSession, CreateObjective,
-    FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity, LearningChapter,
-    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
-    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity,
-    validate_activity_content, validate_chapter, validate_goal, validate_journey,
-    validate_objective,
+    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
+    AuthorActivityRubric, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
+    LearningActivity, LearningChapter, LearningGoal, LearningJourney, LearningObjective,
+    LearningRepository, LearningRepositoryError, LearningSession, LearningSessionStatus,
+    ObjectiveStatus, validate_activity, validate_activity_content, validate_activity_rubric,
+    validate_chapter, validate_goal, validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -429,13 +429,13 @@ impl LearningRepository for PgLearningRepository {
             INSERT INTO tb_activities (
                 journey_id, subject_user_id, source_actor_id,
                 chapter_id, kind, title, order_index, payload_schema_version,
-                content_version, publication_status, payload, status
+                content_version, publication_status, payload, status, rubric
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id, journey_id, subject_user_id, source_actor_id,
                       chapter_id, kind, title, order_index, payload_schema_version,
                       content_version, publication_status, payload,
-                      status, created_at, updated_at
+                      status, rubric, created_at, updated_at
             "#,
         )
         .bind(journey.id)
@@ -450,6 +450,7 @@ impl LearningRepository for PgLearningRepository {
         .bind(publication_status_value(input.publication_status))
         .bind(&input.payload)
         .bind(activity_status_value(input.status))
+        .bind(&input.rubric)
         .fetch_one(&mut *transaction)
         .await
         .map_err(|error| {
@@ -492,7 +493,7 @@ impl LearningRepository for PgLearningRepository {
             SELECT a.id, a.journey_id, a.subject_user_id, a.source_actor_id,
                    a.chapter_id, a.kind, a.title, a.order_index,
                    a.payload_schema_version, a.content_version,
-                   a.publication_status, a.payload, a.status,
+                   a.publication_status, a.payload, a.status, a.rubric,
                    a.created_at, a.updated_at,
                    COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids
             FROM tb_activities a
@@ -577,6 +578,46 @@ impl LearningRepository for PgLearningRepository {
         .get("updated_at");
         activity.updated_at = updated_at;
         Ok(activity)
+    }
+
+    async fn author_activity_rubric(
+        &self,
+        input: AuthorActivityRubric,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_rubric(&input)?;
+        let row = sqlx::query(
+            "SELECT subject_user_id, journey_id, status FROM tb_activities WHERE id = $1",
+        )
+        .bind(input.activity_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(LearningRepositoryError::NotFound {
+            resource: "activity",
+        })?;
+        if row.get::<Uuid, _>("subject_user_id") != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity_status(row.get::<String, _>("status").as_str()) == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        let journey_id: Uuid = row.get("journey_id");
+        sqlx::query(
+            "UPDATE tb_activities SET rubric = $1, updated_at = now() WHERE id = $2 AND subject_user_id = $3 AND status <> 'completed'",
+        )
+        .bind(&input.rubric)
+        .bind(input.activity_id)
+        .bind(input.subject_user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        self.list_activities(input.subject_user_id, journey_id)
+            .await?
+            .into_iter()
+            .find(|activity| activity.id == input.activity_id)
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "activity",
+            })
     }
 
     async fn start_learning_session(
@@ -910,6 +951,7 @@ fn activity_from_row(row: sqlx::postgres::PgRow, objective_ids: Vec<Uuid>) -> Le
         payload: row.get("payload"),
         objective_ids,
         status: activity_status(row.get::<String, _>("status").as_str()),
+        rubric: row.get("rubric"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     }

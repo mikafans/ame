@@ -177,6 +177,9 @@ pub struct CreateActivity {
     pub payload: serde_json::Value,
     pub objective_ids: Vec<Uuid>,
     pub status: ActivityStatus,
+    /// Optional scoring rubric for task/application activities. Opaque JSON here;
+    /// the API layer validates its shape against the platform `TaskRubric` type.
+    pub rubric: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -195,6 +198,9 @@ pub struct LearningActivity {
     pub payload: serde_json::Value,
     pub objective_ids: Vec<Uuid>,
     pub status: ActivityStatus,
+    /// Optional scoring rubric for task/application activities (opaque JSON;
+    /// shape validated at the API boundary against the platform `TaskRubric`).
+    pub rubric: Option<serde_json::Value>,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
@@ -205,6 +211,18 @@ pub struct AuthorActivityContent {
     pub activity_id: Uuid,
     pub generation_run_id: Uuid,
     pub content: serde_json::Value,
+    pub source_references: Vec<String>,
+    pub review_status: String,
+}
+
+/// Provenance-gated authoring of a task activity's scoring rubric. The `rubric`
+/// payload is opaque here; its structured shape is validated at the API layer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AuthorActivityRubric {
+    pub subject_user_id: Uuid,
+    pub activity_id: Uuid,
+    pub generation_run_id: Uuid,
+    pub rubric: serde_json::Value,
     pub source_references: Vec<String>,
     pub review_status: String,
 }
@@ -300,6 +318,8 @@ pub enum LearningRepositoryError {
     ActivityNotReady,
     #[error("activity content is invalid")]
     InvalidActivityContent,
+    #[error("activity rubric is invalid")]
+    InvalidRubric,
     #[error("completed activity content cannot be changed")]
     ActivityContentCompleted,
     #[error("learning session is already finished")]
@@ -386,6 +406,11 @@ pub trait LearningRepository: Send + Sync {
     async fn author_activity_content(
         &self,
         input: AuthorActivityContent,
+    ) -> Result<LearningActivity, LearningRepositoryError>;
+
+    async fn author_activity_rubric(
+        &self,
+        input: AuthorActivityRubric,
     ) -> Result<LearningActivity, LearningRepositoryError>;
 
     async fn start_learning_session(
@@ -554,6 +579,34 @@ pub fn validate_activity_content(
     Ok(())
 }
 
+/// Provenance gate + shape check for an authored rubric. The rubric's structured
+/// contents (criteria, points, passing score) are validated at the API boundary
+/// against the platform `TaskRubric` type; here we only enforce the same
+/// provenance discipline as content authoring and that the payload is an object.
+pub fn validate_activity_rubric(
+    input: &AuthorActivityRubric,
+) -> Result<(), LearningRepositoryError> {
+    if input.source_references.is_empty()
+        || input
+            .source_references
+            .iter()
+            .any(|reference| reference.trim().is_empty())
+    {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "source_references",
+        });
+    }
+    if input.review_status != "approved" {
+        return Err(LearningRepositoryError::EmptyField {
+            field: "review_status",
+        });
+    }
+    if !input.rubric.is_object() {
+        return Err(LearningRepositoryError::InvalidRubric);
+    }
+    Ok(())
+}
+
 fn capability_has_content(capability: &ActivityCapability) -> bool {
     let non_empty = |value: &str| !value.trim().is_empty();
     match capability {
@@ -652,6 +705,50 @@ mod capability_tests {
         for (kind, content) in cases {
             assert!(validate_activity_content(kind, &authored(content)).is_ok());
         }
+    }
+
+    fn authored_rubric(rubric: serde_json::Value) -> AuthorActivityRubric {
+        AuthorActivityRubric {
+            subject_user_id: Uuid::now_v7(),
+            activity_id: Uuid::now_v7(),
+            generation_run_id: Uuid::now_v7(),
+            rubric,
+            source_references: vec!["https://example.com/rubric".to_string()],
+            review_status: "approved".to_string(),
+        }
+    }
+
+    #[test]
+    fn rubric_authoring_requires_provenance_and_object_payload() {
+        let ok = authored_rubric(serde_json::json!({
+            "version": 1,
+            "criteria": [{"id": "c1", "objectiveId": Uuid::now_v7(), "description": "d", "maxPoints": 4, "required": true}]
+        }));
+        assert!(validate_activity_rubric(&ok).is_ok());
+
+        let mut no_sources = ok.clone();
+        no_sources.source_references = vec![];
+        assert_eq!(
+            validate_activity_rubric(&no_sources),
+            Err(LearningRepositoryError::EmptyField {
+                field: "source_references"
+            })
+        );
+
+        let mut unapproved = ok.clone();
+        unapproved.review_status = "draft".to_string();
+        assert_eq!(
+            validate_activity_rubric(&unapproved),
+            Err(LearningRepositoryError::EmptyField {
+                field: "review_status"
+            })
+        );
+
+        let not_object = authored_rubric(serde_json::json!([1, 2, 3]));
+        assert_eq!(
+            validate_activity_rubric(&not_object),
+            Err(LearningRepositoryError::InvalidRubric)
+        );
     }
 
     #[test]

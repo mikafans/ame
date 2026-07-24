@@ -83,6 +83,7 @@ POST   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
 GET    /api/v1/learning/sessions/{id}
 POST   /api/v1/learning/sessions/{id}/finish
 PATCH  /api/v1/learning/activities/{activity_id}/content
+PATCH  /api/v1/learning/activities/{activity_id}/rubric
 
 POST   /api/v1/questions
 GET    /api/v1/questions/{question_id}/versions/{version}
@@ -130,9 +131,10 @@ text alone.
 ## Agent authoring and adaptation
 
 Agents may inspect the journey, create versioned questions and assessments,
-author approved activity content, create source-backed deep dives, and inspect
-progress. Generated content requires an owner-scoped generation run with a
-matching operation and published status:
+author approved activity content, attach scoring rubrics to task activities,
+create source-backed deep dives, and inspect progress. Generated content
+requires an owner-scoped generation run with a matching operation and published
+status:
 
 ```http
 POST  /api/v1/generation-runs
@@ -140,8 +142,9 @@ GET   /api/v1/generation-runs/{id}
 PATCH /api/v1/generation-runs/{id}
 ```
 
-Use `question.compose` for questions, `deep_dive.create` for deep dives, and
-`learning.activity.content.compose` for reviewed activity content. Reuse a
+Use `question.compose` for questions, `deep_dive.create` for deep dives,
+`learning.activity.content.compose` for reviewed activity content, and
+`learning.activity.rubric.compose` for task rubrics. Reuse a
 stable `retryKey` for retryable generation. Failed, cross-owner, stale, or
 operation-mismatched provenance is rejected. Deep dives require matching
 existing evidence and at least one source reference; only approved deep dives

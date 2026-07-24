@@ -1,13 +1,13 @@
 //! Learning repositories and their contract tests.
 
 use ame_learning_domain::{
-    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent, CreateActivity,
-    CreateChapter, CreateGoal, CreateJourney, CreateLearningSession, CreateObjective,
-    FinishLearningSession, GoalStatus, JourneyStatus, LearningActivity, LearningChapter,
-    LearningGoal, LearningJourney, LearningObjective, LearningRepository, LearningRepositoryError,
-    LearningSession, LearningSessionStatus, ObjectiveStatus, validate_activity,
-    validate_activity_content, validate_chapter, validate_goal, validate_journey,
-    validate_objective,
+    ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
+    AuthorActivityRubric, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
+    LearningActivity, LearningChapter, LearningGoal, LearningJourney, LearningObjective,
+    LearningRepository, LearningRepositoryError, LearningSession, LearningSessionStatus,
+    ObjectiveStatus, validate_activity, validate_activity_content, validate_activity_rubric,
+    validate_chapter, validate_goal, validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -404,6 +404,7 @@ impl LearningRepository for InMemoryLearningRepository {
             payload: input.payload,
             objective_ids: input.objective_ids,
             status: input.status,
+            rubric: input.rubric,
             created_at: now,
             updated_at: now,
         };
@@ -545,6 +546,31 @@ impl LearningRepository for InMemoryLearningRepository {
                 "sourceReferences": input.source_references,
             }),
         );
+        activity.updated_at = OffsetDateTime::now_utc();
+        Ok(activity.clone())
+    }
+
+    async fn author_activity_rubric(
+        &self,
+        input: AuthorActivityRubric,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_rubric(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let activity = state.activities.get_mut(&input.activity_id).ok_or(
+            LearningRepositoryError::NotFound {
+                resource: "activity",
+            },
+        )?;
+        if activity.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity.status == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        activity.rubric = Some(input.rubric);
         activity.updated_at = OffsetDateTime::now_utc();
         Ok(activity.clone())
     }
@@ -869,6 +895,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             payload: serde_json::json!({"count": 10}),
             objective_ids: vec![objective.id],
             status: ActivityStatus::Ready,
+            rubric: None,
         })
         .await
         .expect("activity creates");
@@ -887,6 +914,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             payload: serde_json::json!({"count": 5}),
             objective_ids: vec![objective.id],
             status: ActivityStatus::Proposed,
+            rubric: None,
         })
         .await
         .expect("next activity creates");
@@ -901,6 +929,73 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         repository.list_activities(other_subject, journey.id).await,
         Err(LearningRepositoryError::SubjectMismatch)
     );
+
+    // A task rubric can be authored onto an activity, provenance-gated, and
+    // reads back on the activity. Foreign subjects and unapproved provenance
+    // are rejected.
+    let rubric = serde_json::json!({
+        "version": 1,
+        "criteria": [{
+            "id": "explain-tradeoff",
+            "objectiveId": objective.id,
+            "description": "Explains the operational tradeoff",
+            "maxPoints": 4,
+            "required": true
+        }],
+        "passingScore": 0.75
+    });
+    assert_eq!(
+        repository
+            .author_activity_rubric(AuthorActivityRubric {
+                subject_user_id: other_subject,
+                activity_id: activity.id,
+                generation_run_id: Uuid::now_v7(),
+                rubric: rubric.clone(),
+                source_references: vec!["https://example.com/rubric".to_string()],
+                review_status: "approved".to_string(),
+            })
+            .await,
+        Err(LearningRepositoryError::SubjectMismatch)
+    );
+    assert_eq!(
+        repository
+            .author_activity_rubric(AuthorActivityRubric {
+                subject_user_id: subject,
+                activity_id: activity.id,
+                generation_run_id: Uuid::now_v7(),
+                rubric: rubric.clone(),
+                source_references: vec![],
+                review_status: "approved".to_string(),
+            })
+            .await,
+        Err(LearningRepositoryError::EmptyField {
+            field: "source_references"
+        })
+    );
+    let authored = repository
+        .author_activity_rubric(AuthorActivityRubric {
+            subject_user_id: subject,
+            activity_id: activity.id,
+            generation_run_id: Uuid::now_v7(),
+            rubric: rubric.clone(),
+            source_references: vec!["https://example.com/rubric".to_string()],
+            review_status: "approved".to_string(),
+        })
+        .await
+        .expect("rubric authors");
+    assert_eq!(authored.rubric.as_ref(), Some(&rubric));
+    let reloaded = repository
+        .list_activities(subject, journey.id)
+        .await
+        .expect("activities reload");
+    assert_eq!(
+        reloaded
+            .iter()
+            .find(|candidate| candidate.id == activity.id)
+            .and_then(|candidate| candidate.rubric.as_ref()),
+        Some(&rubric)
+    );
+
     let session_input = CreateLearningSession {
         journey_id: journey.id,
         activity_id: activity.id,
@@ -1097,6 +1192,7 @@ mod contract_tests {
                     payload: serde_json::json!({}),
                     objective_ids: vec![objective.id],
                     status: ActivityStatus::Ready,
+                    rubric: None,
                 })
                 .await
                 .expect("activity creates");
