@@ -112,9 +112,12 @@ GET    /api/v1/progress/{journey_id}/timeline
 Starting a session does not prove mastery. Finishing an instructional activity
 records completion, while a quiz attempt or application-task submission
 records demonstrable work. Practice and automatically graded assessments may
-return a score. Essay/code answers can finish as `submitted` with
-`reviewStatus: pending`; do not invent a score or evidence while review is
-pending. Abandoned work never creates mastery evidence.
+return a score. Question `kind` includes `numeric`, graded against
+`acceptedAnswers[0]` (the target value) with an optional
+`acceptedAnswers[1]` tolerance (an absolute number, or a percentage such as
+`"2%"`); omit the tolerance for an exact match. Essay/code answers can finish
+as `submitted` with `reviewStatus: pending`; do not invent a score or evidence
+while review is pending. Abandoned work never creates mastery evidence.
 
 Task submissions carry the exact activity `contentVersion`, response, review
 state, evaluation method, optional score, and feedback. A task contributes

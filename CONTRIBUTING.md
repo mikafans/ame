@@ -42,7 +42,7 @@ CI runs `make check` + `cargo audit` on every PR (see `.github/workflows/ci.yml`
 - Backend: `api/src/` — module boundaries enforced. `engine/` and `assess/` may depend on `bank/` and `domain/`. Reverse is forbidden. `bank/` does not know that attempts exist.
 - Frontend: `web/app/` (App Router pages) + `web/src/` (components, hooks, generated API client).
 - Schema: `db/migrations/` (sqlx). Additive after the squash baseline; never edit a migration that has been applied. Use `make db-reset` to wipe and re-apply locally.
-- Specs: `docs/specs/2026-05-20-harus-platform-design.md` is canonical.
+- Specs: `docs/plans/2026-07-19-agent-first-learning-rework.md` is canonical for the current 0.3 rework (see `docs/ROADMAP.md`).
 
 See `CLAUDE.md` for the full working agreement, shell discipline notes, and tool-by-tool guidance (useful for humans too).
 

@@ -50,7 +50,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - **DB**: Postgres 18 via docker/podman compose (`db/docker-compose.yml`)
 - **Schema**: OpenAPI at `api/openapi.yaml`; regenerate with `make openapi`
 - **Toolchain**: Rust edition 2024, Axum 0.8, Tokio, sqlx; Next.js 16 / React 19 / Tailwind CSS 4 + shadcn/ui. The Nix devShell (`flake.nix`, pinned to `nixpkgs-unstable`) provides the toolchain — rust, bun, uv, python 3.14, sqlx-cli. Enter it with `direnv allow` (auto-loads via `.envrc`) or `nix develop`; in non-interactive shells prefix targets with `nix develop -c make <target>`. Migrations: `sqlx migrate run`; SQL lint: `uvx sqlfluff`; SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`.
-- **Canonical spec**: `docs/specs/2026-05-20-harus-platform-design.md` (replaces the `2026-05-19-question-exam-platform-design.md`, kept only as historical reference). Implementation plans in `docs/plans/`.
+- **Canonical spec**: `docs/plans/2026-07-19-agent-first-learning-rework.md` (design, user stories, contracts, and TDD matrix for the current 0.3 agent-first rework; see `docs/ROADMAP.md`). The earlier `docs/specs/2026-05-20-harus-platform-design.md` was retired once its content landed in code. Implementation plans in `docs/plans/`.
 
 ## Architecture
 
