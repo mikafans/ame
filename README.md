@@ -1,6 +1,6 @@
 # ame — study, sweetened
 
-Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
+Agent-friendly learning platform with one owner-scoped journey API. Rust (Axum) backend, Next.js (App Router) frontend, Postgres.
 
 **Stack**: Rust 2024 · Axum 0.8 · sqlx · Next.js 16 · React 19 · Bun · TypeScript · Tailwind CSS · Postgres 18
 
@@ -8,20 +8,23 @@ Assessment platform with a first-class agent surface. Rust (Axum) backend, Next.
 
 ## Quick start
 
+The toolchain is provided by the Nix devShell — run `direnv allow` (auto-loads
+via `.envrc`) or `nix develop` first, then:
+
 ```bash
-make init-env       # mise install + sqlx-cli + web deps + Playwright
+make init-env       # web deps + Playwright browsers (toolchain comes from nix)
 make db-up          # start Postgres in Docker or Podman
-make db-migrate     # apply pending migrations
 make dev            # API on :28080, frontend on :23000
-make db-seed        # seed demo users, assessments, questions (requires API running)
+make db-seed        # seed the current learner journey fixture (requires API running)
 ```
 
-Demo credentials after seeding: `ada@example.com / password123` (primary user), `mira@example.com / password123` (second user), `admin@example.com / password123` (admin).
+Demo credentials after seeding: `haru@example.com / password123` (learner),
+`admin@example.com / password123` (admin).
 
 ### Admin users
 
 Registration only ever grants the `user` role — there is no API path to self-register
-as an admin (`POST /v1/auth/register` rejects `role: admin`). Admins are granted
+as an admin (`POST /public/v1/auth/register` rejects `role: admin`). Admins are granted
 **directly in the database**:
 
 ```bash
@@ -29,10 +32,9 @@ make db-admin                                  # create/grant admin@example.com 
 make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
 ```
 
-`db-seed` depends on `db-admin`, so the demo admin exists before seeding runs (the
-seed needs an admin to upgrade the primary user, Ada, to premium, which in turn
-unlocks the agent-creation quota used by `make db-bulk`). After being promoted, log
-out and back in — token scopes are fixed at login.
+`db-seed` depends on `db-admin`, so the local admin exists before the current
+learner fixture runs. After being promoted, log
+out and back in to refresh the session.
 
 Copy `.env.example` to `.env` if you need to override defaults.
 
@@ -79,8 +81,8 @@ needed.
 
 For a single-host self-hosted installation, follow
 [`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
-`docs/public/llms.txt` route is the agent discovery contract, not deployment
-documentation.
+`/public/llms.txt` file is the agent discovery contract, served statically by
+the recommended proxy rather than by the API.
 
 ```bash
 cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
@@ -106,18 +108,20 @@ make db-down
 - `web/` — Next.js frontend (App Router, Tailwind CSS and local shadcn-style primitives).
 - `db/` — `docker-compose.yml` + sqlx migrations.
 - `design/source/src/*.jsx` — pixel-faithful UI design source of truth.
-- `docs/specs/` — design specs (`2026-05-20-harus-platform-design.md` is canonical).
+- `docs/specs/` — supporting design and schema specifications.
 - `docs/plans/` — implementation plans.
 - `docs/public/` — canonical public-facing operator, deployment, and agent docs.
-- `docs/ROADMAP.md` — versioned roadmap toward v1.1 "Admin Console GA".
+- `docs/ROADMAP.md` — the current agent-first release roadmap.
 - `.tmp/` — gitignored scratch space for screenshots and Playwright artifacts.
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the path to **v1.1 "Admin Console GA"**.
-Current: **v0.3.0** — learner landing refresh, frontend foundation migration, and
-self-hosting documentation. The next roadmap milestone is the v0.3 content and
-data-hygiene track.
+[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the certifiable agent-first learning
+loop and its later milestones. Current: **v0.3.0** — one unified learner API,
+durable journeys, question-backed practice and exams, evidence-based progress,
+deep dives, and a self-hostable Postgres + Valkey + API + web + Caddy origin.
+The canonical design and user stories are in
+[`docs/plans/2026-07-19-agent-first-learning-rework.md`](docs/plans/2026-07-19-agent-first-learning-rework.md).
 
 ## Contributing
 

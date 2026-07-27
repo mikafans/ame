@@ -19,7 +19,7 @@ export function HighlightedCode({ code, language = "python" }: Props) {
   }, [code, language]);
   const lang = toPrismLanguage(language);
   return (
-    <pre className={`prism-code language-${lang}`}>
+    <pre tabIndex={0} className={`prism-code language-${lang}`}>
       <code ref={ref} className={`language-${lang}`}>
         {code.trim()}
       </code>

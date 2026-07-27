@@ -1,32 +1,36 @@
 # Self-hosting AME
 
-This is the operator guide for running AME on one Linux host with Docker or
-Podman Compose and a TLS reverse proxy. It is separate from the agent guide:
-`llms.txt` describes the public HTTP agent interface for AI clients; it is not a
-deployment manifest or an installation guide.
+This is the operator guide for running AME on one host with Docker or Podman
+Compose. The recommended deployment includes Caddy in the Compose stack, so the
+browser, API, and public machine-readable documents share one origin. The same
+learner API serves the web app and agents; `llms.txt` is the machine-facing
+entry guide for that shared contract.
 
-## Architecture
+## Production architecture
 
 ```text
-Internet -> Caddy/nginx -> web:3000
-                       \-> api:8080 -> postgres:5432
-                                     \-> valkey:6379
+Internet -> containerized Caddy :80/:443
+                    ├-> web:3000
+                    └-> api:8080 -> postgres:5432
+                                  \-> valkey:6379
 ```
 
-Use one public origin for the browser and API. Caddy sends `/v1/*`, `/healthz`,
-and `/readyz` to the API; all other paths go to Next.js. The canonical public
-documents (`/llms.txt`, `/skill.json`, and `/openapi.yaml`) are served by the
-frontend from `docs/public`. The API also exposes compatibility routes for
-clients connecting directly to its port.
+Use one public origin for the browser and API. Containerized Caddy serves the
+canonical documents `/public/llms.txt`, `/public/skill.json`, and
+`/public/openapi.yaml` directly from `docs/public`; it proxies `/api/*` and
+`/public/v1/*` to the API, and keeps `/healthz`, `/readyz`, and `/metrics` as
+root operational endpoints. All other paths go to Next.js.
 
 ## Requirements
 
 - Docker Compose v2 or a working Podman machine with Compose support
 - DNS pointing your hostname at the server
-- Caddy, nginx, or another TLS-capable reverse proxy
 - Persistent backup storage for Postgres
 
-## Configure and start
+The Compose Caddy container terminates TLS when `AME_HOSTNAME` is a real DNS
+name. A system-level Caddy or nginx is not required.
+
+## Configure and start a production deployment
 
 ```bash
 cp .env.example .env
@@ -38,6 +42,7 @@ Set real values in `.env`:
 POSTGRES_PASSWORD=<long-random-password>
 AME_CORS_ORIGINS=https://ame.example.com
 NEXT_PUBLIC_API_URL=https://ame.example.com
+AME_HOSTNAME=ame.example.com
 ```
 
 `NEXT_PUBLIC_API_URL` is compiled into the browser bundle, so set it before
@@ -47,8 +52,8 @@ browser configuration.
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 docker compose -f docker-compose.prod.yml ps
-curl -fsS http://127.0.0.1:8080/healthz
-curl -fsS http://127.0.0.1:8080/readyz
+curl -fsS https://ame.example.com/healthz
+curl -fsS https://ame.example.com/readyz
 ```
 
 The API runs embedded SQLx migrations during startup. There is no separate
@@ -69,19 +74,11 @@ podman machine stop
 podman machine start
 ```
 
-## Reverse proxy
-
-The repository includes [`Caddyfile.example`](../../deploy/Caddyfile.example). Replace the
-hostname and load it into Caddy:
-
-```bash
-caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
-```
-
-Compose binds API and web ports to loopback by default. Keep the proxy and
-containers on the same host, or change the bind address deliberately and add a
-firewall rule.
+The Compose stack publishes only Caddy. API and web remain private services on
+the Compose network, so the proxy cannot accidentally be bypassed. For a
+deployment that already has a separately managed proxy, the optional
+[`Caddyfile.example`](../../deploy/Caddyfile.example) remains available, but
+that system-level arrangement is not the recommended path.
 
 ## First administrator and seed data
 
@@ -105,20 +102,21 @@ Do not use repository demo passwords on an internet-facing instance.
 After the public origin is live, AI clients can discover AME at:
 
 ```text
-https://ame.example.com/llms.txt
-https://ame.example.com/skill.json
-https://ame.example.com/openapi.yaml
+https://ame.example.com/public/llms.txt
+https://ame.example.com/public/skill.json
+https://ame.example.com/public/openapi.yaml
 ```
 
 `llms.txt` is an agent discovery contract, not a self-hosting mechanism. These
-routes advertise the agent surface but do not grant access. An owner must create
-an agent key through the authenticated application flow; keys are bearer
-credentials and must be stored as secrets.
+routes advertise the shared learner API. An agent can start onboarding with an
+email identifier and receive the learner bearer token; no separate integration
+identity is needed.
 
 ## Upgrade and backup checklist
 
 1. Back up Postgres with `make db-backup BACKUP_FILE=...`.
-2. Pull the new revision and review migration changes.
+2. Pull the new revision and verify the release's clean baseline before using it
+   with a new empty database.
 3. Rebuild with `docker compose -f docker-compose.prod.yml up --build -d`.
 4. Check `/readyz`, logs, and the public discovery routes.
 5. Keep the previous image available until smoke checks pass.

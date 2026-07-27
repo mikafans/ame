@@ -16,27 +16,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jdx/mise-action@v2
-        with:
-          install: true
-          cache: true
+      - uses: DeterminateSystems/nix-installer-action@main
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: api
 
-      # mise only reconciles components on a fresh install; with cache: true the
-      # toolchain is restored without re-running that hook, so install explicitly.
-      - name: Ensure rust components
-        run: mise exec -- rustup component add rustfmt clippy
-
       - name: Install web deps
-        working-directory: web
-        run: mise exec -- bun install --frozen-lockfile
+        run: nix develop -c bash -c 'cd web && bun install --frozen-lockfile'
 
       - name: fmt-check + lint + test
-        run: make check
+        run: nix develop -c make check
 
-      - name: openapi + client drift check
-        working-directory: web
-        run: mise exec -- bun run api:check && mise exec -- bun run client:check
+      - name: openapi drift check
+        run: nix develop -c bash -c 'cd web && bun run api:check'

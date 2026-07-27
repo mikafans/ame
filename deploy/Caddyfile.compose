@@ -1,0 +1,32 @@
+{$AME_HOSTNAME} {
+    handle /api/* {
+        reverse_proxy api:8080
+    }
+
+    handle /public/v1/* {
+        reverse_proxy api:8080
+    }
+
+    # Everything else under /public is a static repository artifact from
+    # docs/public. Keep this after /public/v1/* so the public API remains API-backed.
+    handle /public/* {
+        root * /srv/docs
+        file_server
+    }
+
+    handle /healthz {
+        reverse_proxy api:8080
+    }
+
+    handle /readyz {
+        reverse_proxy api:8080
+    }
+
+    handle /metrics {
+        reverse_proxy api:8080
+    }
+
+    handle {
+        reverse_proxy web:3000
+    }
+}

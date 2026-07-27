@@ -2,11 +2,16 @@ use axum::{
     Router,
     extract::State,
     middleware,
-    routing::{get, post},
+    routing::{get, patch, post},
 };
 use axum_prometheus::PrometheusMetricLayer;
 use sqlx::PgPool;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::{
+    limit::RequestBodyLimitLayer,
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
+    trace::TraceLayer,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -36,58 +41,6 @@ pub async fn auth_extract_middleware(
     next.run(req).await
 }
 
-/// Agent-role tokens (sub-accounts) are confined to a small allowlist of endpoints.
-/// All other REST paths return 403 Forbidden. Runs AFTER `auth_extract_middleware`
-/// so the cached user is available for the role check.
-pub async fn agent_guard_middleware(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
-    use crate::auth::extractor::AuthenticatedUser;
-    use crate::domain::user::Role;
-    use axum::response::IntoResponse;
-
-    if let Some(auth) = req.extensions().get::<AuthenticatedUser>()
-        && auth.user.role == Role::Agent
-    {
-        let path = req.uri().path();
-        let method = req.method().as_str();
-
-        // Allowlist: method + pattern (using routed MatchedPath when available,
-        // or raw path as fallback).
-        let matched_path = req
-            .extensions()
-            .get::<axum::extract::MatchedPath>()
-            .map(|p| p.as_str())
-            .unwrap_or(path);
-
-        let allowed = matches!(
-            (method, matched_path),
-            ("GET", "/v1/assessments")
-                | ("GET", "/v1/assessments/{id}")
-                | ("GET", "/v1/assessments/{id}/stats")
-                | ("GET", "/v1/questions")
-                | ("GET", "/v1/questions/{id}/deepen")
-                | ("GET", "/v1/me/attempts")
-                | ("GET", "/v1/me/stats")
-                | ("GET", "/v1/agents/activity")
-                | ("POST", "/v1/agents/run")
-                | ("GET", "/llms.txt")
-                | ("GET", "/skill.json")
-                | ("GET", "/openapi.yaml")
-        );
-
-        if !allowed {
-            return crate::domain::error::ApiError::Forbidden(std::borrow::Cow::Borrowed(
-                "agents are limited to read endpoints and POST /v1/agents/run",
-            ))
-            .into_response();
-        }
-    }
-
-    next.run(req).await
-}
-
 /// Resolves the effective platform settings once per request, stashes them in
 /// request extensions (so `rate_limit_middleware` reuses the same blob), and
 /// returns 503 for non-admins while maintenance mode is on. Runs AFTER
@@ -101,21 +54,18 @@ pub async fn maintenance_mode_middleware(
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     use crate::auth::extractor::AuthenticatedUser;
-    use crate::domain::user::Scope;
     use axum::response::IntoResponse;
 
     let settings = crate::settings::get_effective(&state.pool, &state.valkey, &state.config).await;
 
     if settings.maintenance_mode {
         let path = req.uri().path();
-        let exempt = matches!(
-            path,
-            "/v1/auth/login" | "/llms.txt" | "/skill.json" | "/openapi.yaml" | "/metrics"
-        );
+        let exempt =
+            matches!(path, "/healthz" | "/readyz" | "/metrics") || path.starts_with("/public/");
         let is_admin = req
             .extensions()
             .get::<AuthenticatedUser>()
-            .map(|a| a.token_scopes.contains(&Scope::Admin))
+            .map(|a| a.user.role == crate::domain::user::Role::Admin)
             .unwrap_or(false);
         if !exempt && !is_admin {
             return crate::domain::error::ApiError::Maintenance.into_response();
@@ -127,26 +77,23 @@ pub async fn maintenance_mode_middleware(
     next.run(req).await
 }
 
-pub mod activity;
 pub mod admin;
 pub mod agents;
 pub mod assessments;
+pub mod attempts;
 pub mod auth;
 pub mod db;
 pub mod deep_dives;
-pub mod explore;
-pub mod export;
+pub mod generation;
 pub mod health;
 pub mod idempotency;
+pub mod learning;
 pub mod me;
-pub mod messages;
+pub mod onboarding;
 pub mod openapi;
-pub mod plans;
+pub mod progress;
 pub mod questions;
-pub mod quota;
-pub mod sessions;
-pub mod stats;
-pub mod tags;
+pub mod tasks;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
     let (layer, handle) = PrometheusMetricLayer::pair();
@@ -202,33 +149,58 @@ pub fn router(pool: PgPool) -> Router {
 
     // Endpoints that should be logged (activity_log)
     let logged_router = Router::new()
-        .merge(assessments::router(state.clone()))
-        .merge(sessions::router(state.clone()))
-        .merge(deep_dives::router(state.clone()))
-        .merge(me::router(state.clone()))
-        .merge(plans::router(state.clone()))
-        .merge(agents::logged_router(state.clone()))
-        .merge(messages::router(state.clone()))
-        .route("/v1/me/export", axum::routing::get(export::export_data))
+        .merge(me::current_router(state.clone()))
+        .merge(learning::router(state.clone()))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             idempotency::idempotency_middleware,
+        ));
+
+    let public_routes = Router::new()
+        .merge(onboarding::router(state.clone()))
+        .route("/v1/auth/register", post(auth::register))
+        .route("/v1/auth/login", post(auth::login))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::ratelimit::rate_limit_middleware,
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            activity::activity_log_middleware,
+            maintenance_mode_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_extract_middleware,
         ));
 
     let api_routes = Router::new()
         .merge(admin::router(state.clone()))
         .merge(questions::router(state.clone()))
-        .merge(explore::router(state.clone()))
-        .merge(openapi::router(state.clone()))
-        .merge(stats::router(state.clone()))
-        .merge(tags::router(state.clone()))
-        .merge(agents::public_router(state.clone()))
-        .route("/v1/auth/register", post(auth::register))
-        .route("/v1/auth/login", post(auth::login))
+        .merge(assessments::router(state.clone()))
+        .merge(attempts::router(state.clone()))
+        .merge(progress::router(state.clone()))
+        .merge(deep_dives::router(state.clone()))
+        .merge(generation::router(state.clone()))
+        .route(
+            "/v1/tasks/{task_id}/submissions",
+            post(tasks::start_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/submit",
+            post(tasks::submit_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}",
+            get(tasks::get_submission),
+        )
+        .route(
+            "/v1/admin/task-submissions",
+            get(tasks::list_pending_submissions),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/review",
+            patch(tasks::review_submission),
+        )
         .route("/v1/auth/logout", post(auth::logout))
         .merge(logged_router)
         .layer(middleware::from_fn_with_state(
@@ -239,16 +211,52 @@ pub fn router(pool: PgPool) -> Router {
             state.clone(),
             maintenance_mode_middleware,
         ))
-        .layer(middleware::from_fn(agent_guard_middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,
         ));
 
     Router::new()
-        .merge(api_routes)
+        .nest("/api", api_routes)
+        .nest("/public", public_routes)
         .route("/healthz", get(health::healthz))
         .route("/readyz", get(health::readyz))
+        .layer(PropagateRequestIdLayer::new(
+            axum::http::header::HeaderName::from_static("x-request-id"),
+        ))
+        .layer(SetRequestIdLayer::new(
+            axum::http::header::HeaderName::from_static("x-request-id"),
+            MakeRequestUuid,
+        ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &axum::http::Request<_>| {
+                    let request_id = request
+                        .extensions()
+                        .get::<RequestId>()
+                        .and_then(|id| id.header_value().to_str().ok())
+                        .unwrap_or("missing");
+                    tracing::info_span!(
+                        "http_request",
+                        method = %request.method(),
+                        uri = %request.uri(),
+                        request_id = %request_id,
+                    )
+                })
+                .on_response(
+                    |response: &axum::http::Response<_>,
+                     latency: std::time::Duration,
+                     span: &tracing::Span| {
+                        tracing::info!(
+                            parent: span,
+                            status = %response.status(),
+                            duration_ms = latency.as_secs_f64() * 1000.0,
+                            "http request completed"
+                        );
+                    },
+                ),
+        )
+        .layer(RequestBodyLimitLayer::new(1024 * 1024))
         .layer(cors)
         .layer(middleware::from_fn(security_headers_middleware))
         .with_state(state)

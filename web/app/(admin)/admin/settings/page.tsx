@@ -4,7 +4,6 @@ import { api } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { Button } from "@/components/ui/button";
 import type { components } from "@/api/generated/schema";
-type QuotaSettings = components["schemas"]["QuotaSettings"];
 type RateLimitSettings = components["schemas"]["RateLimitSettings"];
 const input =
   "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -20,17 +19,12 @@ export default function SettingsPage() {
     free: { burst: 0, rate: 0 },
     premium: { burst: 0, rate: 0 },
   });
-  const [quota, setQuota] = useState<QuotaSettings>({
-    agents: { free: 0, premium: 0 },
-    assessments: { free: 0, premium: 0 },
-    questions: { free: 0, premium: 0 },
-  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     api
-      .GET("/v1/admin/settings")
+      .GET("/api/v1/admin/settings", {})
       .then(({ data, error }) => {
         if (error)
           setLoadError(
@@ -39,7 +33,6 @@ export default function SettingsPage() {
         else if (data) {
           setMaintenanceMode(data.maintenanceMode);
           setRatelimit(data.ratelimit);
-          setQuota(data.quota);
         }
       })
       .catch(() =>
@@ -51,7 +44,7 @@ export default function SettingsPage() {
     setSavingMaintenance(true);
     setMaintenanceError(null);
     try {
-      const { data, error } = await api.PUT("/v1/admin/settings", {
+      const { data, error } = await api.PUT("/api/v1/admin/settings", {
         body: { maintenanceMode: value },
       });
       if (error) {
@@ -76,14 +69,13 @@ export default function SettingsPage() {
     setSaveError(null);
     setSaved(false);
     try {
-      const { data, error } = await api.PUT("/v1/admin/settings", {
-        body: { ratelimit, quota },
+      const { data, error } = await api.PUT("/api/v1/admin/settings", {
+        body: { ratelimit },
       });
       if (error)
         setSaveError("Failed to save: " + errorMessage(error, "Unknown error"));
       else if (data) {
         setRatelimit(data.ratelimit);
-        setQuota(data.quota);
         setSaved(true);
         setTimeout(() => setSaved(false), 4000);
       }
@@ -102,15 +94,6 @@ export default function SettingsPage() {
       ...p,
       [tier]: { ...p[tier], [field]: Number(value) || 0 },
     }));
-  const setQuotaValue = (
-    category: "agents" | "assessments" | "questions",
-    tier: "free" | "premium",
-    value: string,
-  ) =>
-    setQuota((p) => ({
-      ...p,
-      [category]: { ...p[category], [tier]: Number(value) || 0 },
-    }));
   if (loading)
     return (
       <main className="p-12 text-muted-foreground">Loading settings…</main>
@@ -120,7 +103,7 @@ export default function SettingsPage() {
       <header className="mb-8">
         <h1 className="text-3xl font-bold">Platform Settings</h1>
         <p className="mt-2 text-muted-foreground">
-          Configure maintenance mode, rate limits, and quota controls.
+          Configure maintenance mode and rate limits.
         </p>
       </header>
       {loadError && <Notice tone="error">{loadError}</Notice>}
@@ -153,9 +136,7 @@ export default function SettingsPage() {
         <h2 className="mb-5 text-lg font-bold">Rate Limits</h2>
         {saveError && <Notice tone="error">{saveError}</Notice>}
         {saved && (
-          <Notice tone="success">
-            Rate limits and quotas saved successfully.
-          </Notice>
+          <Notice tone="success">Rate limits saved successfully.</Notice>
         )}
         <div className="grid gap-6 sm:grid-cols-2">
           {(["free", "premium"] as const).map((tier) => (
@@ -170,26 +151,6 @@ export default function SettingsPage() {
                 label="Rate"
                 value={ratelimit[tier].rate}
                 onChange={(v) => setRate(tier, "rate", v)}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="mb-6 rounded-lg border border-border p-6">
-        <h2 className="mb-5 text-lg font-bold">Usage Quotas</h2>
-        <div className="grid gap-6 sm:grid-cols-3">
-          {(["agents", "assessments", "questions"] as const).map((category) => (
-            <div key={category}>
-              <h3 className="mb-3 font-semibold capitalize">{category}</h3>
-              <Field
-                label="Free tier"
-                value={quota[category].free}
-                onChange={(v) => setQuotaValue(category, "free", v)}
-              />
-              <Field
-                label="Premium tier"
-                value={quota[category].premium}
-                onChange={(v) => setQuotaValue(category, "premium", v)}
               />
             </div>
           ))}

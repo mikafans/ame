@@ -34,7 +34,6 @@ use axum::{
 use http_body_util::BodyExt;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::Row;
 
 use crate::{
     auth::token::{parse_bearer_token, verify_token_secret},
@@ -69,51 +68,14 @@ pub async fn idempotency_middleware(
         Some(t) => t,
         None => return Ok(next.run(req).await),
     };
+    if parsed_token.kind != crate::auth::token::TokenKind::Login {
+        return Ok(next.run(req).await);
+    }
     let token_id = parsed_token.id;
-    let is_login = parsed_token.kind == crate::auth::token::TokenKind::Login;
-
-    let token_info = if is_login {
-        let rec = sqlx::query(
-            r#"
-            SELECT token_hash
-            FROM tb_login_sessions
-            WHERE id = $1
-            "#,
-        )
-        .bind(token_id)
-        .fetch_optional(&state.pool)
+    let token_info = ame_platform_postgres::idempotency::find_login_session(&state.pool, token_id)
         .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-        match rec {
-            Some(r) => {
-                let h: String = r.get("token_hash");
-                Some((h, None))
-            }
-            None => None,
-        }
-    } else {
-        let rec = sqlx::query(
-            r#"
-            SELECT token_hash, revoked_at
-            FROM tb_api_tokens
-            WHERE id = $1
-            "#,
-        )
-        .bind(token_id)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.into()))?;
-
-        match rec {
-            Some(r) => {
-                let h: String = r.get("token_hash");
-                let rev: Option<time::OffsetDateTime> = r.get("revoked_at");
-                Some((h, rev))
-            }
-            None => None,
-        }
-    };
+        .map_err(|e| ApiError::Internal(e.into()))?
+        .map(|session| (session.token_hash, session.revoked_at));
 
     let Some((token_hash, revoked_at)) = token_info else {
         return Ok(next.run(req).await);
@@ -136,29 +98,18 @@ pub async fn idempotency_middleware(
     hasher.update(&bytes);
     let request_hash = hex::encode(hasher.finalize());
 
-    let existing = sqlx::query(
-        r#"
-        SELECT request_hash, response_status, response_body
-        FROM tb_idempotency_keys
-        WHERE token_id = $1 AND key = $2
-        "#,
-    )
-    .bind(token_id)
-    .bind(&idempotency_key)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    let existing =
+        ame_platform_postgres::idempotency::find_response(&state.pool, token_id, &idempotency_key)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
-    if let Some(row) = existing {
-        let stored_request_hash: String = row.get("request_hash");
-        if stored_request_hash != request_hash {
+    if let Some(record) = existing {
+        if record.request_hash != request_hash {
             return Err(ApiError::IdempotencyConflict);
         }
 
-        let response_status: i16 = row.get("response_status");
-        let response_body: Value = row.get("response_body");
-        let status = StatusCode::from_u16(response_status as u16).unwrap_or(StatusCode::OK);
-        return Ok((status, Json(response_body)).into_response());
+        let status = StatusCode::from_u16(record.response_status as u16).unwrap_or(StatusCode::OK);
+        return Ok((status, Json(record.response_body)).into_response());
     }
 
     let req = Request::from_parts(parts, Body::from(bytes));
@@ -175,19 +126,14 @@ pub async fn idempotency_middleware(
         && let Ok(json_body) = serde_json::from_slice::<Value>(&resp_bytes)
     {
         let status = resp_parts.status.as_u16() as i16;
-        sqlx::query(
-            r#"
-            INSERT INTO tb_idempotency_keys (token_id, key, request_hash, response_status, response_body)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (token_id, key) DO NOTHING
-            "#,
+        ame_platform_postgres::idempotency::store_response(
+            &state.pool,
+            token_id,
+            &idempotency_key,
+            &request_hash,
+            status,
+            json_body,
         )
-        .bind(token_id)
-        .bind(idempotency_key)
-        .bind(request_hash)
-        .bind(status)
-        .bind(json_body)
-        .execute(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
     }

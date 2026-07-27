@@ -8,9 +8,7 @@ pub async fn healthz() -> impl IntoResponse {
 
 pub async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     // 1. Check Postgres
-    let pg_res = sqlx::query("SELECT 1").execute(&state.pool).await;
-
-    if pg_res.is_err() {
+    if !ame_platform_postgres::health::postgres_ready(&state.pool).await {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
@@ -21,12 +19,10 @@ pub async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     }
 
     // 2. Check Valkey
-    let valkey_status = match state.valkey.get().await {
-        Ok(mut conn) => {
-            let ping_res: Result<(), _> = redis::cmd("PING").query_async(&mut *conn).await;
-            if ping_res.is_ok() { "ok" } else { "degraded" }
-        }
-        Err(_) => "degraded",
+    let valkey_status = if ame_platform_postgres::health::valkey_ready(&state.valkey).await {
+        "ok"
+    } else {
+        "degraded"
     };
 
     let status = if valkey_status == "degraded" {

@@ -4,66 +4,14 @@
  */
 
 export interface paths {
-    "/v1/admin/assessments": {
+    "/api/v1/admin/audit": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/admin/assessments — list all assessments on the platform */
-        get: operations["list_assessments_admin"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/assessments/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** GET /v1/admin/assessments/{id} — retrieve a single assessment with all questions for admin preview */
-        get: operations["get_assessment_admin"];
-        put?: never;
-        post?: never;
-        /** DELETE /v1/admin/assessments/{id} — soft-delete any assessment (moderation) */
-        delete: operations["delete_assessment_admin"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/assessments/{id}/restore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/admin/assessments/{id}/restore — restore a soft-deleted assessment */
-        post: operations["restore_assessment_admin"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** GET /v1/admin/audit — retrieve append-only audit trail logs */
+        /** GET /api/v1/admin/audit — retrieve append-only audit trail logs */
         get: operations["list_audit_logs"];
         put?: never;
         post?: never;
@@ -73,14 +21,13 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/health": {
+    "/api/v1/admin/health": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/admin/health — retrieve cluster system & health metrics */
         get: operations["get_admin_health"];
         put?: never;
         post?: never;
@@ -90,7 +37,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/settings": {
+    "/api/v1/admin/settings": {
         parameters: {
             query?: never;
             header?: never;
@@ -98,7 +45,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * GET /v1/admin/settings — current effective platform settings (config
+         * GET /api/v1/admin/settings — current effective platform settings (config
          *     defaults overlaid with any tb_settings overrides).
          */
         get: operations["get_settings"];
@@ -115,15 +62,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/tokens": {
+    "/api/v1/admin/task-submissions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/admin/tokens — list all API tokens with filtering */
-        get: operations["list_tokens"];
+        get: operations["list_pending_submissions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -132,31 +78,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/tokens/{id}": {
+    "/api/v1/admin/users": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** DELETE /v1/admin/tokens/{id} — revoke an API token (idempotent) */
-        delete: operations["delete_token_admin"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** GET /v1/admin/users — list all users */
+        /** GET /api/v1/admin/users — list all users */
         get: operations["list_users"];
         put?: never;
         post?: never;
@@ -166,7 +95,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/users/{id}": {
+    "/api/v1/admin/users/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -179,18 +108,18 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user */
+        /** PATCH /v1/admin/users/{id} — update learner/admin role or account status */
         patch: operations["patch_user_admin"];
         trace?: never;
     };
-    "/v1/assessments": {
+    "/api/v1/assessments": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["list_assessments"];
+        get: operations["get_assessment_for_activity"];
         put?: never;
         post: operations["create_assessment"];
         delete?: never;
@@ -199,39 +128,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/assessments/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["count_assessments"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/assessments/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["generate_assessment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/assessments/{id}": {
+    "/api/v1/assessments/{assessment_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -241,29 +138,13 @@ export interface paths {
         get: operations["get_assessment"];
         put?: never;
         post?: never;
-        delete: operations["delete_assessment"];
-        options?: never;
-        head?: never;
-        patch: operations["patch_assessment"];
-        trace?: never;
-    };
-    "/v1/assessments/{id}/questions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["add_assessment_question"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/assessments/{id}/questions/{question_id}": {
+    "/api/v1/assessments/{assessment_id}/attempts": {
         parameters: {
             query?: never;
             header?: never;
@@ -272,53 +153,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
-        delete: operations["remove_assessment_question"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/assessments/{id}/sections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["create_assessment_section"];
+        post: operations["start_attempt"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/assessments/{id}/sections/{section_id}": {
+    "/api/v1/attempts/{attempt_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["delete_assessment_section"];
-        options?: never;
-        head?: never;
-        patch: operations["patch_assessment_section"];
-        trace?: never;
-    };
-    "/v1/attempts/pending": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_pending_attempts"];
+        get: operations["get_attempt"];
         put?: never;
         post?: never;
         delete?: never;
@@ -327,7 +176,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/attempts/{id}/grade": {
+    "/api/v1/attempts/{attempt_id}/answers": {
         parameters: {
             query?: never;
             header?: never;
@@ -336,31 +185,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["grade_attempt"];
-        trace?: never;
-    };
-    "/v1/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** POST /v1/auth/login — authenticate with email and password. */
-        post: operations["login"];
+        post: operations["save_answer"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/logout": {
+    "/api/v1/attempts/{attempt_id}/finish": {
         parameters: {
             query?: never;
             header?: never;
@@ -369,7 +201,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST /v1/auth/logout — clear the HttpOnly token cookie. */
+        post: operations["finish_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/auth/logout — clear the HttpOnly token cookie. */
         post: operations["logout"];
         delete?: never;
         options?: never;
@@ -377,7 +225,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/auth/register": {
+    "/api/v1/deep-dives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_for_activity"];
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/deep-dives/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/generation-runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -386,63 +266,30 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** POST /v1/auth/register — register a new user with email and password. */
-        post: operations["register"];
+        post: operations["start"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/deep-dives": {
+    "/api/v1/generation-runs/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["list_deep_dives"];
-        put?: never;
-        post: operations["create_deep_dive"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/deep-dives/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["export_deep_dives"];
+        get: operations["get_one"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["transition"];
         trace?: never;
     };
-    "/v1/deep-dives/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_deep_dive"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["patch_deep_dive"];
-        trace?: never;
-    };
-    "/v1/deep-dives/{id}/publish": {
+    "/api/v1/learning/activities/{activity_id}/content": {
         parameters: {
             query?: never;
             header?: never;
@@ -455,17 +302,36 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["publish_deep_dive"];
+        /** PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content. */
+        patch: operations["author_activity_content"];
         trace?: never;
     };
-    "/v1/deep-dives/{id}/revisions": {
+    "/api/v1/learning/activities/{activity_id}/rubric": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_deep_dive_revisions"];
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH /api/v1/learning/activities/{activity_id}/rubric — attach a reviewed, source-backed scoring rubric to a task activity. */
+        patch: operations["author_activity_rubric"];
+        trace?: never;
+    };
+    "/api/v1/learning/journeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /api/v1/learning/journeys — list the caller's learner-owned journeys. */
+        get: operations["list_journeys"];
         put?: never;
         post?: never;
         delete?: never;
@@ -474,15 +340,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/explore": {
+    "/api/v1/learning/journeys/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/explore — searchable, paginated assessment exploration. */
-        get: operations["explore"];
+        /** GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey. */
+        get: operations["get_journey"];
         put?: never;
         post?: never;
         delete?: never;
@@ -491,15 +357,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/explore/facets": {
+    "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** GET /v1/explore/facets — facets for filtering. */
-        get: operations["explore_facets"];
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session. */
+        post: operations["start_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_journey_attempts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -508,14 +390,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me": {
+    "/api/v1/learning/sessions/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get the authenticated user's profile. */
+        /** GET /api/v1/learning/sessions/{id} — retrieve a learner's resumable session. */
+        get: operations["get_learning_session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/sessions/{id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/sessions/{id}/finish — finish the current learning activity. */
+        post: operations["finish_learning_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the authenticated learner profile. */
         get: operations["get_me"];
         put?: never;
         post?: never;
@@ -525,23 +441,167 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/agents": {
+    "/api/v1/progress/evidence": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["list_agents"];
+        get?: never;
         put?: never;
-        post: operations["create_agent"];
+        post: operations["record_evidence"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/me/agents/{id}": {
+    "/api/v1/progress/streaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_streak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/{journey_id}/objectives/{objective_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/{journey_id}/recommendation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recommend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/{journey_id}/streaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_streaks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/progress/{journey_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_timeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_question"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/questions/{question_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_question_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/questions/{question_id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_question_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-submissions/{submission_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_submission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/task-submissions/{submission_id}/review": {
         parameters: {
             query?: never;
             header?: never;
@@ -551,13 +611,13 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["delete_agent"];
+        delete?: never;
         options?: never;
         head?: never;
-        patch: operations["update_agent"];
+        patch: operations["review_submission"];
         trace?: never;
     };
-    "/v1/me/agents/{id}/tokens": {
+    "/api/v1/task-submissions/{submission_id}/submit": {
         parameters: {
             query?: never;
             header?: never;
@@ -566,14 +626,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["create_agent_token"];
+        post: operations["submit_submission"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/me/agents/{id}/tokens/{token_id}": {
+    "/api/v1/tasks/{task_id}/submissions": {
         parameters: {
             query?: never;
             header?: never;
@@ -582,47 +642,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
-        delete: operations["revoke_agent_token"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/attempts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List the current user's attempts. */
-        get: operations["list_attempts"];
-        put?: never;
-        post?: never;
+        post: operations["start_submission"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/me/cohort-stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_cohort_stats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/plans": {
+    "/public/v1/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -631,62 +658,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["create_plan"];
+        /** POST /public/v1/auth/login — authenticate with email and password. */
+        post: operations["login"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/plans/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_plan"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/questions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_questions"];
-        put?: never;
-        post: operations["create_questions"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/questions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_question"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["update_question"];
-        trace?: never;
-    };
-    "/v1/questions/{id}/archive": {
+    "/public/v1/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -695,30 +675,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["archive_question"];
+        /** POST /public/v1/auth/register — register a new user with email and password. */
+        post: operations["register"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/questions/{id}/deepen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_question_deepen"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/questions/{id}/promote": {
+    "/public/v1/onboarding/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -727,62 +692,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["promote_question"];
+        /** POST /public/v1/onboarding/preview — explain the first journey without creating state. */
+        post: operations["preview_learning"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/questions/{id}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_versions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_my_sessions"];
-        put?: never;
-        post: operations["create_session"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sessions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_session"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["patch_session"];
-        trace?: never;
-    };
-    "/v1/sessions/{id}/answer": {
+    "/public/v1/onboarding/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -791,39 +709,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["answer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sessions/{id}/finish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["finish"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_tags"];
-        put?: never;
-        post?: never;
+        /** POST /public/v1/onboarding/start — create or resume a learner's first journey. */
+        post: operations["start_learning"];
         delete?: never;
         options?: never;
         head?: never;
@@ -834,349 +721,128 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        ActivityEntry: {
-            /** Format: uuid */
-            agentId: string;
-            agentName?: string | null;
-            /** Format: uuid */
-            id: string;
-            method: string;
-            note?: string | null;
-            path: string;
-            /** Format: int32 */
-            status: number;
-            /** Format: uuid */
-            targetId?: string | null;
-            toolName: string;
-            /** Format: date-time */
-            ts: string;
-        };
-        ActivityResponse: {
-            items: components["schemas"]["ActivityEntry"][];
-            /** Format: uuid */
-            nextCursor?: string | null;
-        };
-        AddAssessmentQuestionBody: {
-            kind?: null | components["schemas"]["QuestionKind"];
-            /** Format: int32 */
-            pointsOverride?: number | null;
-            prompt?: string | null;
-            /**
-             * Format: uuid
-             * @description Link an existing bank question by ID.
-             */
-            questionId?: string | null;
-            /**
-             * Format: uuid
-             * @description Target section ID (defaults to first section if absent).
-             */
-            sectionId?: string | null;
-        };
-        AddAssessmentQuestionResponse: {
-            /** Format: int32 */
-            orderIndex: number;
-            /** Format: uuid */
-            questionId: string;
-        };
-        AdminAssessmentDetail: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            createdByEmail?: string | null;
-            /** Format: date-time */
-            deletedAt?: string | null;
-            description?: string | null;
-            /** Format: uuid */
-            id: string;
-            mode: string;
-            objectives: string[];
-            questions: components["schemas"]["AdminPreviewQuestion"][];
-            status: string;
-            title: string;
-        };
-        AdminAssessmentEntry: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            createdByEmail?: string | null;
-            /** Format: date-time */
-            deletedAt?: string | null;
-            description?: string | null;
-            /** Format: uuid */
-            id: string;
-            mode: string;
-            objectives: string[];
-            status: string;
-            title: string;
-        };
+        /** @enum {string} */
+        ActivityKind: "explanation" | "example" | "diagnostic" | "practice" | "feedback" | "application" | "reflection" | "milestone" | "timed_practice" | "recommendation";
+        /** @enum {string} */
+        ActivityPublicationStatus: "draft" | "review" | "published" | "retired";
+        /** @enum {string} */
+        ActivityStatus: "proposed" | "ready" | "in_progress" | "completed" | "failed";
         AdminHealthResponse: {
             /** Format: int64 */
-            agentsCount: number;
-            /** Format: int64 */
-            assessmentsCount: number;
+            activitiesCount: number;
             /** Format: int64 */
             auditLogCount: number;
             database: string;
             /** Format: int64 */
-            questionsCount: number;
-            /** Format: int64 */
-            quotaRejectionsTotal: number;
+            journeysCount: number;
             /** Format: int64 */
             sessionsCount: number;
             /** Format: int64 */
             usersCount: number;
             valkey: string;
         };
-        AdminListAssessmentsResponse: {
-            assessments: components["schemas"]["AdminAssessmentEntry"][];
-            /** Format: int64 */
-            total: number;
-        };
-        AdminPreviewQuestion: {
-            /** Format: uuid */
-            id: string;
-            kind: string;
-            /** Format: int32 */
-            orderIndex: number;
-            payload: unknown;
-            /** Format: int32 */
-            points: number;
-            prompt: string;
-        };
-        AgentSummary: {
-            /** Format: date-time */
-            createdAt: string;
-            focusTags: string[];
-            /** Format: uuid */
-            id: string;
-            label: string;
-            tokens: components["schemas"]["AgentTokenSummary"][];
-        };
-        AgentTokenSummary: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            expiresAt?: string | null;
-            /** Format: uuid */
-            id: string;
-            /** Format: date-time */
-            lastUsedAt?: string | null;
-            name: string;
-            scopes: string[];
-        };
-        AnswerSessionBody: {
-            /** Format: uuid */
-            questionId: string;
-            response: components["schemas"]["AttemptResponse"];
-            /** Format: int32 */
-            timeToAnswerMs?: number | null;
-        };
-        AnswerSessionResponse: {
-            attempt: components["schemas"]["Attempt"];
-            grade: components["schemas"]["GradeOutcome"];
-            replayed: boolean;
-        };
         ApiError: "Unauthorized" | {
             Forbidden: string;
-        } | {
-            ScopeRequired: string;
         } | {
             NotFound: {
                 resource: string;
             };
         } | {
             Validation: components["schemas"]["FieldError"][];
-        } | {
-            InvalidPayload: {
-                kind: string;
-                reason: string;
-            };
-        } | {
-            ExamPoolInsufficient: {
-                available: number;
-                required: number;
-                section: string;
-            };
-        } | "SessionFinished" | "ExamExpired" | "IdempotencyConflict" | "ScoringUnavailable" | "TooManyRequests" | {
-            UnknownTool: string;
-        } | "Maintenance" | {
-            QuotaExceeded: {
-                kind: string;
-                /** Format: int64 */
-                limit: number;
-                /** Format: int64 */
-                usage: number;
-            };
-        } | {
+        } | "SessionFinished" | "LearningSessionResultConflict" | "ActivityContentConflict" | "IdempotencyConflict" | "GenerationStateConflict" | "TooManyRequests" | "Maintenance" | {
             Internal: string;
         };
-        Assessment: {
-            affectsRating: boolean;
-            compositionTrace?: unknown;
-            course?: string | null;
-            /** Format: date-time */
-            createdAt: string;
+        AssessmentActivityQuery: {
             /** Format: uuid */
-            createdBy: string;
-            description?: string | null;
+            activityId: string;
+        };
+        AssessmentItemBody: {
+            /** Format: uuid */
+            objectiveId: string;
             /** Format: int32 */
-            durationMin?: number | null;
+            orderIndex: number;
+            /** Format: int32 */
+            points: number;
+            /** Format: uuid */
+            questionId: string;
+            /** Format: int32 */
+            questionVersion: number;
+        };
+        AssessmentItemResponse: {
             /** Format: uuid */
             id: string;
-            method: string;
-            mode: components["schemas"]["AssessmentMode"];
-            objectives: string[];
+            /** Format: uuid */
+            objectiveId: string;
             /** Format: int32 */
-            passingPoints?: number | null;
-            showResultsDuring: boolean;
-            status: components["schemas"]["AssessmentStatus"];
+            orderIndex: number;
             /** Format: int32 */
-            timeLimitSeconds?: number | null;
-            title: string;
-            /** Format: int32 */
-            totalPoints: number;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        AssessmentDetail: components["schemas"]["Assessment"] & {
-            /**
-             * @description Whether the requesting caller has a finished session for this assessment.
-             *     Scoped to the caller's own user id (matches the list endpoint, audit F-2).
-             */
-            completed: boolean;
-            /**
-             * Format: uuid
-             * @description The caller's most recent finished session for this assessment, if any.
-             *     Invariant: when present, GET /v1/sessions/{id} resolves for the same caller.
-             */
-            lastSessionId?: string | null;
-            questions: components["schemas"]["AssessmentQuestion"][];
-            sections: components["schemas"]["AssessmentSectionDetail"][];
+            points: number;
+            question: components["schemas"]["AssessmentQuestionResponse"];
+            /** Format: uuid */
+            questionVersionId: string;
         };
         /** @enum {string} */
         AssessmentMode: "practice" | "graded";
-        AssessmentQuestion: {
-            codeSnippet?: unknown;
-            deepDive?: string | null;
-            explanation?: string | null;
-            /** Format: uuid */
+        AssessmentOptionResponse: {
             id: string;
-            kind: string;
-            /** Format: int32 */
-            orderIndex: number;
-            payload: unknown;
-            /** Format: int32 */
-            points: number;
+            text: string;
+        };
+        AssessmentQuestionResponse: {
+            difficulty?: string | null;
+            kind: components["schemas"]["QuestionKind"];
+            options: components["schemas"]["AssessmentOptionResponse"][];
             prompt: string;
-            source?: string | null;
-            status: string;
-            tags: string[];
         };
-        AssessmentSectionDetail: {
+        AssessmentResponse: {
+            /** Format: uuid */
+            activityId: string;
             /** Format: uuid */
             id: string;
+            items: components["schemas"]["AssessmentItemResponse"][];
+            mode: components["schemas"]["AssessmentMode"];
+            status: components["schemas"]["AssessmentStatus"];
             /** Format: int32 */
-            itemsCount: number;
-            mix?: unknown;
-            /** Format: int32 */
-            orderIndex: number;
-            questions: components["schemas"]["AssessmentQuestion"][];
-            title: string;
-            /** Format: double */
-            weight: number;
-        };
-        AssessmentStatsParams: {
-            /** Format: uuid */
-            cohortId?: string | null;
-            window?: string | null;
-        };
-        AssessmentStatsResponse: {
-            /** Format: double */
-            avg: number;
-            distribution: components["schemas"]["DistributionBucket"][];
-            items: components["schemas"]["ItemStats"][];
-            /** Format: double */
-            median: number;
+            version: number;
         };
         /** @enum {string} */
-        AssessmentStatus: "draft" | "active" | "archived";
-        AssessmentSummary: {
-            completed: boolean;
-            course?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            description?: string | null;
-            /** Format: int32 */
-            durationMin?: number | null;
+        AssessmentStatus: "draft" | "published" | "retired";
+        AttemptItemResponse: {
             /** Format: uuid */
-            id: string;
+            assessmentItemId: string;
+            /** Format: float */
+            awardedPoints?: number | null;
+            /** Format: float */
+            correctness?: number | null;
+            evaluationStatus: string;
             /** Format: uuid */
-            lastSessionId?: string | null;
-            mode: string;
-            objectives: string[];
-            /** Format: int64 */
-            questionCount: number;
-            status: string;
-            title: string;
-            /** Format: int32 */
-            totalPoints: number;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        Attempt: {
-            correct_answer?: Record<string, never>;
-            /** Format: date-time */
-            created_at: string;
-            grade_status: string;
-            grader_notes?: string | null;
-            /** Format: uuid */
-            id: string;
-            is_correct: boolean;
-            /** Format: uuid */
-            owner_id: string;
-            presentation: components["schemas"]["AttemptPresentation"];
-            /** Format: double */
-            question_delta: number;
-            /** Format: uuid */
-            question_id: string;
-            /** Format: int32 */
-            question_version: number;
-            /** Format: double */
-            rating_before_question: number;
-            /** Format: double */
-            rating_before_user_avg: number;
-            response: components["schemas"]["AttemptResponse"];
-            /** Format: double */
-            score: number;
-            /** Format: uuid */
-            session_id?: string | null;
-            /** Format: int32 */
-            time_to_answer_ms?: number | null;
-            /** Format: uuid */
-            user_id: string;
-            user_tag_deltas: {
-                [key: string]: number;
-            };
-        };
-        AttemptPresentation: {
-            option_order?: number[] | null;
+            questionVersionId: string;
+            response: unknown;
         };
         AttemptResponse: {
-            selected_position: number;
-        } | {
-            answer: boolean;
-        } | {
-            answer: string;
-        } | {
-            body: string;
+            /** Format: uuid */
+            assessmentId: string;
+            assessmentMode: components["schemas"]["AssessmentMode"];
             /** Format: int32 */
-            word_count: number;
-        } | {
-            language: string;
-            source: string;
+            assessmentVersion: number;
+            /** Format: float */
+            awardedPoints?: number | null;
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["AttemptItemResponse"][];
+            /** Format: float */
+            maxPoints?: number | null;
+            responses: {
+                [key: string]: unknown;
+            };
+            reviewStatus: components["schemas"]["AttemptReviewStatus"];
+            /** Format: float */
+            score?: number | null;
+            status: string;
+            submittedAt?: string | null;
         };
+        /** @enum {string} */
+        AttemptReviewStatus: "not_required" | "pending" | "complete";
         AuditLogEntry: {
             action: string;
             actorEmail?: string | null;
@@ -1198,296 +864,308 @@ export interface components {
             token: string;
             user: components["schemas"]["UserInfo"];
         };
-        CohortStatsBucket: {
-            /** Format: double */
-            bucketEnd: number;
-            /** Format: double */
-            bucketStart: number;
-            /** Format: int64 */
-            count: number;
-        };
-        CohortStatsResponse: {
-            /** Format: double */
-            cohortAvg?: number | null;
-            /** Format: double */
-            completionRate?: number | null;
-            histogram: components["schemas"]["CohortStatsBucket"][];
-            /** Format: int32 */
-            percentile?: number | null;
-        };
-        CountAssessmentsResponse: {
-            /** Format: int64 */
-            count: number;
-        };
-        CreateAgentBody: {
-            focusTags?: string[];
-            label: string;
-            scopes: string[];
-        };
-        CreateAgentResponse: {
-            apiKey: string;
+        AuthorActivityContentBody: {
+            content: Record<string, never>;
             /** Format: uuid */
-            id: string;
+            generationRunId: string;
+            reviewStatus: string;
+            sourceReferences: string[];
         };
-        CreateAgentTokenBody: {
-            name: string;
-            scopes: string[];
+        AuthorActivityRubricBody: {
+            /** Format: uuid */
+            generationRunId: string;
+            reviewStatus: string;
+            rubric: components["schemas"]["TaskRubric"];
+            sourceReferences: string[];
         };
-        CreateAssessmentRequest: {
-            affectsRating?: boolean;
-            course?: string | null;
-            description?: string | null;
-            /** Format: int32 */
-            durationMin?: number | null;
-            method?: string;
-            mode?: components["schemas"]["AssessmentMode"];
-            objectives?: string[];
-            /** Format: int32 */
-            passingPoints?: number | null;
-            questions?: components["schemas"]["QuestionImport"][];
-            showResultsDuring?: boolean;
-            status?: string | null;
-            /** Format: int32 */
-            timeLimitSeconds?: number | null;
-            title: string;
+        /** @enum {string} */
+        ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
+        CreateAssessmentBody: {
+            /** Format: uuid */
+            activityId: string;
+            items: components["schemas"]["AssessmentItemBody"][];
+            mode: components["schemas"]["AssessmentMode"];
+            status?: components["schemas"]["AssessmentStatus"];
         };
         CreateDeepDiveBody: {
             /** Format: uuid */
-            questionId: string;
-            reason?: string | null;
+            activityId: string;
+            applicationTask: string;
+            body: string;
+            caveats: string[];
+            example: string;
             /** Format: uuid */
-            sourceAttemptId?: string | null;
+            generationRunId: string;
             /** Format: uuid */
-            sourceSessionId?: string | null;
-        };
-        CreateKeyResponse: {
+            journeyId: string;
             /** Format: uuid */
-            id: string;
-            secret: string;
-        };
-        CreatePlanBody: {
-            goal: string;
-            /** Format: int64 */
-            lookbackDays?: number | null;
-        };
-        CreateQuestionsBody: {
-            questions: components["schemas"]["QuestionInsert"][];
-        };
-        CreateQuestionsResponse: {
-            questions: components["schemas"]["Question"][];
-        };
-        CreateSectionBody: {
-            mix?: unknown;
+            objectiveId: string;
+            reviewStatus?: components["schemas"]["ContentReviewStatus"];
+            sourceReferences: string[];
             title: string;
-            /** Format: double */
-            weight?: number | null;
-        };
-        CreateSessionBody: {
             /** Format: uuid */
-            assessmentId?: string | null;
-            cats?: string[];
-            count?: number | null;
-            diff?: string | null;
-            /** Format: int64 */
-            duration?: number | null;
-            mode?: string | null;
-            tags?: string[];
-            types?: components["schemas"]["QuestionKind"][];
+            triggeringEvidenceId: string;
         };
-        CreateSessionResponse: {
-            questions: components["schemas"]["SessionQuestion"][];
+        CreateQuestionBody: {
+            acceptedAnswers?: string[];
+            difficulty?: string | null;
+            explanation?: string | null;
             /** Format: uuid */
-            sessionId: string;
+            generationRunId: string;
+            kind: components["schemas"]["QuestionKind"];
+            options?: components["schemas"]["QuestionOption"][];
+            /** Format: int32 */
+            points: number;
+            prompt: string;
+            rationale?: string | null;
+            reviewStatus?: components["schemas"]["ContentReviewStatus"];
+            sourceReferences?: string[];
         };
-        DeepDive: {
-            /** Format: date-time */
-            archivedAt?: string | null;
-            assessmentTitle?: string | null;
-            bodyMarkdown?: string | null;
-            category?: string | null;
-            course?: string | null;
-            /** Format: date-time */
-            createdAt: string;
+        DeepDiveActivityQuery: {
             /** Format: uuid */
-            createdBy?: string | null;
+            activityId: string;
+        };
+        DeepDiveResponse: {
+            /** Format: uuid */
+            activityId: string;
+            applicationTask: string;
+            body: string;
+            caveats: string[];
+            /** Format: int32 */
+            contentVersion: number;
+            example: string;
+            /** Format: uuid */
+            generationRunId: string;
             /** Format: uuid */
             id: string;
-            /** Format: date-time */
-            noteUpdatedAt?: string | null;
             /** Format: uuid */
-            ownerId: string;
-            /** Format: date-time */
-            publishedAt?: string | null;
+            journeyId: string;
             /** Format: uuid */
-            questionId: string;
-            questionKind: string;
-            questionPrompt: string;
-            questionTags: string[];
-            reason?: string | null;
+            objectiveId: string;
+            reviewStatus: components["schemas"]["ContentReviewStatus"];
+            sourceReferences: string[];
+            title: string;
             /** Format: uuid */
-            sourceAttemptId?: string | null;
-            /** Format: uuid */
-            sourceSessionId?: string | null;
-            status: string;
-            /** Format: date-time */
-            updatedAt: string;
-            userNote?: string | null;
+            triggeringEvidenceId: string;
         };
-        DeepDiveRevision: {
-            bodyMarkdown?: string | null;
-            category?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy?: string | null;
-            /** Format: uuid */
-            deepDiveId: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: int32 */
-            revision: number;
-            userNote?: string | null;
-        };
-        DeepDiveRevisionsResponse: {
-            revisions: components["schemas"]["DeepDiveRevision"][];
-        };
-        DistributionBucket: {
-            /** Format: int32 */
-            bucket: number;
-            /** Format: int64 */
-            count: number;
-        };
-        /**
-         * @description The effective platform settings: config defaults with `tb_settings` overrides
-         *     applied. Serialized both as the admin API response and as the cache blob.
-         */
         EffectiveSettings: {
             maintenanceMode: boolean;
-            quota: components["schemas"]["QuotaSettings"];
             ratelimit: components["schemas"]["RateLimitSettings"];
         };
-        ExploreCounts: {
-            /** Format: int64 */
-            graded: number;
-            /** Format: int64 */
-            practice: number;
+        EvidenceBody: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            attemptId?: string | null;
+            /** Format: int32 */
+            contentVersion: number;
+            /** Format: int32 */
+            derivationVersion: number;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: uuid */
+            taskSubmissionId?: string | null;
+            /** Format: float */
+            value: number;
         };
-        ExploreFacetsResponse: {
-            counts: components["schemas"]["ExploreCounts"];
-            tags: string[];
-        };
-        ExploreResponse: {
-            items: unknown[];
-            nextCursor?: string | null;
+        EvidenceResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            attemptId?: string | null;
+            /** Format: int32 */
+            contentVersion: number;
+            /** Format: int32 */
+            derivationVersion: number;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: uuid */
+            taskSubmissionId?: string | null;
+            /** Format: float */
+            value: number;
         };
         FieldError: {
             field: string;
             message: string;
         };
-        FinishSessionResponse: {
-            result: components["schemas"]["SessionResult"];
-            session: components["schemas"]["Session"];
+        FinishLearningSessionBody: {
+            completed: boolean;
+            responses: components["schemas"]["LearningResponseBody"][];
         };
-        GenerateAssessmentBody: {
-            objectives?: string[] | null;
+        GenerationRunResponse: {
             /** Format: int32 */
-            questionCount?: number;
-            source: string;
-            types?: components["schemas"]["QuestionKind"][] | null;
-        };
-        GenerateAssessmentResponse: {
-            candidates: unknown[];
-            objectives: string[];
-            warnings: string[];
-        };
-        GetSessionQuestion: {
-            codeSnippet?: unknown;
-            explanation?: string | null;
-            kind: components["schemas"]["QuestionKind"];
-            language?: string | null;
-            optionOrder?: number[] | null;
-            options?: unknown[] | null;
-            /** Format: int32 */
-            points: number;
-            prompt: string;
+            contentVersion: number;
+            /** Format: date-time */
+            createdAt: string;
+            error?: unknown;
             /** Format: uuid */
-            questionId: string;
-        };
-        GetSessionResponse: {
-            attempts: components["schemas"]["Attempt"][];
-            questions: components["schemas"]["GetSessionQuestion"][];
-            session: components["schemas"]["Session"];
-        };
-        GradeAttemptBody: {
-            notes?: string | null;
-            /** Format: double */
-            score: number;
-        };
-        GradeOutcome: {
-            correct: boolean;
-            correct_answer: Record<string, never>;
-            /** Format: int32 */
-            max: number;
-            note?: string | null;
-            /** Format: int32 */
-            points_awarded: number;
-            status: components["schemas"]["GradeStatus"];
+            id: string;
+            operation: string;
+            provider?: string | null;
+            retryKey?: string | null;
+            status: components["schemas"]["GenerationStatus"];
+            /** Format: date-time */
+            updatedAt: string;
         };
         /** @enum {string} */
-        GradeStatus: "graded" | "pending_manual";
-        ItemStats: {
-            /** Format: double */
-            avgTimeMs: number;
-            /** Format: double */
-            correctRate: number;
-            /** Format: double */
-            discriminationIdx?: number | null;
+        GenerationStatus: "requested" | "running" | "review_required" | "published" | "failed";
+        /** @enum {string} */
+        GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
+        /** @enum {string} */
+        JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
+        LearningActivityResponse: {
             /** Format: uuid */
-            questionId: string;
+            chapterId?: string | null;
+            /** Format: int32 */
+            contentVersion: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            kind: components["schemas"]["ActivityKind"];
+            objectiveIds: string[];
+            /** Format: int32 */
+            orderIndex: number;
+            payload: Record<string, never>;
+            /** Format: int32 */
+            payloadSchemaVersion: number;
+            publicationStatus: components["schemas"]["ActivityPublicationStatus"];
+            rubric?: null | components["schemas"]["TaskRubric"];
+            /** Format: uuid */
+            sourceActorId: string;
+            status: components["schemas"]["ActivityStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            title: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
-        ListAgentsResponse: {
-            agents: components["schemas"]["AgentSummary"][];
+        LearningChapterResponse: {
+            activities: components["schemas"]["LearningActivityResponse"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: int32 */
+            orderIndex: number;
+            /** Format: uuid */
+            subjectUserId: string;
+            summary: string;
+            title: string;
         };
-        ListAssessmentsResponse: {
-            assessments: components["schemas"]["AssessmentSummary"][];
-            /** Format: int64 */
-            total: number;
+        LearningGoalResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            normalizedStatement: string;
+            rawIntent: string;
+            /** Format: uuid */
+            sourceActorId: string;
+            status: components["schemas"]["GoalStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            /** Format: uuid */
+            templateVersionId?: string | null;
         };
-        ListAttemptsResponse: {
-            attempts: components["schemas"]["Attempt"][];
-            /** Format: int64 */
-            total: number;
+        LearningJourneyResponse: {
+            /** @description Flat compatibility view; new clients should use chapters.activities. */
+            activities: components["schemas"]["LearningActivityResponse"][];
+            chapters: components["schemas"]["LearningChapterResponse"][];
+            /** Format: date-time */
+            createdAt: string;
+            goal: components["schemas"]["LearningGoalResponse"];
+            /** Format: uuid */
+            goalId: string;
+            /** Format: uuid */
+            id: string;
+            objectives: components["schemas"]["LearningObjectiveResponse"][];
+            promise: string;
+            recommendation?: null | components["schemas"]["LearningRecommendationResponse"];
+            /** Format: uuid */
+            sourceActorId: string;
+            status: components["schemas"]["JourneyStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            ungroupedActivities: components["schemas"]["LearningActivityResponse"][];
         };
+        LearningJourneySummaryResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            nextActivityId?: string | null;
+            nextActivityTitle?: string | null;
+            promise: string;
+            rawIntent: string;
+            status: components["schemas"]["JourneyStatus"];
+        };
+        LearningObjectiveResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: int32 */
+            orderIndex: number;
+            statement: string;
+            status: components["schemas"]["ObjectiveStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+            successCriteria: string;
+            verb: string;
+        };
+        LearningRecommendationResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            basedOnSessionId?: string | null;
+            evidenceIds: string[];
+            /** Format: uuid */
+            objectiveId: string;
+            objectiveIds: string[];
+            rationale: string;
+            title: string;
+        };
+        LearningResponseBody: {
+            id: string;
+            value: string;
+        };
+        LearningSessionResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            actorIdentityId: string;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            questionPlan: Record<string, never>;
+            result?: Record<string, never> | null;
+            /** Format: date-time */
+            startedAt: string;
+            status: components["schemas"]["LearningSessionStatus"];
+            /** Format: uuid */
+            subjectUserId: string;
+        };
+        /** @enum {string} */
+        LearningSessionStatus: "in_progress" | "finished" | "abandoned";
         ListAuditLogsResponse: {
             logs: components["schemas"]["AuditLogEntry"][];
-            /** Format: int64 */
-            total: number;
-        };
-        ListDeepDivesQuery: {
-            category?: string | null;
-            search?: string | null;
-            status?: string | null;
-        };
-        ListDeepDivesResponse: {
-            deepDives: components["schemas"]["DeepDive"][];
-        };
-        ListMySessionsResponse: {
-            sessions: components["schemas"]["SessionSummary"][];
-            /** Format: int64 */
-            total: number;
-        };
-        ListQuestionsResponse: {
-            next_cursor?: string | null;
-            questions: components["schemas"]["Question"][];
-            /** Format: int64 */
-            total: number;
-        };
-        ListTokensResponse: {
-            /** Format: int64 */
-            page: number;
-            /** Format: int64 */
-            pageSize: number;
-            tokens: components["schemas"]["TokenEntry"][];
             /** Format: int64 */
             total: number;
         };
@@ -1509,347 +1187,251 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
-        PatchDeepDiveBody: {
-            status?: string | null;
-            userNote?: string | null;
-        };
-        PatchSessionBody: {
-            status: components["schemas"]["SessionStatus"];
-        };
-        PatchUserAdminBody: {
-            disabled?: boolean | null;
-            plan?: string | null;
-            role?: string | null;
-        };
-        PendingAttemptRow: {
+        ObjectiveActivityBody: {
             /** Format: uuid */
-            attempt_id: string;
-            /** Format: date-time */
-            created_at: string;
+            activityId: string;
             /** Format: uuid */
-            question_id: string;
-            question_prompt: string;
-            response_body: string;
-            /** Format: int32 */
-            response_word_count: number;
-            /** Format: uuid */
-            session_id: string;
-            user_display_name: string;
-            user_email?: string | null;
-            /** Format: uuid */
-            user_id: string;
+            objectiveId: string;
         };
         /** @enum {string} */
-        Plan: "free" | "premium";
-        PlanItem: {
-            option_order?: number[] | null;
-            /** Format: uuid */
-            question_id: string;
-            section?: string | null;
-            /** Format: int32 */
-            version: number;
-        };
-        PublishDeepDiveBody: {
-            bodyMarkdown: string;
-            category?: string | null;
+        ObjectiveStatus: "active" | "paused" | "completed";
+        PatchUserAdminBody: {
+            role?: string | null;
             status?: string | null;
         };
-        Question: {
+        PreviewActivityResponse: {
+            /** Format: int64 */
+            estimatedMinutes: number;
+            kind: components["schemas"]["ActivityKind"];
+            purpose: string;
+            title: string;
+        };
+        PreviewLearningBody: {
+            prompt: string;
+        };
+        PreviewLearningResponse: {
+            firstActivity: components["schemas"]["PreviewActivityResponse"];
+            normalizedStatement: string;
+            objectives: components["schemas"]["PreviewObjectiveResponse"][];
+            promise: string;
+            templateId: string;
             /** Format: int32 */
-            attemptsCount: number;
-            codeSnippet?: unknown;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: uuid */
-            createdBy: string;
-            deepDive?: string | null;
+            templateVersion: number;
+        };
+        PreviewObjectiveResponse: {
+            statement: string;
+            successCriteria: string;
+            verb: string;
+        };
+        /** @enum {string} */
+        QuestionKind: "multiple_choice" | "true_false" | "short_answer" | "numeric" | "essay" | "code";
+        QuestionOption: {
+            id: string;
+            is_correct: boolean;
+            text: string;
+        };
+        QuestionResponse: {
+            acceptedAnswers: string[];
+            difficulty?: string | null;
             explanation?: string | null;
+            /** Format: uuid */
+            generationRunId: string;
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["QuestionKind"];
-            payload: unknown;
+            options: components["schemas"]["QuestionOption"][];
             /** Format: int32 */
             points: number;
             prompt: string;
-            /** Format: double */
-            rating: number;
-            source?: string | null;
-            status: components["schemas"]["QuestionStatus"];
-            tags?: string[];
-            /** Format: date-time */
-            updatedAt: string;
-            /** Format: int32 */
-            version: number;
-        };
-        QuestionDeepenResponse: {
-            question: components["schemas"]["Question"];
-            related: components["schemas"]["Question"][];
-        };
-        QuestionImport: {
-            explanation?: string | null;
-            kind: components["schemas"]["QuestionKind"];
-            payload: unknown;
-            /** Format: int32 */
-            points?: number | null;
-            prompt: string;
-            tags?: string[];
-        };
-        QuestionInsert: {
-            deepDive?: string | null;
-            explanation?: string | null;
-            kind: components["schemas"]["QuestionKind"];
-            payload: unknown;
-            /** Format: int32 */
-            points?: number | null;
-            prompt: string;
-            source?: string | null;
-            status?: null | components["schemas"]["QuestionStatus"];
-            tags: string[];
-        };
-        /** @enum {string} */
-        QuestionKind: "mc" | "tf" | "short" | "essay" | "code";
-        QuestionPatch: {
-            deepDive?: string | null;
-            explanation?: string | null;
-            payload?: unknown;
-            /** Format: int32 */
-            points?: number | null;
-            prompt?: string | null;
-            source?: string | null;
-            tags?: string[] | null;
-        };
-        QuestionPlan: {
-            items: components["schemas"]["PlanItem"][];
-        };
-        QuestionRating: {
-            /** Format: int32 */
-            attempts_count: number;
-            /** Format: double */
-            rating: number;
-        };
-        /** @enum {string} */
-        QuestionStatus: "draft" | "live" | "archived";
-        QuestionVersion: {
-            /** Format: date-time */
-            archivedAt?: string | null;
-            codeSnippet?: unknown;
-            /** Format: date-time */
-            createdAt: string;
-            deepDive?: string | null;
-            explanation?: string | null;
-            /** Format: uuid */
-            id: string;
-            payload: unknown;
-            prompt: string;
             /** Format: uuid */
             questionId: string;
-            source?: string | null;
+            rationale?: string | null;
+            reviewStatus: components["schemas"]["ContentReviewStatus"];
+            sourceReferences: string[];
             /** Format: int32 */
             version: number;
-        };
-        QuotaSettings: {
-            agents: components["schemas"]["TierQuota"];
-            assessments: components["schemas"]["TierQuota"];
-            questions: components["schemas"]["TierQuota"];
         };
         RateLimitSettings: {
             free: components["schemas"]["TierLimit"];
             premium: components["schemas"]["TierLimit"];
         };
+        RecommendationBody: {
+            objectives: components["schemas"]["ObjectiveActivityBody"][];
+        };
+        RecommendationResponse: {
+            /** Format: uuid */
+            activityId: string;
+            evidenceIds: string[];
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            reason: string;
+        };
         RegisterBody: {
             email: string;
             name: string;
             password: string;
-            role: string;
         };
         /** @enum {string} */
-        Role: "user" | "admin" | "agent";
-        RunResponse: {
-            error?: string | null;
-            ok: boolean;
-            result: unknown;
-            tool: string;
-        };
-        /**
-         * @description Token scope as enforced by the `api_tokens.scopes` CHECK constraint.
-         *
-         *     The wire strings (used in JSON and stored in Postgres `text[]`) must stay in
-         *     lock-step with the migration's CHECK list — see
-         *     `db/migrations/20260520210000_p7_stats_feedback_keys.sql`. `from_str` is the
-         *     single point of translation; anything not listed here is rejected as `UnknownScope`.
-         * @enum {string}
-         */
-        Scope: "assessment.read" | "assessment.write" | "attempt.read" | "attempt.write" | "stats.read" | "feedback.write" | "plan.read" | "plan.write" | "admin";
-        Session: {
-            affects_rating: boolean;
-            /** Format: uuid */
-            assessment_id?: string | null;
-            assessment_title?: string | null;
-            course_title?: string | null;
-            /** Format: date-time */
-            deadline_at?: string | null;
-            filter?: Record<string, never>;
-            /** Format: date-time */
-            finished_at?: string | null;
-            /** Format: uuid */
-            id: string;
-            kind: components["schemas"]["SessionKind"];
-            /** Format: uuid */
-            owner_id: string;
-            question_plan: components["schemas"]["QuestionPlan"];
-            rating_snapshot: Record<string, never>;
-            result?: Record<string, never>;
-            /** Format: date-time */
-            started_at: string;
-            status: components["schemas"]["SessionStatus"];
-            /** Format: uuid */
-            user_id: string;
+        ReviewTaskOutcome: "reviewed" | "rejected";
+        ReviewTaskSubmissionBody: {
+            feedback?: unknown;
+            outcome: components["schemas"]["ReviewTaskOutcome"];
+            /** Format: float */
+            score?: number | null;
         };
         /** @enum {string} */
-        SessionKind: "assessment" | "exam" | "practice";
-        SessionQuestion: {
+        Role: "user" | "admin";
+        SaveAnswerBody: {
             /** Format: uuid */
-            id: string;
-            kind: components["schemas"]["QuestionKind"];
-            option_order?: number[] | null;
-            payload: Record<string, never>;
+            assessmentItemId: string;
+            /** Format: uuid */
+            questionVersionId: string;
+            response: unknown;
+        };
+        SnapshotResponse: {
+            calculatedAt: string;
+            /** Format: float */
+            confidence: number;
             /** Format: int32 */
-            points: number;
+            evidenceCount: number;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: float */
+            mastery: number;
+            /** Format: uuid */
+            objectiveId: string;
+        };
+        StartAttemptBody: {
+            /** Format: uuid */
+            learningSessionId: string;
+        };
+        StartGenerationRunBody: {
+            /** Format: int32 */
+            contentVersion?: number;
+            operation: string;
+            provider?: string | null;
+            retryKey?: string | null;
+        };
+        StartLearningBody: {
+            displayName: string;
+            email: string;
+            idempotencyKey: string;
             prompt: string;
+        };
+        StartLearningResponse: {
+            displayName: string;
+            email: string;
+            /** Format: uuid */
+            goalId: string;
+            /** Format: uuid */
+            journeyId: string;
+            templateId: string;
+            /** Format: int32 */
+            templateVersion: number;
+            token: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        StartTaskSubmissionBody: {
+            /** Format: int32 */
+            contentVersion: number;
+            evaluationMethod?: components["schemas"]["TaskEvaluationMethod"];
+            response: unknown;
+        };
+        StreakBody: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            journeyId: string;
+            learnerTimezone: string;
+            qualifyingDay: string;
+            qualifyingEventKey: string;
+        };
+        StreakResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            qualifyingDay: string;
+            qualifyingEventKey: string;
+        };
+        /** @enum {string} */
+        TaskEvaluationMethod: "self_review" | "automatic" | "agent" | "manual";
+        /** @enum {string} */
+        TaskReviewStatus: "not_required" | "pending" | "complete";
+        TaskRubric: {
+            criteria: components["schemas"]["TaskRubricCriterion"][];
+            /** Format: float */
+            passingScore?: number | null;
             /** Format: int32 */
             version: number;
         };
-        SessionResult: {
+        TaskRubricCriterion: {
+            description: string;
+            id: string;
             /** Format: int32 */
-            max_points: number;
-            /** Format: double */
-            percent: number;
+            maxPoints: number;
+            /** Format: uuid */
+            objectiveId: string;
+            required: boolean;
+        };
+        TaskSubmissionResponse: {
             /** Format: int32 */
-            points_awarded: number;
+            contentVersion: number;
+            evaluationMethod: components["schemas"]["TaskEvaluationMethod"];
+            feedback?: unknown;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            response: unknown;
+            reviewStatus: components["schemas"]["TaskReviewStatus"];
+            /** Format: float */
+            score?: number | null;
+            status: components["schemas"]["TaskSubmissionStatus"];
+            /** Format: uuid */
+            taskId: string;
         };
         /** @enum {string} */
-        SessionStatus: "in_progress" | "finished" | "abandoned";
-        SessionSummary: {
-            /** Format: uuid */
-            assessmentId?: string | null;
-            assessmentTitle?: string | null;
-            /** Format: int64 */
-            attemptNumber: number;
-            /** Format: date-time */
-            finishedAt?: string | null;
-            /** Format: uuid */
-            id: string;
-            kind: string;
-            /** Format: double */
-            maxPoints?: number | null;
-            /** Format: double */
-            pointsAwarded?: number | null;
-            /** Format: date-time */
-            startedAt: string;
-            status: string;
-            /** Format: int64 */
-            totalAttempts: number;
-        };
-        StudyPlan: {
-            /** Format: date-time */
-            generated_at: string;
-            goal: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: int64 */
-            lookback_days: number;
-            /** Format: uuid */
-            user_id: string;
-            weeks: components["schemas"]["StudyPlanWeek"][];
-        };
-        StudyPlanItem: {
-            /** Format: double */
-            hours_est: number;
-            kind: string;
-            ref_id: string;
-        };
-        StudyPlanWeek: {
-            focus: string;
-            items: components["schemas"]["StudyPlanItem"][];
-            week_num: number;
-        };
-        Tag: {
-            /** Format: date-time */
-            createdAt: string;
-            description?: string | null;
-            /** Format: uuid */
-            id: string;
-            name: string;
-        };
+        TaskSubmissionStatus: "in_progress" | "submitted" | "in_review" | "reviewed" | "rejected" | "abandoned";
         TierLimit: {
             /** Format: int32 */
             burst: number;
             /** Format: int32 */
             rate: number;
         };
-        TierQuota: {
-            /** Format: int64 */
-            free: number;
-            /** Format: int64 */
-            premium: number;
-        };
-        TokenEntry: {
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            expiresAt: string;
+        TimelineEventResponse: {
+            /** Format: uuid */
+            activityId?: string | null;
             /** Format: uuid */
             id: string;
+            kind: string;
             /** Format: date-time */
-            lastUsedAt?: string | null;
-            name: string;
-            ownerDisplayName?: string | null;
-            ownerEmail?: string | null;
-            /** Format: uuid */
-            ownerId: string;
-            ownerRole: string;
-            /** Format: date-time */
-            revokedAt?: string | null;
-            scopes: string[];
-            status: string;
+            occurredAt: string;
+            title: string;
         };
-        UpdateAgentBody: {
-            currentGoal?: string | null;
-            focusTags?: string[] | null;
-            label?: string | null;
-            nextTarget?: string | null;
-        };
-        UpdateAssessmentRequest: {
-            description?: string | null;
-            objectives?: string[] | null;
-            status?: null | components["schemas"]["AssessmentStatus"];
-            title?: string | null;
-        };
-        UpdateSectionBody: {
-            mix?: unknown;
-            title?: string | null;
-            /** Format: double */
-            weight?: number | null;
+        TransitionGenerationRunBody: {
+            error?: unknown;
+            status: components["schemas"]["GenerationStatus"];
         };
         /** @description Partial update for platform settings — any omitted field is left unchanged. */
         UpdateSettingsBody: {
             maintenanceMode?: boolean | null;
-            quota?: null | components["schemas"]["QuotaSettings"];
             ratelimit?: null | components["schemas"]["RateLimitSettings"];
         };
         User: {
             /** Format: date-time */
             createdAt: string;
-            /** Format: date-time */
-            deactivatedAt?: string | null;
             displayName: string;
             email?: string | null;
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            ownerUserId?: string | null;
-            plan: string;
             role: components["schemas"]["Role"];
+            status: components["schemas"]["UserStatus"];
         };
         UserInfo: {
             email: string;
@@ -1858,14 +1440,8 @@ export interface components {
             name: string;
             role: string;
         };
-        UserTagRating: {
-            /** Format: int32 */
-            attempts_count: number;
-            /** Format: double */
-            rating: number;
-            /** Format: uuid */
-            tag_id: string;
-        };
+        /** @enum {string} */
+        UserStatus: "active" | "deactivated";
     };
     responses: never;
     parameters: never;
@@ -1875,174 +1451,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_assessments_admin: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                q?: string;
-                mode?: string;
-                status?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessments retrieved successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminListAssessmentsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_assessment_admin: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessment retrieved successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminAssessmentDetail"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    delete_assessment_admin: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessment deleted successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    restore_assessment_admin: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessment restored successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found or not deleted */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     list_audit_logs: {
         parameters: {
             query?: {
@@ -2092,7 +1500,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Admin health metrics retrieved successfully */
+            /** @description Current platform health */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2108,7 +1516,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Forbidden (Admin required) */
+            /** @description Administrator role required */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2189,86 +1597,22 @@ export interface operations {
             };
         };
     };
-    list_tokens: {
+    list_pending_submissions: {
         parameters: {
-            query?: {
-                page?: number;
-                pageSize?: number;
-                q?: string;
-                status?: string;
-                role?: string;
-                ownerId?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Token list successfully retrieved */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListTokensResponse"];
+                    "application/json": components["schemas"]["TaskSubmissionResponse"][];
                 };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    delete_token_admin: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Token ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Token revoked successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden (Admin required) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -2356,17 +1700,10 @@ export interface operations {
             };
         };
     };
-    list_assessments: {
+    get_assessment_for_activity: {
         parameters: {
-            query?: {
-                /** @description Filter by mode (practice or graded) */
-                mode?: string;
-                /** @description Filter by status (draft, active, archived). When absent, returns public-active + caller's own. */
-                status?: string;
-                /** @description Page size (default: 50) */
-                limit?: number;
-                /** @description Page offset */
-                offset?: number;
+            query: {
+                activityId: string;
             };
             header?: never;
             path?: never;
@@ -2374,17 +1711,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of assessments */
+            /** @description Assessment attached to the activity */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListAssessmentsResponse"];
+                    "application/json": components["schemas"]["AssessmentResponse"];
                 };
             };
-            /** @description Missing or invalid token */
-            401: {
+            /** @description No assessment exists for this learner's activity */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2401,100 +1738,18 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateAssessmentRequest"];
+                "application/json": components["schemas"]["CreateAssessmentBody"];
             };
         };
         responses: {
-            /** @description Assessment created successfully */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssessmentSummary"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    count_assessments: {
-        parameters: {
-            query?: {
-                /** @description Filter by mode */
-                mode?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessment count */
+            /** @description Created assessment */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CountAssessmentsResponse"];
+                    "application/json": components["schemas"]["AssessmentResponse"];
                 };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    generate_assessment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerateAssessmentBody"];
-            };
-        };
-        responses: {
-            /** @description Generated assessment candidates */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GenerateAssessmentResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
@@ -2504,341 +1759,124 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Assessment ID */
-                id: string;
+                assessment_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Assessment details */
+            /** @description Assessment */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssessmentDetail"];
+                    "application/json": components["schemas"]["AssessmentResponse"];
                 };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
-    delete_assessment: {
+    start_attempt: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description Assessment ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessment deleted successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_assessment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
+                assessment_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateAssessmentRequest"];
+                "application/json": components["schemas"]["StartAttemptBody"];
             };
         };
         responses: {
-            /** @description Assessment updated successfully */
+            /** @description Started or resumed attempt */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Assessment"];
+                    "application/json": components["schemas"]["AttemptResponse"];
                 };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
-    add_assessment_question: {
+    get_attempt: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Assessment ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddAssessmentQuestionBody"];
-            };
-        };
-        responses: {
-            /** @description Question linked */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AddAssessmentQuestionResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such assessment or question */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    remove_assessment_question: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-                /** @description Question ID */
-                question_id: string;
+                /** @description Attempt ID */
+                attempt_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Question removed from assessment */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such assessment or question */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_assessment_section: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSectionBody"];
-            };
-        };
-        responses: {
-            /** @description Section created successfully */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssessmentSectionDetail"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Assessment not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    delete_assessment_section: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-                /** @description Section ID */
-                section_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Section deleted successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such assessment or section */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_assessment_section: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Assessment ID */
-                id: string;
-                /** @description Section ID */
-                section_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateSectionBody"];
-            };
-        };
-        responses: {
-            /** @description Section updated successfully */
+            /** @description Attempt */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssessmentSectionDetail"];
+                    "application/json": components["schemas"]["AttemptResponse"];
                 };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such assessment or section */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
-    list_pending_attempts: {
+    save_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Attempt ID */
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveAnswerBody"];
+            };
+        };
+        responses: {
+            /** @description Saved answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
+                };
+            };
+        };
+    };
+    finish_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Attempt ID */
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Finished attempt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
+                };
+            };
+        };
+    };
+    logout: {
         parameters: {
             query?: never;
             header?: never;
@@ -2847,16 +1885,291 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Pending manual attempts */
+            /** @description Logged out */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_for_activity: {
+        parameters: {
+            query: {
+                activityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deep dive attached to the activity */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PendingAttemptRow"][];
+                    "application/json": components["schemas"]["DeepDiveResponse"];
                 };
             };
-            /** @description Agent role not allowed */
+            /** @description No deep dive exists for this learner's activity */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeepDiveBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDiveResponse"];
+                };
+            };
+        };
+    };
+    get_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepDiveResponse"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartGenerationRunBody"];
+            };
+        };
+        responses: {
+            /** @description Started or resumed a provider generation run */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationRunResponse"];
+                };
+            };
+        };
+    };
+    get_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Generation run ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owned provider generation run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationRunResponse"];
+                };
+            };
+        };
+    };
+    transition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Generation run ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionGenerationRunBody"];
+            };
+        };
+        responses: {
+            /** @description Transitioned owned provider generation run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationRunResponse"];
+                };
+            };
+        };
+    };
+    author_activity_content: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Activity to ground */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorActivityContentBody"];
+            };
+        };
+        responses: {
+            /** @description Grounded learner activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity or generation run does not belong to this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generation is not published or activity content is immutable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Content, provenance, or review status is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    author_activity_rubric: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task activity to attach a rubric to */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorActivityRubricBody"];
+            };
+        };
+        responses: {
+            /** @description Activity with its attached rubric */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity or generation run does not belong to this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generation is not published or activity is completed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rubric, provenance, or review status is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_journeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Learner journeys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningJourneySummaryResponse"][];
+                };
+            };
+            /** @description Missing or invalid token */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -2865,58 +2178,542 @@ export interface operations {
             };
         };
     };
-    grade_attempt: {
+    get_journey: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Attempt id */
+                /** @description Learning journey ID */
                 id: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GradeAttemptBody"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Graded attempt */
+            /** @description Learning journey and its goal */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Attempt"];
+                    "application/json": components["schemas"]["LearningJourneyResponse"];
                 };
             };
-            /** @description Agent role not allowed */
+            /** @description Missing or invalid token */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description No such attempt */
+            /** @description Journey does not exist for this learner */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Attempt is not pending manual grading */
+        };
+    };
+    start_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning journey ID */
+                journey_id: string;
+                /** @description Learning activity ID */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Learning session started or resumed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningSessionResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The authenticated learner cannot access this resource */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity is not ready */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_journey_attempts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning journey ID */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attempts in the learner-owned journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"][];
+                };
+            };
+        };
+    };
+    get_learning_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning session ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Learning session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningSessionResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    finish_learning_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Learning session ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinishLearningSessionBody"];
+            };
+        };
+        responses: {
+            /** @description Finished learning session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningSessionResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The authenticated learner cannot access this resource */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is already finished */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Validation failed */
-            422: {
+        };
+    };
+    get_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current learner profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    record_evidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceResponse"];
+                };
+            };
+        };
+    };
+    record_streak: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StreakBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreakResponse"];
+                };
+            };
+        };
+    };
+    snapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                objective_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotResponse"];
+                };
+            };
+        };
+    };
+    recommend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecommendationBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationResponse"];
+                };
+            };
+        };
+    };
+    list_streaks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreakResponse"][];
+                };
+            };
+        };
+    };
+    list_timeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineEventResponse"][];
+                };
+            };
+        };
+    };
+    create_question: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuestionBody"];
+            };
+        };
+        responses: {
+            /** @description Created question version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionResponse"];
+                };
+            };
+        };
+    };
+    create_question_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question ID */
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQuestionBody"];
+            };
+        };
+        responses: {
+            /** @description Created question version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionResponse"];
+                };
+            };
+        };
+    };
+    get_question_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Question ID */
+                question_id: string;
+                /** @description Question version */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Question version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionResponse"];
+                };
+            };
+        };
+    };
+    get_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task submission ID */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
+            };
+        };
+    };
+    review_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task submission ID */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewTaskSubmissionBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
+            };
+        };
+    };
+    submit_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task submission ID */
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
+            };
+        };
+    };
+    start_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Application task activity ID */
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartTaskSubmissionBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
             };
         };
     };
@@ -2944,24 +2741,6 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    logout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Logged out */
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3000,38 +2779,7 @@ export interface operations {
             };
         };
     };
-    list_deep_dives: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                status: string | null;
-                category: string | null;
-                search: string | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of deep dives */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListDeepDivesResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_deep_dive: {
+    preview_learning: {
         parameters: {
             query?: never;
             header?: never;
@@ -3040,382 +2788,18 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateDeepDiveBody"];
+                "application/json": components["schemas"]["PreviewLearningBody"];
             };
         };
         responses: {
-            /** @description Deep dive created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeepDive"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Question, session, or attempt not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    export_deep_dives: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ZIP archive of deep dives */
+            /** @description Preview of the first learning journey */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": number[];
+                    "application/json": components["schemas"]["PreviewLearningResponse"];
                 };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_deep_dive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Deep dive ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deep dive details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeepDive"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Deep dive not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_deep_dive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Deep dive ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchDeepDiveBody"];
-            };
-        };
-        responses: {
-            /** @description Deep dive updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeepDive"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Deep dive not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    publish_deep_dive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Deep dive ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishDeepDiveBody"];
-            };
-        };
-        responses: {
-            /** @description Deep dive published */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeepDive"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Deep dive not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_deep_dive_revisions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Deep dive ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of revisions for the deep dive */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeepDiveRevisionsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Deep dive not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    explore: {
-        parameters: {
-            query?: {
-                tags?: string;
-                kind?: string;
-                mode?: string;
-                search?: string;
-                limit?: number;
-                after?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Assessment list */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExploreResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    explore_facets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Explore facets */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExploreFacetsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_me: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Current user profile */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MeResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_agents: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Agent list */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListAgentsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_agent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateAgentBody"];
-            };
-        };
-        responses: {
-            /** @description Agent created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateAgentResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation failed */
             422: {
@@ -3426,253 +2810,37 @@ export interface operations {
             };
         };
     };
-    delete_agent: {
+    start_learning: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                /** @description Agent id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Agent deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such agent */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    update_agent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Agent id */
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateAgentBody"];
+                "application/json": components["schemas"]["StartLearningBody"];
             };
         };
         responses: {
-            /** @description Agent updated */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such agent */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_agent_token: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Agent id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateAgentTokenBody"];
-            };
-        };
-        responses: {
-            /** @description Token created */
+            /** @description Learner and first journey created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CreateKeyResponse"];
+                    "application/json": components["schemas"]["StartLearningResponse"];
                 };
             };
-            /** @description Unauthorized */
+            /** @description Existing learner requires authentication */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description No such agent */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    revoke_agent_token: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Agent id */
-                id: string;
-                /** @description Token id */
-                token_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Token revoked */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No such agent or token */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_attempts: {
-        parameters: {
-            query?: {
-                /** @description Page size (default: 50) */
-                limit?: number;
-                /** @description Page offset */
-                offset?: number;
-                /** @description Filter by session */
-                session_id?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Attempt list */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListAttemptsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_cohort_stats: {
-        parameters: {
-            query?: {
-                /** @description Assessment to compare against */
-                assessmentId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cohort stats */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CohortStatsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_plan: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreatePlanBody"];
-            };
-        };
-        responses: {
-            /** @description Study plan created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyPlan"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
+            /** @description Email already belongs to a learner */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3680,574 +2848,6 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_plan: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Plan id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Study plan */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StudyPlan"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_questions: {
-        parameters: {
-            query?: {
-                tag?: string;
-                status?: string;
-                search?: string;
-                kind?: string;
-                min_rating?: number;
-                max_rating?: number;
-                limit?: number;
-                offset?: number;
-                after?: string;
-                assessment_id?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of questions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListQuestionsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_questions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateQuestionsBody"];
-            };
-        };
-        responses: {
-            /** @description Questions created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateQuestionsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_question: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Question id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Question details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Question"];
-                };
-            };
-            /** @description Question not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    update_question: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Question id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QuestionPatch"];
-            };
-        };
-        responses: {
-            /** @description Question updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Question"];
-                };
-            };
-            /** @description Question not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    archive_question: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Question id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Question archived */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Question"];
-                };
-            };
-            /** @description Question not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_question_deepen: {
-        parameters: {
-            query?: {
-                exclude?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Question id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Question deepen bundle */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuestionDeepenResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Question not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    promote_question: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Question id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Question promoted to live */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Question"];
-                };
-            };
-            /** @description Question not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_versions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Question id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Question history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QuestionVersion"][];
-                };
-            };
-            /** @description Question not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_my_sessions: {
-        parameters: {
-            query?: {
-                /** @description Filter by assessment */
-                assessmentId?: string;
-                /** @description Page size (default: 50) */
-                limit?: number;
-                /** @description Page offset */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Attempt history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListMySessionsResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    create_session: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSessionBody"];
-            };
-        };
-        responses: {
-            /** @description Created session */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CreateSessionResponse"];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token lacks required scope */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_session: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Session id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Session resume state */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GetSessionResponse"];
-                };
-            };
-            /** @description No such session */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    patch_session: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Session id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchSessionBody"];
-            };
-        };
-        responses: {
-            /** @description Session updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Session"];
-                };
-            };
-            /** @description No such session */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    answer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Session id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AnswerSessionBody"];
-            };
-        };
-        responses: {
-            /** @description Stored answer */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnswerSessionResponse"];
-                };
-            };
-            /** @description Session expired */
-            410: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    finish: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Session id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Finished session */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FinishSessionResponse"];
-                };
-            };
-            /** @description No such session */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_tags: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description All tags, sorted by name */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Tag"][];
-                };
-            };
-            /** @description Missing or invalid token */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };

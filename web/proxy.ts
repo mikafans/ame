@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 // This only checks for the *presence* of the HttpOnly `ame_token` cookie — the
 // token is opaque here and cannot be verified without the API. Real enforcement
 // still happens on every API request, and the `(learner)` layout keeps its
-// useAuth gate to catch a present-but-expired/invalid token (it calls /v1/me
+// useAuth gate to catch a present-but-expired/invalid token (it calls /api/v1/me
 // and redirects on 401). This middleware is purely a UX fast-path.
 
 // Public routes that never require a token. Everything else under the matcher
@@ -15,10 +15,11 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = new Set([
   "/",
   "/login",
+  "/start",
   "/self-hosting",
-  "/llms.txt",
-  "/skill.json",
-  "/openapi.yaml",
+  "/public/llms.txt",
+  "/public/skill.json",
+  "/public/openapi.yaml",
 ]);
 
 export function proxy(req: NextRequest) {
@@ -38,7 +39,7 @@ export function proxy(req: NextRequest) {
 }
 
 // Skip Next internals, static assets, and the API-proxied paths
-// (/llms.txt, /v1/*) so only real app pages hit the gate.
+// (/public/*, /api/*) so only real app pages hit the gate.
 export const config = {
-  matcher: ["/((?!_next/|v1/|llms.txt|favicon.ico|.*\\.[\\w]+$).*)"],
+  matcher: ["/((?!_next/|api/|public/|favicon.ico|.*\\.[\\w]+$).*)"],
 };

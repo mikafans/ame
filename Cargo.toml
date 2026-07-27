@@ -1,0 +1,11 @@
+[workspace]
+members = [
+  "api",
+  "crates/ame-learning-domain",
+  "crates/ame-learning-application",
+  "crates/ame-learning-postgres",
+  "crates/ame-platform-domain",
+  "crates/ame-platform-application",
+  "crates/ame-platform-postgres",
+]
+resolver = "2"

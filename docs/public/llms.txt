@@ -1,219 +1,173 @@
 # ame — study, sweetened
 
-> An assessment learning platform with a first-class agent surface. An agent acts
-> on behalf of its owner: it authors question banks, assembles and publishes
-> assessments, grades pending attempts, and reads the owner's learner stats. This
-> file is the entry point and describes the entire contract.
+ame is a self-hostable, agent-friendly learning platform. People and agents
+use the same owner-scoped learner API. An agent can start a journey, compose a
+course-like path, help the learner study and demonstrate knowledge, and read
+the same progress that appears in the browser.
 
-This is NOT an MCP server and there is no JSON-RPC. An agent token can call
-read-only endpoints directly (e.g., GET /v1/assessments, GET /v1/questions) and
-must use the run-door dispatcher `POST /v1/agents/run` for all writes. Agents
-never take assessments and never hold their own sessions; the learner REST
-surface is human-only.
+This is the concise agent entry guide. Use `/public/skill.json` to discover
+named operations and `/public/openapi.yaml` for complete request and response
+schemas.
 
-## Getting a key
+## Start a learner journey
 
-An owner (a human user logged in with email + password) creates an agent:
+Register once and retain the returned bearer token:
 
-```
-POST /v1/me/agents
-{ "label": "my-agent", "scopes": ["assessment.read", "assessment.write"], "focusTags": [...] }
--> 201 { "id": "<uuid>", "apiKey": "<id>_<secret>" }
-```
+```http
+POST /public/v1/auth/register
+Content-Type: application/json
 
-The key travels on every request as `Authorization: Bearer <apiKey>`. The secret
-is shown once at creation and stored only as a hash.
-
-**Valid scopes**: `assessment.read`, `assessment.write`, `attempt.read`,
-`attempt.write`, `stats.read`. These are the only scopes an agent token can
-hold — each maps to one or more tools below. `admin` and the human-only REST
-scopes (`feedback.write`, `plan.read`, `plan.write`) cannot be granted to an
-agent.
-
-## REST API and the run-door dispatcher
-
-An agent token has two ways to call tools:
-- **Direct REST** for read-only operations: `GET /v1/assessments`, `GET /v1/questions`, etc.
-- **Run-door dispatcher** for writes: `POST /v1/agents/run`.
-
-Other direct REST endpoints (e.g. `POST /v1/assessments`, `PATCH /v1/assessments/{id}`)
-are blocked by the agent guard and return `403 Forbidden`.
-
-Discovery endpoints that are always allowed:
-- `GET /v1/agents/activity` — the agent's own call log, newest first.
-- `GET /llms.txt`, `GET /skill.json`, `GET /openapi.yaml` — public discovery.
-
-Every tool invoked via the dispatcher uses the same shape:
-
-```
-POST /v1/agents/run
-{ "tool": "<name>", "params": { ... } }
--> 200 { "ok": true, "tool": "<name>", "result": { ... } }
+{"email":"learner@example.com","name":"Learner","password":"at-least-8-chars"}
 ```
 
-A scope mismatch returns `403`; a malformed `params` returns `422`.
+Existing learners can use `POST /public/v1/auth/login`. Both operations return
+`token` and `user`. Send the token as `Authorization: Bearer <token>` on
+authenticated `/api/v1/*` requests. In self-host mode, email is an account
+identifier; AME does not send email.
 
-## Discovery
+Preview a prompt without creating state:
 
-`GET /skill.json` is the machine-readable tool list. Each tool carries an
-`input_schema`, along with its direct REST `method`, `path`, and required scope.
-`GET /openapi.yaml` is the full OpenAPI schema for all routes on the platform.
-
-## Tools
-
-**Authoring writes (scope `assessment.write`, via POST /v1/agents/run)**
-- `question.create` — batch-create bank questions.
-  `params: { questions: [{ kind, prompt, payload, explanation?, tags?, points?, status? }] }`.
-- `question.promote` — promote one draft question to live. `params: { id }`.
-- `question.update` — patch a bank question. `params: { id, prompt?, explanation?, points?, tags?, payload? }`.
-- `assessment.create` — create an assessment. Required: `title`, `mode`
-  (`practice`|`graded`), `objectives` (array), `method` (`agent`). Optional:
-  `description`, `course`, `status`, and an inline `questions` array.
-- `assessment.batchCreate` — create many assessments in one transaction.
-  `params: { items: [ <assessment.create params> ] }`.
-- `assessment.update` — patch metadata or change lifecycle state.
-  `params: { id, title?, status? }`. `status: "active"` publishes;
-  `status: "archived"` archives.
-- `assessment.archive` — archive an assessment. `params: { id }`.
-- `assessment.publish` — publish an assessment to make it active. `params: { id }`.
-- `assessment.addQuestion` — attach a bank question (or create one inline) to an
-  assessment. `params: { id, questionId? | (kind, prompt), sectionId?, pointsOverride? }`.
-- `assessment.delete` — delete an assessment. `params: { id }`.
-
-**Grading writes (scope `attempt.write`, via POST /v1/agents/run)**
-- `attempt.grade` — grade one pending essay or code attempt.
-  `params: { id, score (0.0–1.0), notes? }`. Grades a learner's attempt, never the
-  agent's own.
-- `deepDive.request` — request a durable Deep Dive explanation for a question.
-  `params: { questionId, sourceSessionId?, sourceAttemptId?, reason? }`.
-
-**Deep Dive writes (scope `assessment.write`, via POST /v1/agents/run)**
-- `deepDive.publish` — publish agent-authored Markdown explanation and category.
-  `params: { id, bodyMarkdown, category?, status? }`.
-
-**Reading (direct GET endpoints)**
-- `assessment.list` — list the owner's assessments. `GET /v1/assessments` with
-  `params: { course?, status?, mode? }` (scope `assessment.read`).
-- `assessment.get` — one assessment with its sections and questions.
-  `GET /v1/assessments/{id}` (scope `assessment.read`).
-- `assessment.stats` — per-assessment performance (scope `stats.read`).
-  `GET /v1/assessments/{id}/stats`.
-- `question.list` — list bank questions. `GET /v1/questions` with
-  `params: { tag?, status?, limit?, offset? }` (scope `assessment.read`).
-- `question.deepen` — retrieve deepening/review details for a question (scope `assessment.read`).
-  `GET /v1/questions/{id}/deepen` with `params: { exclude? }`.
-- `attempt.list` — list the owner's attempt history. `GET /v1/me/attempts` with
-  `params: { limit?, offset?, sessionId? }` (scope `attempt.read`).
-- `deepDive.list` — list Deep Dive requests (scope `assessment.read`, also via run-door).
-  `GET /v1/deep-dives` or `POST /v1/agents/run` with `params: { status?, category?, search? }`.
-- `deepDive.get` — get a single Deep Dive details with notes and revisions.
-  `GET /v1/deep-dives/{id}` (scope `assessment.read`).
-- `deepDive.revisions` — list of explanation and note revision snapshots.
-  `GET /v1/deep-dives/{id}/revisions` (scope `assessment.read`).
-- `deepDive.export` — download a ZIP of all published deep dives as Obsidian-compatible Markdowns.
-  `GET /v1/deep-dives/export` (scope `assessment.read`).
-- `activity.list` — the agent's own activity log. `GET /v1/agents/activity` with
-  `params: { cursor?, limit? }` (scope `assessment.read`).
-- `stats.user` — the owner's aggregate learning statistics.
-  `GET /v1/me/stats` (scope `stats.read`).
-
-**Self-management (no scope required, via POST /v1/agents/run)**
-- `profile.get` — the agent's own config (label, focus tags, goal, memory) plus the
-  owner's per-tag ELO ratings under `owner.ratings`.
-- `memory.set` — replace the agent's memory blob. `params: { memory }`.
-- `memory.append` — shallow-merge keys into the memory blob. `params: { append }`.
-- `target.set` — update the agent's goal and next target.
-  `params: { currentGoal?, nextTarget? }`.
-
-## Authoring an assessment end to end
-
-1. `question.create` (batch) yields question ids.
-2. `assessment.create` `{ title, mode, objectives, method: "agent" }` yields an
-   assessment id in `draft` state.
-3. `assessment.addQuestion` `{ id, questionId }` for each question attaches it.
-4. `assessment.update` `{ id, status: "active" }` publishes; publishing
-   auto-promotes draft questions to live. An assessment needs ≥1 question to
-   publish, and an archived assessment cannot be re-activated.
-5. `assessment.list` confirms the result.
-
-Inline shortcut: `assessment.create` accepts a `questions` array and a
-`status: "active"`, collapsing the four steps into one call.
-
-## Data-model rules (violating these returns 422 or silently mis-grades)
-
-- Multiple-choice options are **bare strings**: `payload.options: ["a", "b"]` with
-  `correct_index` (never `[{ "text": "a" }]`). The grader and the UI both require
-  bare strings.
-- Question `kind` is one of `mc`, `tf`, `short`, `essay`, `code`.
-- No scheduled assessments: there are no `opens_at` / `closes_at` fields.
-- Auth is email + password only. No SSO/SAML.
-- `code` questions are graded by exemplar/manual comparison — there is no code
-  runner, so `code` and `essay` answers land as pending and are resolved with
-  `attempt.grade`.
-
-## Reference client
-
-`agents/client.py` is a dependency-free Python wrapper and the canonical worked
-example of the request/auth/error shapes. Its end-to-end author demo runs with:
-
-```
-uv run agents/client.py --api http://localhost:28080 --token <owner-token>
+```http
+POST /public/v1/onboarding/preview
+{"prompt":"I want to learn Apache Flink checkpointing"}
 ```
 
-## Task playbooks
+Create or resume the learner journey with a stable idempotency key:
 
-Declarative recipes for diagnostic analysis and material adjustment. Each step is
-a tool dispatched through `POST /v1/agents/run`.
+```http
+POST /public/v1/onboarding/start
+{
+  "email":"learner@example.com",
+  "displayName":"Learner",
+  "prompt":"I want to learn Apache Flink checkpointing",
+  "idempotencyKey":"flink-checkpointing-v1"
+}
+```
 
-### Playbook 1: Analyze learner performance (`analyze-performance`)
+## The learning model
 
-Surfaces learning gaps from an assessment's per-item stats and the owner's
-aggregate stats.
+`GET /api/v1/learning/journeys/{id}` returns one resumable manifest:
 
-1. `assessment.stats` `{ id }` returns `avg`, `median`, `distribution`, and an
-   `items` array of `{ questionId, correctRate, avgTimeMs, discriminationIdx }`.
-2. `stats.user` returns the owner's aggregate `{ avgScore, attemptsTotal,
-   hoursSpent, streaks, masteredTopics }`.
-3. `activity.list` returns the agent's recent tool calls for audit.
+```text
+journey
+  └─ chapters/modules
+       ├─ lesson or explanation
+       ├─ worked example or code example
+       ├─ interactive scenario
+       ├─ quiz or assessment
+       ├─ application task
+       └─ review/recommendation
+```
 
-Interpretation: `correctRate < 0.5` marks a topic needing more practice;
-`discriminationIdx < 0.2` marks a question that may be poorly written;
-`avgTimeMs > 30000` marks a question that may be too long or complex.
+The response includes the learner's raw intent, promise, objectives, ordered
+chapters, activities, immutable content versions, activity status, and the
+evidence-backed recommendation. The flat `activities` field remains a
+compatibility view; new clients should prefer `chapters[].activities`.
 
-### Playbook 2: Targeted question generation (`generate-questions`)
+Activity content is typed by `payload.content.type`. Current capabilities are
+`explanation`, `worked_example`, `rich_text`, `diagram`, `code_example`, and
+`scenario`. The server validates that a capability matches the activity kind;
+the browser renders known capabilities and shows a safe fallback for unknown
+future capabilities. Content is versioned and approved before it is learner
+visible. Text fields may contain Markdown, but an activity is not limited to
+plain text.
 
-Authors targeted questions for the owner's weakest topics and publishes them as a
-practice assessment.
+## Learner loop
 
-1. `profile.get` returns `owner.ratings`; the lowest ratings are the primary
-   targets.
-2. `question.create` authors questions for the weakest tag (their `tags` field
-   carries the topic).
-3. `assessment.create` `{ title, mode: "practice", objectives: [<tag>],
-   method: "agent" }` creates the draft.
-4. `assessment.addQuestion` attaches each new question.
-5. `assessment.update` `{ id, status: "active" }` publishes.
+Use these operations with the learner token:
 
-### Playbook 3: Adaptive generation loop (`adaptive-generation`)
+```http
+GET    /api/v1/learning/journeys
+GET    /api/v1/learning/journeys/{id}
+POST   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
+GET    /api/v1/learning/sessions/{id}
+POST   /api/v1/learning/sessions/{id}/finish
+PATCH  /api/v1/learning/activities/{activity_id}/content
+PATCH  /api/v1/learning/activities/{activity_id}/rubric
 
-The full loop: read struggle points, author targeted questions, publish.
+POST   /api/v1/questions
+GET    /api/v1/questions/{question_id}/versions/{version}
+POST   /api/v1/questions/{question_id}/versions
+POST   /api/v1/assessments
+GET    /api/v1/assessments/{assessment_id}
+GET    /api/v1/assessments?activityId={activity_id}
+POST   /api/v1/assessments/{assessment_id}/attempts
+GET    /api/v1/attempts/{attempt_id}
+POST   /api/v1/attempts/{attempt_id}/answers
+POST   /api/v1/attempts/{attempt_id}/finish
+GET    /api/v1/learning/journeys/{journey_id}/attempts
 
-1. `assessment.stats` `{ id }` yields the `items` whose `correctRate < 0.5`.
-2. For each weak tag, `question.create` authors fresh questions tagged to it.
-3. `assessment.create` (or an existing draft) collects them via
-   `assessment.addQuestion`.
-4. `assessment.update` `{ id, status: "active" }` activates and publishes.
+POST   /api/v1/tasks/{task_id}/submissions
+POST   /api/v1/task-submissions/{submission_id}/submit
+GET    /api/v1/task-submissions/{submission_id}
 
-### Playbook 4: Authoring and updating a Deep Dive KB (`author-deep-dive`)
+POST   /api/v1/progress/evidence
+GET    /api/v1/progress/{journey_id}/objectives/{objective_id}
+POST   /api/v1/progress/{journey_id}/recommendation
+POST   /api/v1/progress/streaks
+GET    /api/v1/progress/{journey_id}/streaks
+GET    /api/v1/progress/{journey_id}/timeline
+```
 
-Evolve requested questions into categorized, study-ready deep dive entries.
+Starting a session does not prove mastery. Finishing an instructional activity
+records completion, while a quiz attempt or application-task submission
+records demonstrable work. Practice and automatically graded assessments may
+return a score. Question `kind` includes `numeric`, graded against
+`acceptedAnswers[0]` (the target value) with an optional
+`acceptedAnswers[1]` tolerance (an absolute number, or a percentage such as
+`"2%"`); omit the tolerance for an exact match. Essay/code answers can finish
+as `submitted` with `reviewStatus: pending`; do not invent a score or evidence
+while review is pending. Abandoned work never creates mastery evidence.
 
-1. `deepDive.list` `{ status: "requested" }` returns the owner's outstanding requests (each containing the `questionPrompt`, `questionTags`, and user's requested `reason`).
-2. Generate a high-quality Markdown explanation (`bodyMarkdown`) featuring:
-   - A descriptive title
-   - Conceptual breakdowns and code exemplars
-   - Mermaid visualization diagrams showing dataflow/logic
-   - Recommended study moves for the learner
-3. Determine a high-level `category` (e.g. "Database Systems", "Algorithms", "Network Protocols").
-4. `deepDive.publish` `{ id, bodyMarkdown, category, status: "published" }` publishes the explanation. This creates the first revision snapshot.
-5. If the user updates their notes or requests revisions, re-publish via `deepDive.publish` to update the explanation body, generating sequential revision snapshots.
+Task submissions carry the exact activity `contentVersion`, response, review
+state, evaluation method, optional score, and feedback. A task contributes
+evidence only after its declared evaluation reaches a reviewed terminal state.
+Learners can read their result with
+`GET /api/v1/task-submissions/{submission_id}`.
+
+Evidence must identify exactly one graded assessment attempt or reviewed task
+submission, and must match the same learner, journey, objective, activity, and
+content version. Recommendations, timeline events, and streak events are
+derived from durable activity and evidence state rather than from generated
+text alone.
+
+## Agent authoring and adaptation
+
+Agents may inspect the journey, create versioned questions and assessments,
+author approved activity content, attach scoring rubrics to task activities,
+create source-backed deep dives, and inspect progress. Generated content
+requires an owner-scoped generation run with a matching operation and published
+status:
+
+```http
+POST  /api/v1/generation-runs
+GET   /api/v1/generation-runs/{id}
+PATCH /api/v1/generation-runs/{id}
+```
+
+Use `question.compose` for questions, `deep_dive.create` for deep dives,
+`learning.activity.content.compose` for reviewed activity content, and
+`learning.activity.rubric.compose` for task rubrics. Reuse a
+stable `retryKey` for retryable generation. Failed, cross-owner, stale, or
+operation-mismatched provenance is rejected. Deep dives require matching
+existing evidence and at least one source reference; only approved deep dives
+are learner-readable. Use these deep-dive operations to create or read them:
+
+```http
+POST /api/v1/deep-dives
+GET  /api/v1/deep-dives?activityId={activity_id}
+GET  /api/v1/deep-dives/{id}
+```
+
+## Discovery and rules
+
+- `GET /public/skill.json` — named agent operations and lightweight input schemas.
+- `GET /public/openapi.yaml` — complete HTTP contract for code generation and validation.
+- `GET /public/llms.txt` — this concise agent entry guide.
+- `GET /agent` — human-readable agent integration guide.
+- `GET /self-hosting` — human-readable operator deployment guide.
+
+Use the bearer token returned by registration, login, or onboarding. Keep every
+journey and session owner-scoped. Use a stable `idempotencyKey` for onboarding.
+Do not treat generated content, a selected scenario option, an unfinished
+session, a practice score, or pending manual review as proof of mastery.

@@ -4,8 +4,11 @@ Thanks for considering a contribution. ame is a small project; the bar is "works
 
 ## Setup
 
+The toolchain (rust, bun, uv, python, sqlx-cli) comes from the Nix devShell.
+Enter it with `direnv allow` (auto-loads via `.envrc`) or `nix develop`; then:
+
 ```bash
-make init-env      # mise install + sqlx-cli + bun install + playwright
+make init-env      # web deps + playwright browsers (toolchain is from nix)
 make db-up         # start Postgres in Docker/Podman
 make dev           # API on :28080, frontend on :23000
 make db-seed       # seed demo users, quizzes, questions
@@ -39,7 +42,7 @@ CI runs `make check` + `cargo audit` on every PR (see `.github/workflows/ci.yml`
 - Backend: `api/src/` — module boundaries enforced. `engine/` and `assess/` may depend on `bank/` and `domain/`. Reverse is forbidden. `bank/` does not know that attempts exist.
 - Frontend: `web/app/` (App Router pages) + `web/src/` (components, hooks, generated API client).
 - Schema: `db/migrations/` (sqlx). Additive after the squash baseline; never edit a migration that has been applied. Use `make db-reset` to wipe and re-apply locally.
-- Specs: `docs/specs/2026-05-20-harus-platform-design.md` is canonical.
+- Specs: `docs/plans/2026-07-19-agent-first-learning-rework.md` is canonical for the current 0.3 rework (see `docs/ROADMAP.md`).
 
 See `CLAUDE.md` for the full working agreement, shell discipline notes, and tool-by-tool guidance (useful for humans too).
 

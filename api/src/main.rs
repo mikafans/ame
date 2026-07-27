@@ -25,32 +25,15 @@ async fn main() -> anyhow::Result<()> {
                     burst: 10,
                     period_secs: 2,
                 },
-                export: ame_api::config::ExportConfig {
-                    burst: 1,
-                    period_secs: 60,
-                },
                 cost: ame_api::config::CostConfig { read: 1, write: 5 },
                 trusted_proxies: Some(1),
-            },
-            quota: ame_api::config::QuotaConfig {
-                agents: ame_api::config::TierQuotaConfig {
-                    free: 1,
-                    premium: 100,
-                },
-                assessments: ame_api::config::TierQuotaConfig {
-                    free: 50,
-                    premium: 5000,
-                },
-                questions: ame_api::config::TierQuotaConfig {
-                    free: 50,
-                    premium: 5000,
-                },
             },
             batch: ame_api::config::BatchConfig {
                 free: 50,
                 premium: 500,
             },
             login: ame_api::config::LoginConfig::default(),
+            registration: ame_api::config::RegistrationConfig::default(),
         }
     });
 
@@ -76,9 +59,9 @@ async fn main() -> anyhow::Result<()> {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
         loop {
             interval.tick().await;
-            if let Err(e) = sqlx::query("DELETE FROM tb_login_sessions WHERE expires_at < now()")
-                .execute(&sweep_pool)
-                .await
+            if let Err(e) =
+                ame_platform_postgres::authentication_http::sweep_expired_sessions(&sweep_pool)
+                    .await
             {
                 tracing::warn!("login-session sweep failed: {e}");
             }

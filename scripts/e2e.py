@@ -30,7 +30,10 @@ def main() -> int:
         if not ready():
             env = {
                 **os.environ,
-                "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/ame",
+                "AME_DATABASE_URL": os.environ.get(
+                    "AME_DATABASE_URL",
+                    "postgres://postgres:postgres@localhost:5432/ame",
+                ),
                 "AME_PORT": API_PORT,
                 "AME_CORS_ORIGINS": f"http://{API_HOST}:{WEB_PORT}",
                 "AME_CONFIG_PATH": "ame.dev.toml",
@@ -38,9 +41,6 @@ def main() -> int:
             }
             api = subprocess.Popen(
                 [
-                    "mise",
-                    "exec",
-                    "--",
                     "cargo",
                     "run",
                     "--manifest-path",
@@ -60,7 +60,7 @@ def main() -> int:
 
         subprocess.run(["make", "db-admin"], cwd=ROOT, check=True)
         subprocess.run(
-            ["uv", "run", "scripts/seed.py", "--api", API_URL],
+            ["uv", "run", "scripts/seed_current.py", "--api", API_URL],
             cwd=ROOT,
             check=True,
         )
@@ -72,7 +72,7 @@ def main() -> int:
             "E2E_BASE_URL": f"http://{API_HOST}:{WEB_PORT}",
         }
         return subprocess.run(
-            ["mise", "exec", "--", "bun", "run", "e2e"],
+            ["bun", "run", "e2e"],
             cwd=ROOT / "web",
             env=env,
             check=False,

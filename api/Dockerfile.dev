@@ -8,23 +8,14 @@ RUN apt-get update \
 
 WORKDIR /workspace
 
-COPY api/Cargo.toml api/Cargo.lock api/
-RUN mkdir -p api/src api/src/bin api/benches \
-  && printf 'fn main() {}\n' > api/src/main.rs \
-  && printf '' > api/src/lib.rs \
-  && printf 'fn main() {}\n' > api/src/bin/gen_openapi.rs \
-  && printf 'fn main() {}\n' > api/benches/hot_paths.rs \
-  && cargo build --manifest-path api/Cargo.toml --bin ame-api \
-  && rm -rf api/src
-
-COPY api/src api/src
+COPY Cargo.toml Cargo.lock ./
+COPY api api
+COPY crates crates
 COPY docs/public docs/public
 COPY db/migrations db/migrations
 COPY ame.dev.toml ame.dev.toml
 
-# The first build only warms dependency artifacts with a dummy binary.
-RUN touch api/src/main.rs api/src/lib.rs \
-  && cargo build --manifest-path api/Cargo.toml --bin ame-api
+RUN cargo build --manifest-path api/Cargo.toml --bin ame-api
 
 ENV AME_CONFIG_PATH=/workspace/ame.dev.toml
 ENV AME_PORT=8080

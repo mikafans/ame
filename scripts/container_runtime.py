@@ -14,19 +14,22 @@ def engine() -> list[str]:
         return configured.split()
 
     failures: list[str] = []
-    for candidate in (("podman", "compose"), ("docker", "compose")):
-        if shutil.which(candidate[0]) is None:
+    # (engine executable to probe, compose invocation). podman-compose drives the
+    # podman CLI directly, so it works over the machine's SSH connection without
+    # a docker-compose provider or a DOCKER_HOST socket.
+    for probe_bin, invocation in (("podman", ["podman-compose"]), ("docker", ["docker", "compose"])):
+        if shutil.which(probe_bin) is None or shutil.which(invocation[0]) is None:
             continue
         probe = subprocess.run(
-            [candidate[0], "info"],
+            [probe_bin, "info"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
             check=False,
         )
         if probe.returncode == 0:
-            return list(candidate)
-        failures.append(f"{' '.join(candidate)}: {probe.stderr.strip().splitlines()[-1]}")
+            return invocation
+        failures.append(f"{probe_bin}: {probe.stderr.strip().splitlines()[-1]}")
 
     detail = "\n".join(failures) or "no podman or docker executable found"
     raise SystemExit(

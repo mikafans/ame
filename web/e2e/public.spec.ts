@@ -5,11 +5,17 @@ test.describe("public documentation", () => {
     await page.goto("/");
 
     await expect(
-      page.getByRole("link", { name: /Self-host AME/i }),
-    ).toHaveAttribute("href", "/self-hosting");
-    await expect(
       page.getByRole("link", { name: "Self-hosting", exact: true }),
     ).toHaveAttribute("href", "/self-hosting");
+    await expect(
+      page.getByRole("link", { name: "Agent API", exact: true }),
+    ).toHaveAttribute("href", "/agent");
+    await expect(
+      page.getByRole("link", { name: "Agent guide", exact: true }),
+    ).toHaveAttribute("href", "/agent");
+    await expect(
+      page.getByRole("link", { name: "llms.txt", exact: true }),
+    ).toHaveAttribute("href", "/public/llms.txt");
   });
 
   test("self-hosting page renders the operator guide", async ({ page }) => {

@@ -161,12 +161,7 @@ pub async fn rate_limit_middleware(
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, crate::domain::error::ApiError> {
     let path = req.uri().path();
-    if path == "/healthz"
-        || path == "/metrics"
-        || path == "/skill.json"
-        || path == "/llms.txt"
-        || path == "/openapi.yaml"
-    {
+    if path == "/healthz" || path == "/metrics" {
         return Ok(next.run(req).await);
     }
 
@@ -174,59 +169,35 @@ pub async fn rate_limit_middleware(
     let method = req.method().clone();
     let trusted_proxies = state.config.ratelimit.trusted_proxies.unwrap_or(1);
 
-    let (key, burst, refill_rate, cost) = if path == "/v1/me/export" {
-        if let Some(auth) = auth {
-            let key = format!("ame:limiter:export:{}", auth.owner_id);
-            let burst = state.config.ratelimit.export.burst;
-            let refill_rate = 1.0 / (state.config.ratelimit.export.period_secs as f64);
-            (key, burst, refill_rate, 1)
-        } else {
-            let ip = get_client_ip(&req, trusted_proxies);
-            let key = format!("ame:limiter:ip:{ip}");
-            let burst = state.config.ratelimit.public.burst;
-            let refill_rate = 1.0 / (state.config.ratelimit.public.period_secs as f64);
-            (key, burst, refill_rate, 1)
-        }
-    } else if let Some(auth) = auth {
+    let (key, burst, refill_rate, cost) = if let Some(auth) = auth {
         let key = format!("ame:limiter:owner:{}", auth.owner_id);
         // Prefer the operator-tunable tiers resolved by the maintenance
         // middleware (stashed in extensions); fall back to config if absent.
-        let (free, premium) = req
+        let free = req
             .extensions()
             .get::<crate::settings::EffectiveSettings>()
-            .map(|s| {
-                (
-                    (s.ratelimit.free.burst, s.ratelimit.free.rate),
-                    (s.ratelimit.premium.burst, s.ratelimit.premium.rate),
-                )
-            })
+            .map(|s| (s.ratelimit.free.burst, s.ratelimit.free.rate))
             .unwrap_or((
-                (
-                    state.config.ratelimit.free.burst,
-                    state.config.ratelimit.free.rate,
-                ),
-                (
-                    state.config.ratelimit.premium.burst,
-                    state.config.ratelimit.premium.rate,
-                ),
+                state.config.ratelimit.free.burst,
+                state.config.ratelimit.free.rate,
             ));
-        let (burst, rate) = match auth.owner_plan.as_str() {
-            "premium" => (premium.0, premium.1 as f64),
-            _ => (free.0, free.1 as f64),
-        };
+        // The clean baseline has no account-plan column. Local policy is the
+        // single rate-limit authority for every actor.
+        let (burst, rate) = (free.0, free.1 as f64);
         let is_read = matches!(
             method,
             axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS
         );
-        let cost = if is_read {
+        let base_cost = if is_read {
             state.config.ratelimit.cost.read
         } else {
             state.config.ratelimit.cost.write
         };
+        let cost = authenticated_request_cost(path, base_cost);
         (key, burst, rate, cost)
     } else {
         let ip = get_client_ip(&req, trusted_proxies);
-        let key = format!("ame:limiter:ip:{ip}");
+        let key = public_rate_limit_key(path, &ip);
         let burst = state.config.ratelimit.public.burst;
         let refill_rate = 1.0 / (state.config.ratelimit.public.period_secs as f64);
         (key, burst, refill_rate, 1)
@@ -242,6 +213,24 @@ pub async fn rate_limit_middleware(
         metrics::counter!("ratelimit_rejection_total").increment(1);
         Err(crate::domain::error::ApiError::TooManyRequests)
     }
+}
+
+fn public_rate_limit_key(path: &str, ip: &str) -> String {
+    format!("ame:limiter:public:{}:{ip}", public_bucket(path))
+}
+
+fn public_bucket(path: &str) -> &'static str {
+    match path {
+        "/public/v1/auth/login" => "auth-login",
+        "/public/v1/auth/register" => "auth-register",
+        "/public/v1/onboarding/preview" | "/public/v1/onboarding/start" => "onboarding",
+        _ => "api",
+    }
+}
+
+fn authenticated_request_cost(path: &str, base_cost: u32) -> u32 {
+    let _ = path;
+    base_cost.max(1)
 }
 
 fn get_client_ip(req: &axum::extract::Request, trusted_proxies: usize) -> String {
@@ -333,5 +322,25 @@ mod tests {
             .unwrap();
         req.extensions_mut().insert(ConnectInfo(addr));
         assert_eq!(get_client_ip(&req, 0), "10.0.0.1");
+    }
+
+    #[test]
+    fn public_routes_use_separate_rate_limit_buckets() {
+        assert_eq!(public_bucket("/public/v1/auth/login"), "auth-login");
+        assert_eq!(public_bucket("/public/v1/auth/register"), "auth-register");
+        assert_eq!(public_bucket("/public/v1/onboarding/start"), "onboarding");
+        assert_eq!(public_bucket("/public/v1/onboarding/preview"), "onboarding");
+        assert_eq!(public_bucket("/api/v1/explore"), "api");
+        assert_eq!(
+            public_rate_limit_key("/public/v1/onboarding/start", "192.0.2.10"),
+            "ame:limiter:public:onboarding:192.0.2.10"
+        );
+    }
+
+    #[test]
+    fn all_authenticated_requests_use_the_same_cost_policy() {
+        assert_eq!(authenticated_request_cost("/v1/learning/journeys", 5), 5);
+        assert_eq!(authenticated_request_cost("/v1/learning/sessions", 5), 5);
+        assert_eq!(authenticated_request_cost("/v1/learning/journeys", 0), 1);
     }
 }

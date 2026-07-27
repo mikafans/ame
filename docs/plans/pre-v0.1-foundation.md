@@ -3,8 +3,10 @@
 A condensed record of the build that produced the v0.1 platform. The detailed
 per-phase plans (`2026-05-20-plan-*`, the design audits, the MUI-migration and
 agent-identity workspaces) were retired once the work landed in code; this is the
-durable summary of *what was built and why*. Canonical spec:
-[`docs/specs/2026-05-20-harus-platform-design.md`](../specs/2026-05-20-harus-platform-design.md).
+durable summary of *what was built and why*. The spec that was canonical for
+this arc, `docs/specs/2026-05-20-harus-platform-design.md`, was itself retired
+once its content landed in code; the current canonical doc for the 0.3 rework
+is `docs/plans/2026-07-19-agent-first-learning-rework.md` (see `docs/ROADMAP.md`).
 
 ## The arc, in order
 

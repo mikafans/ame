@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-engine test-db test-bank test-stats test-assess test-api bench bench-load bench-soak e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed db-bulk db-heavy simulate init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs
+.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs local-api-contracts
 
 API_HOST ?= localhost
 API_PORT ?= 28080
@@ -20,34 +20,24 @@ fmt: ## Format Rust, frontend, and SQL
 	uv run scripts/tasks.py fmt
 fmt-check: ## Verify Rust, frontend, and SQL formatting
 	uv run scripts/tasks.py fmt-check
-lint: ## Run Rust, TypeScript, client-drift, and SQL checks
+lint: ## Run Rust, TypeScript, OpenAPI, and SQL checks
 	uv run scripts/tasks.py lint
 test: ## Run backend and frontend unit tests
 	uv run scripts/tasks.py test
 check: fmt-check lint test ## Run the pre-commit gate
 ci: check test-db db-reset e2e ## Run the full local CI gate
 
-test-engine: ## Run engine and planner tests
-	uv run scripts/tasks.py test-engine
 test-db: db-up ## Run all DB-backed integration tests
 	uv run scripts/tasks.py test-db
-test-bank: db-up ## Run bank integration tests
-	uv run scripts/tasks.py test-bank
-test-assess: db-up ## Run assessment integration tests
-	uv run scripts/tasks.py test-assess
-test-stats: db-up ## Run stats integration tests
-	uv run scripts/tasks.py test-stats
 test-api: ## Run black-box HTTP tests against the local API
 	uv run pytest api_tests -v
-bench: ## Run Criterion micro-benchmarks
-	uv run scripts/tasks.py bench
 bench-load: ## Run the answer load benchmark against a running API
 	uv run scripts/perf.py load
 bench-soak: ## Run the duration benchmark against a running API
 	uv run scripts/perf.py soak
 
 # Application and API artifacts
-openapi: ## Regenerate the OpenAPI and generated client artifacts
+openapi: ## Regenerate the OpenAPI and generated frontend schema
 	uv run scripts/tasks.py openapi
 
 public-docs: openapi ## Regenerate generated documents in docs/public
@@ -80,12 +70,6 @@ db-admin: db-up ## Promote the configured admin account
 	uv run scripts/tasks.py db-admin
 db-seed: db-admin ## Seed demo data through the host API
 	uv run scripts/tasks.py db-seed
-db-bulk: ## Mint bulk demo assessments and exams
-	uv run scripts/tasks.py db-bulk
-db-heavy: ## Reset, seed, and mint the heavy demo dataset
-	uv run scripts/tasks.py db-heavy
-simulate: ## Run instructor, learner, and agent simulations
-	uv run scripts/tasks.py simulate
 init-env: ## Install project toolchains, dependencies, and browsers
 	uv run scripts/tasks.py init-env
 dev: ## Start the host development stack
@@ -110,6 +94,8 @@ local-seed: ## Seed the containerized stack through Caddy
 	uv run scripts/local_stack.py seed
 local-logs: ## Tail containerized stack logs
 	uv run scripts/local_stack.py logs
+local-api-contracts: ## Run the api_tests black-box contract suite through Caddy
+	uv run scripts/local_stack.py api-contracts
 
 hooks-install: ## Configure the repository git hooks
 	git config core.hooksPath .githooks

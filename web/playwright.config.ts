@@ -29,10 +29,14 @@ export default defineConfig({
       use: { ...devices["Pixel 5"] },
     },
   ],
-  webServer: {
-    command: `bun run dev -- -p ${WEB_PORT} >> ../.tmp/ame-web-e2e.log 2>&1`,
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 90_000,
-  },
+  ...(process.env.E2E_EXTERNAL_SERVER
+    ? {}
+    : {
+        webServer: {
+          command: `bun run dev -- -p ${WEB_PORT} >> ../.tmp/ame-web-e2e.log 2>&1`,
+          url: BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 90_000,
+        },
+      }),
 });

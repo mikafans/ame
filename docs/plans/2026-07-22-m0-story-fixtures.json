@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "status": "m0_contract",
+  "purpose": "Semantic fixtures for AME's first course-quality learner and agent stories.",
+  "identity": {
+    "local_demo_email": "haru@example.com",
+    "production_rule": "Fixtures must not require a specific learner email; local bootstrap may enroll the named demo learner.",
+    "idempotency_key": "m0-golden-journey-v1"
+  },
+  "journeys": [
+    {
+      "id": "flink-foundations",
+      "title": "Apache Flink foundations and Kubernetes operations",
+      "intent": "I want to learn Apache Flink fundamentals, including streams, state, windows, and how Flink jobs run on Kubernetes.",
+      "learner_profile": {
+        "starting_level": "beginner",
+        "time_per_session_minutes": 30,
+        "desired_outcome": "Understand the core runtime model, reason about event-time processing, and explain how to run a reliable Flink job on Kubernetes."
+      },
+      "chapters": [
+        {
+          "id": "streams-and-time",
+          "title": "Streams, events, and time",
+          "objectives": [
+            "Explain Flink's stream-processing model.",
+            "Distinguish processing time, ingestion time, and event time."
+          ],
+          "activities": [
+            {"id": "streams-lesson", "kind": "lesson", "capabilities": ["rich_text", "diagram", "code_example"]},
+            {"id": "streams-example", "kind": "worked_example", "capabilities": ["rich_text", "runnable_example"]},
+            {"id": "streams-quiz", "kind": "quiz", "capabilities": ["multiple_choice", "true_false", "short_answer"]},
+            {"id": "streams-task", "kind": "task", "capabilities": ["scenario", "structured_submission", "agent_review"]}
+          ]
+        },
+        {
+          "id": "state-and-recovery",
+          "title": "State, consistency, and recovery",
+          "objectives": [
+            "Explain keyed state and operator state.",
+            "Describe checkpoints and their role in recovery."
+          ],
+          "activities": [
+            {"id": "state-lesson", "kind": "lesson", "capabilities": ["rich_text", "diagram"]},
+            {"id": "state-example", "kind": "worked_example", "capabilities": ["code_example", "runnable_example"]},
+            {"id": "state-quiz", "kind": "quiz", "capabilities": ["multiple_choice", "true_false", "short_answer"]},
+            {"id": "state-task", "kind": "task", "capabilities": ["debugging_scenario", "structured_submission", "agent_review"]}
+          ]
+        },
+        {
+          "id": "windows-and-watermarks",
+          "title": "Windows, watermarks, and late data",
+          "objectives": [
+            "Choose a windowing strategy for a stream requirement.",
+            "Explain how watermarks and allowed lateness affect results."
+          ],
+          "activities": [
+            {"id": "windows-lesson", "kind": "lesson", "capabilities": ["rich_text", "diagram", "timeline"]},
+            {"id": "windows-example", "kind": "worked_example", "capabilities": ["interactive_timeline", "runnable_example"]},
+            {"id": "windows-quiz", "kind": "quiz", "capabilities": ["multiple_choice", "true_false", "short_answer"]},
+            {"id": "windows-task", "kind": "task", "capabilities": ["scenario", "structured_submission", "agent_review"]}
+          ]
+        },
+        {
+          "id": "flink-on-kubernetes",
+          "title": "Job execution and the Flink Kubernetes Operator",
+          "objectives": [
+            "Describe the roles of JobManager, TaskManagers, and task slots.",
+            "Explain the deployment lifecycle of a Flink job on Kubernetes."
+          ],
+          "activities": [
+            {"id": "kubernetes-lesson", "kind": "lesson", "capabilities": ["rich_text", "diagram", "yaml_example"]},
+            {"id": "kubernetes-example", "kind": "worked_example", "capabilities": ["yaml_example", "runnable_example"]},
+            {"id": "kubernetes-quiz", "kind": "quiz", "capabilities": ["multiple_choice", "true_false", "short_answer"]},
+            {"id": "kubernetes-task", "kind": "task", "capabilities": ["deployment_scenario", "structured_submission", "agent_review"]}
+          ]
+        }
+      ],
+      "adaptation": {
+        "weak_objective_action": "create_or_recommend_targeted_review",
+        "mastered_objective_action": "unlock_next_chapter_or_advanced_task",
+        "manual_review_action": "show_pending_state_without_fabricating_score"
+      }
+    },
+    {
+      "id": "database-indexing-foundations",
+      "title": "Database indexing foundations",
+      "intent": "I want to understand how database indexes work and choose an index for a query workload.",
+      "learner_profile": {
+        "starting_level": "beginner",
+        "time_per_session_minutes": 20,
+        "desired_outcome": "Read a query plan, explain index tradeoffs, and propose an index with evidence."
+      },
+      "chapters": [
+        {
+          "id": "index-model",
+          "title": "What an index provides",
+          "objectives": [
+            "Explain how an index changes data access.",
+            "Distinguish lookup cost from write and storage cost."
+          ],
+          "activities": [
+            {"id": "index-lesson", "kind": "lesson", "capabilities": ["rich_text", "diagram"]},
+            {"id": "index-quiz", "kind": "quiz", "capabilities": ["multiple_choice", "true_false", "short_answer"]},
+            {"id": "index-task", "kind": "task", "capabilities": ["query_plan_scenario", "structured_submission", "agent_review"]}
+          ]
+        },
+        {
+          "id": "index-design",
+          "title": "Designing and validating an index",
+          "objectives": [
+            "Choose an index for a concrete query workload.",
+            "Validate the choice using a query plan and measurements."
+          ],
+          "activities": [
+            {"id": "design-example", "kind": "worked_example", "capabilities": ["sql_example", "query_plan"]},
+            {"id": "design-quiz", "kind": "quiz", "capabilities": ["multiple_choice", "short_answer"]},
+            {"id": "design-task", "kind": "task", "capabilities": ["sql_submission", "rubric", "agent_review"]}
+          ]
+        }
+      ],
+      "adaptation": {
+        "weak_objective_action": "insert_alternate_explanation_or_practice",
+        "mastered_objective_action": "recommend_tradeoff_task"
+      }
+    }
+  ],
+  "story_assertions": {
+    "journey_structure": "Every journey has ordered chapters, objectives, instructional activities, assessment or task activities, and a next-action policy.",
+    "learner_boundary": "All journey, content, attempt, evidence, and recommendation reads and writes resolve to the authenticated learner subject.",
+    "content_boundary": "Every rendered capability has a typed payload and a version or provenance reference.",
+    "progress_boundary": "Only completed or reviewed learner work can create evidence; generated content alone is never evidence.",
+    "resume_boundary": "Refreshing, restarting, or changing authorized clients preserves the same journey and active activity state."
+  }
+}

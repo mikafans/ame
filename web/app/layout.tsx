@@ -6,7 +6,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 export const metadata: Metadata = {
   title: "ame — study, sweetened",
   description:
-    "ame — study, sweetened. Assessment platform with a first-class agent surface.",
+    "ame — study, sweetened. One clear next step for what you want to learn.",
   icons: {
     icon: [
       {
@@ -34,12 +34,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           rel="alternate"
           type="text/plain"
-          href="/llms.txt"
+          href="/public/llms.txt"
           title="LLM/Agent Documentation"
         />
       </head>

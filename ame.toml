@@ -34,19 +34,12 @@ write = 5
 free = 50
 premium = 500
 
-[quota.agents]
-free = 1
-premium = 100
-
-[quota.assessments]
-free = 50
-premium = 5000
-
-[quota.questions]
-free = 50
-premium = 5000
-
 [login]
 # Interactive login (browser auth) TTL in seconds; sliding — refreshed on each
 # authenticated request. 3 hours.
 ttl_seconds = 10800
+
+[registration]
+# open allows first-journey onboarding with an email identifier; password and
+# invite require an already authenticated learner session.
+mode = "open"

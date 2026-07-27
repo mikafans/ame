@@ -6,12 +6,20 @@ import {
   ClipboardCheck,
   HeartPulse,
   History,
-  KeyRound,
   Shield,
   Users,
 } from "lucide-react";
 
 const panels = [
+  {
+    title: "Task Review",
+    description:
+      "Review learner application tasks, provide feedback, and turn verified work into mastery evidence.",
+    icon: ClipboardCheck,
+    tone: "text-violet-500",
+    link: "/admin/tasks",
+    actionLabel: "Review Tasks",
+  },
   {
     title: "Manage Users",
     description:
@@ -20,15 +28,6 @@ const panels = [
     tone: "text-blue-500",
     link: "/admin/users",
     actionLabel: "Users Console",
-  },
-  {
-    title: "Moderate Assessments",
-    description:
-      "Audit and moderate assessments created on the platform. Review question contents and perform administrative soft deactivations.",
-    icon: ClipboardCheck,
-    tone: "text-amber-500",
-    link: "/admin/assessments",
-    actionLabel: "Moderation Console",
   },
   {
     title: "Audit Logs",
@@ -42,20 +41,11 @@ const panels = [
   {
     title: "System Health",
     description:
-      "Check database and Valkey live statuses, view table row counts, and monitor rate-limiting quota rejections.",
+      "Check database and Valkey live statuses, view table row counts, and monitor rate-limit rejections.",
     icon: HeartPulse,
     tone: "text-red-500",
     link: "/admin/health",
     actionLabel: "System Status",
-  },
-  {
-    title: "API Tokens",
-    description:
-      "Audit all API tokens platform-wide. Review token usage history, expiration dates, assigned scopes, and revoke tokens on demand.",
-    icon: KeyRound,
-    tone: "text-sky-500",
-    link: "/admin/tokens",
-    actionLabel: "Token Audit",
   },
 ];
 

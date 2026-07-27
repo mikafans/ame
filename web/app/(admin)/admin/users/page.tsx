@@ -9,9 +9,8 @@ interface UserType {
   id: string;
   email?: string | null;
   displayName: string;
-  role: "admin" | "agent" | "user";
-  plan: string;
-  deactivatedAt?: string | null;
+  role: "admin" | "user";
+  status: "active" | "deactivated";
   createdAt: string;
 }
 export default function ManageUsersPage() {
@@ -25,16 +24,15 @@ export default function ManageUsersPage() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<UserType | null>(null);
-  const [dialog, setDialog] = useState<"role" | "plan" | "status" | null>(null);
-  const [targetRole, setTargetRole] = useState("user");
-  const [targetPlan, setTargetPlan] = useState("free");
+  const [dialog, setDialog] = useState<"role" | "status" | null>(null);
+  const [targetRole, setTargetRole] = useState("learner");
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await api.GET("/v1/admin/users", {
+      const { data, error } = await api.GET("/api/v1/admin/users", {
         params: {
           query: { limit: rows, offset: page * rows, q: query || undefined },
         },
@@ -56,25 +54,22 @@ export default function ManageUsersPage() {
   useEffect(() => {
     load();
   }, [load]);
-  const open = (u: UserType, kind: "role" | "plan" | "status") => {
+  const open = (u: UserType, kind: "role" | "status") => {
     setSelected(u);
     setDialog(kind);
     setTargetRole(u.role);
-    setTargetPlan(u.plan);
     setConfirm(false);
   };
   const save = async () => {
     if (!selected || !dialog) return;
-    if (dialog === "status" && !selected.deactivatedAt && !confirm) return;
+    if (dialog === "status" && selected.status === "active" && !confirm) return;
     setSaving(true);
     try {
       const body =
         dialog === "role"
           ? { role: targetRole }
-          : dialog === "plan"
-            ? { plan: targetPlan }
-            : { disabled: !selected.deactivatedAt };
-      const { error } = await api.PATCH("/v1/admin/users/{id}", {
+          : { status: selected.status === "active" ? "deactivated" : "active" };
+      const { error } = await api.PATCH("/api/v1/admin/users/{id}", {
         params: { path: { id: selected.id } },
         body,
       });
@@ -95,8 +90,7 @@ export default function ManageUsersPage() {
       <header className="mb-8">
         <h1 className="text-3xl font-bold">Manage Users</h1>
         <p className="mt-2 text-muted-foreground">
-          Paginate, search, and update roles, plans, or account suspension
-          status.
+          Paginate, search, and update learner/admin roles or account status.
         </p>
       </header>
       <form
@@ -129,7 +123,6 @@ export default function ManageUsersPage() {
             <tr>
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Joined</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -156,7 +149,10 @@ export default function ManageUsersPage() {
               </tr>
             ) : (
               users.map((u) => (
-                <tr key={u.id} className={u.deactivatedAt ? "opacity-60" : ""}>
+                <tr
+                  key={u.id}
+                  className={u.status === "deactivated" ? "opacity-60" : ""}
+                >
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <span className="flex size-9 items-center justify-center rounded-full border border-border bg-muted font-semibold">
@@ -187,9 +183,8 @@ export default function ManageUsersPage() {
                       {u.role}
                     </span>
                   </td>
-                  <td className="px-4 py-4">{u.plan}</td>
                   <td className="px-4 py-4">
-                    {u.deactivatedAt ? (
+                    {u.status === "deactivated" ? (
                       <span className="text-red-500">Disabled</span>
                     ) : (
                       <span className="text-emerald-600">Active</span>
@@ -210,16 +205,9 @@ export default function ManageUsersPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => open(u, "plan")}
-                      >
-                        Plan
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
                         onClick={() => open(u, "status")}
                       >
-                        {u.deactivatedAt ? "Enable" : "Disable"}
+                        {u.status === "deactivated" ? "Enable" : "Disable"}
                       </Button>
                     </div>
                   </td>
@@ -272,11 +260,9 @@ export default function ManageUsersPage() {
             <h2 className="text-lg font-semibold">
               {dialog === "role"
                 ? "Change role"
-                : dialog === "plan"
-                  ? "Change plan"
-                  : selected.deactivatedAt
-                    ? "Enable user"
-                    : "Disable user"}
+                : selected.status === "deactivated"
+                  ? "Enable user"
+                  : "Disable user"}
             </h2>
             {dialog === "role" && (
               <select
@@ -284,22 +270,11 @@ export default function ManageUsersPage() {
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
               >
-                <option value="user">User</option>
-                <option value="agent">Agent</option>
+                <option value="learner">Learner</option>
                 <option value="admin">Admin</option>
               </select>
             )}
-            {dialog === "plan" && (
-              <select
-                className="mt-5 h-9 w-full rounded border border-input bg-background px-3"
-                value={targetPlan}
-                onChange={(e) => setTargetPlan(e.target.value)}
-              >
-                <option value="free">Free</option>
-                <option value="premium">Premium</option>
-              </select>
-            )}
-            {dialog === "status" && !selected.deactivatedAt && (
+            {dialog === "status" && selected.status === "active" && (
               <label className="mt-5 flex gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -317,7 +292,9 @@ export default function ManageUsersPage() {
                 onClick={save}
                 disabled={
                   saving ||
-                  (dialog === "status" && !selected.deactivatedAt && !confirm)
+                  (dialog === "status" &&
+                    selected.status === "active" &&
+                    !confirm)
                 }
               >
                 {saving ? "Saving…" : "Save"}

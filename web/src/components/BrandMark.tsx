@@ -24,7 +24,7 @@ export function BrandMark({ size = 32 }: BrandMarkProps) {
       />
       <span
         data-testid="brand-wordmark"
-        className="font-extrabold leading-none tracking-[-0.02em] text-neutral-950 dark:text-white"
+        className="font-extrabold leading-none tracking-[-0.02em] text-foreground"
         style={{ fontSize: Math.round(size * 0.75) }}
       >
         ame

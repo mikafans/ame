@@ -1,141 +1,16 @@
 openapi: 3.1.0
 info:
   title: ame API
-  description: Adaptive Mastery Engine — assessment platform with agent identity.
+  description: ame — an agent-friendly learning API with one owner-scoped learner model.
   license:
     name: ''
-  version: 0.2.0
+  version: 0.3.0
 paths:
-  /v1/admin/assessments:
+  /api/v1/admin/audit:
     get:
       tags:
       - admin
-      summary: GET /v1/admin/assessments — list all assessments on the platform
-      operationId: list_assessments_admin
-      parameters:
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: offset
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: q
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: mode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Assessments retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminListAssessmentsResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-      security:
-      - bearer: []
-  /v1/admin/assessments/{id}:
-    get:
-      tags:
-      - admin
-      summary: GET /v1/admin/assessments/{id} — retrieve a single assessment with all questions for admin preview
-      operationId: get_assessment_admin
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Assessment retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminAssessmentDetail'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-        '404':
-          description: Assessment not found
-      security:
-      - bearer: []
-    delete:
-      tags:
-      - admin
-      summary: DELETE /v1/admin/assessments/{id} — soft-delete any assessment (moderation)
-      operationId: delete_assessment_admin
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Assessment deleted successfully
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-        '404':
-          description: Assessment not found
-      security:
-      - bearer: []
-  /v1/admin/assessments/{id}/restore:
-    post:
-      tags:
-      - admin
-      summary: POST /v1/admin/assessments/{id}/restore — restore a soft-deleted assessment
-      operationId: restore_assessment_admin
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Assessment restored successfully
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-        '404':
-          description: Assessment not found or not deleted
-      security:
-      - bearer: []
-  /v1/admin/audit:
-    get:
-      tags:
-      - admin
-      summary: GET /v1/admin/audit — retrieve append-only audit trail logs
+      summary: GET /api/v1/admin/audit — retrieve append-only audit trail logs
       operationId: list_audit_logs
       parameters:
       - name: limit
@@ -180,15 +55,14 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/health:
+  /api/v1/admin/health:
     get:
       tags:
       - admin
-      summary: GET /v1/admin/health — retrieve cluster system & health metrics
       operationId: get_admin_health
       responses:
         '200':
-          description: Admin health metrics retrieved successfully
+          description: Current platform health
           content:
             application/json:
               schema:
@@ -196,15 +70,15 @@ paths:
         '401':
           description: Unauthorized
         '403':
-          description: Forbidden (Admin required)
+          description: Administrator role required
       security:
       - bearer: []
-  /v1/admin/settings:
+  /api/v1/admin/settings:
     get:
       tags:
       - admin
       summary: |-
-        GET /v1/admin/settings — current effective platform settings (config
+        GET /api/v1/admin/settings — current effective platform settings (config
         defaults overlaid with any tb_settings overrides).
       operationId: get_settings
       responses:
@@ -247,89 +121,27 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/tokens:
+  /api/v1/admin/task-submissions:
     get:
       tags:
-      - admin
-      summary: GET /v1/admin/tokens — list all API tokens with filtering
-      operationId: list_tokens
-      parameters:
-      - name: page
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: pageSize
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: q
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: role
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: ownerId
-        in: query
-        required: false
-        schema:
-          type: string
-          format: uuid
+      - tasks
+      operationId: list_pending_submissions
       responses:
         '200':
-          description: Token list successfully retrieved
+          description: ''
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ListTokensResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskSubmissionResponse'
       security:
       - bearer: []
-  /v1/admin/tokens/{id}:
-    delete:
-      tags:
-      - admin
-      summary: DELETE /v1/admin/tokens/{id} — revoke an API token (idempotent)
-      operationId: delete_token_admin
-      parameters:
-      - name: id
-        in: path
-        description: Token ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Token revoked successfully
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden (Admin required)
-        '404':
-          description: Token not found
-      security:
-      - bearer: []
-  /v1/admin/users:
+  /api/v1/admin/users:
     get:
       tags:
       - admin
-      summary: GET /v1/admin/users — list all users
+      summary: GET /api/v1/admin/users — list all users
       operationId: list_users
       parameters:
       - name: limit
@@ -362,11 +174,11 @@ paths:
           description: Forbidden (Admin required)
       security:
       - bearer: []
-  /v1/admin/users/{id}:
+  /api/v1/admin/users/{id}:
     patch:
       tags:
       - admin
-      summary: PATCH /v1/admin/users/{id} — toggle user plan or disable/deactivate user
+      summary: PATCH /v1/admin/users/{id} — update learner/admin role or account status
       operationId: patch_user_admin
       parameters:
       - name: id
@@ -393,49 +205,29 @@ paths:
           description: User not found
       security:
       - bearer: []
-  /v1/assessments:
+  /api/v1/assessments:
     get:
       tags:
       - assessments
-      operationId: list_assessments
+      operationId: get_assessment_for_activity
       parameters:
-      - name: mode
+      - name: activityId
         in: query
-        description: Filter by mode (practice or graded)
-        required: false
+        required: true
         schema:
           type: string
-      - name: status
-        in: query
-        description: Filter by status (draft, active, archived). When absent, returns public-active + caller's own.
-        required: false
-        schema:
-          type: string
-      - name: limit
-        in: query
-        description: 'Page size (default: 50)'
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: offset
-        in: query
-        description: Page offset
-        required: false
-        schema:
-          type: integer
-          format: int64
+          format: uuid
       responses:
         '200':
-          description: List of assessments
+          description: Assessment attached to the activity
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ListAssessmentsResponse'
-        '401':
-          description: Missing or invalid token
+                $ref: '#/components/schemas/AssessmentResponse'
+        '404':
+          description: No assessment exists for this learner's activity
       security:
-      - bearer_auth: []
+      - bearer: []
     post:
       tags:
       - assessments
@@ -444,75 +236,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateAssessmentRequest'
-        required: true
-      responses:
-        '201':
-          description: Assessment created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AssessmentSummary'
-        '401':
-          description: Missing or invalid token
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/assessments/count:
-    get:
-      tags:
-      - assessments
-      operationId: count_assessments
-      parameters:
-      - name: mode
-        in: query
-        description: Filter by mode
-        required: false
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Assessment count
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CountAssessmentsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer_auth: []
-  /v1/assessments/generate:
-    post:
-      tags:
-      - assessments
-      operationId: generate_assessment
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenerateAssessmentBody'
+              $ref: '#/components/schemas/CreateAssessmentBody'
         required: true
       responses:
         '200':
-          description: Generated assessment candidates
+          description: Created assessment
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenerateAssessmentResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
+                $ref: '#/components/schemas/AssessmentResponse'
       security:
-      - bearer_auth: []
-  /v1/assessments/{id}:
+      - bearer: []
+  /api/v1/assessments/{assessment_id}:
     get:
       tags:
       - assessments
       operationId: get_assessment
       parameters:
-      - name: id
+      - name: assessment_id
         in: path
         description: Assessment ID
         required: true
@@ -521,80 +262,20 @@ paths:
           format: uuid
       responses:
         '200':
-          description: Assessment details
+          description: Assessment
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AssessmentDetail'
-        '401':
-          description: Missing or invalid token
-        '404':
-          description: Assessment not found
+                $ref: '#/components/schemas/AssessmentResponse'
       security:
-      - bearer_auth: []
-    delete:
-      tags:
-      - assessments
-      operationId: delete_assessment
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Assessment deleted successfully
-        '401':
-          description: Missing or invalid token
-        '404':
-          description: Assessment not found
-      security:
-      - bearer_auth: []
-    patch:
-      tags:
-      - assessments
-      operationId: patch_assessment
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateAssessmentRequest'
-        required: true
-      responses:
-        '200':
-          description: Assessment updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Assessment'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Not the owner
-        '404':
-          description: Assessment not found
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/assessments/{id}/questions:
+      - bearer: []
+  /api/v1/assessments/{assessment_id}/attempts:
     post:
       tags:
-      - assessments
-      operationId: add_assessment_question
+      - attempts
+      operationId: start_attempt
       parameters:
-      - name: id
+      - name: assessment_id
         in: path
         description: Assessment ID
         required: true
@@ -605,36 +286,659 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddAssessmentQuestionBody'
+              $ref: '#/components/schemas/StartAttemptBody'
+        required: true
+      responses:
+        '200':
+          description: Started or resumed attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /api/v1/attempts/{attempt_id}:
+    get:
+      tags:
+      - attempts
+      operationId: get_attempt
+      parameters:
+      - name: attempt_id
+        in: path
+        description: Attempt ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /api/v1/attempts/{attempt_id}/answers:
+    post:
+      tags:
+      - attempts
+      operationId: save_answer
+      parameters:
+      - name: attempt_id
+        in: path
+        description: Attempt ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAnswerBody'
+        required: true
+      responses:
+        '200':
+          description: Saved answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /api/v1/attempts/{attempt_id}/finish:
+    post:
+      tags:
+      - attempts
+      operationId: finish_attempt
+      parameters:
+      - name: attempt_id
+        in: path
+        description: Attempt ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Finished attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: POST /api/v1/auth/logout — clear the HttpOnly token cookie.
+      operationId: logout
+      responses:
+        '200':
+          description: Logged out
+  /api/v1/deep-dives:
+    get:
+      tags:
+      - deep-dives
+      operationId: get_for_activity
+      parameters:
+      - name: activityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Deep dive attached to the activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveResponse'
+        '404':
+          description: No deep dive exists for this learner's activity
+      security:
+      - bearer: []
+    post:
+      tags:
+      - deep-dives
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeepDiveBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveResponse'
+      security:
+      - bearer: []
+  /api/v1/deep-dives/{id}:
+    get:
+      tags:
+      - deep-dives
+      operationId: get_one
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepDiveResponse'
+      security:
+      - bearer: []
+  /api/v1/generation-runs:
+    post:
+      tags:
+      - generation
+      operationId: start
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartGenerationRunBody'
         required: true
       responses:
         '201':
-          description: Question linked
+          description: Started or resumed a provider generation run
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AddAssessmentQuestionResponse'
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such assessment or question
-        '422':
-          description: Validation failed
+                $ref: '#/components/schemas/GenerationRunResponse'
       security:
-      - bearer_auth: []
-  /v1/assessments/{id}/questions/{question_id}:
-    delete:
+      - bearer: []
+  /api/v1/generation-runs/{id}:
+    get:
       tags:
-      - assessments
-      operationId: remove_assessment_question
+      - generation
+      operationId: get_one
       parameters:
       - name: id
         in: path
-        description: Assessment ID
+        description: Generation run ID
         required: true
         schema:
           type: string
           format: uuid
+      responses:
+        '200':
+          description: Owned provider generation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationRunResponse'
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - generation
+      operationId: transition
+      parameters:
+      - name: id
+        in: path
+        description: Generation run ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionGenerationRunBody'
+        required: true
+      responses:
+        '200':
+          description: Transitioned owned provider generation run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationRunResponse'
+      security:
+      - bearer: []
+  /api/v1/learning/activities/{activity_id}/content:
+    patch:
+      tags:
+      - learning
+      summary: PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content.
+      operationId: author_activity_content
+      parameters:
+      - name: activity_id
+        in: path
+        description: Activity to ground
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorActivityContentBody'
+        required: true
+      responses:
+        '200':
+          description: Grounded learner activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity or generation run does not belong to this learner
+        '409':
+          description: Generation is not published or activity content is immutable
+        '422':
+          description: Content, provenance, or review status is invalid
+      security:
+      - bearer_auth: []
+  /api/v1/learning/activities/{activity_id}/rubric:
+    patch:
+      tags:
+      - learning
+      summary: PATCH /api/v1/learning/activities/{activity_id}/rubric — attach a reviewed, source-backed scoring rubric to a task activity.
+      operationId: author_activity_rubric
+      parameters:
+      - name: activity_id
+        in: path
+        description: Task activity to attach a rubric to
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorActivityRubricBody'
+        required: true
+      responses:
+        '200':
+          description: Activity with its attached rubric
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity or generation run does not belong to this learner
+        '409':
+          description: Generation is not published or activity is completed
+        '422':
+          description: Rubric, provenance, or review status is invalid
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys:
+    get:
+      tags:
+      - learning
+      summary: GET /api/v1/learning/journeys — list the caller's learner-owned journeys.
+      operationId: list_journeys
+      responses:
+        '200':
+          description: Learner journeys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LearningJourneySummaryResponse'
+        '401':
+          description: Missing or invalid token
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{id}:
+    get:
+      tags:
+      - learning
+      summary: GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey.
+      operationId: get_journey
+      parameters:
+      - name: id
+        in: path
+        description: Learning journey ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Learning journey and its goal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningJourneyResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Journey does not exist for this learner
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.
+      operationId: start_activity
+      parameters:
+      - name: journey_id
+        in: path
+        description: Learning journey ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: activity_id
+        in: path
+        description: Learning activity ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: Learning session started or resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: The authenticated learner cannot access this resource
+        '404':
+          description: Activity does not exist for this learner
+        '422':
+          description: Activity is not ready
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/attempts:
+    get:
+      tags:
+      - attempts
+      operationId: list_journey_attempts
+      parameters:
+      - name: journey_id
+        in: path
+        description: Learning journey ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Attempts in the learner-owned journey
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttemptResponse'
+      security:
+      - bearer: []
+  /api/v1/learning/sessions/{id}:
+    get:
+      tags:
+      - learning
+      summary: GET /api/v1/learning/sessions/{id} — retrieve a learner's resumable session.
+      operationId: get_learning_session
+      parameters:
+      - name: id
+        in: path
+        description: Learning session ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Learning session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Session does not exist for this learner
+      security:
+      - bearer_auth: []
+  /api/v1/learning/sessions/{id}/finish:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/sessions/{id}/finish — finish the current learning activity.
+      operationId: finish_learning_session
+      parameters:
+      - name: id
+        in: path
+        description: Learning session ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinishLearningSessionBody'
+        required: true
+      responses:
+        '200':
+          description: Finished learning session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningSessionResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: The authenticated learner cannot access this resource
+        '404':
+          description: Session does not exist for this learner
+        '409':
+          description: Session is already finished
+      security:
+      - bearer_auth: []
+  /api/v1/me:
+    get:
+      tags:
+      - me
+      summary: Get the authenticated learner profile.
+      operationId: get_me
+      responses:
+        '200':
+          description: Current learner profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /api/v1/progress/evidence:
+    post:
+      tags:
+      - progress
+      operationId: record_evidence
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceResponse'
+      security:
+      - bearer: []
+  /api/v1/progress/streaks:
+    post:
+      tags:
+      - progress
+      operationId: record_streak
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreakBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreakResponse'
+      security:
+      - bearer: []
+  /api/v1/progress/{journey_id}/objectives/{objective_id}:
+    get:
+      tags:
+      - progress
+      operationId: snapshot
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: objective_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotResponse'
+      security:
+      - bearer: []
+  /api/v1/progress/{journey_id}/recommendation:
+    post:
+      tags:
+      - progress
+      operationId: recommend
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+      security:
+      - bearer: []
+  /api/v1/progress/{journey_id}/streaks:
+    get:
+      tags:
+      - progress
+      operationId: list_streaks
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StreakResponse'
+      security:
+      - bearer: []
+  /api/v1/progress/{journey_id}/timeline:
+    get:
+      tags:
+      - progress
+      operationId: list_timeline
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimelineEventResponse'
+      security:
+      - bearer: []
+  /api/v1/questions:
+    post:
+      tags:
+      - questions
+      operationId: create_question
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionBody'
+        required: true
+      responses:
+        '200':
+          description: Created question version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResponse'
+      security:
+      - bearer: []
+  /api/v1/questions/{question_id}/versions:
+    post:
+      tags:
+      - questions
+      operationId: create_question_version
+      parameters:
       - name: question_id
         in: path
         description: Question ID
@@ -642,24 +946,82 @@ paths:
         schema:
           type: string
           format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionBody'
+        required: true
       responses:
-        '204':
-          description: Question removed from assessment
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such assessment or question
+        '200':
+          description: Created question version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResponse'
       security:
-      - bearer_auth: []
-  /v1/assessments/{id}/sections:
-    post:
+      - bearer: []
+  /api/v1/questions/{question_id}/versions/{version}:
+    get:
       tags:
-      - assessments
-      operationId: create_assessment_section
+      - questions
+      operationId: get_question_version
       parameters:
-      - name: id
+      - name: question_id
         in: path
-        description: Assessment ID
+        description: Question ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        description: Question version
+        required: true
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      responses:
+        '200':
+          description: Question version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResponse'
+      security:
+      - bearer: []
+  /api/v1/task-submissions/{submission_id}:
+    get:
+      tags:
+      - tasks
+      operationId: get_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/task-submissions/{submission_id}/review:
+    patch:
+      tags:
+      - tasks
+      operationId: review_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
         required: true
         schema:
           type: string
@@ -668,149 +1030,72 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSectionBody'
+              $ref: '#/components/schemas/ReviewTaskSubmissionBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/task-submissions/{submission_id}/submit:
+    post:
+      tags:
+      - tasks
+      operationId: submit_submission
+      parameters:
+      - name: submission_id
+        in: path
+        description: Task submission ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/tasks/{task_id}/submissions:
+    post:
+      tags:
+      - tasks
+      operationId: start_submission
+      parameters:
+      - name: task_id
+        in: path
+        description: Application task activity ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartTaskSubmissionBody'
         required: true
       responses:
         '201':
-          description: Section created successfully
+          description: ''
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AssessmentSectionDetail'
-        '401':
-          description: Unauthorized
-        '404':
-          description: Assessment not found
-        '422':
-          description: Validation failed
+                $ref: '#/components/schemas/TaskSubmissionResponse'
       security:
-      - bearer_auth: []
-  /v1/assessments/{id}/sections/{section_id}:
-    delete:
-      tags:
-      - assessments
-      operationId: delete_assessment_section
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: section_id
-        in: path
-        description: Section ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Section deleted successfully
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such assessment or section
-      security:
-      - bearer_auth: []
-    patch:
-      tags:
-      - assessments
-      operationId: patch_assessment_section
-      parameters:
-      - name: id
-        in: path
-        description: Assessment ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: section_id
-        in: path
-        description: Section ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateSectionBody'
-        required: true
-      responses:
-        '200':
-          description: Section updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AssessmentSectionDetail'
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such assessment or section
-      security:
-      - bearer_auth: []
-  /v1/attempts/pending:
-    get:
-      tags:
-      - crate::http::sessions
-      operationId: list_pending_attempts
-      responses:
-        '200':
-          description: Pending manual attempts
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PendingAttemptRow'
-        '401':
-          description: Agent role not allowed
-      security:
-      - bearer_auth: []
-  /v1/attempts/{id}/grade:
-    patch:
-      tags:
-      - crate::http::sessions
-      operationId: grade_attempt
-      parameters:
-      - name: id
-        in: path
-        description: Attempt id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GradeAttemptBody'
-        required: true
-      responses:
-        '200':
-          description: Graded attempt
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Attempt'
-        '401':
-          description: Agent role not allowed
-        '404':
-          description: No such attempt
-        '409':
-          description: Attempt is not pending manual grading
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/auth/login:
+      - bearer: []
+  /public/v1/auth/login:
     post:
       tags:
       - auth
-      summary: POST /v1/auth/login — authenticate with email and password.
+      summary: POST /public/v1/auth/login — authenticate with email and password.
       operationId: login
       requestBody:
         content:
@@ -827,20 +1112,11 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Unauthorized
-  /v1/auth/logout:
+  /public/v1/auth/register:
     post:
       tags:
       - auth
-      summary: POST /v1/auth/logout — clear the HttpOnly token cookie.
-      operationId: logout
-      responses:
-        '200':
-          description: Logged out
-  /v1/auth/register:
-    post:
-      tags:
-      - auth
-      summary: POST /v1/auth/register — register a new user with email and password.
+      summary: POST /public/v1/auth/register — register a new user with email and password.
       operationId: register
       requestBody:
         content:
@@ -857,1211 +1133,94 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '422':
           description: Validation failed
-  /v1/deep-dives:
-    get:
-      tags:
-      - deep-dives
-      operationId: list_deep_dives
-      parameters:
-      - name: status
-        in: path
-        required: true
-        schema:
-          type:
-          - string
-          - 'null'
-      - name: category
-        in: path
-        required: true
-        schema:
-          type:
-          - string
-          - 'null'
-      - name: search
-        in: path
-        required: true
-        schema:
-          type:
-          - string
-          - 'null'
-      responses:
-        '200':
-          description: List of deep dives
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListDeepDivesResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
+  /public/v1/onboarding/preview:
     post:
       tags:
-      - deep-dives
-      operationId: create_deep_dive
+      - onboarding
+      summary: POST /public/v1/onboarding/preview — explain the first journey without creating state.
+      operationId: preview_learning
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateDeepDiveBody'
+              $ref: '#/components/schemas/PreviewLearningBody'
+        required: true
+      responses:
+        '200':
+          description: Preview of the first learning journey
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewLearningResponse'
+        '422':
+          description: Validation failed
+  /public/v1/onboarding/start:
+    post:
+      tags:
+      - onboarding
+      summary: POST /public/v1/onboarding/start — create or resume a learner's first journey.
+      operationId: start_learning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartLearningBody'
         required: true
       responses:
         '201':
-          description: Deep dive created
+          description: Learner and first journey created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DeepDive'
-        '400':
-          description: Bad request
+                $ref: '#/components/schemas/StartLearningResponse'
         '401':
-          description: Unauthorized
-        '404':
-          description: Question, session, or attempt not found
-      security:
-      - bearer: []
-  /v1/deep-dives/export:
-    get:
-      tags:
-      - deep-dives
-      operationId: export_deep_dives
-      responses:
-        '200':
-          description: ZIP archive of deep dives
-          content:
-            application/octet-stream:
-              schema:
-                type: array
-                items:
-                  type: integer
-                  format: int32
-                  minimum: 0
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
-  /v1/deep-dives/{id}:
-    get:
-      tags:
-      - deep-dives
-      operationId: get_deep_dive
-      parameters:
-      - name: id
-        in: path
-        description: Deep dive ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Deep dive details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeepDive'
-        '401':
-          description: Unauthorized
-        '404':
-          description: Deep dive not found
-      security:
-      - bearer: []
-    patch:
-      tags:
-      - deep-dives
-      operationId: patch_deep_dive
-      parameters:
-      - name: id
-        in: path
-        description: Deep dive ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchDeepDiveBody'
-        required: true
-      responses:
-        '200':
-          description: Deep dive updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeepDive'
-        '400':
-          description: Bad request
-        '401':
-          description: Unauthorized
-        '404':
-          description: Deep dive not found
-      security:
-      - bearer: []
-  /v1/deep-dives/{id}/publish:
-    patch:
-      tags:
-      - deep-dives
-      operationId: publish_deep_dive
-      parameters:
-      - name: id
-        in: path
-        description: Deep dive ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PublishDeepDiveBody'
-        required: true
-      responses:
-        '200':
-          description: Deep dive published
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeepDive'
-        '400':
-          description: Bad request
-        '401':
-          description: Unauthorized
-        '404':
-          description: Deep dive not found
-      security:
-      - bearer: []
-  /v1/deep-dives/{id}/revisions:
-    get:
-      tags:
-      - deep-dives
-      operationId: get_deep_dive_revisions
-      parameters:
-      - name: id
-        in: path
-        description: Deep dive ID
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: List of revisions for the deep dive
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeepDiveRevisionsResponse'
-        '401':
-          description: Unauthorized
-        '404':
-          description: Deep dive not found
-      security:
-      - bearer: []
-  /v1/explore:
-    get:
-      tags:
-      - assessments
-      summary: GET /v1/explore — searchable, paginated assessment exploration.
-      operationId: explore
-      parameters:
-      - name: tags
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: kind
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: mode
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: after
-        in: query
-        required: false
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Assessment list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExploreResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer_auth: []
-  /v1/explore/facets:
-    get:
-      tags:
-      - assessments
-      summary: GET /v1/explore/facets — facets for filtering.
-      operationId: explore_facets
-      responses:
-        '200':
-          description: Explore facets
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExploreFacetsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer_auth: []
-  /v1/me:
-    get:
-      tags:
-      - me
-      summary: Get the authenticated user's profile.
-      operationId: get_me
-      responses:
-        '200':
-          description: Current user profile
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MeResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
-  /v1/me/agents:
-    get:
-      tags:
-      - me
-      operationId: list_agents
-      responses:
-        '200':
-          description: Agent list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListAgentsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
-    post:
-      tags:
-      - me
-      operationId: create_agent
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateAgentBody'
-        required: true
-      responses:
-        '201':
-          description: Agent created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateAgentResponse'
-        '401':
-          description: Unauthorized
+          description: Existing learner requires authentication
+        '409':
+          description: Email already belongs to a learner
         '422':
           description: Validation failed
-      security:
-      - bearer: []
-  /v1/me/agents/{id}:
-    delete:
-      tags:
-      - me
-      operationId: delete_agent
-      parameters:
-      - name: id
-        in: path
-        description: Agent id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Agent deleted
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such agent
-      security:
-      - bearer: []
-    patch:
-      tags:
-      - me
-      operationId: update_agent
-      parameters:
-      - name: id
-        in: path
-        description: Agent id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateAgentBody'
-        required: true
-      responses:
-        '204':
-          description: Agent updated
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such agent
-      security:
-      - bearer: []
-  /v1/me/agents/{id}/tokens:
-    post:
-      tags:
-      - me
-      operationId: create_agent_token
-      parameters:
-      - name: id
-        in: path
-        description: Agent id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateAgentTokenBody'
-        required: true
-      responses:
-        '201':
-          description: Token created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateKeyResponse'
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such agent
-      security:
-      - bearer: []
-  /v1/me/agents/{id}/tokens/{token_id}:
-    delete:
-      tags:
-      - me
-      operationId: revoke_agent_token
-      parameters:
-      - name: id
-        in: path
-        description: Agent id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: token_id
-        in: path
-        description: Token id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '204':
-          description: Token revoked
-        '401':
-          description: Unauthorized
-        '404':
-          description: No such agent or token
-      security:
-      - bearer: []
-  /v1/me/attempts:
-    get:
-      tags:
-      - me
-      summary: List the current user's attempts.
-      operationId: list_attempts
-      parameters:
-      - name: limit
-        in: query
-        description: 'Page size (default: 50)'
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: offset
-        in: query
-        description: Page offset
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: session_id
-        in: query
-        description: Filter by session
-        required: false
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Attempt list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListAttemptsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
-  /v1/me/cohort-stats:
-    get:
-      tags:
-      - me
-      operationId: get_cohort_stats
-      parameters:
-      - name: assessmentId
-        in: query
-        description: Assessment to compare against
-        required: false
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Cohort stats
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CohortStatsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
-  /v1/plans:
-    post:
-      tags:
-      - crate::http::plans
-      operationId: create_plan
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePlanBody'
-        required: true
-      responses:
-        '201':
-          description: Study plan created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StudyPlan'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/plans/{id}:
-    get:
-      tags:
-      - crate::http::plans
-      operationId: get_plan
-      parameters:
-      - name: id
-        in: path
-        description: Plan id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Study plan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StudyPlan'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '404':
-          description: Not found
-      security:
-      - bearer_auth: []
-  /v1/questions:
-    get:
-      tags:
-      - questions
-      operationId: list_questions
-      parameters:
-      - name: tag
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: kind
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: min_rating
-        in: query
-        required: false
-        schema:
-          type: number
-          format: double
-      - name: max_rating
-        in: query
-        required: false
-        schema:
-          type: number
-          format: double
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: offset
-        in: query
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: after
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: assessment_id
-        in: query
-        required: false
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: List of questions
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListQuestionsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer: []
-    post:
-      tags:
-      - questions
-      operationId: create_questions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateQuestionsBody'
-        required: true
-      responses:
-        '201':
-          description: Questions created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateQuestionsResponse'
-        '401':
-          description: Unauthorized
-        '422':
-          description: Validation failed
-      security:
-      - bearer: []
-  /v1/questions/{id}:
-    get:
-      tags:
-      - questions
-      operationId: get_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: Question not found
-      security:
-      - bearer: []
-    patch:
-      tags:
-      - questions
-      operationId: update_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/QuestionPatch'
-        required: true
-      responses:
-        '200':
-          description: Question updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: Question not found
-        '422':
-          description: Validation failed
-      security:
-      - bearer: []
-  /v1/questions/{id}/archive:
-    post:
-      tags:
-      - questions
-      operationId: archive_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question archived
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: Question not found
-      security:
-      - bearer: []
-  /v1/questions/{id}/deepen:
-    get:
-      tags:
-      - questions
-      operationId: get_question_deepen
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: exclude
-        in: query
-        required: false
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Question deepen bundle
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/QuestionDeepenResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: Question not found
-      security:
-      - bearer: []
-  /v1/questions/{id}/promote:
-    post:
-      tags:
-      - questions
-      operationId: promote_question
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question promoted to live
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Question'
-        '404':
-          description: Question not found
-      security:
-      - bearer: []
-  /v1/questions/{id}/versions:
-    get:
-      tags:
-      - questions
-      operationId: list_versions
-      parameters:
-      - name: id
-        in: path
-        description: Question id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Question history
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/QuestionVersion'
-        '404':
-          description: Question not found
-      security:
-      - bearer: []
-  /v1/sessions:
-    get:
-      tags:
-      - crate::http::sessions
-      operationId: list_my_sessions
-      parameters:
-      - name: assessmentId
-        in: query
-        description: Filter by assessment
-        required: false
-        schema:
-          type: string
-          format: uuid
-      - name: limit
-        in: query
-        description: 'Page size (default: 50)'
-        required: false
-        schema:
-          type: integer
-          format: int64
-      - name: offset
-        in: query
-        description: Page offset
-        required: false
-        schema:
-          type: integer
-          format: int64
-      responses:
-        '200':
-          description: Attempt history
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListMySessionsResponse'
-        '401':
-          description: Unauthorized
-      security:
-      - bearer_auth: []
-    post:
-      tags:
-      - crate::http::sessions
-      operationId: create_session
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateSessionBody'
-        required: true
-      responses:
-        '201':
-          description: Created session
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreateSessionResponse'
-        '401':
-          description: Missing or invalid token
-        '403':
-          description: Token lacks required scope
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/sessions/{id}:
-    get:
-      tags:
-      - crate::http::sessions
-      operationId: get_session
-      parameters:
-      - name: id
-        in: path
-        description: Session id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Session resume state
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GetSessionResponse'
-        '404':
-          description: No such session
-      security:
-      - bearer_auth: []
-    patch:
-      tags:
-      - crate::http::sessions
-      operationId: patch_session
-      parameters:
-      - name: id
-        in: path
-        description: Session id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchSessionBody'
-        required: true
-      responses:
-        '200':
-          description: Session updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Session'
-        '404':
-          description: No such session
-      security:
-      - bearer_auth: []
-  /v1/sessions/{id}/answer:
-    post:
-      tags:
-      - crate::http::sessions
-      operationId: answer
-      parameters:
-      - name: id
-        in: path
-        description: Session id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AnswerSessionBody'
-        required: true
-      responses:
-        '200':
-          description: Stored answer
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AnswerSessionResponse'
-        '410':
-          description: Session expired
-        '422':
-          description: Validation failed
-      security:
-      - bearer_auth: []
-  /v1/sessions/{id}/finish:
-    post:
-      tags:
-      - crate::http::sessions
-      operationId: finish
-      parameters:
-      - name: id
-        in: path
-        description: Session id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        '200':
-          description: Finished session
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FinishSessionResponse'
-        '404':
-          description: No such session
-      security:
-      - bearer_auth: []
-  /v1/tags:
-    get:
-      tags:
-      - crate::http::tags
-      operationId: list_tags
-      responses:
-        '200':
-          description: All tags, sorted by name
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Tag'
-        '401':
-          description: Missing or invalid token
-      security:
-      - bearer_auth: []
 components:
   schemas:
-    ActivityEntry:
-      type: object
-      required:
-      - id
-      - ts
-      - agentId
-      - toolName
-      - method
-      - path
-      - status
-      properties:
-        agentId:
-          type: string
-          format: uuid
-        agentName:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
-        method:
-          type: string
-        note:
-          type:
-          - string
-          - 'null'
-        path:
-          type: string
-        status:
-          type: integer
-          format: int32
-        targetId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        toolName:
-          type: string
-        ts:
-          type: string
-          format: date-time
-    ActivityResponse:
-      type: object
-      required:
-      - items
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ActivityEntry'
-        nextCursor:
-          type:
-          - string
-          - 'null'
-          format: uuid
-    AddAssessmentQuestionBody:
-      type: object
-      properties:
-        kind:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/QuestionKind'
-            description: Create a new question inline (kind + prompt required if question_id absent).
-        pointsOverride:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        prompt:
-          type:
-          - string
-          - 'null'
-        questionId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Link an existing bank question by ID.
-        sectionId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Target section ID (defaults to first section if absent).
-    AddAssessmentQuestionResponse:
-      type: object
-      required:
-      - questionId
-      - orderIndex
-      properties:
-        orderIndex:
-          type: integer
-          format: int32
-        questionId:
-          type: string
-          format: uuid
-    AdminAssessmentDetail:
-      type: object
-      required:
-      - id
-      - title
-      - status
-      - mode
-      - createdBy
-      - objectives
-      - createdAt
-      - questions
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: string
-          format: uuid
-        createdByEmail:
-          type:
-          - string
-          - 'null'
-        deletedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        description:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
-        mode:
-          type: string
-        objectives:
-          type: array
-          items:
-            type: string
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminPreviewQuestion'
-        status:
-          type: string
-        title:
-          type: string
-    AdminAssessmentEntry:
-      type: object
-      required:
-      - id
-      - title
-      - status
-      - mode
-      - createdBy
-      - objectives
-      - createdAt
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: string
-          format: uuid
-        createdByEmail:
-          type:
-          - string
-          - 'null'
-        deletedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        description:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
-        mode:
-          type: string
-        objectives:
-          type: array
-          items:
-            type: string
-        status:
-          type: string
-        title:
-          type: string
+    ActivityKind:
+      type: string
+      enum:
+      - explanation
+      - example
+      - diagnostic
+      - practice
+      - feedback
+      - application
+      - reflection
+      - milestone
+      - timed_practice
+      - recommendation
+    ActivityPublicationStatus:
+      type: string
+      enum:
+      - draft
+      - review
+      - published
+      - retired
+    ActivityStatus:
+      type: string
+      enum:
+      - proposed
+      - ready
+      - in_progress
+      - completed
+      - failed
     AdminHealthResponse:
       type: object
       required:
       - database
       - valkey
       - usersCount
-      - agentsCount
-      - assessmentsCount
+      - journeysCount
+      - activitiesCount
       - sessionsCount
-      - questionsCount
       - auditLogCount
-      - quotaRejectionsTotal
       properties:
-        agentsCount:
-          type: integer
-          format: int64
-        assessmentsCount:
+        activitiesCount:
           type: integer
           format: int64
         auditLogCount:
@@ -2069,10 +1228,7 @@ components:
           format: int64
         database:
           type: string
-        questionsCount:
-          type: integer
-          format: int64
-        quotaRejectionsTotal:
+        journeysCount:
           type: integer
           format: int64
         sessionsCount:
@@ -2083,127 +1239,6 @@ components:
           format: int64
         valkey:
           type: string
-    AdminListAssessmentsResponse:
-      type: object
-      required:
-      - assessments
-      - total
-      properties:
-        assessments:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminAssessmentEntry'
-        total:
-          type: integer
-          format: int64
-    AdminPreviewQuestion:
-      type: object
-      required:
-      - id
-      - kind
-      - prompt
-      - points
-      - orderIndex
-      - payload
-      properties:
-        id:
-          type: string
-          format: uuid
-        kind:
-          type: string
-        orderIndex:
-          type: integer
-          format: int32
-        payload: {}
-        points:
-          type: integer
-          format: int32
-        prompt:
-          type: string
-    AgentSummary:
-      type: object
-      required:
-      - id
-      - label
-      - focusTags
-      - tokens
-      - createdAt
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        focusTags:
-          type: array
-          items:
-            type: string
-        id:
-          type: string
-          format: uuid
-        label:
-          type: string
-        tokens:
-          type: array
-          items:
-            $ref: '#/components/schemas/AgentTokenSummary'
-    AgentTokenSummary:
-      type: object
-      required:
-      - id
-      - name
-      - scopes
-      - createdAt
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        expiresAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        id:
-          type: string
-          format: uuid
-        lastUsedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        name:
-          type: string
-        scopes:
-          type: array
-          items:
-            type: string
-    AnswerSessionBody:
-      type: object
-      required:
-      - questionId
-      - response
-      properties:
-        questionId:
-          type: string
-          format: uuid
-        response:
-          $ref: '#/components/schemas/AttemptResponse'
-        timeToAnswerMs:
-          type:
-          - integer
-          - 'null'
-          format: int32
-    AnswerSessionResponse:
-      type: object
-      required:
-      - attempt
-      - grade
-      - replayed
-      properties:
-        attempt:
-          $ref: '#/components/schemas/Attempt'
-        grade:
-          $ref: '#/components/schemas/GradeOutcome'
-        replayed:
-          type: boolean
     ApiError:
       oneOf:
       - type: string
@@ -2214,12 +1249,6 @@ components:
         - Forbidden
         properties:
           Forbidden:
-            type: string
-      - type: object
-        required:
-        - ScopeRequired
-        properties:
-          ScopeRequired:
             type: string
       - type: object
         required:
@@ -2240,497 +1269,256 @@ components:
             type: array
             items:
               $ref: '#/components/schemas/FieldError'
-      - type: object
-        required:
-        - InvalidPayload
-        properties:
-          InvalidPayload:
-            type: object
-            required:
-            - kind
-            - reason
-            properties:
-              kind:
-                type: string
-              reason:
-                type: string
-      - type: object
-        required:
-        - ExamPoolInsufficient
-        properties:
-          ExamPoolInsufficient:
-            type: object
-            required:
-            - section
-            - required
-            - available
-            properties:
-              available:
-                type: integer
-                minimum: 0
-              required:
-                type: integer
-                minimum: 0
-              section:
-                type: string
       - type: string
         enum:
         - SessionFinished
       - type: string
         enum:
-        - ExamExpired
+        - LearningSessionResultConflict
+      - type: string
+        enum:
+        - ActivityContentConflict
       - type: string
         enum:
         - IdempotencyConflict
       - type: string
         enum:
-        - ScoringUnavailable
+        - GenerationStateConflict
       - type: string
         enum:
         - TooManyRequests
-      - type: object
-        required:
-        - UnknownTool
-        properties:
-          UnknownTool:
-            type: string
       - type: string
         enum:
         - Maintenance
-      - type: object
-        required:
-        - QuotaExceeded
-        properties:
-          QuotaExceeded:
-            type: object
-            required:
-            - kind
-            - limit
-            - usage
-            properties:
-              kind:
-                type: string
-              limit:
-                type: integer
-                format: int64
-              usage:
-                type: integer
-                format: int64
       - type: object
         required:
         - Internal
         properties:
           Internal:
             type: string
-    Assessment:
+    AssessmentActivityQuery:
+      type: object
+      required:
+      - activityId
+      properties:
+        activityId:
+          type: string
+          format: uuid
+    AssessmentItemBody:
+      type: object
+      required:
+      - objectiveId
+      - questionId
+      - questionVersion
+      - orderIndex
+      - points
+      properties:
+        objectiveId:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        points:
+          type: integer
+          format: int32
+          minimum: 0
+        questionId:
+          type: string
+          format: uuid
+        questionVersion:
+          type: integer
+          format: int32
+          minimum: 0
+    AssessmentItemResponse:
       type: object
       required:
       - id
-      - title
-      - mode
-      - status
-      - objectives
-      - totalPoints
-      - showResultsDuring
-      - affectsRating
-      - method
-      - createdBy
-      - createdAt
-      - updatedAt
+      - objectiveId
+      - questionVersionId
+      - orderIndex
+      - points
+      - question
       properties:
-        affectsRating:
-          type: boolean
-        compositionTrace: {}
-        course:
-          type:
-          - string
-          - 'null'
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: string
-          format: uuid
-        description:
-          type:
-          - string
-          - 'null'
-        durationMin:
-          type:
-          - integer
-          - 'null'
-          format: int32
         id:
           type: string
           format: uuid
-        method:
+        objectiveId:
           type: string
-        mode:
-          $ref: '#/components/schemas/AssessmentMode'
-        objectives:
-          type: array
-          items:
-            type: string
-        passingPoints:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        showResultsDuring:
-          type: boolean
-        status:
-          $ref: '#/components/schemas/AssessmentStatus'
-        timeLimitSeconds:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        title:
-          type: string
-        totalPoints:
+          format: uuid
+        orderIndex:
           type: integer
           format: int32
-        updatedAt:
+        points:
+          type: integer
+          format: int32
+          minimum: 0
+        question:
+          $ref: '#/components/schemas/AssessmentQuestionResponse'
+        questionVersionId:
           type: string
-          format: date-time
-    AssessmentDetail:
-      allOf:
-      - $ref: '#/components/schemas/Assessment'
-      - type: object
-        required:
-        - completed
-        - sections
-        - questions
-        properties:
-          completed:
-            type: boolean
-            description: |-
-              Whether the requesting caller has a finished session for this assessment.
-              Scoped to the caller's own user id (matches the list endpoint, audit F-2).
-          lastSessionId:
-            type:
-            - string
-            - 'null'
-            format: uuid
-            description: |-
-              The caller's most recent finished session for this assessment, if any.
-              Invariant: when present, GET /v1/sessions/{id} resolves for the same caller.
-          questions:
-            type: array
-            items:
-              $ref: '#/components/schemas/AssessmentQuestion'
-          sections:
-            type: array
-            items:
-              $ref: '#/components/schemas/AssessmentSectionDetail'
+          format: uuid
     AssessmentMode:
       type: string
       enum:
       - practice
       - graded
-    AssessmentQuestion:
+    AssessmentOptionResponse:
       type: object
       required:
       - id
+      - text
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+    AssessmentQuestionResponse:
+      type: object
+      required:
       - kind
       - prompt
-      - tags
-      - payload
-      - points
-      - status
-      - orderIndex
+      - options
       properties:
-        codeSnippet: {}
-        deepDive:
+        difficulty:
           type:
           - string
           - 'null'
-        explanation:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
         kind:
-          type: string
-        orderIndex:
-          type: integer
-          format: int32
-        payload: {}
-        points:
-          type: integer
-          format: int32
-        prompt:
-          type: string
-        source:
-          type:
-          - string
-          - 'null'
-        status:
-          type: string
-        tags:
+          $ref: '#/components/schemas/QuestionKind'
+        options:
           type: array
           items:
-            type: string
-    AssessmentSectionDetail:
+            $ref: '#/components/schemas/AssessmentOptionResponse'
+        prompt:
+          type: string
+    AssessmentResponse:
       type: object
       required:
       - id
-      - title
-      - orderIndex
-      - weight
-      - itemsCount
-      - questions
+      - activityId
+      - version
+      - mode
+      - status
+      - items
       properties:
+        activityId:
+          type: string
+          format: uuid
         id:
           type: string
           format: uuid
-        itemsCount:
-          type: integer
-          format: int32
-        mix: {}
-        orderIndex:
-          type: integer
-          format: int32
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/AssessmentQuestion'
-        title:
-          type: string
-        weight:
-          type: number
-          format: double
-    AssessmentStatsParams:
-      type: object
-      properties:
-        cohortId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        window:
-          type:
-          - string
-          - 'null'
-    AssessmentStatsResponse:
-      type: object
-      required:
-      - avg
-      - median
-      - distribution
-      - items
-      properties:
-        avg:
-          type: number
-          format: double
-        distribution:
-          type: array
-          items:
-            $ref: '#/components/schemas/DistributionBucket'
         items:
           type: array
           items:
-            $ref: '#/components/schemas/ItemStats'
-        median:
-          type: number
-          format: double
+            $ref: '#/components/schemas/AssessmentItemResponse'
+        mode:
+          $ref: '#/components/schemas/AssessmentMode'
+        status:
+          $ref: '#/components/schemas/AssessmentStatus'
+        version:
+          type: integer
+          format: int32
+          minimum: 0
     AssessmentStatus:
       type: string
       enum:
       - draft
-      - active
-      - archived
-    AssessmentSummary:
+      - published
+      - retired
+    AttemptItemResponse:
+      type: object
+      required:
+      - assessmentItemId
+      - questionVersionId
+      - response
+      - evaluationStatus
+      properties:
+        assessmentItemId:
+          type: string
+          format: uuid
+        awardedPoints:
+          type:
+          - number
+          - 'null'
+          format: float
+        correctness:
+          type:
+          - number
+          - 'null'
+          format: float
+        evaluationStatus:
+          type: string
+        questionVersionId:
+          type: string
+          format: uuid
+        response: {}
+    AttemptResponse:
       type: object
       required:
       - id
-      - title
-      - mode
+      - assessmentId
+      - assessmentVersion
       - status
-      - objectives
-      - totalPoints
-      - questionCount
-      - completed
+      - assessmentMode
+      - reviewStatus
+      - responses
+      - items
       - createdAt
-      - updatedAt
       properties:
-        completed:
-          type: boolean
-        course:
+        assessmentId:
+          type: string
+          format: uuid
+        assessmentMode:
+          $ref: '#/components/schemas/AssessmentMode'
+        assessmentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        awardedPoints:
           type:
-          - string
+          - number
           - 'null'
+          format: float
         createdAt:
           type: string
-          format: date-time
-        description:
-          type:
-          - string
-          - 'null'
-        durationMin:
-          type:
-          - integer
-          - 'null'
-          format: int32
         id:
           type: string
           format: uuid
-        lastSessionId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        mode:
-          type: string
-        objectives:
+        items:
           type: array
           items:
-            type: string
-        questionCount:
-          type: integer
-          format: int64
-        status:
-          type: string
-        title:
-          type: string
-        totalPoints:
-          type: integer
-          format: int32
-        updatedAt:
-          type: string
-          format: date-time
-    Attempt:
-      type: object
-      required:
-      - id
-      - user_id
-      - owner_id
-      - question_id
-      - question_version
-      - response
-      - presentation
-      - is_correct
-      - score
-      - grade_status
-      - rating_before_user_avg
-      - rating_before_question
-      - user_tag_deltas
-      - question_delta
-      - created_at
-      properties:
-        correct_answer:
+            $ref: '#/components/schemas/AttemptItemResponse'
+        maxPoints:
+          type:
+          - number
+          - 'null'
+          format: float
+        responses:
           type: object
-        created_at:
-          type: string
-          format: date-time
-        grade_status:
-          type: string
-        grader_notes:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
-        is_correct:
-          type: boolean
-        owner_id:
-          type: string
-          format: uuid
-        presentation:
-          $ref: '#/components/schemas/AttemptPresentation'
-        question_delta:
-          type: number
-          format: double
-        question_id:
-          type: string
-          format: uuid
-        question_version:
-          type: integer
-          format: int32
-        rating_before_question:
-          type: number
-          format: double
-        rating_before_user_avg:
-          type: number
-          format: double
-        response:
-          $ref: '#/components/schemas/AttemptResponse'
-        score:
-          type: number
-          format: double
-        session_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        time_to_answer_ms:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        user_id:
-          type: string
-          format: uuid
-        user_tag_deltas:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
+          additionalProperties: {}
           propertyNames:
             type: string
-    AttemptPresentation:
-      type: object
-      properties:
-        option_order:
+            format: uuid
+        reviewStatus:
+          $ref: '#/components/schemas/AttemptReviewStatus'
+        score:
           type:
-          - array
+          - number
           - 'null'
-          items:
-            type: integer
-            minimum: 0
-    AttemptResponse:
-      oneOf:
-      - type: object
-        required:
-        - selected_position
-        properties:
-          selected_position:
-            type: integer
-            minimum: 0
-      - type: object
-        required:
-        - answer
-        properties:
-          answer:
-            type: boolean
-      - type: object
-        required:
-        - answer
-        properties:
-          answer:
-            type: string
-      - type: object
-        required:
-        - body
-        - word_count
-        properties:
-          body:
-            type: string
-          word_count:
-            type: integer
-            format: int32
-      - type: object
-        required:
-        - source
-        - language
-        properties:
-          language:
-            type: string
-          source:
-            type: string
+          format: float
+        status:
+          type: string
+        submittedAt:
+          type:
+          - string
+          - 'null'
+    AttemptReviewStatus:
+      type: string
+      enum:
+      - not_required
+      - pending
+      - complete
     AuditLogEntry:
       type: object
       required:
@@ -2788,472 +1576,323 @@ components:
           type: string
         user:
           $ref: '#/components/schemas/UserInfo'
-    CohortStatsBucket:
+    AuthorActivityContentBody:
       type: object
       required:
-      - bucketStart
-      - bucketEnd
-      - count
+      - generationRunId
+      - content
+      - sourceReferences
+      - reviewStatus
       properties:
-        bucketEnd:
-          type: number
-          format: double
-        bucketStart:
-          type: number
-          format: double
-        count:
-          type: integer
-          format: int64
-    CohortStatsResponse:
-      type: object
-      required:
-      - histogram
-      properties:
-        cohortAvg:
-          type:
-          - number
-          - 'null'
-          format: double
-        completionRate:
-          type:
-          - number
-          - 'null'
-          format: double
-        histogram:
-          type: array
-          items:
-            $ref: '#/components/schemas/CohortStatsBucket'
-        percentile:
-          type:
-          - integer
-          - 'null'
-          format: int32
-    CountAssessmentsResponse:
-      type: object
-      required:
-      - count
-      properties:
-        count:
-          type: integer
-          format: int64
-    CreateAgentBody:
-      type: object
-      required:
-      - label
-      - scopes
-      properties:
-        focusTags:
-          type: array
-          items:
-            type: string
-        label:
-          type: string
-        scopes:
-          type: array
-          items:
-            type: string
-    CreateAgentResponse:
-      type: object
-      required:
-      - id
-      - apiKey
-      properties:
-        apiKey:
-          type: string
-        id:
+        content:
+          type: object
+        generationRunId:
           type: string
           format: uuid
-    CreateAgentTokenBody:
-      type: object
-      required:
-      - name
-      - scopes
-      properties:
-        name:
+        reviewStatus:
           type: string
-        scopes:
+        sourceReferences:
           type: array
           items:
             type: string
-    CreateAssessmentRequest:
+    AuthorActivityRubricBody:
       type: object
       required:
-      - title
+      - generationRunId
+      - rubric
+      - sourceReferences
+      - reviewStatus
       properties:
-        affectsRating:
-          type: boolean
-        course:
-          type:
-          - string
-          - 'null'
-        description:
-          type:
-          - string
-          - 'null'
-        durationMin:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        method:
+        generationRunId:
           type: string
+          format: uuid
+        reviewStatus:
+          type: string
+        rubric:
+          $ref: '#/components/schemas/TaskRubric'
+        sourceReferences:
+          type: array
+          items:
+            type: string
+    ContentReviewStatus:
+      type: string
+      enum:
+      - draft
+      - review
+      - approved
+      - rejected
+      - retired
+    CreateAssessmentBody:
+      type: object
+      required:
+      - activityId
+      - mode
+      - items
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentItemBody'
         mode:
           $ref: '#/components/schemas/AssessmentMode'
-        objectives:
-          type: array
-          items:
-            type: string
-        passingPoints:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/QuestionImport'
-        showResultsDuring:
-          type: boolean
         status:
-          type:
-          - string
-          - 'null'
-        timeLimitSeconds:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        title:
-          type: string
+          $ref: '#/components/schemas/AssessmentStatus'
     CreateDeepDiveBody:
       type: object
       required:
-      - questionId
-      properties:
-        questionId:
-          type: string
-          format: uuid
-        reason:
-          type:
-          - string
-          - 'null'
-        sourceAttemptId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        sourceSessionId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-    CreateKeyResponse:
-      type: object
-      required:
-      - id
-      - secret
-      properties:
-        id:
-          type: string
-          format: uuid
-        secret:
-          type: string
-    CreatePlanBody:
-      type: object
-      required:
-      - goal
-      properties:
-        goal:
-          type: string
-        lookbackDays:
-          type:
-          - integer
-          - 'null'
-          format: int64
-    CreateQuestionsBody:
-      type: object
-      required:
-      - questions
-      properties:
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/QuestionInsert'
-    CreateQuestionsResponse:
-      type: object
-      required:
-      - questions
-      properties:
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Question'
-    CreateSectionBody:
-      type: object
-      required:
+      - generationRunId
+      - journeyId
+      - activityId
+      - objectiveId
+      - triggeringEvidenceId
       - title
+      - body
+      - example
+      - caveats
+      - sourceReferences
+      - applicationTask
       properties:
-        mix: {}
+        activityId:
+          type: string
+          format: uuid
+        applicationTask:
+          type: string
+        body:
+          type: string
+        caveats:
+          type: array
+          items:
+            type: string
+        example:
+          type: string
+        generationRunId:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reviewStatus:
+          $ref: '#/components/schemas/ContentReviewStatus'
+        sourceReferences:
+          type: array
+          items:
+            type: string
         title:
           type: string
-        weight:
-          type:
-          - number
-          - 'null'
-          format: double
-    CreateSessionBody:
-      type: object
-      properties:
-        assessmentId:
-          type:
-          - string
-          - 'null'
+        triggeringEvidenceId:
+          type: string
           format: uuid
-        cats:
+    CreateQuestionBody:
+      type: object
+      required:
+      - generationRunId
+      - kind
+      - prompt
+      - points
+      properties:
+        acceptedAnswers:
           type: array
           items:
             type: string
-        count:
+        difficulty:
           type:
-          - integer
+          - string
           - 'null'
+        explanation:
+          type:
+          - string
+          - 'null'
+        generationRunId:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionOption'
+        points:
+          type: integer
+          format: int32
           minimum: 0
-        diff:
+        prompt:
+          type: string
+        rationale:
           type:
           - string
           - 'null'
-        duration:
-          type:
-          - integer
-          - 'null'
-          format: int64
-        mode:
-          type:
-          - string
-          - 'null'
-        tags:
+        reviewStatus:
+          $ref: '#/components/schemas/ContentReviewStatus'
+        sourceReferences:
           type: array
           items:
             type: string
-        types:
-          type: array
-          items:
-            $ref: '#/components/schemas/QuestionKind'
-    CreateSessionResponse:
+    DeepDiveActivityQuery:
       type: object
       required:
-      - sessionId
-      - questions
+      - activityId
       properties:
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/SessionQuestion'
-        sessionId:
+        activityId:
           type: string
           format: uuid
-    DeepDive:
+    DeepDiveResponse:
       type: object
       required:
       - id
-      - ownerId
-      - questionId
-      - status
-      - createdAt
-      - updatedAt
-      - questionPrompt
-      - questionKind
-      - questionTags
+      - generationRunId
+      - journeyId
+      - activityId
+      - objectiveId
+      - triggeringEvidenceId
+      - title
+      - body
+      - example
+      - caveats
+      - sourceReferences
+      - applicationTask
+      - reviewStatus
+      - contentVersion
       properties:
-        archivedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        assessmentTitle:
-          type:
-          - string
-          - 'null'
-        bodyMarkdown:
-          type:
-          - string
-          - 'null'
-        category:
-          type:
-          - string
-          - 'null'
-        course:
-          type:
-          - string
-          - 'null'
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        id:
+        activityId:
           type: string
           format: uuid
-        noteUpdatedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        ownerId:
+        applicationTask:
           type: string
-          format: uuid
-        publishedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        questionId:
+        body:
           type: string
-          format: uuid
-        questionKind:
-          type: string
-        questionPrompt:
-          type: string
-        questionTags:
+        caveats:
           type: array
           items:
             type: string
-        reason:
-          type:
-          - string
-          - 'null'
-        sourceAttemptId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        sourceSessionId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        status:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        example:
           type: string
-        updatedAt:
-          type: string
-          format: date-time
-        userNote:
-          type:
-          - string
-          - 'null'
-    DeepDiveRevision:
-      type: object
-      required:
-      - id
-      - deepDiveId
-      - revision
-      - createdAt
-      properties:
-        bodyMarkdown:
-          type:
-          - string
-          - 'null'
-        category:
-          type:
-          - string
-          - 'null'
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        deepDiveId:
+        generationRunId:
           type: string
           format: uuid
         id:
           type: string
           format: uuid
-        revision:
-          type: integer
-          format: int32
-        userNote:
-          type:
-          - string
-          - 'null'
-    DeepDiveRevisionsResponse:
-      type: object
-      required:
-      - revisions
-      properties:
-        revisions:
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reviewStatus:
+          $ref: '#/components/schemas/ContentReviewStatus'
+        sourceReferences:
           type: array
           items:
-            $ref: '#/components/schemas/DeepDiveRevision'
-    DistributionBucket:
-      type: object
-      required:
-      - bucket
-      - count
-      properties:
-        bucket:
-          type: integer
-          format: int32
-        count:
-          type: integer
-          format: int64
+            type: string
+        title:
+          type: string
+        triggeringEvidenceId:
+          type: string
+          format: uuid
     EffectiveSettings:
       type: object
-      description: |-
-        The effective platform settings: config defaults with `tb_settings` overrides
-        applied. Serialized both as the admin API response and as the cache blob.
       required:
       - maintenanceMode
       - ratelimit
-      - quota
       properties:
         maintenanceMode:
           type: boolean
-        quota:
-          $ref: '#/components/schemas/QuotaSettings'
         ratelimit:
           $ref: '#/components/schemas/RateLimitSettings'
-    ExploreCounts:
+    EvidenceBody:
       type: object
       required:
-      - practice
-      - graded
+      - journeyId
+      - objectiveId
+      - activityId
+      - contentVersion
+      - value
+      - derivationVersion
       properties:
-        graded:
-          type: integer
-          format: int64
-        practice:
-          type: integer
-          format: int64
-    ExploreFacetsResponse:
-      type: object
-      required:
-      - tags
-      - counts
-      properties:
-        counts:
-          $ref: '#/components/schemas/ExploreCounts'
-        tags:
-          type: array
-          items:
-            type: string
-    ExploreResponse:
-      type: object
-      required:
-      - items
-      properties:
-        items:
-          type: array
-          items: {}
-        nextCursor:
+        activityId:
+          type: string
+          format: uuid
+        attemptId:
           type:
           - string
           - 'null'
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        derivationVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        taskSubmissionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        value:
+          type: number
+          format: float
+    EvidenceResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - objectiveId
+      - activityId
+      - contentVersion
+      - value
+      - derivationVersion
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        attemptId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        derivationVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        taskSubmissionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        value:
+          type: number
+          format: float
     FieldError:
       type: object
       required:
@@ -3264,211 +1903,436 @@ components:
           type: string
         message:
           type: string
-    FinishSessionResponse:
+    FinishLearningSessionBody:
       type: object
       required:
-      - session
-      - result
+      - completed
+      - responses
       properties:
-        result:
-          $ref: '#/components/schemas/SessionResult'
-        session:
-          $ref: '#/components/schemas/Session'
-    GenerateAssessmentBody:
-      type: object
-      required:
-      - source
-      properties:
-        objectives:
-          type:
-          - array
-          - 'null'
+        completed:
+          type: boolean
+        responses:
+          type: array
           items:
-            type: string
-        questionCount:
+            $ref: '#/components/schemas/LearningResponseBody'
+    GenerationRunResponse:
+      type: object
+      required:
+      - id
+      - operation
+      - contentVersion
+      - status
+      - createdAt
+      - updatedAt
+      properties:
+        contentVersion:
           type: integer
           format: int32
           minimum: 0
-        source:
+        createdAt:
           type: string
-        types:
+          format: date-time
+        error: {}
+        id:
+          type: string
+          format: uuid
+        operation:
+          type: string
+        provider:
           type:
-          - array
+          - string
           - 'null'
-          items:
-            $ref: '#/components/schemas/QuestionKind'
-    GenerateAssessmentResponse:
+        retryKey:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/GenerationStatus'
+        updatedAt:
+          type: string
+          format: date-time
+    GenerationStatus:
+      type: string
+      enum:
+      - requested
+      - running
+      - review_required
+      - published
+      - failed
+    GoalStatus:
+      type: string
+      enum:
+      - proposed
+      - active
+      - paused
+      - completed
+      - failed
+    JourneyStatus:
+      type: string
+      enum:
+      - onboarding
+      - active
+      - paused
+      - completed
+      - failed
+    LearningActivityResponse:
       type: object
       required:
-      - candidates
-      - objectives
-      - warnings
+      - id
+      - journeyId
+      - subjectUserId
+      - sourceActorId
+      - kind
+      - title
+      - orderIndex
+      - payloadSchemaVersion
+      - contentVersion
+      - publicationStatus
+      - payload
+      - objectiveIds
+      - status
+      - createdAt
+      - updatedAt
       properties:
-        candidates:
+        chapterId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ActivityKind'
+        objectiveIds:
           type: array
-          items: {}
+          items:
+            type: string
+            format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        payload:
+          type: object
+        payloadSchemaVersion:
+          type: integer
+          format: int32
+        publicationStatus:
+          $ref: '#/components/schemas/ActivityPublicationStatus'
+        rubric:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TaskRubric'
+            description: Structured scoring rubric for task/application activities, if authored.
+        sourceActorId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ActivityStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    LearningChapterResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - subjectUserId
+      - title
+      - summary
+      - orderIndex
+      - activities
+      - createdAt
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        subjectUserId:
+          type: string
+          format: uuid
+        summary:
+          type: string
+        title:
+          type: string
+    LearningGoalResponse:
+      type: object
+      required:
+      - id
+      - subjectUserId
+      - sourceActorId
+      - rawIntent
+      - normalizedStatement
+      - status
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        normalizedStatement:
+          type: string
+        rawIntent:
+          type: string
+        sourceActorId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/GoalStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        templateVersionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    LearningJourneyResponse:
+      type: object
+      required:
+      - id
+      - goalId
+      - subjectUserId
+      - sourceActorId
+      - promise
+      - status
+      - createdAt
+      - goal
+      - objectives
+      - chapters
+      - ungroupedActivities
+      - activities
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
+          description: Flat compatibility view; new clients should use chapters.activities.
+        chapters:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningChapterResponse'
+        createdAt:
+          type: string
+          format: date-time
+        goal:
+          $ref: '#/components/schemas/LearningGoalResponse'
+        goalId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
         objectives:
           type: array
           items:
-            type: string
-        warnings:
-          type: array
-          items:
-            type: string
-    GetSessionQuestion:
-      type: object
-      required:
-      - questionId
-      - kind
-      - prompt
-      - points
-      properties:
-        codeSnippet: {}
-        explanation:
-          type:
-          - string
-          - 'null'
-        kind:
-          $ref: '#/components/schemas/QuestionKind'
-        language:
-          type:
-          - string
-          - 'null'
-        optionOrder:
-          type:
-          - array
-          - 'null'
-          items:
-            type: integer
-            minimum: 0
-        options:
-          type:
-          - array
-          - 'null'
-          items: {}
-        points:
-          type: integer
-          format: int32
-        prompt:
+            $ref: '#/components/schemas/LearningObjectiveResponse'
+        promise:
           type: string
-        questionId:
+        recommendation:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/LearningRecommendationResponse'
+        sourceActorId:
           type: string
           format: uuid
-    GetSessionResponse:
-      type: object
-      required:
-      - session
-      - questions
-      - attempts
-      properties:
-        attempts:
-          type: array
-          items:
-            $ref: '#/components/schemas/Attempt'
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/GetSessionQuestion'
-        session:
-          $ref: '#/components/schemas/Session'
-    GradeAttemptBody:
-      type: object
-      required:
-      - score
-      properties:
-        notes:
-          type:
-          - string
-          - 'null'
-        score:
-          type: number
-          format: double
-    GradeOutcome:
-      type: object
-      required:
-      - status
-      - correct
-      - points_awarded
-      - max
-      - correct_answer
-      properties:
-        correct:
-          type: boolean
-        correct_answer:
-          type: object
-        max:
-          type: integer
-          format: int32
-        note:
-          type:
-          - string
-          - 'null'
-        points_awarded:
-          type: integer
-          format: int32
         status:
-          $ref: '#/components/schemas/GradeStatus'
-    GradeStatus:
+          $ref: '#/components/schemas/JourneyStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        ungroupedActivities:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningActivityResponse'
+    LearningJourneySummaryResponse:
+      type: object
+      required:
+      - id
+      - promise
+      - status
+      - rawIntent
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        nextActivityId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        nextActivityTitle:
+          type:
+          - string
+          - 'null'
+        promise:
+          type: string
+        rawIntent:
+          type: string
+        status:
+          $ref: '#/components/schemas/JourneyStatus'
+    LearningObjectiveResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - subjectUserId
+      - verb
+      - statement
+      - successCriteria
+      - orderIndex
+      - status
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+          format: int32
+        statement:
+          type: string
+        status:
+          $ref: '#/components/schemas/ObjectiveStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+        successCriteria:
+          type: string
+        verb:
+          type: string
+    LearningRecommendationResponse:
+      type: object
+      required:
+      - activityId
+      - objectiveId
+      - title
+      - objectiveIds
+      - evidenceIds
+      - rationale
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        basedOnSessionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        objectiveIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        rationale:
+          type: string
+        title:
+          type: string
+    LearningResponseBody:
+      type: object
+      required:
+      - id
+      - value
+      properties:
+        id:
+          type: string
+        value:
+          type: string
+    LearningSessionResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - activityId
+      - subjectUserId
+      - actorIdentityId
+      - status
+      - questionPlan
+      - startedAt
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        actorIdentityId:
+          type: string
+          format: uuid
+        finishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        questionPlan:
+          type: object
+        result:
+          type:
+          - object
+          - 'null'
+        startedAt:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/LearningSessionStatus'
+        subjectUserId:
+          type: string
+          format: uuid
+    LearningSessionStatus:
       type: string
       enum:
-      - graded
-      - pending_manual
-    ItemStats:
-      type: object
-      required:
-      - questionId
-      - correctRate
-      - avgTimeMs
-      properties:
-        avgTimeMs:
-          type: number
-          format: double
-        correctRate:
-          type: number
-          format: double
-        discriminationIdx:
-          type:
-          - number
-          - 'null'
-          format: double
-        questionId:
-          type: string
-          format: uuid
-    ListAgentsResponse:
-      type: object
-      required:
-      - agents
-      properties:
-        agents:
-          type: array
-          items:
-            $ref: '#/components/schemas/AgentSummary'
-    ListAssessmentsResponse:
-      type: object
-      required:
-      - assessments
-      - total
-      properties:
-        assessments:
-          type: array
-          items:
-            $ref: '#/components/schemas/AssessmentSummary'
-        total:
-          type: integer
-          format: int64
-    ListAttemptsResponse:
-      type: object
-      required:
-      - attempts
-      - total
-      properties:
-        attempts:
-          type: array
-          items:
-            $ref: '#/components/schemas/Attempt'
-        total:
-          type: integer
-          format: int64
+      - in_progress
+      - finished
+      - abandoned
     ListAuditLogsResponse:
       type: object
       required:
@@ -3479,81 +2343,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AuditLogEntry'
-        total:
-          type: integer
-          format: int64
-    ListDeepDivesQuery:
-      type: object
-      properties:
-        category:
-          type:
-          - string
-          - 'null'
-        search:
-          type:
-          - string
-          - 'null'
-        status:
-          type:
-          - string
-          - 'null'
-    ListDeepDivesResponse:
-      type: object
-      required:
-      - deepDives
-      properties:
-        deepDives:
-          type: array
-          items:
-            $ref: '#/components/schemas/DeepDive'
-    ListMySessionsResponse:
-      type: object
-      required:
-      - sessions
-      - total
-      properties:
-        sessions:
-          type: array
-          items:
-            $ref: '#/components/schemas/SessionSummary'
-        total:
-          type: integer
-          format: int64
-    ListQuestionsResponse:
-      type: object
-      required:
-      - questions
-      - total
-      properties:
-        next_cursor:
-          type:
-          - string
-          - 'null'
-        questions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Question'
-        total:
-          type: integer
-          format: int64
-    ListTokensResponse:
-      type: object
-      required:
-      - tokens
-      - total
-      - page
-      - pageSize
-      properties:
-        page:
-          type: integer
-          format: int64
-        pageSize:
-          type: integer
-          format: int64
-        tokens:
-          type: array
-          items:
-            $ref: '#/components/schemas/TokenEntry'
         total:
           type: integer
           format: int64
@@ -3602,348 +2391,140 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
-    PatchDeepDiveBody:
-      type: object
-      properties:
-        status:
-          type:
-          - string
-          - 'null'
-        userNote:
-          type:
-          - string
-          - 'null'
-    PatchSessionBody:
+    ObjectiveActivityBody:
       type: object
       required:
-      - status
+      - objectiveId
+      - activityId
       properties:
-        status:
-          $ref: '#/components/schemas/SessionStatus'
+        activityId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+    ObjectiveStatus:
+      type: string
+      enum:
+      - active
+      - paused
+      - completed
     PatchUserAdminBody:
       type: object
       properties:
-        disabled:
-          type:
-          - boolean
-          - 'null'
-        plan:
-          type:
-          - string
-          - 'null'
         role:
           type:
           - string
           - 'null'
-    PendingAttemptRow:
-      type: object
-      required:
-      - attempt_id
-      - session_id
-      - user_id
-      - user_display_name
-      - question_id
-      - question_prompt
-      - response_body
-      - response_word_count
-      - created_at
-      properties:
-        attempt_id:
-          type: string
-          format: uuid
-        created_at:
-          type: string
-          format: date-time
-        question_id:
-          type: string
-          format: uuid
-        question_prompt:
-          type: string
-        response_body:
-          type: string
-        response_word_count:
-          type: integer
-          format: int32
-        session_id:
-          type: string
-          format: uuid
-        user_display_name:
-          type: string
-        user_email:
-          type:
-          - string
-          - 'null'
-        user_id:
-          type: string
-          format: uuid
-    Plan:
-      type: string
-      enum:
-      - free
-      - premium
-    PlanItem:
-      type: object
-      required:
-      - question_id
-      - version
-      properties:
-        option_order:
-          type:
-          - array
-          - 'null'
-          items:
-            type: integer
-            minimum: 0
-        question_id:
-          type: string
-          format: uuid
-        section:
-          type:
-          - string
-          - 'null'
-        version:
-          type: integer
-          format: int32
-    PublishDeepDiveBody:
-      type: object
-      required:
-      - bodyMarkdown
-      properties:
-        bodyMarkdown:
-          type: string
-        category:
-          type:
-          - string
-          - 'null'
         status:
           type:
           - string
           - 'null'
-    Question:
-      type: object
-      required:
-      - id
-      - kind
-      - prompt
-      - version
-      - status
-      - points
-      - payload
-      - rating
-      - attemptsCount
-      - createdBy
-      - createdAt
-      - updatedAt
-      properties:
-        attemptsCount:
-          type: integer
-          format: int32
-        codeSnippet: {}
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: string
-          format: uuid
-        deepDive:
-          type:
-          - string
-          - 'null'
-        explanation:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
-        kind:
-          $ref: '#/components/schemas/QuestionKind'
-        payload: {}
-        points:
-          type: integer
-          format: int32
-        prompt:
-          type: string
-        rating:
-          type: number
-          format: double
-        source:
-          type:
-          - string
-          - 'null'
-        status:
-          $ref: '#/components/schemas/QuestionStatus'
-        tags:
-          type: array
-          items:
-            type: string
-        updatedAt:
-          type: string
-          format: date-time
-        version:
-          type: integer
-          format: int32
-    QuestionDeepenResponse:
-      type: object
-      required:
-      - question
-      - related
-      properties:
-        question:
-          $ref: '#/components/schemas/Question'
-        related:
-          type: array
-          items:
-            $ref: '#/components/schemas/Question'
-    QuestionImport:
+    PreviewActivityResponse:
       type: object
       required:
       - kind
-      - prompt
-      - payload
+      - title
+      - purpose
+      - estimatedMinutes
       properties:
-        explanation:
-          type:
-          - string
-          - 'null'
+        estimatedMinutes:
+          type: integer
+          format: int64
         kind:
-          $ref: '#/components/schemas/QuestionKind'
-        payload: {}
-        points:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        prompt:
+          $ref: '#/components/schemas/ActivityKind'
+        purpose:
           type: string
-        tags:
-          type: array
-          items:
-            type: string
-    QuestionInsert:
+        title:
+          type: string
+    PreviewLearningBody:
       type: object
       required:
-      - kind
       - prompt
-      - payload
-      - tags
       properties:
-        deepDive:
-          type:
-          - string
-          - 'null'
-        explanation:
-          type:
-          - string
-          - 'null'
-        kind:
-          $ref: '#/components/schemas/QuestionKind'
-        payload: {}
-        points:
-          type:
-          - integer
-          - 'null'
-          format: int32
         prompt:
           type: string
-        source:
-          type:
-          - string
-          - 'null'
-        status:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/QuestionStatus'
-        tags:
+    PreviewLearningResponse:
+      type: object
+      required:
+      - normalizedStatement
+      - promise
+      - templateId
+      - templateVersion
+      - objectives
+      - firstActivity
+      properties:
+        firstActivity:
+          $ref: '#/components/schemas/PreviewActivityResponse'
+        normalizedStatement:
+          type: string
+        objectives:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/PreviewObjectiveResponse'
+        promise:
+          type: string
+        templateId:
+          type: string
+        templateVersion:
+          type: integer
+          format: int32
+          minimum: 0
+    PreviewObjectiveResponse:
+      type: object
+      required:
+      - verb
+      - statement
+      - successCriteria
+      properties:
+        statement:
+          type: string
+        successCriteria:
+          type: string
+        verb:
+          type: string
     QuestionKind:
       type: string
       enum:
-      - mc
-      - tf
-      - short
+      - multiple_choice
+      - true_false
+      - short_answer
+      - numeric
       - essay
       - code
-    QuestionPatch:
-      type: object
-      properties:
-        deepDive:
-          type:
-          - string
-          - 'null'
-        explanation:
-          type:
-          - string
-          - 'null'
-        payload: {}
-        points:
-          type:
-          - integer
-          - 'null'
-          format: int32
-        prompt:
-          type:
-          - string
-          - 'null'
-        source:
-          type:
-          - string
-          - 'null'
-        tags:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-    QuestionPlan:
+    QuestionOption:
       type: object
       required:
-      - items
+      - id
+      - text
+      - is_correct
       properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/PlanItem'
-    QuestionRating:
-      type: object
-      required:
-      - rating
-      - attempts_count
-      properties:
-        attempts_count:
-          type: integer
-          format: int32
-        rating:
-          type: number
-          format: double
-    QuestionStatus:
-      type: string
-      enum:
-      - draft
-      - live
-      - archived
-    QuestionVersion:
+        id:
+          type: string
+        is_correct:
+          type: boolean
+        text:
+          type: string
+    QuestionResponse:
       type: object
       required:
       - id
       - questionId
       - version
+      - generationRunId
+      - kind
       - prompt
-      - payload
-      - createdAt
+      - options
+      - acceptedAnswers
+      - points
+      - reviewStatus
+      - sourceReferences
       properties:
-        archivedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        codeSnippet: {}
-        createdAt:
-          type: string
-          format: date-time
-        deepDive:
+        acceptedAnswers:
+          type: array
+          items:
+            type: string
+        difficulty:
           type:
           - string
           - 'null'
@@ -3951,35 +2532,41 @@ components:
           type:
           - string
           - 'null'
+        generationRunId:
+          type: string
+          format: uuid
         id:
           type: string
           format: uuid
-        payload: {}
+        kind:
+          $ref: '#/components/schemas/QuestionKind'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionOption'
+        points:
+          type: integer
+          format: int32
+          minimum: 0
         prompt:
           type: string
         questionId:
           type: string
           format: uuid
-        source:
+        rationale:
           type:
           - string
           - 'null'
+        reviewStatus:
+          $ref: '#/components/schemas/ContentReviewStatus'
+        sourceReferences:
+          type: array
+          items:
+            type: string
         version:
           type: integer
           format: int32
-    QuotaSettings:
-      type: object
-      required:
-      - agents
-      - assessments
-      - questions
-      properties:
-        agents:
-          $ref: '#/components/schemas/TierQuota'
-        assessments:
-          $ref: '#/components/schemas/TierQuota'
-        questions:
-          $ref: '#/components/schemas/TierQuota'
+          minimum: 0
     RateLimitSettings:
       type: object
       required:
@@ -3990,13 +2577,46 @@ components:
           $ref: '#/components/schemas/TierLimit'
         premium:
           $ref: '#/components/schemas/TierLimit'
+    RecommendationBody:
+      type: object
+      required:
+      - objectives
+      properties:
+        objectives:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectiveActivityBody'
+    RecommendationResponse:
+      type: object
+      required:
+      - journeyId
+      - objectiveId
+      - activityId
+      - reason
+      - evidenceIds
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        evidenceIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reason:
+          type: string
     RegisterBody:
       type: object
       required:
       - email
       - name
       - password
-      - role
       properties:
         email:
           type: string
@@ -4004,298 +2624,304 @@ components:
           type: string
         password:
           type: string
-        role:
-          type: string
+    ReviewTaskOutcome:
+      type: string
+      enum:
+      - reviewed
+      - rejected
+    ReviewTaskSubmissionBody:
+      type: object
+      required:
+      - outcome
+      properties:
+        feedback: {}
+        outcome:
+          $ref: '#/components/schemas/ReviewTaskOutcome'
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
     Role:
       type: string
       enum:
       - user
       - admin
-      - agent
-    RunResponse:
+    SaveAnswerBody:
       type: object
       required:
-      - ok
-      - tool
-      - result
+      - assessmentItemId
+      - questionVersionId
+      - response
       properties:
-        error:
-          type:
-          - string
-          - 'null'
-        ok:
-          type: boolean
-        result: {}
-        tool:
+        assessmentItemId:
           type: string
-    Scope:
-      type: string
-      description: |-
-        Token scope as enforced by the `api_tokens.scopes` CHECK constraint.
-
-        The wire strings (used in JSON and stored in Postgres `text[]`) must stay in
-        lock-step with the migration's CHECK list — see
-        `db/migrations/20260520210000_p7_stats_feedback_keys.sql`. `from_str` is the
-        single point of translation; anything not listed here is rejected as `UnknownScope`.
-      enum:
-      - assessment.read
-      - assessment.write
-      - attempt.read
-      - attempt.write
-      - stats.read
-      - feedback.write
-      - plan.read
-      - plan.write
-      - admin
-    Session:
+          format: uuid
+        questionVersionId:
+          type: string
+          format: uuid
+        response: {}
+    SnapshotResponse:
       type: object
       required:
-      - id
-      - user_id
-      - owner_id
-      - kind
-      - question_plan
-      - status
-      - affects_rating
-      - rating_snapshot
-      - started_at
+      - journeyId
+      - objectiveId
+      - mastery
+      - confidence
+      - evidenceCount
+      - calculatedAt
       properties:
-        affects_rating:
-          type: boolean
-        assessment_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        assessment_title:
-          type:
-          - string
-          - 'null'
-        course_title:
-          type:
-          - string
-          - 'null'
-        deadline_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        filter:
-          type: object
-        finished_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        id:
+        calculatedAt:
           type: string
-          format: uuid
-        kind:
-          $ref: '#/components/schemas/SessionKind'
-        owner_id:
-          type: string
-          format: uuid
-        question_plan:
-          $ref: '#/components/schemas/QuestionPlan'
-        rating_snapshot:
-          type: object
-        result:
-          type: object
-        started_at:
-          type: string
-          format: date-time
-        status:
-          $ref: '#/components/schemas/SessionStatus'
-        user_id:
-          type: string
-          format: uuid
-    SessionKind:
-      type: string
-      enum:
-      - assessment
-      - exam
-      - practice
-    SessionQuestion:
-      type: object
-      required:
-      - id
-      - kind
-      - prompt
-      - version
-      - points
-      - payload
-      properties:
-        id:
-          type: string
-          format: uuid
-        kind:
-          $ref: '#/components/schemas/QuestionKind'
-        option_order:
-          type:
-          - array
-          - 'null'
-          items:
-            type: integer
-            minimum: 0
-        payload:
-          type: object
-        points:
+        confidence:
+          type: number
+          format: float
+        evidenceCount:
           type: integer
           format: int32
+          minimum: 0
+        journeyId:
+          type: string
+          format: uuid
+        mastery:
+          type: number
+          format: float
+        objectiveId:
+          type: string
+          format: uuid
+    StartAttemptBody:
+      type: object
+      required:
+      - learningSessionId
+      properties:
+        learningSessionId:
+          type: string
+          format: uuid
+    StartGenerationRunBody:
+      type: object
+      required:
+      - operation
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        operation:
+          type: string
+        provider:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type:
+          - string
+          - 'null'
+    StartLearningBody:
+      type: object
+      required:
+      - email
+      - displayName
+      - prompt
+      - idempotencyKey
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        idempotencyKey:
+          type: string
         prompt:
           type: string
+    StartLearningResponse:
+      type: object
+      required:
+      - token
+      - userId
+      - email
+      - displayName
+      - goalId
+      - journeyId
+      - templateId
+      - templateVersion
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        goalId:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        templateId:
+          type: string
+        templateVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        token:
+          type: string
+        userId:
+          type: string
+          format: uuid
+    StartTaskSubmissionBody:
+      type: object
+      required:
+      - contentVersion
+      - response
+      properties:
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        evaluationMethod:
+          $ref: '#/components/schemas/TaskEvaluationMethod'
+        response: {}
+    StreakBody:
+      type: object
+      required:
+      - journeyId
+      - activityId
+      - qualifyingEventKey
+      - learnerTimezone
+      - qualifyingDay
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        learnerTimezone:
+          type: string
+        qualifyingDay:
+          type: string
+        qualifyingEventKey:
+          type: string
+    StreakResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - activityId
+      - qualifyingEventKey
+      - qualifyingDay
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        qualifyingDay:
+          type: string
+        qualifyingEventKey:
+          type: string
+    TaskEvaluationMethod:
+      type: string
+      enum:
+      - self_review
+      - automatic
+      - agent
+      - manual
+    TaskReviewStatus:
+      type: string
+      enum:
+      - not_required
+      - pending
+      - complete
+    TaskRubric:
+      type: object
+      required:
+      - version
+      - criteria
+      properties:
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskRubricCriterion'
+        passingScore:
+          type:
+          - number
+          - 'null'
+          format: float
         version:
           type: integer
           format: int32
-    SessionResult:
+          minimum: 0
+    TaskRubricCriterion:
       type: object
       required:
-      - points_awarded
-      - max_points
-      - percent
+      - id
+      - objectiveId
+      - description
+      - maxPoints
+      - required
       properties:
-        max_points:
+        description:
+          type: string
+        id:
+          type: string
+        maxPoints:
           type: integer
           format: int32
-        percent:
-          type: number
-          format: double
-        points_awarded:
+          minimum: 0
+        objectiveId:
+          type: string
+          format: uuid
+        required:
+          type: boolean
+    TaskSubmissionResponse:
+      type: object
+      required:
+      - id
+      - taskId
+      - journeyId
+      - contentVersion
+      - response
+      - evaluationMethod
+      - status
+      - reviewStatus
+      properties:
+        contentVersion:
           type: integer
           format: int32
-    SessionStatus:
+          minimum: 0
+        evaluationMethod:
+          $ref: '#/components/schemas/TaskEvaluationMethod'
+        feedback: {}
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        response: {}
+        reviewStatus:
+          $ref: '#/components/schemas/TaskReviewStatus'
+        score:
+          type:
+          - number
+          - 'null'
+          format: float
+        status:
+          $ref: '#/components/schemas/TaskSubmissionStatus'
+        taskId:
+          type: string
+          format: uuid
+    TaskSubmissionStatus:
       type: string
       enum:
       - in_progress
-      - finished
+      - submitted
+      - in_review
+      - reviewed
+      - rejected
       - abandoned
-    SessionSummary:
-      type: object
-      required:
-      - id
-      - kind
-      - status
-      - startedAt
-      - attemptNumber
-      - totalAttempts
-      properties:
-        assessmentId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        assessmentTitle:
-          type:
-          - string
-          - 'null'
-        attemptNumber:
-          type: integer
-          format: int64
-        finishedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        id:
-          type: string
-          format: uuid
-        kind:
-          type: string
-        maxPoints:
-          type:
-          - number
-          - 'null'
-          format: double
-        pointsAwarded:
-          type:
-          - number
-          - 'null'
-          format: double
-        startedAt:
-          type: string
-          format: date-time
-        status:
-          type: string
-        totalAttempts:
-          type: integer
-          format: int64
-    StudyPlan:
-      type: object
-      required:
-      - id
-      - user_id
-      - goal
-      - lookback_days
-      - generated_at
-      - weeks
-      properties:
-        generated_at:
-          type: string
-          format: date-time
-        goal:
-          type: string
-        id:
-          type: string
-          format: uuid
-        lookback_days:
-          type: integer
-          format: int64
-        user_id:
-          type: string
-          format: uuid
-        weeks:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyPlanWeek'
-    StudyPlanItem:
-      type: object
-      required:
-      - kind
-      - ref_id
-      - hours_est
-      properties:
-        hours_est:
-          type: number
-          format: double
-        kind:
-          type: string
-        ref_id:
-          type: string
-    StudyPlanWeek:
-      type: object
-      required:
-      - week_num
-      - focus
-      - items
-      properties:
-        focus:
-          type: string
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/StudyPlanItem'
-        week_num:
-          type: integer
-          minimum: 0
-    Tag:
-      type: object
-      required:
-      - id
-      - name
-      - createdAt
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        description:
-          type:
-          - string
-          - 'null'
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
     TierLimit:
       type: object
       required:
@@ -4310,125 +2936,37 @@ components:
           type: integer
           format: int32
           minimum: 0
-    TierQuota:
-      type: object
-      required:
-      - free
-      - premium
-      properties:
-        free:
-          type: integer
-          format: int64
-        premium:
-          type: integer
-          format: int64
-    TokenEntry:
+    TimelineEventResponse:
       type: object
       required:
       - id
-      - name
-      - ownerId
-      - ownerRole
-      - status
-      - scopes
-      - expiresAt
-      - createdAt
+      - kind
+      - title
+      - occurredAt
       properties:
-        createdAt:
-          type: string
-          format: date-time
-        expiresAt:
-          type: string
-          format: date-time
+        activityId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         id:
           type: string
           format: uuid
-        lastUsedAt:
-          type:
-          - string
-          - 'null'
+        kind:
+          type: string
+        occurredAt:
+          type: string
           format: date-time
-        name:
-          type: string
-        ownerDisplayName:
-          type:
-          - string
-          - 'null'
-        ownerEmail:
-          type:
-          - string
-          - 'null'
-        ownerId:
-          type: string
-          format: uuid
-        ownerRole:
-          type: string
-        revokedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        scopes:
-          type: array
-          items:
-            type: string
-        status:
-          type: string
-    UpdateAgentBody:
-      type: object
-      properties:
-        currentGoal:
-          type:
-          - string
-          - 'null'
-        focusTags:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-        label:
-          type:
-          - string
-          - 'null'
-        nextTarget:
-          type:
-          - string
-          - 'null'
-    UpdateAssessmentRequest:
-      type: object
-      properties:
-        description:
-          type:
-          - string
-          - 'null'
-        objectives:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-        status:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/AssessmentStatus'
         title:
-          type:
-          - string
-          - 'null'
-    UpdateSectionBody:
+          type: string
+    TransitionGenerationRunBody:
       type: object
+      required:
+      - status
       properties:
-        mix: {}
-        title:
-          type:
-          - string
-          - 'null'
-        weight:
-          type:
-          - number
-          - 'null'
-          format: double
+        error: {}
+        status:
+          $ref: '#/components/schemas/GenerationStatus'
     UpdateSettingsBody:
       type: object
       description: Partial update for platform settings — any omitted field is left unchanged.
@@ -4437,10 +2975,6 @@ components:
           type:
           - boolean
           - 'null'
-        quota:
-          oneOf:
-          - type: 'null'
-          - $ref: '#/components/schemas/QuotaSettings'
         ratelimit:
           oneOf:
           - type: 'null'
@@ -4451,16 +2985,11 @@ components:
       - id
       - displayName
       - role
-      - plan
+      - status
       - createdAt
       properties:
         createdAt:
           type: string
-          format: date-time
-        deactivatedAt:
-          type:
-          - string
-          - 'null'
           format: date-time
         displayName:
           type: string
@@ -4471,15 +3000,10 @@ components:
         id:
           type: string
           format: uuid
-        ownerUserId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        plan:
-          type: string
         role:
           $ref: '#/components/schemas/Role'
+        status:
+          $ref: '#/components/schemas/UserStatus'
     UserInfo:
       type: object
       required:
@@ -4497,19 +3021,8 @@ components:
           type: string
         role:
           type: string
-    UserTagRating:
-      type: object
-      required:
-      - tag_id
-      - rating
-      - attempts_count
-      properties:
-        attempts_count:
-          type: integer
-          format: int32
-        rating:
-          type: number
-          format: double
-        tag_id:
-          type: string
-          format: uuid
+    UserStatus:
+      type: string
+      enum:
+      - active
+      - deactivated

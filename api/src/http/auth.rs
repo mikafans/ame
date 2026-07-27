@@ -4,15 +4,11 @@ use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use axum::{Json, http::StatusCode, response::IntoResponse};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    auth::{
-        extractor::CachedTokenInfo,
-        token::{generate_secret, hash_secret},
-    },
+    auth::token::{generate_secret, hash_secret},
     domain::error::{ApiError, FieldError},
     http::AppState,
 };
@@ -25,7 +21,6 @@ pub struct RegisterBody {
     pub email: String,
     pub name: String,
     pub password: String,
-    pub role: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -60,10 +55,26 @@ fn set_token_cookie_header(token: &str, secure: bool) -> String {
     format!("ame_token={token}; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=2592000")
 }
 
-/// POST /v1/auth/register — register a new user with email and password.
+fn registration_error(error: sqlx::Error) -> ApiError {
+    if error
+        .as_database_error()
+        .and_then(|database| database.code())
+        .as_deref()
+        == Some("23505")
+    {
+        ApiError::Validation(vec![FieldError {
+            field: "email".into(),
+            message: "email already registered".into(),
+        }])
+    } else {
+        ApiError::Internal(error.into())
+    }
+}
+
+/// POST /public/v1/auth/register — register a new user with email and password.
 #[utoipa::path(
     post,
-    path = "/v1/auth/register",
+    path = "/public/v1/auth/register",
     request_body = RegisterBody,
     responses(
         (status = 201, description = "User registered", body = AuthResponse),
@@ -100,73 +111,25 @@ pub async fn register(
         }]));
     }
 
-    // Validate role — only user is valid for human registration
-    let normalized_role = body.role.to_lowercase();
-    match normalized_role.as_str() {
-        "user" => {}
-        _ => {
-            return Err(ApiError::Validation(vec![FieldError {
-                field: "role".into(),
-                message: "must be 'user'".to_string(),
-            }]));
-        }
-    }
-
-    // Hash password
+    // Human registration always creates a learner; role elevation is an
+    // administrative action, never a client-controlled registration field.
     let password_hash = hash_password(&body.password)?;
-
-    // Insert user
     let user_id = Uuid::now_v7();
-    let result = sqlx::query(
-        "INSERT INTO tb_users (id, email, display_name, role, password_hash)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, display_name, role, plan, created_at, NULL::uuid AS owner_user_id",
-    )
-    .bind(user_id)
-    .bind(trimmed_email)
-    .bind(&body.name)
-    .bind(&normalized_role)
-    .bind(&password_hash)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| {
-        // Check for unique violation on email
-        if e.to_string()
-            .contains("duplicate key value violates unique constraint")
-        {
-            ApiError::Validation(vec![FieldError {
-                field: "email".into(),
-                message: "email already registered".into(),
-            }])
-        } else {
-            ApiError::Internal(e.into())
-        }
-    })?
-    .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("insert returned no rows")))?;
-
-    let user_id: Uuid = result.get("id");
-    let email: String = result.get("email");
-    let display_name: String = result.get("display_name");
-    let role: String = result.get("role");
-    let plan: String = result.get("plan");
-    let created_at: time::OffsetDateTime = result.get("created_at");
-    let owner_user_id: Option<Uuid> = result.get("owner_user_id");
-
-    let token_str = issue_token(
+    let email = crate::auth::token::canonical_email(trimmed_email);
+    let registered = ame_platform_postgres::authentication_http::register_user(
         &state.pool,
-        &state.valkey,
-        state.config.login.ttl_seconds,
         user_id,
-        Some(email.clone()),
-        display_name.clone(),
-        role.clone(),
-        plan,
-        created_at,
-        owner_user_id,
-        None,
-        "free".to_string(),
+        &email,
+        body.name.trim(),
+        &password_hash,
     )
-    .await?;
+    .await
+    .map_err(registration_error)?;
+    let user_id = registered.id;
+    let email = registered.email;
+    let display_name = registered.display_name;
+    let role = registered.role;
+    let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
     metrics::counter!("signup_total").increment(1);
@@ -186,10 +149,10 @@ pub async fn register(
     ))
 }
 
-/// POST /v1/auth/login — authenticate with email and password.
+/// POST /public/v1/auth/login — authenticate with email and password.
 #[utoipa::path(
     post,
-    path = "/v1/auth/login",
+    path = "/public/v1/auth/login",
     request_body = LoginBody,
     responses(
         (status = 200, description = "Logged in", body = AuthResponse),
@@ -219,29 +182,24 @@ pub async fn login(
         return Err(ApiError::TooManyRequests);
     }
 
-    // Fetch user by email canonical
-    let user_row = sqlx::query(
-        "SELECT u.id, u.email, u.display_name, u.role, u.password_hash, u.deactivated_at, \
-                u.plan, u.created_at, NULL::uuid AS owner_user_id, \
-                NULL::timestamptz as owner_deactivated_at, \
-                u.plan as owner_plan \
-         FROM tb_users u \
-         WHERE u.email_canonical = $1",
-    )
-    .bind(&canonical)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.into()))?;
+    // Fetch only clean user columns. Identity status is checked by the
+    // authentication repository on the subsequent request.
+    let user_row =
+        ame_platform_postgres::authentication_http::find_login_user(&state.pool, &canonical)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
 
     // A valid dummy hash to equalize timing on the miss path
     let dummy_hash = "$argon2id$v=19$m=19456,t=2,p=1$fgRxq3Ut+2IcRLdMp41ROw$xzZcJdQfimlft7Byw21EMnT/p4TcRAJa68gHeUK2EZ4";
 
     let (hash_to_verify, is_valid_user) = match &user_row {
         Some(row) => {
-            let hash: Option<String> = row.get("password_hash");
-            let deactivated_at: Option<time::OffsetDateTime> = row.get("deactivated_at");
-            match (hash, deactivated_at) {
-                (Some(h), None) => (h.to_string(), true),
+            match (
+                row.password_hash.clone(),
+                row.status.as_str(),
+                row.identity_status.as_str(),
+            ) {
+                (Some(h), "active", "active") => (h.to_string(), true),
                 _ => (dummy_hash.to_string(), false),
             }
         }
@@ -255,39 +213,20 @@ pub async fn login(
         return Err(ApiError::Unauthorized);
     }
 
-    let user_row = match user_row {
-        Some(row) => row,
+    let user = match user_row {
+        Some(user) => user,
         None => {
             metrics::counter!("login_total", "result" => "failure").increment(1);
             return Err(ApiError::Unauthorized);
         }
     };
 
-    let user_id: Uuid = user_row.get("id");
-    let email: String = user_row.get("email");
-    let display_name: String = user_row.get("display_name");
-    let role: String = user_row.get("role");
-    let plan: String = user_row.get("plan");
-    let created_at: time::OffsetDateTime = user_row.get("created_at");
-    let owner_user_id: Option<Uuid> = user_row.get("owner_user_id");
-    let owner_deactivated_at: Option<time::OffsetDateTime> = user_row.get("owner_deactivated_at");
-    let owner_plan: String = user_row.get("owner_plan");
+    let user_id = user.id;
+    let email = user.email;
+    let display_name = user.display_name;
+    let role = user.role;
 
-    let token_str = issue_token(
-        &state.pool,
-        &state.valkey,
-        state.config.login.ttl_seconds,
-        user_id,
-        Some(email.clone()),
-        display_name.clone(),
-        role.clone(),
-        plan,
-        created_at,
-        owner_user_id,
-        owner_deactivated_at,
-        owner_plan,
-    )
-    .await?;
+    let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
     let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
 
     metrics::counter!("login_total", "result" => "success").increment(1);
@@ -309,102 +248,31 @@ pub async fn login(
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
 async fn issue_token(
     pool: &sqlx::PgPool,
-    valkey: &deadpool_redis::Pool,
     ttl_seconds: u64,
     user_id: Uuid,
-    email: Option<String>,
-    display_name: String,
-    role: String,
-    plan: String,
-    created_at: time::OffsetDateTime,
-    owner_user_id: Option<Uuid>,
-    owner_deactivated_at: Option<time::OffsetDateTime>,
-    owner_plan: String,
 ) -> Result<String, ApiError> {
     let token_id = Uuid::now_v7();
     let secret = generate_secret();
     let token_hash = hash_secret(&secret);
     let expires_at = time::OffsetDateTime::now_utc() + time::Duration::seconds(ttl_seconds as i64);
-    let scopes: Vec<String> = scopes_for_role(&role)
-        .into_iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    // 1. Insert session row into tb_login_sessions (source of truth, fail CLOSED)
-    sqlx::query(
-        "INSERT INTO tb_login_sessions (id, user_id, token_hash, scopes, expires_at) \
-         VALUES ($1, $2, $3, $4, $5)",
+    // Insert the session row into the clean baseline (source of truth, fail closed).
+    ame_platform_postgres::authentication_http::issue_login_session(
+        pool,
+        token_id,
+        user_id,
+        &token_hash,
+        expires_at,
     )
-    .bind(token_id)
-    .bind(user_id)
-    .bind(&token_hash)
-    .bind(&scopes)
-    .bind(expires_at)
-    .execute(pool)
     .await
     .map_err(|e| ApiError::Internal(e.into()))?;
-
-    // 2. Warm Valkey cache (fail-open, ignore errors)
-    let claims = CachedTokenInfo {
-        token_hash,
-        scopes,
-        revoked_at: None,
-        expires_at,
-        user_id,
-        email,
-        display_name,
-        role,
-        plan,
-        created_at,
-        owner_user_id,
-        user_deactivated_at: None,
-        owner_deactivated_at,
-        owner_plan,
-    };
-
-    if let Ok(serialized) = serde_json::to_string(&claims)
-        && let Ok(mut conn) = valkey.get().await
-    {
-        use redis::AsyncCommands;
-        let login_key = format!("ame:login:{}", token_id);
-        let _: Result<(), _> = conn.set_ex(&login_key, serialized, ttl_seconds).await;
-    }
 
     Ok(crate::auth::token::format_token(
         crate::auth::token::TokenKind::Login,
         token_id,
         &secret,
     ))
-}
-
-fn scopes_for_role(role: &str) -> Vec<&'static str> {
-    match role {
-        "agent" => vec!["assessment.read"],
-        "admin" => vec![
-            "assessment.read",
-            "assessment.write",
-            "attempt.read",
-            "attempt.write",
-            "stats.read",
-            "feedback.write",
-            "plan.read",
-            "plan.write",
-            "admin",
-        ],
-        _ => vec![
-            "assessment.read",
-            "assessment.write",
-            "attempt.read",
-            "attempt.write",
-            "stats.read",
-            "feedback.write",
-            "plan.read",
-            "plan.write",
-        ],
-    }
 }
 
 pub fn hash_password(password: &str) -> Result<String, ApiError> {
@@ -426,10 +294,10 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
         .is_ok()
 }
 
-/// POST /v1/auth/logout — clear the HttpOnly token cookie.
+/// POST /api/v1/auth/logout — clear the HttpOnly token cookie.
 #[utoipa::path(
     post,
-    path = "/v1/auth/logout",
+    path = "/api/v1/auth/logout",
     responses(
         (status = 200, description = "Logged out")
     ),
@@ -457,23 +325,13 @@ pub async fn logout(
                 })
                 .and_then(|v| crate::auth::token::parse_token_value(&v))
         })
+        && parsed.kind == crate::auth::token::TokenKind::Login
     {
-        // Login session: delete source-of-truth row + cache (both fail-open / best-effort).
-        let _ = sqlx::query("DELETE FROM tb_login_sessions WHERE id = $1")
-            .bind(parsed.id)
-            .execute(&state.pool)
-            .await;
-        if let Ok(mut conn) = state.valkey.get().await {
-            use redis::AsyncCommands;
-            let _: Result<(), _> = conn.del(format!("ame:login:{}", parsed.id)).await;
-        }
-
-        // Mark database tokens as revoked & invalidate cache (for PAT/agents)
-        let _ = sqlx::query("UPDATE tb_api_tokens SET revoked_at = NOW() WHERE id = $1")
-            .bind(parsed.id)
-            .execute(&state.pool)
-            .await;
-        crate::auth::extractor::invalidate_token(&state.valkey, parsed.id).await;
+        let _ = ame_platform_postgres::authentication_http::revoke_login_session(
+            &state.pool,
+            parsed.id,
+        )
+        .await;
     }
 
     (

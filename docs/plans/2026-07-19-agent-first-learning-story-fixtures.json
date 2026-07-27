@@ -1,0 +1,222 @@
+{
+  "version": 2,
+  "status": "design_only",
+  "purpose": "Behavior-certification fixtures for the agent-first AME learning redesign.",
+  "contract_style": "semantic",
+  "implementation_rule": "Every certification must pass as a real API and browser scenario on the recommended clean local stack before the corresponding release is complete.",
+  "identity_rule": "AME has one learner-owned resource model. An external agent, the AME web app, and another authorized client operate that model through the same unified API. There is no product-level agent account, agent scope, agent token, run door, or second resource API.",
+  "evidence_format": [
+    "redacted request and response trace",
+    "database assertions against the clean PostgreSQL baseline",
+    "browser evidence for learner-visible behavior",
+    "happy, evil, and edge behavior-test results",
+    "expected versus observed outcome and final pass/fail decision"
+  ],
+  "stories": [
+    {
+      "id": "C1",
+      "name": "agent_bootstraps_a_learner_journey",
+      "persona": "A learner asks an external agent for help.",
+      "request": "There is an AME platform. Use it to help me learn the topic I name.",
+      "input": {
+        "email": "learner-c1@example.test",
+        "intent": "Learn a learner-selected topic",
+        "constraints": {
+          "time_per_session": "20 minutes",
+          "starting_level": "beginner"
+        }
+      },
+      "agent_actions": [
+        "discover the public AME contract",
+        "create or resume the learner through the unified onboarding flow",
+        "preview a suitable versioned learning template",
+        "create the goal, journey, objectives, and first activity package"
+      ],
+      "must_persist": [
+        "one learner account",
+        "one resumable learner session",
+        "one normalized learning intent",
+        "one versioned learning goal and journey",
+        "observable objectives linked to skills or topics",
+        "an explanation, worked example, diagnostic/practice activity, and next action"
+      ],
+      "must_not_persist": [
+        "an agent account or agent-owned copy of the learner",
+        "a second agent-specific resource API",
+        "duplicate learner, journey, or starter activities on retry",
+        "learning progress before an activity is actually completed"
+      ],
+      "certification": [
+        "The external agent can complete the bootstrap without a manually designed curriculum.",
+        "The browser can open the same journey and resume it after refresh.",
+        "The same idempotency identity returns the existing bootstrap result.",
+        "The learner can see what they will learn, why the first activity exists, and what comes next."
+      ]
+    },
+    {
+      "id": "C2",
+      "name": "agent_composes_a_grounded_assessment",
+      "persona": "An agent turns the learner's objective into assessable work.",
+      "input": {
+        "journey": "the C1 learner-selected-topic journey",
+        "objective": "Explain one observable concept from the learner-selected topic",
+        "activity_mode": "practice"
+      },
+      "agent_actions": [
+        "create or select versioned questions",
+        "link each question to an objective or skill",
+        "include explanation, answer rationale, source/provenance, and difficulty metadata",
+        "compose an ordered assessment from those questions"
+      ],
+      "must_support": [
+        "multiple choice with stable answer identity despite presentation shuffling",
+        "true/false",
+        "short answer",
+        "essay or code response that can remain pending manual or agent review",
+        "question and assessment versioning without rewriting historical attempts"
+      ],
+      "certification": [
+        "The learner sees a readable assessment rather than raw generated JSON.",
+        "Every item is traceable to an objective and content provenance.",
+        "Editing a current question creates a new version and leaves old attempts reproducible.",
+        "An untrusted or incomplete generated item cannot be presented as approved learning content."
+      ]
+    },
+    {
+      "id": "C3",
+      "name": "learner_completes_practice_and_exam_with_results",
+      "persona": "The learner practices, then takes a meaningful exam.",
+      "input": {
+        "journey": "the C1 learner-selected-topic journey",
+        "practice_answers": "mixed correct and incorrect answers across two objectives",
+        "exam_mode": "graded"
+      },
+      "must_support": [
+        "separate practice and graded-exam behavior",
+        "durable activity session and attempt state",
+        "server-side scoring for objectively gradable items",
+        "explicit pending-review state for essay or code items",
+        "item feedback and explanation",
+        "objective-level evidence and performance summary",
+        "one primary next recommendation"
+      ],
+      "certification": [
+        "Shuffled multiple-choice options still grade and display the correct answer correctly.",
+        "A learner can resume an interrupted attempt without losing answers or creating a second attempt.",
+        "Results explain weak objectives using actual evidence, not a hardcoded topic rule.",
+        "The recommended activity starts without rebuilding the journey.",
+        "Practice results do not masquerade as a passed exam."
+      ]
+    },
+    {
+      "id": "C4",
+      "name": "agent_deepens_a_weak_topic",
+      "persona": "The learner asks the agent to explain the topic exposed by evidence.",
+      "input": {
+        "journey": "the C1 learner-selected-topic journey",
+        "weak_objective": "Understand the lifecycle and upgrade behavior of one selected concept",
+        "request": "Explain this deeply with a minimal example and tell me what to try next."
+      },
+      "agent_actions": [
+        "read the learner's objective-level evidence",
+        "create or retrieve a grounded deep-dive linked to the weak objective",
+        "include explanation, example, caveats, source references, and a small application task",
+        "offer the deep-dive as the next learner activity"
+      ],
+      "certification": [
+        "The deep-dive is linked to the actual weak objective and triggering evidence.",
+        "The learner can read it in the same journey and complete its application task.",
+        "Content provenance and review status are visible to the system and appropriate to the learner.",
+        "A generated explanation never silently changes mastery or exam status."
+      ]
+    },
+    {
+      "id": "C5",
+      "name": "progress_survives_sessions_and_clients",
+      "persona": "The learner returns later, possibly through a different agent or the browser.",
+      "input": {
+        "email": "learner-c5@example.test",
+        "completed_activities": 3,
+        "return_boundary": "next local calendar day"
+      },
+      "must_persist": [
+        "activity and attempt history",
+        "objective evidence and mastery state",
+        "learning timeline",
+        "streak state with explicit timezone and qualifying-event rules",
+        "next recommendation and its provenance"
+      ],
+      "certification": [
+        "The browser and an authorized external agent observe the same learner state.",
+        "A restart does not erase progress or duplicate completed activities.",
+        "A qualifying learning event updates the streak exactly once.",
+        "A failed or abandoned activity does not falsely advance mastery.",
+        "A second client can continue the learner's journey without creating a second identity."
+      ]
+    },
+    {
+      "id": "C6",
+      "name": "self_host_operator_runs_one_coherent_origin",
+      "persona": "A self-host operator validates the product before inviting learners.",
+      "input": {
+        "stack": [
+          "postgres",
+          "valkey",
+          "api",
+          "web",
+          "caddy"
+        ],
+        "email_delivery": false,
+        "public_origin": "http://localhost:28800"
+      },
+      "must_be_available": [
+        "/",
+        "/self-hosting",
+        "/public/llms.txt",
+        "/public/skill.json",
+        "/public/openapi.yaml",
+        "/healthz",
+        "/readyz"
+      ],
+      "certification": [
+        "The documented Postgres + Valkey + API + web + Caddy stack reaches its declared state from a clean volume.",
+        "Human docs and machine contracts agree with the same public origin.",
+        "Registration and C1 work without SMTP.",
+        "API or web restart preserves the learner journey and progress.",
+        "No system-level Caddy or undocumented alternate origin is required by the recommended stack."
+      ]
+    }
+  ],
+  "behavior_test_matrix": {
+    "happy": [
+      "new learner bootstrap is idempotent and produces a visible first learning moment",
+      "versioned questions compose into practice and graded assessments",
+      "objective evidence produces understandable results and one next action",
+      "a linked deep-dive becomes a readable, actionable activity",
+      "progress, streak, and recommendations survive restart and client changes",
+      "the five-service local stack serves one coherent public origin"
+    ],
+    "evil": [
+      "replay onboarding with the same idempotency identity",
+      "attempt to read or mutate another learner's journey, question, attempt, or deep-dive",
+      "submit an answer using a stale question or assessment version",
+      "forge a score, mastery update, streak event, or recommendation",
+      "present unreviewed generated content as approved or passed learning",
+      "continue a session after expiry or logout",
+      "claim an existing email account without the configured claim path",
+      "make a provider or Valkey dependency fail during bootstrap or completion"
+    ],
+    "edge": [
+      "bootstrap fails after each durable write and then retries",
+      "the learner abandons and resumes an in-progress attempt",
+      "an assessment contains no objectively gradable items",
+      "an assessment mixes objective, short-answer, essay, and code items",
+      "the same answer is submitted twice",
+      "a question is revised after an old attempt is complete",
+      "the learner has no evidence yet, or has tied objective scores",
+      "the local calendar day and configured learner timezone change at a streak boundary",
+      "the public document is requested directly and through Caddy"
+    ]
+  },
+  "release_rule": "C1-C6 remain pending until their API, database, browser, and behavior-test evidence is attached. A passing unit test or mock agent alone is not certification."
+}

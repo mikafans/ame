@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "templates": [
+    {
+      "id": "understand-a-subject",
+      "version": 1,
+      "title": "Learn a subject",
+      "description": "Build a clear foundation in a topic and practice the first useful skills.",
+      "promise": "Build a durable foundation through guided practice and review",
+      "when_to_use": "The learner wants to understand a subject and has no fixed exam or artifact yet.",
+      "inputs": {
+        "required": ["goal"],
+        "optional": ["current_level", "target_outcome", "available_time", "preferred_style"]
+      },
+      "stages": [
+        "orient",
+        "explain",
+        "diagnose",
+        "practice",
+        "apply",
+        "reflect",
+        "recommend"
+      ],
+      "activity_types": [
+        "explanation",
+        "example",
+        "diagnostic",
+        "practice",
+        "feedback",
+        "application",
+        "reflection",
+        "recommendation"
+      ],
+      "output_contract": [
+        "goal",
+        "objectives",
+        "first_session",
+        "objective_evidence",
+        "next_action"
+      ],
+      "quality_rules": [
+        "Every activity maps to at least one objective or skill.",
+        "Every incorrect diagnostic or practice response has an explanation.",
+        "The first session is bounded by the learner's available time.",
+        "The application activity asks the learner to use the idea, not only recall it.",
+        "The recommendation names one primary next action and its evidence."
+      ],
+      "allowed_capabilities": [
+        "goal.propose",
+        "objective.propose",
+        "activity.create",
+        "feedback.create",
+        "recommendation.create"
+      ],
+      "preview": {
+        "shows": ["promise", "objectives", "estimated_effort", "first_activity_purpose", "success_criteria"]
+      }
+    },
+    {
+      "id": "prepare-for-an-exam",
+      "version": 1,
+      "title": "Prepare for an exam",
+      "description": "Turn an exam target into a focused practice and review loop.",
+      "promise": "Build an exam-ready understanding through guided practice and review",
+      "when_to_use": "The learner names an exam, certification, syllabus, or target score.",
+      "inputs": {
+        "required": ["goal", "target_outcome"],
+        "optional": ["current_level", "available_time", "preferred_style"]
+      },
+      "stages": [
+        "orient",
+        "map_exam_objectives",
+        "diagnose",
+        "practice",
+        "review",
+        "timed_practice",
+        "recommend"
+      ],
+      "activity_types": [
+        "explanation",
+        "example",
+        "diagnostic",
+        "practice",
+        "feedback",
+        "timed_practice",
+        "reflection",
+        "recommendation"
+      ],
+      "output_contract": [
+        "goal",
+        "exam_objectives",
+        "first_session",
+        "objective_evidence",
+        "next_action"
+      ],
+      "quality_rules": [
+        "Every question maps to an exam objective.",
+        "Practice and timed practice are visibly different modes.",
+        "Every incorrect response has an explanation and review target.",
+        "The first session states its estimated effort and exam purpose.",
+        "Recommendations prioritize the weakest evidenced objective."
+      ],
+      "allowed_capabilities": [
+        "goal.propose",
+        "objective.propose",
+        "activity.create",
+        "timed_activity.create",
+        "feedback.create",
+        "recommendation.create"
+      ],
+      "preview": {
+        "shows": ["exam_target", "objectives", "estimated_effort", "practice_mode", "success_criteria"]
+      }
+    },
+    {
+      "id": "build-a-project",
+      "version": 1,
+      "title": "Build a project",
+      "description": "Learn a practical skill by producing a concrete artifact in small milestones.",
+      "promise": "Learn the concepts and produce a working first project",
+      "when_to_use": "The learner names a project, artifact, workflow, or practical outcome.",
+      "inputs": {
+        "required": ["goal", "target_outcome"],
+        "optional": ["current_level", "available_time", "preferred_style"]
+      },
+      "stages": [
+        "orient",
+        "define_artifact",
+        "explain",
+        "diagnose",
+        "practice",
+        "milestone",
+        "reflect",
+        "recommend"
+      ],
+      "activity_types": [
+        "explanation",
+        "example",
+        "diagnostic",
+        "practice",
+        "feedback",
+        "application",
+        "milestone",
+        "reflection",
+        "recommendation"
+      ],
+      "output_contract": [
+        "goal",
+        "objectives",
+        "artifact_definition",
+        "first_milestone",
+        "objective_evidence",
+        "next_action"
+      ],
+      "quality_rules": [
+        "Every milestone maps to an objective or skill.",
+        "The first milestone is small enough to complete in the planned session.",
+        "The learner receives feedback on the artifact or application attempt.",
+        "The journey distinguishes learning evidence from merely declaring completion.",
+        "The recommendation names the next milestone and its reason."
+      ],
+      "allowed_capabilities": [
+        "goal.propose",
+        "objective.propose",
+        "activity.create",
+        "milestone.create",
+        "feedback.create",
+        "recommendation.create"
+      ],
+      "preview": {
+        "shows": ["artifact", "objectives", "first_milestone", "estimated_effort", "success_criteria"]
+      }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ Usage:
     uv run scripts/local_stack.py logs
     uv run scripts/local_stack.py seed
     uv run scripts/local_stack.py uiux
+    uv run scripts/local_stack.py api-contracts
 """
 
 from __future__ import annotations
@@ -45,6 +46,21 @@ def wait_for_api(timeout: int = 120) -> None:
     raise SystemExit("local stack did not become ready within 120 seconds")
 
 
+def wait_for_web(timeout: int = 120) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            ["curl", "-fsS", "http://localhost:28800/"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        time.sleep(1)
+    raise SystemExit("local web stack did not become ready within 120 seconds")
+
+
 def promote_admin() -> None:
     password_hash = subprocess.check_output(
         [
@@ -59,12 +75,28 @@ def promote_admin() -> None:
         cwd=ROOT,
         text=True,
     ).strip()
-    sql = (
-        "INSERT INTO tb_users (email, display_name, role, password_hash) "
-        "VALUES ('admin@example.com', 'Carol Admin', 'admin', "
-        f"'{password_hash}') "
-        "ON CONFLICT (email) DO UPDATE SET role = 'admin';"
-    )
+    sql = f"""
+DO $$
+DECLARE
+  existing_user_id uuid;
+  new_user_id uuid;
+BEGIN
+  SELECT id INTO existing_user_id
+  FROM tb_users
+  WHERE email_canonical = 'admin@example.com';
+
+  IF existing_user_id IS NULL THEN
+    new_user_id := uuid_generate_v7();
+    INSERT INTO tb_identities (id, identity_type, label)
+    VALUES (new_user_id, 'human', 'Carol Admin');
+    INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
+    VALUES (new_user_id, 'admin@example.com', 'admin@example.com', 'Carol Admin', 'admin', '{password_hash}');
+  ELSE
+    UPDATE tb_users SET role = 'admin' WHERE id = existing_user_id;
+  END IF;
+END
+$$;
+"""
     compose(
         "exec",
         "-T",
@@ -88,12 +120,10 @@ def run_uiux() -> None:
         "NEXT_PUBLIC_API_URL": "http://localhost:28800",
         "E2E_API_URL": "http://localhost:28800",
         "E2E_BASE_URL": "http://localhost:28800",
+        "E2E_EXTERNAL_SERVER": "1",
     }
     subprocess.run(
         [
-            "mise",
-            "exec",
-            "--",
             "bunx",
             "playwright",
             "test",
@@ -101,6 +131,16 @@ def run_uiux() -> None:
             "--project=chromium",
         ],
         cwd=ROOT / "web",
+        env=env,
+        check=True,
+    )
+
+
+def run_api_contracts() -> None:
+    env = {**os.environ, "AME_API_URL": "http://localhost:28800"}
+    subprocess.run(
+        ["uv", "run", "pytest", "api_tests", "-v"],
+        cwd=ROOT,
         env=env,
         check=True,
     )
@@ -138,7 +178,7 @@ def seed_stack(*, force: bool = False) -> None:
         return
     promote_admin()
     subprocess.run(
-        ["uv", "run", "scripts/seed.py", "--api", "http://localhost:28800"],
+        ["uv", "run", "scripts/seed_current.py", "--api", "http://localhost:28800"],
         cwd=ROOT,
         check=True,
     )
@@ -146,12 +186,18 @@ def seed_stack(*, force: bool = False) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("up", "down", "logs", "seed", "uiux"))
+    parser.add_argument(
+        "command", choices=("up", "down", "logs", "seed", "uiux", "api-contracts")
+    )
     args = parser.parse_args()
 
     if args.command == "up":
-        compose("up", "-d", "--build")
+        # The web source and its node_modules live in separate mounts. Recreate
+        # the web container on each start so a changed package manifest cannot
+        # leave a stale dependency volume behind.
+        compose("up", "-d", "--build", "--force-recreate", "api", "web", "caddy")
         wait_for_api()
+        wait_for_web()
         seed_stack()
         print("local stack ready → http://localhost:28800")
     elif args.command == "down":
@@ -161,6 +207,9 @@ def main() -> int:
     elif args.command == "seed":
         wait_for_api()
         seed_stack(force=True)
+    elif args.command == "api-contracts":
+        wait_for_api()
+        run_api_contracts()
     else:
         wait_for_api()
         run_uiux()

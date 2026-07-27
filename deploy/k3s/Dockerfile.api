@@ -7,7 +7,8 @@
 #   - runtime is a COPY-only distroless image, so no target-arch code is ever
 #     executed at build time and no qemu/binfmt is required.
 # AME has no OpenSSL dep (sqlx no-TLS, reqwest rustls-tls), so a fully static
-# musl binary links cleanly. Migrations + llms.txt are embedded in the binary.
+# musl binary links cleanly. Migrations are embedded in the binary; public
+# documents are delivered by the public web/proxy surface.
 #
 # Build context MUST be the ame repo root:
 #   podman build --platform=linux/amd64 -f deploy/k3s/Dockerfile.api -t ame-api:amd64 .

@@ -10,6 +10,13 @@ import { useAuth } from "@/hooks/useAuth";
 
 type TabId = "signup" | "login";
 
+function authDestination() {
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+  return returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+    ? returnTo
+    : "/learning";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, refresh } = useAuth();
@@ -22,7 +29,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) router.push("/explore");
+    if (user) router.push(authDestination());
   }, [user, router]);
 
   useEffect(() => {
@@ -36,6 +43,7 @@ export default function LoginPage() {
     (typeof window !== "undefined"
       ? `http://${window.location.hostname}:28080`
       : "http://localhost:28080");
+  const publicApiUrl = apiUrl.replace(/\/$/, "");
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -43,12 +51,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const endpoint =
-        tab === "signup" ? "/v1/auth/register" : "/v1/auth/login";
+        tab === "signup" ? "/public/v1/auth/register" : "/public/v1/auth/login";
       const body =
         tab === "signup"
           ? { email, name: fullName, password, role: "user" }
           : { email, password };
-      const response = await fetch(`${apiUrl}${endpoint}`, {
+      const response = await fetch(`${publicApiUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -70,14 +78,7 @@ export default function LoginPage() {
         return;
       }
       await refresh();
-      const returnTo = new URLSearchParams(window.location.search).get(
-        "returnTo",
-      );
-      const destination =
-        returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
-          ? returnTo
-          : "/explore";
-      router.push(destination);
+      router.push(authDestination());
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -108,11 +109,11 @@ export default function LoginPage() {
 
         <div className="mt-16 max-w-lg">
           <h1 className="text-3xl font-semibold leading-tight tracking-tight">
-            Assessment infrastructure for learners and agents.
+            One clear next step for what you want to learn.
           </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            A structured assessment engine with a real API. Every assessment,
-            attempt, and rubric is typed, documented, and queryable.
+            Tell ame your intent with an email identifier. A first journey is
+            created for you, and an agent or the web app can keep it moving.
           </p>
         </div>
 
@@ -120,12 +121,11 @@ export default function LoginPage() {
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
             For agents &amp; integrations
           </p>
-          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-primary">{`curl -X POST $API/v1/me/agents \
-  -H 'Authorization: Bearer <token>' \
-  -d '{"label":"my-agent","scopes":["assessment.read"]}'`}</pre>
+          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-primary">{`POST /public/v1/onboarding/start
+{"email":"learner@example.com","displayName":"Learner","prompt":"I'd like to learn a new subject","idempotencyKey":"first-journey"}`}</pre>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Returns an API key scoped to your account. Sign in first, then
-            create agents via your account settings.
+            Returns the learner bearer token and the first journey. No agent
+            account or scope setup is required.
           </p>
         </div>
         <p className="mt-5 text-[10px] tracking-wide text-muted-foreground">
@@ -244,14 +244,10 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-8 rounded-xl border border-dashed border-border p-4">
-            <p className="mb-1 text-xs font-semibold">Programmatic access?</p>
+            <p className="mb-1 text-xs font-semibold">Using an agent?</p>
             <p className="text-xs leading-5 text-muted-foreground">
-              <code className="rounded border border-border px-1 py-0.5 font-mono text-[11px]">
-                POST /v1/me/agents
-              </code>{" "}
-              Create an account, then generate API keys via{" "}
-              <strong>Account Settings</strong> to interact with assessments,
-              attempts, and stats.
+              Give it the learner token returned by onboarding. It can use the
+              same journey endpoints as this web app.
             </p>
           </div>
         </div>

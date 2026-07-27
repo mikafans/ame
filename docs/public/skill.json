@@ -1,117 +1,132 @@
 {
   "auth": {
-    "format": "<id>_<secret>",
+    "format": "ame_token",
+    "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required.",
     "type": "bearer"
   },
-  "description": "ame — study, sweetened. Read and write assessments, attempts, and study plans.",
-  "entrypoint": "/llms.txt",
+  "description": "ame — study, sweetened. An agent-friendly learning API with one owner-scoped learner model.",
+  "entrypoint": "/public/llms.txt",
   "name": "ame",
-  "run": {
-    "body": {
-      "params": {
-        "...": "..."
-      },
-      "tool": "<tool name>"
-    },
-    "description": "Execute a composite or write tool.",
-    "endpoint": "/v1/agents/run",
-    "method": "POST",
-    "runnable_tools": [
-      "assessment.list",
-      "assessment.get",
-      "assessment.stats",
-      "question.list",
-      "activity.list",
-      "stats.user",
-      "attempt.list",
-      "assessment.create",
-      "assessment.batchCreate",
-      "assessment.update",
-      "assessment.addQuestion",
-      "assessment.delete",
-      "assessment.archive",
-      "assessment.publish",
-      "question.create",
-      "question.promote",
-      "question.update",
-      "deepDive.request",
-      "deepDive.list",
-      "deepDive.publish",
-      "attempt.grade",
-      "profile.get",
-      "memory.set",
-      "memory.append",
-      "target.set"
-    ]
-  },
+  "principles": [
+    "Agents and people use the same authenticated learner API.",
+    "Every learning resource is scoped to the bearer token's learner.",
+    "The API never sends email; email is an account identifier in self-host mode.",
+    "Use idempotencyKey when starting a journey."
+  ],
   "schema_version": "v1",
   "tools": [
     {
-      "description": "List assessments accessible to the caller.",
+      "description": "Register a learner account and receive the bearer session used by the unified learning API. Self-host mode does not send email.",
       "input_schema": {
         "properties": {
-          "course": {
+          "email": {
+            "format": "email",
             "type": "string"
           },
-          "mode": {
-            "enum": [
-              "practice",
-              "graded"
-            ],
+          "name": {
             "type": "string"
           },
-          "status": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "assessment.list",
-      "path": "/v1/assessments",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Get assessment details.",
-      "input_schema": {
-        "properties": {
-          "id": {
+          "password": {
+            "minLength": 8,
             "type": "string"
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "assessment.get",
-      "path": "/v1/assessments/{id}",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Archive an assessment.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
+          "email",
+          "name",
+          "password"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "assessment.archive",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "name": "identity.register",
+      "path": "/public/v1/auth/register"
     },
     {
-      "description": "Publish an assessment to make it active and promote draft questions to live.",
+      "description": "Authenticate an existing learner account and receive the bearer session used by the unified learning API.",
+      "input_schema": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "identity.login",
+      "path": "/public/v1/auth/login"
+    },
+    {
+      "description": "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
+      "input_schema": {
+        "properties": {
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.preview",
+      "path": "/public/v1/onboarding/preview"
+    },
+    {
+      "description": "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
+      "input_schema": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "displayName",
+          "prompt",
+          "idempotencyKey"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.start",
+      "path": "/public/v1/onboarding/start"
+    },
+    {
+      "description": "List the authenticated learner's journeys and the next activity for each.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.journey.list",
+      "path": "/api/v1/learning/journeys"
+    },
+    {
+      "description": "Read one authenticated learner's intent, objectives, activities, evidence, and the same evidence-backed recommendation returned to the browser. The recommendation includes objectiveId and server-derived evidenceIds.",
       "input_schema": {
         "properties": {
           "id": {
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -120,427 +135,336 @@
         ],
         "type": "object"
       },
-      "method": "POST",
-      "name": "assessment.publish",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "method": "GET",
+      "name": "learning.journey.get",
+      "path": "/api/v1/learning/journeys/{id}"
     },
     {
-      "description": "Create a new assessment, optionally importing questions.",
+      "description": "Start an activity in an owned journey.",
       "input_schema": {
         "properties": {
-          "course": {
+          "activityId": {
+            "format": "uuid",
             "type": "string"
           },
-          "description": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.activity.start",
+      "path": "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"
+    },
+    {
+      "description": "Finish a learning session and persist the learner's evidence and responses.",
+      "input_schema": {
+        "properties": {
+          "completed": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
             "type": "string"
           },
-          "method": {
+          "responses": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "completed",
+          "responses"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.session.finish",
+      "path": "/api/v1/learning/sessions/{id}/finish"
+    },
+    {
+      "description": "Read one authenticated learner's activity session so an external agent can resume the same state as the browser.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.session.get",
+      "path": "/api/v1/learning/sessions/{id}"
+    },
+    {
+      "description": "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
+      "input_schema": {
+        "properties": {
+          "contentVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "evaluationMethod": {
             "enum": [
-              "manual",
-              "agent"
+              "self_review",
+              "automatic",
+              "agent",
+              "manual"
             ],
             "type": "string"
           },
-          "mode": {
+          "response": {
+            "type": "object"
+          },
+          "taskId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "contentVersion",
+          "response"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.task.submission.start",
+      "path": "/api/v1/tasks/{task_id}/submissions"
+    },
+    {
+      "description": "Submit an application-task response for evaluation. It may become pending review rather than immediately producing a score.",
+      "input_schema": {
+        "properties": {
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submissionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.task.submission.submit",
+      "path": "/api/v1/task-submissions/{submission_id}/submit"
+    },
+    {
+      "description": "Read the learner's task submission status, score, and reviewer or agent feedback.",
+      "input_schema": {
+        "properties": {
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submissionId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.task.submission.get",
+      "path": "/api/v1/task-submissions/{submission_id}"
+    },
+    {
+      "description": "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "content": {
+            "description": "The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings.",
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          "generationRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "Only approved content is learner-visible.",
             "enum": [
-              "practice",
-              "graded"
+              "approved"
             ],
             "type": "string"
           },
-          "objectives": {
+          "sourceReferences": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "activityId",
+          "generationRunId",
+          "content",
+          "sourceReferences",
+          "reviewStatus"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.activity.content.author",
+      "path": "/api/v1/learning/activities/{activity_id}/content"
+    },
+    {
+      "description": "Attach a structured scoring rubric to a task/application activity from a published learning.activity.rubric.compose generation run. Criteria and points guide manual/agent review; learners see the criteria. Provenance is mandatory.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "generationRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "Only approved rubrics are learner-visible.",
+            "enum": [
+              "approved"
+            ],
+            "type": "string"
+          },
+          "rubric": {
+            "description": "Structured rubric: version, criteria[] (each id, objectiveId, description, maxPoints>=1, required), optional passingScore 0..1.",
+            "properties": {
+              "criteria": {
+                "items": {
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "maxPoints": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "objectiveId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "objectiveId",
+                    "description",
+                    "maxPoints",
+                    "required"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "passingScore": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "version": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "version",
+              "criteria"
+            ],
+            "type": "object"
+          },
+          "sourceReferences": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "activityId",
+          "generationRunId",
+          "rubric",
+          "sourceReferences",
+          "reviewStatus"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.activity.rubric.author",
+      "path": "/api/v1/learning/activities/{activity_id}/rubric"
+    },
+    {
+      "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
+      "input_schema": {
+        "properties": {
+          "acceptedAnswers": {
             "items": {
               "type": "string"
             },
             "type": "array"
           },
-          "questions": {
-            "items": {
-              "properties": {
-                "explanation": {
-                  "type": "string"
-                },
-                "kind": {
-                  "enum": [
-                    "mc",
-                    "tf",
-                    "short",
-                    "essay",
-                    "code"
-                  ],
-                  "type": "string"
-                },
-                "payload": {
-                  "type": "object"
-                },
-                "points": {
-                  "type": "integer"
-                },
-                "prompt": {
-                  "type": "string"
-                },
-                "tags": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "kind",
-                "prompt",
-                "payload"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "status": {
-            "enum": [
-              "draft",
-              "active",
-              "archived"
-            ],
+          "difficulty": {
             "type": "string"
           },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "title",
-          "mode",
-          "method"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.create",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Batch-create multiple assessments in one call.",
-      "input_schema": {
-        "properties": {
-          "items": {
-            "items": {
-              "properties": {
-                "course": {
-                  "type": "string"
-                },
-                "description": {
-                  "type": "string"
-                },
-                "method": {
-                  "enum": [
-                    "manual",
-                    "agent"
-                  ],
-                  "type": "string"
-                },
-                "mode": {
-                  "enum": [
-                    "practice",
-                    "graded"
-                  ],
-                  "type": "string"
-                },
-                "objectives": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "questions": {
-                  "items": {
-                    "properties": {
-                      "explanation": {
-                        "type": "string"
-                      },
-                      "kind": {
-                        "enum": [
-                          "mc",
-                          "tf",
-                          "short",
-                          "essay",
-                          "code"
-                        ],
-                        "type": "string"
-                      },
-                      "payload": {
-                        "type": "object"
-                      },
-                      "points": {
-                        "type": "integer"
-                      },
-                      "prompt": {
-                        "type": "string"
-                      },
-                      "tags": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
-                      }
-                    },
-                    "required": [
-                      "kind",
-                      "prompt",
-                      "payload"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
-                "status": {
-                  "enum": [
-                    "draft",
-                    "active",
-                    "archived"
-                  ],
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "title",
-                "mode",
-                "method"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.batchCreate",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Update assessment metadata.",
-      "input_schema": {
-        "properties": {
-          "id": {
+          "explanation": {
             "type": "string"
           },
-          "status": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.update",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Attach a bank question to an assessment or create a new question inline.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "description": "assessment id",
+          "generationRunId": {
             "format": "uuid",
             "type": "string"
           },
           "kind": {
-            "description": "required if questionId absent",
             "enum": [
-              "mc",
-              "tf",
-              "short",
+              "multiple_choice",
+              "true_false",
+              "short_answer",
+              "numeric",
               "essay",
               "code"
             ],
             "type": "string"
           },
-          "pointsOverride": {
-            "description": "override default points",
-            "type": "integer"
-          },
-          "prompt": {
-            "description": "question text",
-            "type": "string"
-          },
-          "questionId": {
-            "description": "existing bank question id (optional)",
-            "format": "uuid",
-            "type": "string"
-          },
-          "sectionId": {
-            "description": "target section (defaults to first)",
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "assessment.addQuestion",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "List questions in the bank.",
-      "input_schema": {
-        "properties": {
-          "after": {
-            "type": "string"
-          },
-          "assessmentId": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "cursor": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer"
-          },
-          "status": {
-            "enum": [
-              "draft",
-              "live",
-              "archived"
-            ],
-            "type": "string"
-          },
-          "tag": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "question.list",
-      "path": "/v1/questions",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Batch-create one or more questions in the bank.",
-      "input_schema": {
-        "properties": {
-          "questions": {
-            "items": {
-              "properties": {
-                "explanation": {
-                  "type": "string"
-                },
-                "kind": {
-                  "enum": [
-                    "mc",
-                    "tf",
-                    "short",
-                    "essay",
-                    "code"
-                  ],
-                  "type": "string"
-                },
-                "payload": {
-                  "type": "object"
-                },
-                "points": {
-                  "type": "integer"
-                },
-                "prompt": {
-                  "type": "string"
-                },
-                "status": {
-                  "enum": [
-                    "draft",
-                    "live",
-                    "archived"
-                  ],
-                  "type": "string"
-                },
-                "tags": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "kind",
-                "prompt",
-                "payload"
-              ],
-              "type": "object"
-            },
+          "options": {
             "type": "array"
-          }
-        },
-        "required": [
-          "questions"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "question.create",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Promote one draft question to live.",
-      "input_schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "question.promote",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
-    },
-    {
-      "description": "Update a question in the bank.",
-      "input_schema": {
-        "properties": {
-          "explanation": {
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "payload": {
-            "type": "object"
           },
           "points": {
+            "minimum": 1,
             "type": "integer"
           },
           "prompt": {
             "type": "string"
           },
-          "tags": {
+          "rationale": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "type": "string"
+          },
+          "sourceReferences": {
             "items": {
               "type": "string"
             },
@@ -548,229 +472,535 @@
           }
         },
         "required": [
-          "id"
+          "generationRunId",
+          "kind",
+          "prompt",
+          "points"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "question.update",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "name": "learning.question.create",
+      "path": "/api/v1/questions"
     },
     {
-      "description": "Retrieve deepen/review details for a question (tags, related questions, references, study notes). Returns 403 Forbidden if there is an active session for this question.",
-      "input_schema": {
-        "properties": {
-          "exclude": {
-            "description": "Comma-separated list of question IDs to exclude",
-            "type": "string"
-          },
-          "id": {
-            "description": "Question ID",
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "question.deepen",
-      "path": "/v1/questions/{id}/deepen",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Request a durable Deep Dive explanation for an owned question.",
+      "description": "Read one exact learner-owned question version for reproducible assessment history.",
       "input_schema": {
         "properties": {
           "questionId": {
             "format": "uuid",
             "type": "string"
           },
-          "reason": {
+          "version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "questionId",
+          "version"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.question.get",
+      "path": "/api/v1/questions/{question_id}/versions/{version}"
+    },
+    {
+      "description": "Create the next immutable question version from a published question.compose generation run.",
+      "input_schema": {
+        "properties": {
+          "difficulty": {
             "type": "string"
           },
-          "sourceAttemptId": {
+          "generationRunId": {
             "format": "uuid",
             "type": "string"
           },
-          "sourceSessionId": {
-            "format": "uuid",
+          "kind": {
+            "type": "string"
+          },
+          "points": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "prompt": {
             "type": "string"
           }
         },
         "required": [
-          "questionId"
+          "generationRunId",
+          "kind",
+          "prompt",
+          "points"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "deepDive.request",
-      "path": "/v1/agents/run",
-      "scope": "attempt.write"
+      "name": "learning.question.revise",
+      "path": "/api/v1/questions/{question_id}/versions"
     },
     {
-      "description": "List the owner's Deep Dive requests.",
+      "description": "Compose approved question versions into a learner-owned practice or graded assessment.",
       "input_schema": {
         "properties": {
-          "status": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "objectiveId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "orderIndex": {
+                  "type": "integer"
+                },
+                "points": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "questionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "questionVersion": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "objectiveId",
+                "questionId",
+                "questionVersion",
+                "orderIndex",
+                "points"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "mode": {
             "enum": [
-              "requested",
-              "drafting",
-              "published",
-              "needs_revision",
-              "archived"
+              "practice",
+              "graded"
             ],
             "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "deepDive.list",
-      "path": "/v1/agents/run",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Publish authored Markdown for an owned Deep Dive request.",
-      "input_schema": {
-        "properties": {
-          "bodyMarkdown": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "type": "string"
           },
           "status": {
-            "enum": [
-              "published",
-              "drafting",
-              "needs_revision",
-              "requested"
-            ],
             "type": "string"
           }
         },
         "required": [
-          "id",
-          "bodyMarkdown"
+          "activityId",
+          "mode",
+          "items"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "deepDive.publish",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "name": "learning.assessment.create",
+      "path": "/api/v1/assessments"
     },
     {
-      "description": "Get per-assessment performance stats (avg, median, distribution, per-question metrics).",
+      "description": "Read one learner-owned assessment and its exact question-version membership.",
       "input_schema": {
         "properties": {
-          "id": {
+          "assessmentId": {
+            "format": "uuid",
             "type": "string"
           }
         },
         "required": [
-          "id"
+          "assessmentId"
         ],
         "type": "object"
       },
       "method": "GET",
-      "name": "assessment.stats",
-      "path": "/v1/assessments/{id}/stats",
-      "scope": "stats.read"
+      "name": "learning.assessment.get",
+      "path": "/api/v1/assessments/{assessment_id}"
     },
     {
-      "description": "List agent activity log.",
+      "description": "Discover the learner-owned assessment attached to an activity before starting it.",
       "input_schema": {
         "properties": {
-          "cursor": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "limit": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "activity.list",
-      "path": "/v1/agents/activity",
-      "scope": "assessment.read"
-    },
-    {
-      "description": "Read the caller's aggregate learning statistics.",
-      "input_schema": {
-        "properties": {},
-        "type": "object"
-      },
-      "method": "GET",
-      "name": "stats.user",
-      "path": "/v1/me/stats",
-      "scope": "stats.read"
-    },
-    {
-      "description": "List the owner's per-attempt history, optionally filtered to one session.",
-      "input_schema": {
-        "properties": {
-          "limit": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer"
-          },
-          "sessionId": {
+          "activityId": {
             "format": "uuid",
             "type": "string"
           }
         },
+        "required": [
+          "activityId"
+        ],
         "type": "object"
       },
       "method": "GET",
-      "name": "attempt.list",
-      "path": "/v1/me/attempts",
-      "scope": "attempt.read"
+      "name": "learning.assessment.get_for_activity",
+      "path": "/api/v1/assessments?activityId={activity_id}"
     },
     {
-      "description": "Grade a pending essay or code attempt.",
+      "description": "Start or resume an attempt against one immutable assessment version.",
       "input_schema": {
         "properties": {
-          "id": {
+          "assessmentId": {
             "format": "uuid",
             "type": "string"
           },
-          "notes": {
+          "learningSessionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assessmentId",
+          "learningSessionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.attempt.start",
+      "path": "/api/v1/assessments/{assessment_id}/attempts"
+    },
+    {
+      "description": "Save one answer while preserving assessment item and question version identity.",
+      "input_schema": {
+        "properties": {
+          "assessmentItemId": {
+            "format": "uuid",
             "type": "string"
           },
-          "score": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "questionVersionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "response": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "attemptId",
+          "assessmentItemId",
+          "questionVersionId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.attempt.answer",
+      "path": "/api/v1/attempts/{attempt_id}/answers"
+    },
+    {
+      "description": "Finish an attempt, grade deterministic items, and return assessmentMode plus reviewStatus (complete or pending) so practice results cannot be mistaken for an exam result.",
+      "input_schema": {
+        "properties": {
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attemptId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.attempt.finish",
+      "path": "/api/v1/attempts/{attempt_id}/finish"
+    },
+    {
+      "description": "Read an owned attempt and its saved responses/result.",
+      "input_schema": {
+        "properties": {
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attemptId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.attempt.get",
+      "path": "/api/v1/attempts/{attempt_id}"
+    },
+    {
+      "description": "Read all assessment attempts in one learner-owned journey, including durable results.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.attempt.history",
+      "path": "/api/v1/learning/journeys/{journey_id}/attempts"
+    },
+    {
+      "description": "Record rebuildable mastery evidence from a completed learner attempt.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "attemptId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "derivationVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "objectiveId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "value": {
+            "maximum": 1,
+            "minimum": 0,
             "type": "number"
           }
         },
         "required": [
-          "id",
-          "score"
+          "journeyId",
+          "objectiveId",
+          "activityId",
+          "attemptId",
+          "value",
+          "derivationVersion"
         ],
         "type": "object"
       },
       "method": "POST",
-      "name": "attempt.grade",
-      "path": "/v1/agents/run",
-      "scope": "attempt.write"
+      "name": "learning.progress.evidence",
+      "path": "/api/v1/progress/evidence"
     },
     {
-      "description": "Delete an assessment.",
+      "description": "Read evidence-derived mastery and confidence for one objective.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "objectiveId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "objectiveId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.progress.snapshot",
+      "path": "/api/v1/progress/{journey_id}/objectives/{objective_id}"
+    },
+    {
+      "description": "Select the weakest objective from an explicit journey objective set.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "objectives": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "journeyId",
+          "objectives"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.progress.recommend",
+      "path": "/api/v1/progress/{journey_id}/recommendation"
+    },
+    {
+      "description": "Record an idempotent qualifying learning day from a completed attempt event (attempt:<id>); the day must match the attempt's graded timestamp in the supplied IANA learner timezone.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "learnerTimezone": {
+            "type": "string"
+          },
+          "qualifyingDay": {
+            "format": "date",
+            "type": "string"
+          },
+          "qualifyingEventKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "activityId",
+          "qualifyingEventKey",
+          "learnerTimezone",
+          "qualifyingDay"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.progress.streak.record",
+      "path": "/api/v1/progress/streaks"
+    },
+    {
+      "description": "Read qualifying learning days for one owned journey.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.progress.streak.list",
+      "path": "/api/v1/progress/{journey_id}/streaks"
+    },
+    {
+      "description": "Read the ordered activity, assessment, evidence, deep-dive, and streak history for one owned journey.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.progress.timeline",
+      "path": "/api/v1/progress/{journey_id}/timeline"
+    },
+    {
+      "description": "Create a source-backed deep dive from a published deep_dive.create generation run, linked to matching owned evidence. Unreviewed content is stored for review but is not learner-readable until approved.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "applicationTask": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          },
+          "generationRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "objectiveId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewStatus": {
+            "description": "Content is returned by learner reads only when approved.",
+            "enum": [
+              "draft",
+              "review",
+              "approved",
+              "rejected"
+            ],
+            "type": "string"
+          },
+          "sourceReferences": {
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "triggeringEvidenceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generationRunId",
+          "journeyId",
+          "activityId",
+          "objectiveId",
+          "triggeringEvidenceId",
+          "title",
+          "body",
+          "example",
+          "sourceReferences",
+          "applicationTask"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.deep_dive.create",
+      "path": "/api/v1/deep-dives"
+    },
+    {
+      "description": "Discover the approved source-backed deep dive attached to an activity. Draft and review content is not returned.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.deep_dive.get_for_activity",
+      "path": "/api/v1/deep-dives?activityId={activity_id}"
+    },
+    {
+      "description": "Read one approved source-backed deep dive owned by the learner; draft and review content is not returned.",
       "input_schema": {
         "properties": {
           "id": {
+            "format": "uuid",
             "type": "string"
           }
         },
@@ -779,75 +1009,86 @@
         ],
         "type": "object"
       },
-      "method": "POST",
-      "name": "assessment.delete",
-      "path": "/v1/agents/run",
-      "scope": "assessment.write"
+      "method": "GET",
+      "name": "learning.deep_dive.get",
+      "path": "/api/v1/deep-dives/{id}"
     },
     {
-      "description": "Get the agent's own config (label, focus tags, goal, memory) plus the owner's per-tag ELO ratings.",
-      "input_schema": {
-        "properties": {},
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "profile.get",
-      "path": "/v1/agents/run",
-      "scope": null
-    },
-    {
-      "description": "Replace the agent's memory blob wholesale.",
+      "description": "Start or resume an owner-scoped provider generation run with an idempotent retry key.",
       "input_schema": {
         "properties": {
-          "memory": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "memory"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "memory.set",
-      "path": "/v1/agents/run",
-      "scope": null
-    },
-    {
-      "description": "Shallow-merge the given keys into the agent's memory blob.",
-      "input_schema": {
-        "properties": {
-          "append": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "append"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "memory.append",
-      "path": "/v1/agents/run",
-      "scope": null
-    },
-    {
-      "description": "Update the agent's current goal and/or next target.",
-      "input_schema": {
-        "properties": {
-          "currentGoal": {
+          "contentVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "operation": {
             "type": "string"
           },
-          "nextTarget": {
+          "provider": {
+            "type": "string"
+          },
+          "retryKey": {
             "type": "string"
           }
         },
+        "required": [
+          "operation"
+        ],
         "type": "object"
       },
       "method": "POST",
-      "name": "target.set",
-      "path": "/v1/agents/run",
-      "scope": null
+      "name": "learning.generation.start",
+      "path": "/api/v1/generation-runs"
+    },
+    {
+      "description": "Read the status, provider, failure detail, and content version of an owned generation run.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.generation.get",
+      "path": "/api/v1/generation-runs/{id}"
+    },
+    {
+      "description": "Advance an owned generation run or record a provider failure; failed runs cannot be published.",
+      "input_schema": {
+        "properties": {
+          "error": {
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "requested",
+              "running",
+              "review_required",
+              "published",
+              "failed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.generation.transition",
+      "path": "/api/v1/generation-runs/{id}"
     }
   ]
 }

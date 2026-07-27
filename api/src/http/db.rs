@@ -28,13 +28,7 @@ pub async fn set_rls_guc(
     owner_id: Uuid,
     is_admin: bool,
 ) -> Result<(), crate::domain::error::ApiError> {
-    let owner_id_str = owner_id.to_string();
-    let is_admin_str = if is_admin { "true" } else { "false" };
-
-    sqlx::query("SELECT set_config('app.owner', $1, false), set_config('app.is_admin', $2, false)")
-        .bind(&owner_id_str)
-        .bind(is_admin_str)
-        .execute(&mut *conn)
+    ame_platform_postgres::health::set_rls_guc(conn, owner_id, is_admin)
         .await
         .map_err(|e| ApiError::Internal(e.into()))?;
 
@@ -72,7 +66,7 @@ pub fn convert_pool_to_ame_app(pool: &PgPool) -> PgPool {
         .max_connections(5)
         .after_release(|conn: &mut PgConnection, _meta| {
             Box::pin(async move {
-                sqlx::query("RESET ALL;").execute(conn).await?;
+                ame_platform_postgres::health::reset_connection(conn).await?;
                 Ok(true)
             })
         })

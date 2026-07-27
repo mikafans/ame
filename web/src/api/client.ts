@@ -21,3 +21,19 @@ export function makeClient() {
 
 // Default singleton client (browser only — uses HttpOnly cookie)
 export const api = makeClient();
+
+export function makePublicClient() {
+  return createClient<paths>({
+    baseUrl:
+      typeof window === "undefined"
+        ? (process.env.PUBLIC_API_URL ??
+          process.env.API_URL ??
+          "http://localhost:28080")
+        : (process.env.NEXT_PUBLIC_PUBLIC_API_URL ??
+          process.env.NEXT_PUBLIC_API_URL ??
+          `http://${window.location.hostname}:28080`),
+    credentials: "include",
+  });
+}
+
+export const publicApi = makePublicClient();

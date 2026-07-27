@@ -10,11 +10,11 @@ beforeEach(() => {
 });
 
 describe("logout", () => {
-  it("POSTs to /v1/auth/logout with credentials", async () => {
+  it("POSTs to /api/v1/auth/logout with credentials", async () => {
     const { logout } = await import("./useAuth");
     await logout();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/v1/auth/logout"),
+      expect.stringContaining("/api/v1/auth/logout"),
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
   });
