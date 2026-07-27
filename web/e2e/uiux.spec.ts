@@ -308,7 +308,7 @@ test("learner sees a completed chapter state", async ({ page }) => {
   await page.goto("/start");
   await page
     .getByLabel("What would you like to learn?")
-    .fill("I would like to learn Flink checkpointing");
+    .fill("I would like to learn distributed checkpointing");
   await page.getByLabel("Your name").fill("Chapter Learner");
   await page.getByLabel("Email identifier").fill(email);
   await page.getByLabel("Password").fill("chapter-local-2026");
@@ -359,7 +359,7 @@ test("learner sees a completed chapter state", async ({ page }) => {
 test("learner can answer the first application task in a journey", async ({
   page,
 }) => {
-  const prompt = "I would like to learn Flink event-time processing";
+  const prompt = "I would like to learn distributed event-time processing";
   const email = `task-uiux-${Date.now()}@example.com`;
 
   await page.goto("/start");
@@ -381,7 +381,7 @@ test("learner can answer the first application task in a journey", async ({
   ).toBeVisible();
 
   const explanationTitle =
-    "Build a clear starting model for Flink event-time processing";
+    "Build a clear starting model for distributed event-time processing";
   await expect(
     page.getByRole("heading", { name: explanationTitle }).first(),
   ).toBeVisible();
@@ -397,7 +397,7 @@ test("learner can answer the first application task in a journey", async ({
   ).toBeVisible();
 
   const exampleTitle =
-    "Walk through a worked example for Flink event-time processing";
+    "Walk through a worked example for distributed event-time processing";
   await expect(
     page.getByRole("heading", { name: exampleTitle }).first(),
   ).toBeVisible();
@@ -412,7 +412,8 @@ test("learner can answer the first application task in a journey", async ({
     page.getByText("Complete. Your next activity is now ready."),
   ).toBeVisible();
 
-  const taskTitle = "Try a short first task for Flink event-time processing";
+  const taskTitle =
+    "Try a short first task for distributed event-time processing";
   await expect(
     page.getByRole("heading", { name: taskTitle }).first(),
   ).toBeVisible();
@@ -434,7 +435,7 @@ test("learner can answer the first application task in a journey", async ({
 test("admin can review a pending learner task from the console", async ({
   page,
 }) => {
-  const prompt = "I would like to learn Flink checkpointing";
+  const prompt = "I would like to learn distributed checkpointing";
   const email = `review-queue-uiux-${Date.now()}@example.com`;
 
   await page.goto("/start");
