@@ -6,6 +6,7 @@ Usage:
     uv run scripts/local_stack.py logs
     uv run scripts/local_stack.py seed
     uv run scripts/local_stack.py uiux
+    uv run scripts/local_stack.py api-contracts
 """
 
 from __future__ import annotations
@@ -135,6 +136,16 @@ def run_uiux() -> None:
     )
 
 
+def run_api_contracts() -> None:
+    env = {**os.environ, "AME_API_URL": "http://localhost:28800"}
+    subprocess.run(
+        ["uv", "run", "pytest", "api_tests", "-v"],
+        cwd=ROOT,
+        env=env,
+        check=True,
+    )
+
+
 def database_has_users() -> bool:
     result = subprocess.run(
         [
@@ -175,7 +186,9 @@ def seed_stack(*, force: bool = False) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("up", "down", "logs", "seed", "uiux"))
+    parser.add_argument(
+        "command", choices=("up", "down", "logs", "seed", "uiux", "api-contracts")
+    )
     args = parser.parse_args()
 
     if args.command == "up":
@@ -194,6 +207,9 @@ def main() -> int:
     elif args.command == "seed":
         wait_for_api()
         seed_stack(force=True)
+    elif args.command == "api-contracts":
+        wait_for_api()
+        run_api_contracts()
     else:
         wait_for_api()
         run_uiux()

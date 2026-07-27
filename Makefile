@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs
+.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs local-api-contracts
 
 API_HOST ?= localhost
 API_PORT ?= 28080
@@ -94,6 +94,8 @@ local-seed: ## Seed the containerized stack through Caddy
 	uv run scripts/local_stack.py seed
 local-logs: ## Tail containerized stack logs
 	uv run scripts/local_stack.py logs
+local-api-contracts: ## Run the api_tests black-box contract suite through Caddy
+	uv run scripts/local_stack.py api-contracts
 
 hooks-install: ## Configure the repository git hooks
 	git config core.hooksPath .githooks
