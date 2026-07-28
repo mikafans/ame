@@ -166,6 +166,20 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["id","content","sourceReferences"],"properties":{"id":{"type":"string","format":"uuid"},"content":{"type":"object"},"sourceReferences":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1}}}),
         ),
         endpoint(
+            "learning.portability.export",
+            "Export an owned journey and learner history as a versioned, checksummed application manifest.",
+            "GET",
+            "/api/v1/learning/journeys/{id}/export",
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.portability.import",
+            "Validate and idempotently restore a same-owner journey manifest, reporting tampering and conflicts explicitly.",
+            "POST",
+            "/api/v1/learning/imports",
+            json!({"type":"object","required":["schemaVersion","ownerId","journeyId","exportedAt","checksum","payload"],"properties":{"schemaVersion":{"const":"ame.journey-history.v1"},"ownerId":{"type":"string","format":"uuid"},"journeyId":{"type":"string","format":"uuid"},"exportedAt":{"type":"string","format":"date-time"},"checksum":{"type":"string"},"payload":{"type":"object"}}}),
+        ),
+        endpoint(
             "learning.session.finish",
             "Finish a learning session and persist the learner's evidence and responses.",
             "POST",

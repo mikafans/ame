@@ -124,6 +124,29 @@ test("learner writes, resumes, edits, and deletes a version-anchored private not
   await expect(page.getByText("Velocity includes direction.")).toHaveCount(0);
 });
 
+test("owner inspects an export and repeated import does not duplicate learner state", async ({
+  page,
+}) => {
+  await onboardIntoJourney(
+    page,
+    "I would like to learn physics",
+    "Portable Learner",
+    `portable-golden-${Date.now()}@example.com`,
+    "portable-golden-2026",
+  );
+  await page.goto("/learning");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export JSON" }).click();
+  await download;
+  const artifact = page.getByLabel("Journey portability artifact");
+  await expect(artifact).toHaveValue(/ame\.journey-history\.v1/);
+  await expect(artifact).toHaveValue(/"checksum"/);
+  await page.getByRole("button", { name: "Import JSON" }).click();
+  await expect(
+    page.getByText("Already imported; no learner state was duplicated."),
+  ).toBeVisible();
+});
+
 test("learner sees variant failure, retries, and uses reviewed source-backed content without mastery", async ({
   page,
 }) => {

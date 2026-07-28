@@ -538,6 +538,64 @@
       "path": "/api/v1/learning-variants/{id}"
     },
     {
+      "description": "Export an owned journey and learner history as a versioned, checksummed application manifest.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.portability.export",
+      "path": "/api/v1/learning/journeys/{id}/export"
+    },
+    {
+      "description": "Validate and idempotently restore a same-owner journey manifest, reporting tampering and conflicts explicitly.",
+      "input_schema": {
+        "properties": {
+          "checksum": {
+            "type": "string"
+          },
+          "exportedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "schemaVersion": {
+            "const": "ame.journey-history.v1"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "ownerId",
+          "journeyId",
+          "exportedAt",
+          "checksum",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.portability.import",
+      "path": "/api/v1/learning/imports"
+    },
+    {
       "description": "Finish a learning session and persist the learner's evidence and responses.",
       "input_schema": {
         "properties": {

@@ -122,3 +122,12 @@ identity is needed.
 5. Keep the previous image available until smoke checks pass.
 
 Never commit `.env`, database dumps, agent keys, or proxy certificates.
+
+### Restore a portable learner journey
+
+Journey manifests do not create accounts. Restore or configure the learner in
+your identity service first, sign in as that same owner, then submit the
+`ame.journey-history.v1` artifact to `POST /api/v1/learning/imports`. A foreign
+`ownerId` is rejected rather than merged. Keep the import receipt and original
+manifest; use database backups for whole-instance disaster recovery, not as a
+substitute for the portable artifact.

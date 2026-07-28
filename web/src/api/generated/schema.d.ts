@@ -387,6 +387,22 @@ export interface paths {
         patch: operations["author_activity_rubric"];
         trace?: never;
     };
+    "/api/v1/learning/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_journey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/journeys": {
         parameters: {
             query?: never;
@@ -413,6 +429,22 @@ export interface paths {
         };
         /** GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey. */
         get: operations["get_journey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_journey"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1293,12 +1325,29 @@ export interface components {
         GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
         /** @enum {string} */
         GroundingStatus: "supported" | "contradicted" | "unverified";
+        ImportReceipt: {
+            alreadyImported: boolean;
+            checksum: string;
+            /** Format: uuid */
+            journeyId: string;
+        };
         ImportSourceBody: {
             content?: string | null;
             kind: components["schemas"]["SourceKind"];
             locator: string;
             mediaType?: string | null;
             retryKey: string;
+        };
+        JourneyExportManifest: {
+            checksum: string;
+            /** Format: date-time */
+            exportedAt: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            ownerId: string;
+            payload: unknown;
+            schemaVersion: string;
         };
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
@@ -2712,6 +2761,29 @@ export interface operations {
             };
         };
     };
+    import_journey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JourneyExportManifest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReceipt"];
+                };
+            };
+        };
+    };
     list_journeys: {
         parameters: {
             query?: never;
@@ -2773,6 +2845,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    export_journey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyExportManifest"];
+                };
             };
         };
     };

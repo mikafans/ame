@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { PortabilityPanel } from "@/components/learning/PortabilityPanel";
 
 type JourneySummary = {
   id: string;
@@ -379,6 +380,10 @@ export default function LearningHomePage() {
             ))}
           </div>
         </section>
+      )}
+
+      {!loading && journeys.length > 0 && (
+        <PortabilityPanel journeys={journeys} />
       )}
 
       {loading ? (

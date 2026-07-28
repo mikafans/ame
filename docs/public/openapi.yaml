@@ -709,6 +709,26 @@ paths:
           description: Rubric, provenance, or review status is invalid
       security:
       - bearer_auth: []
+  /api/v1/learning/imports:
+    post:
+      tags:
+      - portability
+      operationId: import_journey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JourneyExportManifest'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReceipt'
+      security:
+      - bearer: []
   /api/v1/learning/journeys:
     get:
       tags:
@@ -755,6 +775,27 @@ paths:
           description: Journey does not exist for this learner
       security:
       - bearer_auth: []
+  /api/v1/learning/journeys/{id}/export:
+    get:
+      tags:
+      - portability
+      operationId: export_journey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyExportManifest'
+      security:
+      - bearer: []
   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
     post:
       tags:
@@ -2486,6 +2527,20 @@ components:
       - supported
       - contradicted
       - unverified
+    ImportReceipt:
+      type: object
+      required:
+      - journeyId
+      - checksum
+      - alreadyImported
+      properties:
+        alreadyImported:
+          type: boolean
+        checksum:
+          type: string
+        journeyId:
+          type: string
+          format: uuid
     ImportSourceBody:
       type: object
       required:
@@ -2506,6 +2561,30 @@ components:
           - string
           - 'null'
         retryKey:
+          type: string
+    JourneyExportManifest:
+      type: object
+      required:
+      - schemaVersion
+      - ownerId
+      - journeyId
+      - exportedAt
+      - checksum
+      - payload
+      properties:
+        checksum:
+          type: string
+        exportedAt:
+          type: string
+          format: date-time
+        journeyId:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        payload: {}
+        schemaVersion:
           type: string
     JourneyStatus:
       type: string

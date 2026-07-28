@@ -93,6 +93,7 @@ pub mod me;
 pub mod notes;
 pub mod onboarding;
 pub mod openapi;
+pub mod portability;
 pub mod progress;
 pub mod questions;
 pub mod reviews;
@@ -189,6 +190,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(citations::router(state.clone()))
         .merge(notes::router(state.clone()))
         .merge(variants::router(state.clone()))
+        .merge(portability::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(
