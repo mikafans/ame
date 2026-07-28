@@ -98,6 +98,7 @@ pub mod questions;
 pub mod reviews;
 pub mod sources;
 pub mod tasks;
+pub mod variants;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
     let (layer, handle) = PrometheusMetricLayer::pair();
@@ -187,6 +188,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(sources::router(state.clone()))
         .merge(citations::router(state.clone()))
         .merge(notes::router(state.clone()))
+        .merge(variants::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(

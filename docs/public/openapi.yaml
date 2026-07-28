@@ -566,6 +566,75 @@ paths:
                 $ref: '#/components/schemas/GenerationRunResponse'
       security:
       - bearer: []
+  /api/v1/learning-variants:
+    get:
+      tags:
+      - variants
+      operationId: list_variants
+      parameters:
+      - name: activityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VariantResponse'
+      security:
+      - bearer: []
+    post:
+      tags:
+      - variants
+      operationId: request_variant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestVariantBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariantResponse'
+      security:
+      - bearer: []
+  /api/v1/learning-variants/{id}:
+    patch:
+      tags:
+      - variants
+      operationId: publish_variant
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishVariantBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariantResponse'
+      security:
+      - bearer: []
   /api/v1/learning/activities/{activity_id}/content:
     patch:
       tags:
@@ -2970,6 +3039,17 @@ components:
           type: string
         verb:
           type: string
+    PublishVariantBody:
+      type: object
+      required:
+      - content
+      - sourceReferences
+      properties:
+        content: {}
+        sourceReferences:
+          type: array
+          items:
+            type: string
     QuestionKind:
       type: string
       enum:
@@ -3118,6 +3198,35 @@ components:
           type: string
         password:
           type: string
+    RequestVariantBody:
+      type: object
+      required:
+      - sourceActivityId
+      - objectiveId
+      - variantKind
+      - recommendationReason
+      - retryKey
+      properties:
+        objectiveId:
+          type: string
+          format: uuid
+        provider:
+          type:
+          - string
+          - 'null'
+        recommendationReason:
+          type: string
+        requestedDifficulty:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type: string
+        sourceActivityId:
+          type: string
+          format: uuid
+        variantKind:
+          $ref: '#/components/schemas/VariantKind'
     ReviewItemResponse:
       type: object
       required:
@@ -3662,3 +3771,49 @@ components:
       enum:
       - active
       - deactivated
+    VariantKind:
+      type: string
+      enum:
+      - explanation
+      - example
+      - difficulty
+    VariantResponse:
+      type: object
+      required:
+      - id
+      - sourceActivityId
+      - objectiveId
+      - generationRunId
+      - variantKind
+      - recommendationReason
+      - status
+      - sourceReferences
+      properties:
+        content: {}
+        error: {}
+        generationRunId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        recommendationReason:
+          type: string
+        requestedDifficulty:
+          type:
+          - string
+          - 'null'
+        sourceActivityId:
+          type: string
+          format: uuid
+        sourceReferences:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/GenerationStatus'
+        variantKind:
+          $ref: '#/components/schemas/VariantKind'

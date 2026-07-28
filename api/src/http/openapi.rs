@@ -39,6 +39,7 @@ use crate::http::{
         ReviewTaskOutcome, ReviewTaskSubmissionBody, StartTaskSubmissionBody,
         TaskSubmissionResponse,
     },
+    variants::{PublishVariantBody, RequestVariantBody, VariantResponse},
 };
 
 #[derive(OpenApi)]
@@ -87,6 +88,9 @@ use crate::http::{
         crate::http::notes::list_notes,
         crate::http::notes::update_note,
         crate::http::notes::delete_note,
+        crate::http::variants::request_variant,
+        crate::http::variants::list_variants,
+        crate::http::variants::publish_variant,
         crate::http::deep_dives::create,
         crate::http::deep_dives::get_for_activity,
         crate::http::deep_dives::get_one,
@@ -164,6 +168,9 @@ use crate::http::{
         CreateNoteBody,
         UpdateNoteBody,
         NoteResponse,
+        RequestVariantBody,
+        PublishVariantBody,
+        VariantResponse,
         CreateDeepDiveBody,
         DeepDiveResponse,
         DeepDiveActivityQuery,

@@ -145,6 +145,27 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.variant.request",
+            "Request another explanation, example, or difficulty variant through the existing generation lifecycle without creating mastery evidence.",
+            "POST",
+            "/api/v1/learning-variants",
+            json!({"type":"object","required":["sourceActivityId","objectiveId","variantKind","recommendationReason","retryKey"],"properties":{"sourceActivityId":{"type":"string","format":"uuid"},"objectiveId":{"type":"string","format":"uuid"},"variantKind":{"type":"string","enum":["explanation","example","difficulty"]},"recommendationReason":{"type":"string"},"requestedDifficulty":{"type":"string"},"provider":{"type":"string"},"retryKey":{"type":"string"}}}),
+        ),
+        endpoint(
+            "learning.variant.list",
+            "Inspect pending, failed, review-required, and available variants for an owned activity.",
+            "GET",
+            "/api/v1/learning-variants?activityId={activity_id}",
+            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.variant.publish",
+            "Attach reviewed, citation-certified content after the linked generation run is published.",
+            "PATCH",
+            "/api/v1/learning-variants/{id}",
+            json!({"type":"object","required":["id","content","sourceReferences"],"properties":{"id":{"type":"string","format":"uuid"},"content":{"type":"object"},"sourceReferences":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1}}}),
+        ),
+        endpoint(
             "learning.session.finish",
             "Finish a learning session and persist the learner's evidence and responses.",
             "POST",

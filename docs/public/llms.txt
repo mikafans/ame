@@ -147,6 +147,9 @@ POST /api/v1/notes
 GET  /api/v1/notes?journeyId={journey_id}&activityId={activity_id}
 PATCH /api/v1/notes/{id}
 DELETE /api/v1/notes/{id}
+POST /api/v1/learning-variants
+GET  /api/v1/learning-variants?activityId={activity_id}
+PATCH /api/v1/learning-variants/{id}
 ```
 
 `kind: url` fetches public HTTPS text with redirects disabled, private-address

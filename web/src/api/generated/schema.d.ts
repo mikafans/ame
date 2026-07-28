@@ -321,6 +321,38 @@ export interface paths {
         patch: operations["transition"];
         trace?: never;
     };
+    "/api/v1/learning-variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_variants"];
+        put?: never;
+        post: operations["request_variant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-variants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["publish_variant"];
+        trace?: never;
+    };
     "/api/v1/learning/activities/{activity_id}/content": {
         parameters: {
             query?: never;
@@ -1477,6 +1509,10 @@ export interface components {
             successCriteria: string;
             verb: string;
         };
+        PublishVariantBody: {
+            content: unknown;
+            sourceReferences: string[];
+        };
         /** @enum {string} */
         QuestionKind: "multiple_choice" | "true_false" | "short_answer" | "numeric" | "essay" | "code";
         QuestionOption: {
@@ -1529,6 +1565,17 @@ export interface components {
             email: string;
             name: string;
             password: string;
+        };
+        RequestVariantBody: {
+            /** Format: uuid */
+            objectiveId: string;
+            provider?: string | null;
+            recommendationReason: string;
+            requestedDifficulty?: string | null;
+            retryKey: string;
+            /** Format: uuid */
+            sourceActivityId: string;
+            variantKind: components["schemas"]["VariantKind"];
         };
         ReviewItemResponse: {
             /** Format: uuid */
@@ -1760,6 +1807,25 @@ export interface components {
         };
         /** @enum {string} */
         UserStatus: "active" | "deactivated";
+        /** @enum {string} */
+        VariantKind: "explanation" | "example" | "difficulty";
+        VariantResponse: {
+            content?: unknown;
+            error?: unknown;
+            /** Format: uuid */
+            generationRunId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            objectiveId: string;
+            recommendationReason: string;
+            requestedDifficulty?: string | null;
+            /** Format: uuid */
+            sourceActivityId: string;
+            sourceReferences: string[];
+            status: components["schemas"]["GenerationStatus"];
+            variantKind: components["schemas"]["VariantKind"];
+        };
     };
     responses: never;
     parameters: never;
@@ -2418,6 +2484,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerationRunResponse"];
+                };
+            };
+        };
+    };
+    list_variants: {
+        parameters: {
+            query: {
+                activityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantResponse"][];
+                };
+            };
+        };
+    };
+    request_variant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestVariantBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantResponse"];
+                };
+            };
+        };
+    };
+    publish_variant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishVariantBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantResponse"];
                 };
             };
         };
