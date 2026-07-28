@@ -184,7 +184,7 @@ pub fn build_skill_manifest() -> Value {
             "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
             "POST",
             "/api/v1/tasks/{task_id}/submissions",
-            json!({"type":"object","required":["taskId","contentVersion","response"],"properties":{"taskId":{"type":"string","format":"uuid"},"contentVersion":{"type":"integer","minimum":1},"response":{"type":"object"},"evaluationMethod":{"type":"string","enum":["self_review","automatic","agent","manual"]}}}),
+            json!({"type":"object","required":["taskId","contentVersion","response"],"properties":{"taskId":{"type":"string","format":"uuid"},"contentVersion":{"type":"integer","minimum":1},"response":{"type":"object"},"artifacts":{"type":"array","items":{"type":"object","required":["kind","name","mediaType","content"]}},"evaluationMethod":{"type":"string","enum":["self_review","automatic","agent","manual"]}}}),
         ),
         endpoint(
             "learning.task.submission.submit",
@@ -374,6 +374,13 @@ pub fn build_skill_manifest() -> Value {
             "PATCH",
             "/api/v1/generation-runs/{id}",
             json!({"type":"object","required":["id","status"],"properties":{"id":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["requested","running","review_required","published","failed"]},"error":{"type":"object"}}}),
+        ),
+        endpoint(
+            "learning.task.revise",
+            "Create a new immutable revision from a rejected learner submission while preserving its task, objective, and content-version lineage.",
+            "PATCH",
+            "/api/v1/task-submissions/{submission_id}/revise",
+            json!({"type":"object","required":["submissionId","response"],"properties":{"submissionId":{"type":"string","format":"uuid"},"response":{"type":"object"},"artifacts":{"type":"array","items":{"type":"object","required":["kind","name","mediaType","content"]}}}}),
         ),
     ];
 

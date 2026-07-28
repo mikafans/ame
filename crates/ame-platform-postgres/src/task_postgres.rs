@@ -4,7 +4,7 @@ use ame_platform_application::task::{
 };
 use ame_platform_domain::task::{
     TaskEvaluationMethod, TaskReviewStatus, TaskSubmissionEnvelope, TaskSubmissionStatus,
-    validate_task_submission_transition,
+    validate_submission_artifacts, validate_task_submission_transition,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -37,7 +37,9 @@ impl PgTaskSubmissionRepository {
     ) -> Result<TaskSubmission, TaskSubmissionError> {
         let row = sqlx::query(
             "SELECT id, journey_id, task_id, subject_user_id, content_version, response,
-                    evaluation_method, status, review_status, score::float4 AS score, feedback
+                    evaluation_method, status, review_status, score::float4 AS score, feedback,
+                    artifacts, revision, parent_submission_id, reviewer_user_id,
+                    rubric_scores, review_provenance
              FROM tb_task_submissions WHERE id = $1 AND subject_user_id = $2",
         )
         .bind(submission_id)
@@ -51,10 +53,13 @@ impl PgTaskSubmissionRepository {
 
     pub async fn list_pending_for_admin(&self) -> Result<Vec<TaskSubmission>, TaskSubmissionError> {
         let rows = sqlx::query(
-            "SELECT id, journey_id, task_id, subject_user_id, content_version, response,
-                    evaluation_method, status, review_status, score::float4 AS score, feedback
-             FROM tb_task_submissions
-             WHERE status IN ('submitted', 'in_review') AND review_status = 'pending'
+            "SELECT s.id, s.journey_id, s.task_id, s.subject_user_id, s.content_version, s.response,
+                    s.evaluation_method, s.status, s.review_status, s.score::float4 AS score,
+                    s.feedback, s.artifacts, s.revision, s.parent_submission_id,
+                    s.reviewer_user_id, s.rubric_scores, s.review_provenance, a.rubric
+             FROM tb_task_submissions s
+             JOIN tb_activities a ON a.id = s.task_id
+             WHERE s.status IN ('submitted', 'in_review') AND s.review_status = 'pending'
              ORDER BY submitted_at ASC NULLS LAST, created_at ASC
              LIMIT 100",
         )
@@ -106,6 +111,8 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                 "response must be present".into(),
             ));
         }
+        validate_submission_artifacts(&input.artifacts)
+            .map_err(|error| TaskSubmissionError::InvalidContract(error.to_string()))?;
         let task = sqlx::query(
             "SELECT a.journey_id, a.subject_user_id, a.content_version
              FROM tb_activities a
@@ -123,16 +130,20 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
         }
         let row = sqlx::query(
             "INSERT INTO tb_task_submissions
-                 (task_id, subject_user_id, journey_id, content_version, response, evaluation_method)
-             VALUES ($1, $2, $3, $4, $5, $6)
+                 (task_id, subject_user_id, journey_id, content_version, response,
+                  artifacts, evaluation_method)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                       evaluation_method, status, review_status, score::float4 AS score, feedback",
+                       evaluation_method, status, review_status, score::float4 AS score, feedback,
+                       artifacts, revision, parent_submission_id, reviewer_user_id,
+                       rubric_scores, review_provenance",
         )
         .bind(input.task_id)
         .bind(input.subject_user_id)
         .bind(task.get::<Uuid, _>("journey_id"))
         .bind(input.content_version as i32)
         .bind(input.response)
+        .bind(serde_json::json!(input.artifacts))
         .bind(evaluation_method_name(input.evaluation_method))
         .fetch_one(&self.pool)
         .await
@@ -147,7 +158,9 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
     ) -> Result<TaskSubmission, TaskSubmissionError> {
         let current = sqlx::query(
             "SELECT id, journey_id, task_id, subject_user_id, content_version, response,
-                    evaluation_method, status, review_status, score, feedback
+                    evaluation_method, status, review_status, score, feedback,
+                    artifacts, revision, parent_submission_id, reviewer_user_id,
+                    rubric_scores, review_provenance
              FROM tb_task_submissions WHERE id = $1",
         )
         .bind(submission_id)
@@ -175,7 +188,9 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
                     updated_at = now()
               WHERE id = $1
               RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                        evaluation_method, status, review_status, score::float4 AS score, feedback",
+                        evaluation_method, status, review_status, score::float4 AS score, feedback,
+                        artifacts, revision, parent_submission_id, reviewer_user_id,
+                        rubric_scores, review_provenance",
         )
         .bind(submission_id)
         .bind(task_submission_status_name(next_status))
@@ -215,15 +230,95 @@ impl TaskSubmissionRepository for PgTaskSubmissionRepository {
         let row = sqlx::query(
             "UPDATE tb_task_submissions
                 SET status = $2, review_status = 'complete', score = $3,
-                    feedback = $4, reviewed_at = now(), updated_at = now()
+                    feedback = $4, reviewer_user_id = $5, rubric_scores = $6,
+                    review_provenance = $7, reviewed_at = now(), updated_at = now()
               WHERE id = $1
               RETURNING id, journey_id, task_id, subject_user_id, content_version, response,
-                        evaluation_method, status, review_status, score::float4 AS score, feedback",
+                        evaluation_method, status, review_status, score::float4 AS score, feedback,
+                        artifacts, revision, parent_submission_id, reviewer_user_id,
+                        rubric_scores, review_provenance",
         )
         .bind(input.submission_id)
         .bind(task_submission_status_name(next_status))
         .bind(input.score)
         .bind(input.feedback)
+        .bind(input.reviewer_user_id)
+        .bind(
+            input
+                .rubric_scores
+                .map(serde_json::to_value)
+                .transpose()
+                .map_err(|error| TaskSubmissionError::InvalidContract(error.to_string()))?,
+        )
+        .bind(input.review_provenance)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        decode_submission(row)
+    }
+
+    async fn revise(
+        &self,
+        subject_user_id: Uuid,
+        submission_id: Uuid,
+        response: serde_json::Value,
+        artifacts: Vec<ame_platform_domain::task::SubmissionArtifact>,
+    ) -> Result<TaskSubmission, TaskSubmissionError> {
+        let current = sqlx::query(
+            "SELECT * FROM tb_task_submissions
+             WHERE id = $1 AND subject_user_id = $2",
+        )
+        .bind(submission_id)
+        .bind(subject_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(TaskSubmissionError::NotFound)?;
+        let status = task_submission_status(current.get("status"))?;
+        validate_task_submission_transition(status, TaskSubmissionStatus::InProgress)
+            .map_err(TaskSubmissionError::InvalidTransition)?;
+        if response.is_null() {
+            return Err(TaskSubmissionError::InvalidContract(
+                "response must be present".into(),
+            ));
+        }
+        validate_submission_artifacts(&artifacts)
+            .map_err(|error| TaskSubmissionError::InvalidContract(error.to_string()))?;
+        if let Some(row) =
+            sqlx::query("SELECT * FROM tb_task_submissions WHERE parent_submission_id = $1")
+                .bind(submission_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(storage_error)?
+        {
+            let existing = decode_submission(row)?;
+            if existing.envelope.response == response && existing.envelope.artifacts == artifacts {
+                return Ok(existing);
+            }
+            return Err(TaskSubmissionError::InvalidContract(
+                "revision payload conflicts with the existing successor".into(),
+            ));
+        }
+        let row = sqlx::query(
+            "INSERT INTO tb_task_submissions
+                (task_id, subject_user_id, journey_id, content_version, response,
+                 artifacts, evaluation_method, revision, parent_submission_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, journey_id, task_id, subject_user_id, content_version,
+                       response, evaluation_method, status, review_status,
+                       score::float4 AS score, feedback, artifacts, revision,
+                       parent_submission_id, reviewer_user_id, rubric_scores,
+                       review_provenance",
+        )
+        .bind(current.get::<Uuid, _>("task_id"))
+        .bind(subject_user_id)
+        .bind(current.get::<Uuid, _>("journey_id"))
+        .bind(current.get::<i32, _>("content_version"))
+        .bind(response)
+        .bind(serde_json::json!(artifacts))
+        .bind(current.get::<String, _>("evaluation_method"))
+        .bind(current.get::<i32, _>("revision") + 1)
+        .bind(submission_id)
         .fetch_one(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -235,11 +330,29 @@ fn decode_submission(row: sqlx::postgres::PgRow) -> Result<TaskSubmission, TaskS
     Ok(TaskSubmission {
         id: row.get("id"),
         journey_id: row.get("journey_id"),
+        revision: row.get::<i32, _>("revision") as u32,
+        parent_submission_id: row.get("parent_submission_id"),
+        reviewer_user_id: row.get("reviewer_user_id"),
+        rubric_scores: row
+            .get::<Option<serde_json::Value>, _>("rubric_scores")
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| TaskSubmissionError::Storage(error.to_string()))?,
+        review_provenance: row.get("review_provenance"),
+        rubric: row
+            .try_get::<Option<serde_json::Value>, _>("rubric")
+            .ok()
+            .flatten()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| TaskSubmissionError::Storage(error.to_string()))?,
         envelope: TaskSubmissionEnvelope {
             task_id: row.get("task_id"),
             subject_user_id: row.get("subject_user_id"),
             content_version: row.get::<i32, _>("content_version") as u32,
             response: row.get("response"),
+            artifacts: serde_json::from_value(row.get("artifacts"))
+                .map_err(|error| TaskSubmissionError::Storage(error.to_string()))?,
             evaluation_method: task_evaluation_method(row.get("evaluation_method"))?,
             status: task_submission_status(row.get("status"))?,
             review_status: task_review_status(row.get("review_status"))?,

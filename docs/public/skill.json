@@ -585,6 +585,18 @@
       "description": "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
       "input_schema": {
         "properties": {
+          "artifacts": {
+            "items": {
+              "required": [
+                "kind",
+                "name",
+                "mediaType",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "contentVersion": {
             "minimum": 1,
             "type": "integer"
@@ -1464,6 +1476,40 @@
       "method": "PATCH",
       "name": "learning.generation.transition",
       "path": "/api/v1/generation-runs/{id}"
+    },
+    {
+      "description": "Create a new immutable revision from a rejected learner submission while preserving its task, objective, and content-version lineage.",
+      "input_schema": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "required": [
+                "kind",
+                "name",
+                "mediaType",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "response": {
+            "type": "object"
+          },
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submissionId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.task.revise",
+      "path": "/api/v1/task-submissions/{submission_id}/revise"
     }
   ]
 }

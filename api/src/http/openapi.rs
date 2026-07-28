@@ -36,8 +36,8 @@ use crate::http::{
     reviews::{DueReviewQuery, RateReviewBody, ReviewItemResponse, SeedReviewBody},
     sources::{ImportSourceBody, SourceImportRunResponse, SourceSnapshotResponse},
     tasks::{
-        ReviewTaskOutcome, ReviewTaskSubmissionBody, StartTaskSubmissionBody,
-        TaskSubmissionResponse,
+        ReviewTaskOutcome, ReviewTaskSubmissionBody, ReviseTaskSubmissionBody,
+        StartTaskSubmissionBody, TaskSubmissionResponse,
     },
     variants::{PublishVariantBody, RequestVariantBody, VariantResponse},
 };
@@ -106,6 +106,7 @@ use crate::http::{
         crate::http::admin::put_settings,
         crate::http::tasks::start_submission,
         crate::http::tasks::get_submission,
+        crate::http::tasks::revise_submission,
         crate::http::tasks::list_pending_submissions,
         crate::http::tasks::submit_submission,
         crate::http::tasks::review_submission
@@ -188,6 +189,7 @@ use crate::http::{
         crate::settings::TierLimit,
         StartTaskSubmissionBody,
         TaskSubmissionResponse,
+        ReviseTaskSubmissionBody,
         ReviewTaskOutcome,
         ReviewTaskSubmissionBody
     )),

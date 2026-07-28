@@ -92,8 +92,9 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
     sqlx::query(
         "INSERT INTO tb_activities
              (id, journey_id, subject_user_id, source_actor_id, kind, title, order_index,
-              payload_schema_version, payload, status, content_version, publication_status)
-         VALUES ($1, $2, $3, $3, 'application', 'Choose a watermark strategy', 0, 1, $4, 'ready', 2, 'published')",
+              payload_schema_version, payload, status, content_version,
+              publication_status, rubric)
+         VALUES ($1, $2, $3, $3, 'application', 'Choose a watermark strategy', 0, 1, $4, 'ready', 2, 'published', $5)",
     )
     .bind(activity)
     .bind(journey)
@@ -105,6 +106,17 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
             "prompt": "What should the Flink job use?",
             "options": [{"id": "event-time", "label": "Event time with watermarks"}, {"id": "processing-time", "label": "Processing time only"}]
         }
+    }))
+    .bind(serde_json::json!({
+        "version": 1,
+        "criteria": [{
+            "id": "event-time-reasoning",
+            "objectiveId": objective,
+            "description": "Explains a sound watermark strategy",
+            "maxPoints": 10,
+            "required": true
+        }],
+        "passingScore": 0.7
     }))
     .execute(&mut *transaction)
     .await
@@ -181,6 +193,10 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
             axum::routing::get(tasks::get_submission),
         )
         .route(
+            "/v1/task-submissions/{submission_id}/revise",
+            patch(tasks::revise_submission),
+        )
+        .route(
             "/v1/admin/task-submissions",
             axum::routing::get(tasks::list_pending_submissions),
         )
@@ -213,6 +229,12 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
         .json(&serde_json::json!({
             "contentVersion": 2,
             "response": {"optionId": "event-time"},
+            "artifacts": [{
+                "kind": "analysis",
+                "name": "watermark.md",
+                "mediaType": "text/markdown",
+                "content": "Use bounded out-of-orderness watermarks."
+            }],
             "evaluationMethod": "agent"
         }))
         .send()
@@ -220,7 +242,7 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
         .expect("start task over HTTP");
     assert_eq!(started.status(), StatusCode::CREATED);
     let started: serde_json::Value = started.json().await.expect("decode started task");
-    let submission_id = started["id"].as_str().expect("submission id");
+    let mut submission_id = started["id"].as_str().expect("submission id").to_string();
     let submitted = client
         .post(format!(
             "{base_url}/v1/task-submissions/{submission_id}/submit"
@@ -241,8 +263,59 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
     assert!(
         pending
             .iter()
-            .any(|task| task["id"].as_str() == Some(submission_id))
+            .any(|task| task["id"].as_str() == Some(submission_id.as_str()))
     );
+    let rejected = client
+        .patch(format!(
+            "{base_url}/v1/task-submissions/{submission_id}/review"
+        ))
+        .bearer_auth(&admin_token)
+        .json(&serde_json::json!({
+            "outcome": "rejected",
+            "score": 0.4,
+            "feedback": {"note": "Add the out-of-orderness bound."},
+            "rubricScores": [{
+                "criterionId": "event-time-reasoning",
+                "points": 4,
+                "feedback": "The strategy is named but not bounded."
+            }],
+            "reviewProvenance": {"method": "manual", "rubricVersion": 1}
+        }))
+        .send()
+        .await
+        .expect("reject first revision");
+    assert_eq!(rejected.status(), StatusCode::OK);
+    let revised = client
+        .patch(format!(
+            "{base_url}/v1/task-submissions/{submission_id}/revise"
+        ))
+        .bearer_auth(&learner_token)
+        .json(&serde_json::json!({
+            "response": {"optionId": "event-time", "bound": "5 seconds"},
+            "artifacts": [{
+                "kind": "analysis",
+                "name": "watermark-v2.md",
+                "mediaType": "text/markdown",
+                "content": "Use five seconds of bounded out-of-orderness."
+            }]
+        }))
+        .send()
+        .await
+        .expect("revise rejected task");
+    assert_eq!(revised.status(), StatusCode::CREATED);
+    let revised: serde_json::Value = revised.json().await.expect("decode revision");
+    assert_eq!(revised["revision"], 2);
+    assert_eq!(revised["parentSubmissionId"], submission_id);
+    submission_id = revised["id"].as_str().expect("revision id").to_string();
+    let resubmitted = client
+        .post(format!(
+            "{base_url}/v1/task-submissions/{submission_id}/submit"
+        ))
+        .bearer_auth(&learner_token)
+        .send()
+        .await
+        .expect("resubmit revision");
+    assert_eq!(resubmitted.status(), StatusCode::OK);
     let reviewed = client
         .patch(format!(
             "{base_url}/v1/task-submissions/{submission_id}/review"
@@ -251,7 +324,16 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
         .json(&serde_json::json!({
             "outcome": "reviewed",
             "score": 0.9,
-            "feedback": {"note": "Correct event-time reasoning"}
+            "feedback": {"note": "Correct event-time reasoning"},
+            "rubricScores": [{
+                "criterionId": "event-time-reasoning",
+                "points": 9,
+                "feedback": "Sound watermark reasoning with an explicit bound."
+            }],
+            "reviewProvenance": {
+                "method": "manual",
+                "rubricVersion": 1
+            }
         }))
         .send()
         .await
@@ -260,6 +342,8 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
     let reviewed: serde_json::Value = reviewed.json().await.expect("decode reviewed task");
     assert_eq!(reviewed["reviewStatus"], "complete");
     assert_eq!(reviewed["score"], 0.9);
+    assert_eq!(reviewed["reviewerUserId"], admin.to_string());
+    assert_eq!(reviewed["revision"], 2);
     let learner_read = client
         .get(format!("{base_url}/v1/task-submissions/{submission_id}"))
         .bearer_auth(&learner_token)
@@ -275,7 +359,7 @@ async fn flink_task_review_creates_task_sourced_mastery_evidence() {
     );
 
     let tasks = PgTaskSubmissionRepository::new(pool.clone());
-    let reviewed_id = Uuid::parse_str(submission_id).expect("parse submission id");
+    let reviewed_id = Uuid::parse_str(&submission_id).expect("parse submission id");
     let context = tasks
         .evidence_context(reviewed_id)
         .await

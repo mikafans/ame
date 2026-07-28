@@ -150,6 +150,7 @@ DELETE /api/v1/notes/{id}
 POST /api/v1/learning-variants
 GET  /api/v1/learning-variants?activityId={activity_id}
 PATCH /api/v1/learning-variants/{id}
+PATCH /api/v1/task-submissions/{submission_id}/revise
 ```
 
 `kind: url` fetches public HTTPS text with redirects disabled, private-address

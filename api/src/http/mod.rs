@@ -204,6 +204,10 @@ pub fn router(pool: PgPool) -> Router {
             get(tasks::get_submission),
         )
         .route(
+            "/v1/task-submissions/{submission_id}/revise",
+            patch(tasks::revise_submission),
+        )
+        .route(
             "/v1/admin/task-submissions",
             get(tasks::list_pending_submissions),
         )

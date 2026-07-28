@@ -1400,6 +1400,33 @@ paths:
                 $ref: '#/components/schemas/TaskSubmissionResponse'
       security:
       - bearer: []
+  /api/v1/task-submissions/{submission_id}/revise:
+    patch:
+      tags:
+      - tasks
+      operationId: revise_submission
+      parameters:
+      - name: submission_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviseTaskSubmissionBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
   /api/v1/task-submissions/{submission_id}/submit:
     post:
       tags:
@@ -3286,16 +3313,47 @@ components:
         feedback: {}
         outcome:
           $ref: '#/components/schemas/ReviewTaskOutcome'
+        reviewProvenance: {}
+        rubricScores:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/RubricScore'
         score:
           type:
           - number
           - 'null'
           format: float
+    ReviseTaskSubmissionBody:
+      type: object
+      required:
+      - response
+      properties:
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionArtifact'
+        response: {}
     Role:
       type: string
       enum:
       - user
       - admin
+    RubricScore:
+      type: object
+      required:
+      - criterionId
+      - points
+      - feedback
+      properties:
+        criterionId:
+          type: string
+        feedback:
+          type: string
+        points:
+          type: number
+          format: float
     SaveAnswerBody:
       type: object
       required:
@@ -3505,6 +3563,10 @@ components:
       - contentVersion
       - response
       properties:
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionArtifact'
         contentVersion:
           type: integer
           format: int32
@@ -3554,6 +3616,22 @@ components:
         qualifyingDay:
           type: string
         qualifyingEventKey:
+          type: string
+    SubmissionArtifact:
+      type: object
+      required:
+      - kind
+      - name
+      - mediaType
+      - content
+      properties:
+        content:
+          type: string
+        kind:
+          type: string
+        mediaType:
+          type: string
+        name:
           type: string
     TaskEvaluationMethod:
       type: string
@@ -3617,10 +3695,16 @@ components:
       - journeyId
       - contentVersion
       - response
+      - artifacts
+      - revision
       - evaluationMethod
       - status
       - reviewStatus
       properties:
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionArtifact'
         contentVersion:
           type: integer
           format: int32
@@ -3634,9 +3718,34 @@ components:
         journeyId:
           type: string
           format: uuid
+        parentSubmissionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         response: {}
+        reviewProvenance: {}
         reviewStatus:
           $ref: '#/components/schemas/TaskReviewStatus'
+        reviewerUserId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        revision:
+          type: integer
+          format: int32
+          minimum: 0
+        rubric:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TaskRubric'
+        rubricScores:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/RubricScore'
         score:
           type:
           - number

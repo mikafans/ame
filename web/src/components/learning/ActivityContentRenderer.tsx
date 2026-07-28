@@ -131,6 +131,8 @@ export function ActivityContentRenderer({
   const [taskSubmission, setTaskSubmission] = useState<TaskSubmission | null>(
     null,
   );
+  const [projectResponse, setProjectResponse] = useState("");
+  const [artifactContent, setArtifactContent] = useState("");
 
   useEffect(() => {
     if (!taskId || typeof window === "undefined") return;
@@ -267,6 +269,51 @@ export function ActivityContentRenderer({
                     : "Reviewer feedback is available for this submission."}
                 </p>
               )}
+              {taskSubmission?.status === "rejected" && taskId && (
+                <button
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                  onClick={async () => {
+                    setTaskStatus("submitting");
+                    const revised = await api.PATCH(
+                      "/api/v1/task-submissions/{submission_id}/revise",
+                      {
+                        params: {
+                          path: { submission_id: taskSubmission.id },
+                        },
+                        body: {
+                          response: { optionId: selectedOption },
+                          artifacts: [],
+                        },
+                      },
+                    );
+                    if (!revised.response.ok || !revised.data) {
+                      setTaskStatus("error");
+                      return;
+                    }
+                    const submitted = await api.POST(
+                      "/api/v1/task-submissions/{submission_id}/submit",
+                      {
+                        params: {
+                          path: { submission_id: revised.data.id },
+                        },
+                      },
+                    );
+                    if (submitted.response.ok && submitted.data) {
+                      setTaskSubmission(submitted.data);
+                      window.localStorage.setItem(
+                        `ame-task-submission:${taskId}`,
+                        submitted.data.id,
+                      );
+                      setTaskStatus("submitted");
+                    } else {
+                      setTaskStatus("error");
+                    }
+                  }}
+                  type="button"
+                >
+                  Revise and resubmit
+                </button>
+              )}
               {taskId && taskStatus !== "submitted" && (
                 <button
                   type="button"
@@ -318,6 +365,118 @@ export function ActivityContentRenderer({
         </>
       )}
       {rubric && <RubricSection rubric={rubric} />}
+      {rubric && taskId && parsed.type !== "scenario" && (
+        <div className="space-y-3 rounded-xl border border-primary/20 bg-background/70 p-4">
+          <label
+            className="block text-sm font-medium"
+            htmlFor={`project-${taskId}`}
+          >
+            Project response
+          </label>
+          <textarea
+            className="min-h-28 w-full rounded-xl border border-input bg-background p-3 text-sm"
+            id={`project-${taskId}`}
+            onChange={(event) => setProjectResponse(event.target.value)}
+            placeholder="Explain your approach, decisions, and result…"
+            value={projectResponse}
+          />
+          <label
+            className="block text-sm font-medium"
+            htmlFor={`artifact-${taskId}`}
+          >
+            Supporting artifact
+          </label>
+          <textarea
+            className="min-h-24 w-full rounded-xl border border-input bg-background p-3 font-mono text-sm"
+            id={`artifact-${taskId}`}
+            onChange={(event) => setArtifactContent(event.target.value)}
+            placeholder="Paste a report, data sample, or code excerpt…"
+            value={artifactContent}
+          />
+          {taskSubmission?.reviewStatus === "pending" && (
+            <p className="text-sm text-muted-foreground">
+              Submitted · awaiting rubric review.
+            </p>
+          )}
+          {taskSubmission?.feedback != null && (
+            <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">
+              {JSON.stringify(taskSubmission.feedback, null, 2)}
+            </pre>
+          )}
+          {taskSubmission?.rubricScores?.map((score) => (
+            <p className="text-sm" key={score.criterionId}>
+              {score.criterionId}: {score.points} pts · {score.feedback}
+            </p>
+          ))}
+          <button
+            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            disabled={taskStatus === "submitting" || !projectResponse.trim()}
+            onClick={async () => {
+              setTaskStatus("submitting");
+              const artifacts = artifactContent.trim()
+                ? [
+                    {
+                      kind: "text",
+                      name: "learner-artifact.txt",
+                      mediaType: "text/plain",
+                      content: artifactContent,
+                    },
+                  ]
+                : [];
+              const result =
+                taskSubmission?.status === "rejected"
+                  ? await api.PATCH(
+                      "/api/v1/task-submissions/{submission_id}/revise",
+                      {
+                        params: {
+                          path: { submission_id: taskSubmission.id },
+                        },
+                        body: {
+                          response: { text: projectResponse },
+                          artifacts,
+                        },
+                      },
+                    )
+                  : await api.POST("/api/v1/tasks/{task_id}/submissions", {
+                      params: { path: { task_id: taskId } },
+                      body: {
+                        contentVersion,
+                        response: { text: projectResponse },
+                        artifacts,
+                        evaluationMethod: "agent",
+                      },
+                    });
+              if (!result.response.ok || !result.data) {
+                setTaskStatus("error");
+                return;
+              }
+              const submitted = await api.POST(
+                "/api/v1/task-submissions/{submission_id}/submit",
+                {
+                  params: {
+                    path: { submission_id: result.data.id },
+                  },
+                },
+              );
+              if (submitted.response.ok && submitted.data) {
+                setTaskSubmission(submitted.data);
+                window.localStorage.setItem(
+                  `ame-task-submission:${taskId}`,
+                  submitted.data.id,
+                );
+                setTaskStatus("submitted");
+              } else {
+                setTaskStatus("error");
+              }
+            }}
+            type="button"
+          >
+            {taskSubmission?.status === "rejected"
+              ? "Revise and resubmit"
+              : "Submit for rubric review"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -825,6 +825,22 @@ export interface paths {
         patch: operations["review_submission"];
         trace?: never;
     };
+    "/api/v1/task-submissions/{submission_id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["revise_submission"];
+        trace?: never;
+    };
     "/api/v1/task-submissions/{submission_id}/submit": {
         parameters: {
             query?: never;
@@ -1602,11 +1618,23 @@ export interface components {
         ReviewTaskSubmissionBody: {
             feedback?: unknown;
             outcome: components["schemas"]["ReviewTaskOutcome"];
+            reviewProvenance?: unknown;
+            rubricScores?: components["schemas"]["RubricScore"][] | null;
             /** Format: float */
             score?: number | null;
         };
+        ReviseTaskSubmissionBody: {
+            artifacts?: components["schemas"]["SubmissionArtifact"][];
+            response: unknown;
+        };
         /** @enum {string} */
         Role: "user" | "admin";
+        RubricScore: {
+            criterionId: string;
+            feedback: string;
+            /** Format: float */
+            points: number;
+        };
         SaveAnswerBody: {
             /** Format: uuid */
             assessmentItemId: string;
@@ -1695,6 +1723,7 @@ export interface components {
             userId: string;
         };
         StartTaskSubmissionBody: {
+            artifacts?: components["schemas"]["SubmissionArtifact"][];
             /** Format: int32 */
             contentVersion: number;
             evaluationMethod?: components["schemas"]["TaskEvaluationMethod"];
@@ -1719,6 +1748,12 @@ export interface components {
             qualifyingDay: string;
             qualifyingEventKey: string;
         };
+        SubmissionArtifact: {
+            content: string;
+            kind: string;
+            mediaType: string;
+            name: string;
+        };
         /** @enum {string} */
         TaskEvaluationMethod: "self_review" | "automatic" | "agent" | "manual";
         /** @enum {string} */
@@ -1740,6 +1775,7 @@ export interface components {
             required: boolean;
         };
         TaskSubmissionResponse: {
+            artifacts: components["schemas"]["SubmissionArtifact"][];
             /** Format: int32 */
             contentVersion: number;
             evaluationMethod: components["schemas"]["TaskEvaluationMethod"];
@@ -1748,8 +1784,17 @@ export interface components {
             id: string;
             /** Format: uuid */
             journeyId: string;
+            /** Format: uuid */
+            parentSubmissionId?: string | null;
             response: unknown;
+            reviewProvenance?: unknown;
             reviewStatus: components["schemas"]["TaskReviewStatus"];
+            /** Format: uuid */
+            reviewerUserId?: string | null;
+            /** Format: int32 */
+            revision: number;
+            rubric?: null | components["schemas"]["TaskRubric"];
+            rubricScores?: components["schemas"]["RubricScore"][] | null;
             /** Format: float */
             score?: number | null;
             status: components["schemas"]["TaskSubmissionStatus"];
@@ -3416,6 +3461,31 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
+            };
+        };
+    };
+    revise_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseTaskSubmissionBody"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
