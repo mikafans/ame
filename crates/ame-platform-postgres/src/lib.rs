@@ -17,6 +17,7 @@ pub mod progress_postgres;
 pub mod question_postgres;
 pub mod review_postgres;
 pub mod settings;
+pub mod source_postgres;
 pub mod task_postgres;
 pub mod timeline_postgres;
 
@@ -49,6 +50,9 @@ pub mod question {
 pub mod review {
     pub use ame_platform_application::review::*;
 }
+pub mod source {
+    pub use ame_platform_application::source::*;
+}
 pub mod task {
     pub use ame_platform_application::task::*;
 }
@@ -57,6 +61,6 @@ pub mod domain {
     pub use ame_learning_domain as learning;
     pub use ame_platform_domain::{
         assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz,
-        review, task, timeline, user,
+        review, source, task, timeline, user,
     };
 }

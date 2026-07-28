@@ -94,6 +94,7 @@ pub mod openapi;
 pub mod progress;
 pub mod questions;
 pub mod reviews;
+pub mod sources;
 pub mod tasks;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
@@ -181,6 +182,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(attempts::router(state.clone()))
         .merge(progress::router(state.clone()))
         .merge(reviews::router(state.clone()))
+        .merge(sources::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(

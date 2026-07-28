@@ -633,6 +633,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/source-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_imports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/source-snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/source-snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sources/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/task-submissions/{submission_id}": {
         parameters: {
             query?: never;
@@ -1069,6 +1133,13 @@ export interface components {
         GenerationStatus: "requested" | "running" | "review_required" | "published" | "failed";
         /** @enum {string} */
         GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
+        ImportSourceBody: {
+            content?: string | null;
+            kind: components["schemas"]["SourceKind"];
+            locator: string;
+            mediaType?: string | null;
+            retryKey: string;
+        };
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
         LearningActivityResponse: {
@@ -1381,6 +1452,38 @@ export interface components {
             mastery: number;
             /** Format: uuid */
             objectiveId: string;
+        };
+        SourceImportRunResponse: {
+            /** Format: date-time */
+            completedAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            errorCode?: string | null;
+            /** Format: uuid */
+            id: string;
+            retryKey: string;
+            /** Format: uuid */
+            sourceId: string;
+            status: components["schemas"]["SourceImportStatus"];
+        };
+        /** @enum {string} */
+        SourceImportStatus: "requested" | "completed" | "failed";
+        /** @enum {string} */
+        SourceKind: "url" | "document" | "local_file";
+        SourceSnapshotResponse: {
+            /** Format: int32 */
+            byteLength: number;
+            content: string;
+            contentSha256: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            importRunId: string;
+            mediaType: string;
+            /** Format: uuid */
+            sourceId: string;
         };
         StartAttemptBody: {
             /** Format: uuid */
@@ -2765,6 +2868,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewItemResponse"];
+                };
+            };
+        };
+    };
+    list_imports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceImportRunResponse"][];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSnapshotResponse"][];
+                };
+            };
+        };
+    };
+    get_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSnapshotResponse"];
+                };
+            };
+        };
+    };
+    import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportSourceBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSnapshotResponse"];
                 };
             };
         };

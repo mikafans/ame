@@ -140,6 +140,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "fsrs",
+ "reqwest",
  "serde",
  "serde_json",
  "thiserror",

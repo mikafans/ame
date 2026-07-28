@@ -991,6 +991,149 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
+  /api/v1/reviews:
+    post:
+      tags:
+      - reviews
+      operationId: seed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeedReviewBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewItemResponse'
+      security:
+      - bearer: []
+  /api/v1/reviews/due:
+    get:
+      tags:
+      - reviews
+      operationId: list_due
+      parameters:
+      - name: dueBefore
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReviewItemResponse'
+      security:
+      - bearer: []
+  /api/v1/reviews/{review_item_id}/ratings:
+    post:
+      tags:
+      - reviews
+      operationId: rate
+      parameters:
+      - name: review_item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateReviewBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewItemResponse'
+      security:
+      - bearer: []
+  /api/v1/source-imports:
+    get:
+      tags:
+      - sources
+      operationId: list_imports
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceImportRunResponse'
+      security:
+      - bearer: []
+  /api/v1/source-snapshots:
+    get:
+      tags:
+      - sources
+      operationId: list
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceSnapshotResponse'
+      security:
+      - bearer: []
+  /api/v1/source-snapshots/{snapshot_id}:
+    get:
+      tags:
+      - sources
+      operationId: get_one
+      parameters:
+      - name: snapshot_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSnapshotResponse'
+      security:
+      - bearer: []
+  /api/v1/sources/imports:
+    post:
+      tags:
+      - sources
+      operationId: import
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportSourceBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSnapshotResponse'
+      security:
+      - bearer: []
   /api/v1/task-submissions/{submission_id}:
     get:
       tags:
@@ -1799,6 +1942,14 @@ components:
         triggeringEvidenceId:
           type: string
           format: uuid
+    DueReviewQuery:
+      type: object
+      properties:
+        dueBefore:
+          type:
+          - string
+          - 'null'
+          format: date-time
     EffectiveSettings:
       type: object
       required:
@@ -1967,6 +2118,27 @@ components:
       - paused
       - completed
       - failed
+    ImportSourceBody:
+      type: object
+      required:
+      - kind
+      - locator
+      - retryKey
+      properties:
+        content:
+          type:
+          - string
+          - 'null'
+        kind:
+          $ref: '#/components/schemas/SourceKind'
+        locator:
+          type: string
+        mediaType:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type: string
     JourneyStatus:
       type: string
       enum:
@@ -2577,6 +2749,13 @@ components:
           $ref: '#/components/schemas/TierLimit'
         premium:
           $ref: '#/components/schemas/TierLimit'
+    RateReviewBody:
+      type: object
+      required:
+      - rating
+      properties:
+        rating:
+          $ref: '#/components/schemas/ReviewRating'
     RecommendationBody:
       type: object
       required:
@@ -2624,6 +2803,52 @@ components:
           type: string
         password:
           type: string
+    ReviewItemResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - objectiveId
+      - activityId
+      - contentVersion
+      - dueAt
+      - intervalDays
+      - reviewCount
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        dueAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        intervalDays:
+          type: integer
+          format: int32
+          minimum: 0
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reviewCount:
+          type: integer
+          format: int32
+          minimum: 0
+    ReviewRating:
+      type: string
+      enum:
+      - again
+      - hard
+      - good
+      - easy
     ReviewTaskOutcome:
       type: string
       enum:
@@ -2661,6 +2886,14 @@ components:
           type: string
           format: uuid
         response: {}
+    SeedReviewBody:
+      type: object
+      required:
+      - evidenceId
+      properties:
+        evidenceId:
+          type: string
+          format: uuid
     SnapshotResponse:
       type: object
       required:
@@ -2687,6 +2920,83 @@ components:
           type: number
           format: float
         objectiveId:
+          type: string
+          format: uuid
+    SourceImportRunResponse:
+      type: object
+      required:
+      - id
+      - sourceId
+      - retryKey
+      - status
+      - createdAt
+      properties:
+        completedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        errorCode:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        retryKey:
+          type: string
+        sourceId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/SourceImportStatus'
+    SourceImportStatus:
+      type: string
+      enum:
+      - requested
+      - completed
+      - failed
+    SourceKind:
+      type: string
+      enum:
+      - url
+      - document
+      - local_file
+    SourceSnapshotResponse:
+      type: object
+      required:
+      - id
+      - sourceId
+      - importRunId
+      - mediaType
+      - contentSha256
+      - byteLength
+      - content
+      - createdAt
+      properties:
+        byteLength:
+          type: integer
+          format: int32
+          minimum: 0
+        content:
+          type: string
+        contentSha256:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        importRunId:
+          type: string
+          format: uuid
+        mediaType:
+          type: string
+        sourceId:
           type: string
           format: uuid
     StartAttemptBody:

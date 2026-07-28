@@ -10,6 +10,7 @@ pub mod progress;
 pub mod question;
 pub mod quiz;
 pub mod review;
+pub mod source;
 pub mod task;
 pub mod timeline;
 pub mod user;
@@ -18,7 +19,7 @@ pub mod user;
 pub mod domain {
     pub use crate::{
         assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz,
-        review, task, timeline, user,
+        review, source, task, timeline, user,
     };
     pub use ame_learning_domain as learning;
 }

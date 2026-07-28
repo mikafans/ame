@@ -131,6 +131,25 @@ content version. Recommendations, timeline events, and streak events are
 derived from durable activity and evidence state rather than from generated
 text alone.
 
+## Immutable source snapshots
+
+Import bounded source text before using it for grounded content:
+
+```http
+POST /api/v1/sources/imports
+GET  /api/v1/source-imports
+GET  /api/v1/source-snapshots
+GET  /api/v1/source-snapshots/{snapshot_id}
+```
+
+`kind: url` fetches public HTTPS text with redirects disabled, private-address
+resolution rejected, a ten-second timeout, and a two MiB limit. `document` and
+`local_file` accept text in the request; `local_file` is a provenance label and
+never asks the server to read an arbitrary path. A stable `retryKey` returns
+the same immutable snapshot only when locator and content digest match.
+Snapshots expose their SHA-256 digest so later citations can identify exact
+bytes rather than an editable URL or filename.
+
 ## Agent authoring and adaptation
 
 Agents may inspect the journey, create versioned questions and assessments,

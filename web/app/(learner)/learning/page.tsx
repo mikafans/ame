@@ -52,6 +52,13 @@ type ReviewItem = {
   intervalDays: number;
   reviewCount: number;
 };
+type SourceSnapshot = {
+  id: string;
+  mediaType: string;
+  contentSha256: string;
+  byteLength: number;
+  content: string;
+};
 
 function activityStatusLabel(status: string) {
   if (status === "completed") return "Complete";
@@ -76,12 +83,14 @@ export default function LearningHomePage() {
   );
   const [dueReviews, setDueReviews] = useState<ReviewItem[]>([]);
   const [ratingReviewId, setRatingReviewId] = useState<string | null>(null);
+  const [sources, setSources] = useState<SourceSnapshot[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const [{ data, response }, reviews] = await Promise.all([
+      const [{ data, response }, reviews, sourceSnapshots] = await Promise.all([
         api.GET("/api/v1/learning/journeys" as never),
         api.GET("/api/v1/reviews/due"),
+        api.GET("/api/v1/source-snapshots"),
       ]);
       if (response.ok && data) {
         const nextJourneys = data as JourneySummary[];
@@ -89,6 +98,9 @@ export default function LearningHomePage() {
       }
       if (reviews.response.ok && reviews.data) {
         setDueReviews(reviews.data as ReviewItem[]);
+      }
+      if (sourceSnapshots.response.ok && sourceSnapshots.data) {
+        setSources(sourceSnapshots.data as SourceSnapshot[]);
       }
       setLoading(false);
     })();
@@ -292,6 +304,36 @@ export default function LearningHomePage() {
                   )}
                 </div>
               </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && sources.length > 0 && (
+        <section
+          className="rounded-3xl border border-border bg-card p-7"
+          data-testid="source-library"
+        >
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            Source library
+          </p>
+          <h2 className="mt-2 text-2xl font-bold">What your learning uses</h2>
+          <div className="mt-5 grid gap-3">
+            {sources.map((source) => (
+              <details
+                className="rounded-2xl border border-border p-4"
+                key={source.id}
+              >
+                <summary className="cursor-pointer font-semibold">
+                  {source.mediaType} · {source.byteLength} bytes
+                </summary>
+                <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+                  SHA-256 {source.contentSha256}
+                </p>
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-4 text-xs">
+                  {source.content}
+                </pre>
+              </details>
             ))}
           </div>
         </section>
