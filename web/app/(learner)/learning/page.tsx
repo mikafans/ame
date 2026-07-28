@@ -44,6 +44,14 @@ type TimelineEvent = {
   title: string;
   occurredAt: string;
 };
+type ReviewItem = {
+  id: string;
+  journeyId: string;
+  activityId: string;
+  dueAt: string;
+  intervalDays: number;
+  reviewCount: number;
+};
 
 function activityStatusLabel(status: string) {
   if (status === "completed") return "Complete";
@@ -66,15 +74,21 @@ export default function LearningHomePage() {
   const [timelines, setTimelines] = useState<Record<string, TimelineEvent[]>>(
     {},
   );
+  const [dueReviews, setDueReviews] = useState<ReviewItem[]>([]);
+  const [ratingReviewId, setRatingReviewId] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const { data, response } = await api.GET(
-        "/api/v1/learning/journeys" as never,
-      );
+      const [{ data, response }, reviews] = await Promise.all([
+        api.GET("/api/v1/learning/journeys" as never),
+        api.GET("/api/v1/reviews/due"),
+      ]);
       if (response.ok && data) {
         const nextJourneys = data as JourneySummary[];
         setJourneys(nextJourneys);
+      }
+      if (reviews.response.ok && reviews.data) {
+        setDueReviews(reviews.data as ReviewItem[]);
       }
       setLoading(false);
     })();
@@ -195,6 +209,20 @@ export default function LearningHomePage() {
     })();
   }, [journeys]);
 
+  async function rateReview(reviewItemId: string, rating: string) {
+    setRatingReviewId(reviewItemId);
+    const result = await api.POST("/api/v1/reviews/{review_item_id}/ratings", {
+      params: { path: { review_item_id: reviewItemId } },
+      body: { rating: rating as "again" | "hard" | "good" | "easy" },
+    });
+    if (result.response.ok) {
+      setDueReviews((items) =>
+        items.filter((item) => item.id !== reviewItemId),
+      );
+    }
+    setRatingReviewId(null);
+  }
+
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-8 sm:py-12">
       <section className="rounded-3xl border border-border bg-card p-7 shadow-sm sm:p-10">
@@ -214,6 +242,60 @@ export default function LearningHomePage() {
           </Link>
         </Button>
       </section>
+
+      {!loading && dueReviews.length > 0 && (
+        <section
+          className="rounded-3xl border border-primary/30 bg-card p-7"
+          data-testid="due-review-queue"
+        >
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            Due for review
+          </p>
+          <h2 className="mt-2 text-2xl font-bold">
+            Strengthen what you learned
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Rate how recall felt. AME schedules the next review from your own
+            review history.
+          </p>
+          <div className="mt-5 space-y-4">
+            {dueReviews.map((review) => (
+              <article
+                className="rounded-2xl border border-border p-5"
+                key={review.id}
+              >
+                <Link
+                  className="font-semibold hover:text-primary"
+                  href={`/learning/journeys/${review.journeyId}#activity-${review.activityId}`}
+                >
+                  Review learning activity
+                </Link>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {review.reviewCount === 0
+                    ? "First scheduled review"
+                    : `${review.reviewCount} reviews completed`}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(["again", "hard", "good", "easy"] as const).map(
+                    (rating) => (
+                      <Button
+                        disabled={ratingReviewId === review.id}
+                        key={rating}
+                        onClick={() => void rateReview(review.id, rating)}
+                        size="sm"
+                        type="button"
+                        variant={rating === "good" ? "default" : "outline"}
+                      >
+                        {rating[0].toUpperCase() + rating.slice(1)}
+                      </Button>
+                    ),
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading journeys…</p>

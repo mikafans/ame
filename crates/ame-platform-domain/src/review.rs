@@ -2,7 +2,7 @@
 
 use fsrs::{FSRS, MemoryState};
 use serde::{Deserialize, Serialize};
-use time::{Date, Duration, OffsetDateTime, Time};
+use time::{Duration, OffsetDateTime, Time};
 use utoipa::ToSchema;
 
 pub const DEFAULT_DESIRED_RETENTION: f32 = 0.9;
@@ -96,6 +96,7 @@ pub fn schedule_review(input: ScheduleReview) -> Result<ReviewSchedule, ReviewSc
 #[cfg(test)]
 mod tests {
     use super::*;
+    use time::Date;
     use time::macros::datetime;
 
     fn new_review(rating: ReviewRating) -> ScheduleReview {

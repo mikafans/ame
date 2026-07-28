@@ -15,6 +15,7 @@ pub mod idempotency;
 pub mod identity_postgres;
 pub mod progress_postgres;
 pub mod question_postgres;
+pub mod review_postgres;
 pub mod settings;
 pub mod task_postgres;
 pub mod timeline_postgres;
@@ -45,6 +46,9 @@ pub mod progress {
 pub mod question {
     pub use ame_platform_application::question::*;
 }
+pub mod review {
+    pub use ame_platform_application::review::*;
+}
 pub mod task {
     pub use ame_platform_application::task::*;
 }
@@ -52,7 +56,7 @@ pub mod task {
 pub mod domain {
     pub use ame_learning_domain as learning;
     pub use ame_platform_domain::{
-        assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz, task,
-        timeline, user,
+        assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz,
+        review, task, timeline, user,
     };
 }

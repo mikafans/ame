@@ -585,6 +585,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["seed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reviews/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_due"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reviews/{review_item_id}/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/task-submissions/{submission_id}": {
         parameters: {
             query?: never;
@@ -948,6 +996,10 @@ export interface components {
             /** Format: uuid */
             triggeringEvidenceId: string;
         };
+        DueReviewQuery: {
+            /** Format: date-time */
+            dueBefore?: string | null;
+        };
         EffectiveSettings: {
             maintenanceMode: boolean;
             ratelimit: components["schemas"]["RateLimitSettings"];
@@ -1255,6 +1307,9 @@ export interface components {
             free: components["schemas"]["TierLimit"];
             premium: components["schemas"]["TierLimit"];
         };
+        RateReviewBody: {
+            rating: components["schemas"]["ReviewRating"];
+        };
         RecommendationBody: {
             objectives: components["schemas"]["ObjectiveActivityBody"][];
         };
@@ -1273,6 +1328,26 @@ export interface components {
             name: string;
             password: string;
         };
+        ReviewItemResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: int32 */
+            contentVersion: number;
+            /** Format: date-time */
+            dueAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            intervalDays: number;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: int32 */
+            reviewCount: number;
+        };
+        /** @enum {string} */
+        ReviewRating: "again" | "hard" | "good" | "easy";
         /** @enum {string} */
         ReviewTaskOutcome: "reviewed" | "rejected";
         ReviewTaskSubmissionBody: {
@@ -1289,6 +1364,10 @@ export interface components {
             /** Format: uuid */
             questionVersionId: string;
             response: unknown;
+        };
+        SeedReviewBody: {
+            /** Format: uuid */
+            evidenceId: string;
         };
         SnapshotResponse: {
             calculatedAt: string;
@@ -2617,6 +2696,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestionResponse"];
+                };
+            };
+        };
+    };
+    seed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedReviewBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemResponse"];
+                };
+            };
+        };
+    };
+    list_due: {
+        parameters: {
+            query?: {
+                dueBefore?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemResponse"][];
+                };
+            };
+        };
+    };
+    rate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RateReviewBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemResponse"];
                 };
             };
         };
