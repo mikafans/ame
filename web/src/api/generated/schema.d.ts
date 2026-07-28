@@ -225,6 +225,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/citations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_citations"];
+        put?: never;
+        post: operations["create_citation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/citations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_citation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/deep-dives": {
         parameters: {
             query?: never;
@@ -990,6 +1022,25 @@ export interface components {
             rubric: components["schemas"]["TaskRubric"];
             sourceReferences: string[];
         };
+        CitationResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: int32 */
+            endByte: number;
+            extractionMethod: components["schemas"]["ExtractionMethod"];
+            groundingNote: string;
+            groundingStatus: components["schemas"]["GroundingStatus"];
+            /** Format: uuid */
+            id: string;
+            licenseName?: string | null;
+            licenseStatus: components["schemas"]["LicenseStatus"];
+            licenseUrl?: string | null;
+            quote: string;
+            /** Format: uuid */
+            snapshotId: string;
+            /** Format: int32 */
+            startByte: number;
+        };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
         CreateAssessmentBody: {
@@ -998,6 +1049,21 @@ export interface components {
             items: components["schemas"]["AssessmentItemBody"][];
             mode: components["schemas"]["AssessmentMode"];
             status?: components["schemas"]["AssessmentStatus"];
+        };
+        CreateCitationBody: {
+            /** Format: int32 */
+            endByte: number;
+            extractionMethod: components["schemas"]["ExtractionMethod"];
+            groundingNote: string;
+            groundingStatus: components["schemas"]["GroundingStatus"];
+            licenseName?: string | null;
+            licenseStatus: components["schemas"]["LicenseStatus"];
+            licenseUrl?: string | null;
+            quote: string;
+            /** Format: uuid */
+            snapshotId: string;
+            /** Format: int32 */
+            startByte: number;
         };
         CreateDeepDiveBody: {
             /** Format: uuid */
@@ -1106,6 +1172,8 @@ export interface components {
             /** Format: float */
             value: number;
         };
+        /** @enum {string} */
+        ExtractionMethod: "exact_quote" | "manual_selection";
         FieldError: {
             field: string;
             message: string;
@@ -1133,6 +1201,8 @@ export interface components {
         GenerationStatus: "requested" | "running" | "review_required" | "published" | "failed";
         /** @enum {string} */
         GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
+        /** @enum {string} */
+        GroundingStatus: "supported" | "contradicted" | "unverified";
         ImportSourceBody: {
             content?: string | null;
             kind: components["schemas"]["SourceKind"];
@@ -1287,6 +1357,8 @@ export interface components {
         };
         /** @enum {string} */
         LearningSessionStatus: "in_progress" | "finished" | "abandoned";
+        /** @enum {string} */
+        LicenseStatus: "allowed" | "restricted" | "unknown";
         ListAuditLogsResponse: {
             logs: components["schemas"]["AuditLogEntry"][];
             /** Format: int64 */
@@ -2073,6 +2145,69 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_citations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationResponse"][];
+                };
+            };
+        };
+    };
+    create_citation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCitationBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationResponse"];
+                };
+            };
+        };
+    };
+    get_citation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationResponse"];
+                };
             };
         };
     };

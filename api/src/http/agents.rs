@@ -96,6 +96,27 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["snapshotId"],"properties":{"snapshotId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.citation.create",
+            "Certify an exact byte range in an immutable source snapshot with grounding and licensing review metadata.",
+            "POST",
+            "/api/v1/citations",
+            json!({"type":"object","required":["snapshotId","startByte","endByte","quote","extractionMethod","groundingStatus","groundingNote","licenseStatus"],"properties":{"snapshotId":{"type":"string","format":"uuid"},"startByte":{"type":"integer","minimum":0},"endByte":{"type":"integer","minimum":1},"quote":{"type":"string"},"extractionMethod":{"type":"string","enum":["exact_quote","manual_selection"]},"groundingStatus":{"type":"string","enum":["supported","contradicted","unverified"]},"groundingNote":{"type":"string"},"licenseStatus":{"type":"string","enum":["allowed","restricted","unknown"]},"licenseName":{"type":"string"},"licenseUrl":{"type":"string"}}}),
+        ),
+        endpoint(
+            "learning.citation.list",
+            "Inspect learner-owned citation certificates and their immutable snapshot anchors.",
+            "GET",
+            "/api/v1/citations",
+            json!({"type":"object","properties":{}}),
+        ),
+        endpoint(
+            "learning.citation.get",
+            "Read one learner-owned citation certificate, grounding decision, and licensing metadata.",
+            "GET",
+            "/api/v1/citations/{id}",
+            json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.session.finish",
             "Finish a learning session and persist the learner's evidence and responses.",
             "POST",

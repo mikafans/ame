@@ -3,6 +3,7 @@
 pub mod assessment;
 pub mod attempt;
 pub mod authentication;
+pub mod citation;
 pub mod deep_dive;
 pub mod generation;
 pub mod identity;
@@ -25,8 +26,8 @@ pub mod auth {
 pub mod domain {
     pub use ame_learning_domain as learning;
     pub use ame_platform_domain::{
-        assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz,
-        review, source, task, timeline, user,
+        assessment, attempt, auth, citation, deep_dive, generation, identity, progress, question,
+        quiz, review, source, task, timeline, user,
     };
 }
 

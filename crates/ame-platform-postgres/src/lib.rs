@@ -8,6 +8,7 @@ pub mod audit_query;
 pub mod auth_cache;
 pub mod authentication_http;
 pub mod authentication_postgres;
+pub mod citation_postgres;
 pub mod deep_dive_postgres;
 pub mod generation_postgres;
 pub mod health;
@@ -35,6 +36,9 @@ pub mod auth {
 pub mod deep_dive {
     pub use ame_platform_application::deep_dive::*;
 }
+pub mod citation {
+    pub use ame_platform_application::citation::*;
+}
 pub mod generation {
     pub use ame_platform_application::generation::*;
 }
@@ -60,7 +64,7 @@ pub mod task {
 pub mod domain {
     pub use ame_learning_domain as learning;
     pub use ame_platform_domain::{
-        assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz,
-        review, source, task, timeline, user,
+        assessment, attempt, auth, citation, deep_dive, generation, identity, progress, question,
+        quiz, review, source, task, timeline, user,
     };
 }

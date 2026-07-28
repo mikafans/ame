@@ -140,6 +140,9 @@ POST /api/v1/sources/imports
 GET  /api/v1/source-imports
 GET  /api/v1/source-snapshots
 GET  /api/v1/source-snapshots/{snapshot_id}
+POST /api/v1/citations
+GET  /api/v1/citations
+GET  /api/v1/citations/{id}
 ```
 
 `kind: url` fetches public HTTPS text with redirects disabled, private-address

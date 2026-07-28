@@ -23,6 +23,8 @@ fn skill_manifest_contains_namespaced_unified_learning_tools() {
     assert!(paths.contains(&"/api/v1/sources/imports"));
     assert!(paths.contains(&"/api/v1/source-imports"));
     assert!(paths.contains(&"/api/v1/source-snapshots/{snapshot_id}"));
+    assert!(paths.contains(&"/api/v1/citations"));
+    assert!(paths.contains(&"/api/v1/citations/{id}"));
     assert_eq!(
         manifest["entrypoint"],
         Value::String("/public/llms.txt".into())

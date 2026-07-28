@@ -378,6 +378,62 @@ paths:
       responses:
         '200':
           description: Logged out
+  /api/v1/citations:
+    get:
+      tags:
+      - citations
+      operationId: list_citations
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CitationResponse'
+      security:
+      - bearer: []
+    post:
+      tags:
+      - citations
+      operationId: create_citation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCitationBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationResponse'
+      security:
+      - bearer: []
+  /api/v1/citations/{id}:
+    get:
+      tags:
+      - citations
+      operationId: get_citation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationResponse'
+      security:
+      - bearer: []
   /api/v1/deep-dives:
     get:
       tags:
@@ -1757,6 +1813,55 @@ components:
           type: array
           items:
             type: string
+    CitationResponse:
+      type: object
+      required:
+      - id
+      - snapshotId
+      - startByte
+      - endByte
+      - quote
+      - extractionMethod
+      - groundingStatus
+      - groundingNote
+      - licenseStatus
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        endByte:
+          type: integer
+          format: int32
+          minimum: 0
+        extractionMethod:
+          $ref: '#/components/schemas/ExtractionMethod'
+        groundingNote:
+          type: string
+        groundingStatus:
+          $ref: '#/components/schemas/GroundingStatus'
+        id:
+          type: string
+          format: uuid
+        licenseName:
+          type:
+          - string
+          - 'null'
+        licenseStatus:
+          $ref: '#/components/schemas/LicenseStatus'
+        licenseUrl:
+          type:
+          - string
+          - 'null'
+        quote:
+          type: string
+        snapshotId:
+          type: string
+          format: uuid
+        startByte:
+          type: integer
+          format: int32
+          minimum: 0
     ContentReviewStatus:
       type: string
       enum:
@@ -1783,6 +1888,47 @@ components:
           $ref: '#/components/schemas/AssessmentMode'
         status:
           $ref: '#/components/schemas/AssessmentStatus'
+    CreateCitationBody:
+      type: object
+      required:
+      - snapshotId
+      - startByte
+      - endByte
+      - quote
+      - extractionMethod
+      - groundingStatus
+      - groundingNote
+      - licenseStatus
+      properties:
+        endByte:
+          type: integer
+          format: int32
+          minimum: 0
+        extractionMethod:
+          $ref: '#/components/schemas/ExtractionMethod'
+        groundingNote:
+          type: string
+        groundingStatus:
+          $ref: '#/components/schemas/GroundingStatus'
+        licenseName:
+          type:
+          - string
+          - 'null'
+        licenseStatus:
+          $ref: '#/components/schemas/LicenseStatus'
+        licenseUrl:
+          type:
+          - string
+          - 'null'
+        quote:
+          type: string
+        snapshotId:
+          type: string
+          format: uuid
+        startByte:
+          type: integer
+          format: int32
+          minimum: 0
     CreateDeepDiveBody:
       type: object
       required:
@@ -2044,6 +2190,11 @@ components:
         value:
           type: number
           format: float
+    ExtractionMethod:
+      type: string
+      enum:
+      - exact_quote
+      - manual_selection
     FieldError:
       type: object
       required:
@@ -2118,6 +2269,12 @@ components:
       - paused
       - completed
       - failed
+    GroundingStatus:
+      type: string
+      enum:
+      - supported
+      - contradicted
+      - unverified
     ImportSourceBody:
       type: object
       required:
@@ -2505,6 +2662,12 @@ components:
       - in_progress
       - finished
       - abandoned
+    LicenseStatus:
+      type: string
+      enum:
+      - allowed
+      - restricted
+      - unknown
     ListAuditLogsResponse:
       type: object
       required:

@@ -3,13 +3,13 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
 pub use ame_platform_application::{
-    assessment, attempt, deep_dive, generation, identity, onboarding, progress, question, review,
-    source, task, templates,
+    assessment, attempt, citation, deep_dive, generation, identity, onboarding, progress, question,
+    review, source, task, templates,
 };
 pub use ame_platform_postgres::{
-    assessment_postgres, attempt_postgres, authentication_postgres, deep_dive_postgres,
-    generation_postgres, identity_postgres, progress_postgres, question_postgres, review_postgres,
-    source_postgres, task_postgres, timeline_postgres,
+    assessment_postgres, attempt_postgres, authentication_postgres, citation_postgres,
+    deep_dive_postgres, generation_postgres, identity_postgres, progress_postgres,
+    question_postgres, review_postgres, source_postgres, task_postgres, timeline_postgres,
 };
 pub mod audit;
 pub mod auth;

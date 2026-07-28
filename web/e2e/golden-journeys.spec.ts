@@ -37,6 +37,39 @@ async function publishedGenerationRun(page: Page, operation: string) {
   return run.id as string;
 }
 
+async function supportedCitation(page: Page, content: string, quote: string) {
+  const source = await page.request.post(apiUrl("/api/v1/sources/imports"), {
+    data: {
+      kind: "document",
+      locator: `golden/${Date.now()}-${Math.random()}.txt`,
+      mediaType: "text/plain",
+      content,
+      retryKey: `golden-source-${Date.now()}-${Math.random()}`,
+    },
+  });
+  expect(source.ok()).toBeTruthy();
+  const snapshot = await source.json();
+  const startByte = new TextEncoder().encode(
+    content.slice(0, content.indexOf(quote)),
+  ).length;
+  const endByte = startByte + new TextEncoder().encode(quote).length;
+  const certificate = await page.request.post(apiUrl("/api/v1/citations"), {
+    data: {
+      snapshotId: snapshot.id,
+      startByte,
+      endByte,
+      quote,
+      extractionMethod: "exact_quote",
+      groundingStatus: "supported",
+      groundingNote: "Seeded golden source directly supports the tested item.",
+      licenseStatus: "allowed",
+      licenseName: "Test fixture",
+    },
+  });
+  expect(certificate.ok()).toBeTruthy();
+  return (await certificate.json()).id as string;
+}
+
 async function onboardIntoJourney(
   page: Page,
   prompt: string,
@@ -92,6 +125,16 @@ test("physics golden journey seeds deterministically and grades numeric answers 
     page,
     "question.compose",
   );
+  const kinematicsCitation = await supportedCitation(
+    page,
+    "For constant acceleration, velocity equals acceleration multiplied by elapsed time.",
+    "velocity equals acceleration multiplied by elapsed time",
+  );
+  const forceCitation = await supportedCitation(
+    page,
+    "Net force equals mass multiplied by acceleration.",
+    "Net force equals mass multiplied by acceleration",
+  );
 
   const withinToleranceQuestion = await page.request.post(
     apiUrl("/api/v1/questions"),
@@ -104,7 +147,7 @@ test("physics golden journey seeds deterministically and grades numeric answers 
         acceptedAnswers: ["19.6", "0.5"],
         points: 1,
         reviewStatus: "approved",
-        sourceReferences: ["https://example.com/kinematics"],
+        sourceReferences: [kinematicsCitation],
       },
     },
   );
@@ -122,7 +165,7 @@ test("physics golden journey seeds deterministically and grades numeric answers 
         acceptedAnswers: ["100", "1"],
         points: 1,
         reviewStatus: "approved",
-        sourceReferences: ["https://example.com/newtons-second-law"],
+        sourceReferences: [forceCitation],
       },
     },
   );
@@ -245,6 +288,11 @@ test("flink golden journey seeds deterministically and routes a code submission 
     page,
     "question.compose",
   );
+  const codeCitation = await supportedCitation(
+    page,
+    "A Python function can return the sum of its two integer parameters.",
+    "return the sum of its two integer parameters",
+  );
 
   const codeQuestion = await page.request.post(apiUrl("/api/v1/questions"), {
     data: {
@@ -254,7 +302,7 @@ test("flink golden journey seeds deterministically and routes a code submission 
         "Write a Python function `add(a, b)` that returns the sum of two integers.",
       points: 1,
       reviewStatus: "approved",
-      sourceReferences: ["https://example.com/flink-python-exercise"],
+      sourceReferences: [codeCitation],
     },
   });
   expect(codeQuestion.ok()).toBeTruthy();

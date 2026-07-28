@@ -82,6 +82,7 @@ pub mod agents;
 pub mod assessments;
 pub mod attempts;
 pub mod auth;
+pub mod citations;
 pub mod db;
 pub mod deep_dives;
 pub mod generation;
@@ -183,6 +184,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(progress::router(state.clone()))
         .merge(reviews::router(state.clone()))
         .merge(sources::router(state.clone()))
+        .merge(citations::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(

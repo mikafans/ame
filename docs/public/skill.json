@@ -244,6 +244,102 @@
       "path": "/api/v1/source-snapshots/{snapshot_id}"
     },
     {
+      "description": "Certify an exact byte range in an immutable source snapshot with grounding and licensing review metadata.",
+      "input_schema": {
+        "properties": {
+          "endByte": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "extractionMethod": {
+            "enum": [
+              "exact_quote",
+              "manual_selection"
+            ],
+            "type": "string"
+          },
+          "groundingNote": {
+            "type": "string"
+          },
+          "groundingStatus": {
+            "enum": [
+              "supported",
+              "contradicted",
+              "unverified"
+            ],
+            "type": "string"
+          },
+          "licenseName": {
+            "type": "string"
+          },
+          "licenseStatus": {
+            "enum": [
+              "allowed",
+              "restricted",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "licenseUrl": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "startByte": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "snapshotId",
+          "startByte",
+          "endByte",
+          "quote",
+          "extractionMethod",
+          "groundingStatus",
+          "groundingNote",
+          "licenseStatus"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.citation.create",
+      "path": "/api/v1/citations"
+    },
+    {
+      "description": "Inspect learner-owned citation certificates and their immutable snapshot anchors.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.citation.list",
+      "path": "/api/v1/citations"
+    },
+    {
+      "description": "Read one learner-owned citation certificate, grounding decision, and licensing metadata.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.citation.get",
+      "path": "/api/v1/citations/{id}"
+    },
+    {
       "description": "Finish a learning session and persist the learner's evidence and responses.",
       "input_schema": {
         "properties": {

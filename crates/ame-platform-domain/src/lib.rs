@@ -3,6 +3,7 @@
 pub mod assessment;
 pub mod attempt;
 pub mod auth;
+pub mod citation;
 pub mod deep_dive;
 pub mod generation;
 pub mod identity;

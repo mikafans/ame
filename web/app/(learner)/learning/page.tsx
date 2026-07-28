@@ -59,6 +59,17 @@ type SourceSnapshot = {
   byteLength: number;
   content: string;
 };
+type Citation = {
+  id: string;
+  snapshotId: string;
+  quote: string;
+  startByte: number;
+  endByte: number;
+  groundingStatus: string;
+  groundingNote: string;
+  licenseStatus: string;
+  licenseName?: string | null;
+};
 
 function activityStatusLabel(status: string) {
   if (status === "completed") return "Complete";
@@ -84,13 +95,20 @@ export default function LearningHomePage() {
   const [dueReviews, setDueReviews] = useState<ReviewItem[]>([]);
   const [ratingReviewId, setRatingReviewId] = useState<string | null>(null);
   const [sources, setSources] = useState<SourceSnapshot[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const [{ data, response }, reviews, sourceSnapshots] = await Promise.all([
+      const [
+        { data, response },
+        reviews,
+        sourceSnapshots,
+        citationCertificates,
+      ] = await Promise.all([
         api.GET("/api/v1/learning/journeys" as never),
         api.GET("/api/v1/reviews/due"),
         api.GET("/api/v1/source-snapshots"),
+        api.GET("/api/v1/citations"),
       ]);
       if (response.ok && data) {
         const nextJourneys = data as JourneySummary[];
@@ -101,6 +119,9 @@ export default function LearningHomePage() {
       }
       if (sourceSnapshots.response.ok && sourceSnapshots.data) {
         setSources(sourceSnapshots.data as SourceSnapshot[]);
+      }
+      if (citationCertificates.response.ok && citationCertificates.data) {
+        setCitations(citationCertificates.data as Citation[]);
       }
       setLoading(false);
     })();
@@ -333,6 +354,27 @@ export default function LearningHomePage() {
                 <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-4 text-xs">
                   {source.content}
                 </pre>
+                {citations
+                  .filter((citation) => citation.snapshotId === source.id)
+                  .map((citation) => (
+                    <blockquote
+                      className="mt-3 border-l-2 border-primary pl-4 text-sm"
+                      data-testid={`citation-${citation.id}`}
+                      key={citation.id}
+                    >
+                      “{citation.quote}”
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        Bytes {citation.startByte}–{citation.endByte} ·{" "}
+                        {citation.groundingStatus} · {citation.licenseStatus}
+                        {citation.licenseName
+                          ? ` (${citation.licenseName})`
+                          : ""}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {citation.groundingNote}
+                      </span>
+                    </blockquote>
+                  ))}
               </details>
             ))}
           </div>
