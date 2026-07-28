@@ -340,6 +340,109 @@
       "path": "/api/v1/citations/{id}"
     },
     {
+      "description": "Create an idempotent private learner note anchored to a journey or an exact activity content version.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "contentVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "retryKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "body",
+          "retryKey"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.note.create",
+      "path": "/api/v1/notes"
+    },
+    {
+      "description": "Resume private notes for an owned journey or activity, preserving their original content-version anchors.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.note.list",
+      "path": "/api/v1/notes?journeyId={journey_id}&activityId={activity_id}"
+    },
+    {
+      "description": "Edit a private note using its revision for optimistic concurrency.",
+      "input_schema": {
+        "properties": {
+          "body": {
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "expectedRevision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision",
+          "body"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.note.update",
+      "path": "/api/v1/notes/{id}"
+    },
+    {
+      "description": "Permanently delete one private learner note.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "DELETE",
+      "name": "learning.note.delete",
+      "path": "/api/v1/notes/{id}"
+    },
+    {
       "description": "Finish a learning session and persist the learner's evidence and responses.",
       "input_schema": {
         "properties": {

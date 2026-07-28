@@ -7,6 +7,7 @@ pub mod citation;
 pub mod deep_dive;
 pub mod generation;
 pub mod identity;
+pub mod note;
 pub mod progress;
 pub mod question;
 pub mod quiz;

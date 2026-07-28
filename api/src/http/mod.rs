@@ -90,6 +90,7 @@ pub mod health;
 pub mod idempotency;
 pub mod learning;
 pub mod me;
+pub mod notes;
 pub mod onboarding;
 pub mod openapi;
 pub mod progress;
@@ -185,6 +186,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(reviews::router(state.clone()))
         .merge(sources::router(state.clone()))
         .merge(citations::router(state.clone()))
+        .merge(notes::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(

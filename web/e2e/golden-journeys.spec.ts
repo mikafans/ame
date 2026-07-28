@@ -98,6 +98,32 @@ async function onboardIntoJourney(
   return { journeyId: journeyId as string, journey };
 }
 
+test("learner writes, resumes, edits, and deletes a version-anchored private note", async ({
+  page,
+}) => {
+  await onboardIntoJourney(
+    page,
+    "I would like to learn physics",
+    "Note Learner",
+    `note-golden-${Date.now()}@example.com`,
+    "note-golden-2026",
+  );
+  const editor = page.getByLabel("Private note");
+  await expect(editor).toBeVisible();
+  await editor.fill("Velocity is a vector.");
+  await page.getByRole("button", { name: "Add note" }).click();
+  await expect(page.getByText("Velocity is a vector.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("Velocity is a vector.")).toBeVisible();
+  await page.getByRole("button", { name: "Edit" }).click();
+  await editor.fill("Velocity includes direction.");
+  await page.getByRole("button", { name: "Save edit" }).click();
+  await expect(page.getByText("Velocity includes direction.")).toBeVisible();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Velocity includes direction.")).toHaveCount(0);
+});
+
 test("physics golden journey seeds deterministically and grades numeric answers by tolerance", async ({
   page,
 }) => {

@@ -473,6 +473,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_notes"];
+        put?: never;
+        post: operations["create_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_note"];
+        options?: never;
+        head?: never;
+        patch: operations["update_note"];
+        trace?: never;
+    };
     "/api/v1/progress/evidence": {
         parameters: {
             query?: never;
@@ -1084,6 +1116,16 @@ export interface components {
             /** Format: uuid */
             triggeringEvidenceId: string;
         };
+        CreateNoteBody: {
+            /** Format: uuid */
+            activityId?: string | null;
+            body: string;
+            /** Format: int32 */
+            contentVersion?: number | null;
+            /** Format: uuid */
+            journeyId: string;
+            retryKey: string;
+        };
         CreateQuestionBody: {
             acceptedAnswers?: string[];
             difficulty?: string | null;
@@ -1382,6 +1424,23 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        NoteResponse: {
+            /** Format: uuid */
+            activityId?: string | null;
+            body: string;
+            /** Format: int32 */
+            contentVersion?: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: int32 */
+            revision: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         ObjectiveActivityBody: {
             /** Format: uuid */
             activityId: string;
@@ -1671,6 +1730,11 @@ export interface components {
         TransitionGenerationRunBody: {
             error?: unknown;
             status: components["schemas"]["GenerationStatus"];
+        };
+        UpdateNoteBody: {
+            body: string;
+            /** Format: int32 */
+            expectedRevision: number;
         };
         /** @description Partial update for platform settings — any omitted field is left unchanged. */
         UpdateSettingsBody: {
@@ -2724,6 +2788,95 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_notes: {
+        parameters: {
+            query: {
+                journeyId: string;
+                activityId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"][];
+                };
+            };
+        };
+    };
+    create_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNoteBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
+            };
+        };
+    };
+    delete_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNoteBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
             };
         };
     };

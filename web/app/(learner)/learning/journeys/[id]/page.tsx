@@ -8,6 +8,7 @@ import type { components } from "@/api/generated/schema.d.ts";
 import { Button } from "@/components/ui/button";
 import { ActivityContentRenderer } from "@/components/learning/ActivityContentRenderer";
 import { AssessmentResultFeedback } from "@/components/learning/AssessmentResultFeedback";
+import { ActivityNotes } from "@/components/learning/ActivityNotes";
 
 type Journey = components["schemas"]["LearningJourneyResponse"];
 type LearningSession = components["schemas"]["LearningSessionResponse"];
@@ -876,6 +877,13 @@ export default function LearningJourneyPage() {
             {activeProvenance?.sourceReferences && (
               <ActivityProvenance
                 sourceReferences={activeProvenance.sourceReferences}
+              />
+            )}
+            {activeActivity && (
+              <ActivityNotes
+                activityId={activeActivity.id}
+                contentVersion={activeActivity.contentVersion}
+                journeyId={String(params.id)}
               />
             )}
             {session.status === "in_progress" && assessment && attempt ? (
