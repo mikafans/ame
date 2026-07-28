@@ -79,6 +79,7 @@ pub async fn maintenance_mode_middleware(
 
 pub mod admin;
 pub mod agents;
+pub mod analytics;
 pub mod assessments;
 pub mod attempts;
 pub mod auth;
@@ -191,6 +192,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(notes::router(state.clone()))
         .merge(variants::router(state.clone()))
         .merge(portability::router(state.clone()))
+        .merge(analytics::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(

@@ -403,6 +403,75 @@ test("physics golden journey seeds deterministically and grades numeric answers 
   expect(gradedInTolerance.evaluationStatus).toBe("correct");
   expect(gradedOutOfTolerance.evaluationStatus).toBe("incorrect");
   expect(finished.score).toBeCloseTo(0.5, 5);
+  const evidence = await page.request.post(
+    apiUrl("/api/v1/progress/evidence"),
+    {
+      data: {
+        journeyId: journey.id,
+        objectiveId: objective.id,
+        activityId: activity.id,
+        attemptId: attempt.id,
+        contentVersion: activity.contentVersion,
+        value: 0.5,
+        derivationVersion: 1,
+      },
+    },
+  );
+  expect(evidence.ok()).toBeTruthy();
+  const due = await page.request.get(apiUrl("/api/v1/reviews/due"));
+  const dueReviews = await due.json();
+  const review = dueReviews.find(
+    (candidate: { activityId: string }) => candidate.activityId === activity.id,
+  );
+  expect(review).toBeTruthy();
+  const rating = await page.request.post(
+    apiUrl(`/api/v1/reviews/${review.id}/ratings`),
+    { data: { rating: "good", learnerTimezone: "Asia/Tokyo" } },
+  );
+  expect(rating.ok()).toBeTruthy();
+  const dayParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(new Date())
+    .reduce<Record<string, string>>((parts, part) => {
+      parts[part.type] = part.value;
+      return parts;
+    }, {});
+  const qualifyingDay = `${dayParts.year}-${dayParts.month}-${dayParts.day}`;
+  const streak = await page.request.post(apiUrl("/api/v1/progress/streaks"), {
+    data: {
+      journeyId: journey.id,
+      activityId: activity.id,
+      qualifyingEventKey: `physics-review-${review.id}`,
+      learnerTimezone: "Asia/Tokyo",
+      qualifyingDay,
+    },
+  });
+  expect(streak.ok()).toBeTruthy();
+  const finishedSession = await page.request.post(
+    apiUrl(`/api/v1/learning/sessions/${session.id}/finish`),
+    { data: { completed: true, responses: [] } },
+  );
+  expect(finishedSession.ok()).toBeTruthy();
+  const analytics = await page.request.get(
+    apiUrl(
+      `/api/v1/learning/journeys/${journey.id}/analytics?timezone=Asia%2FTokyo`,
+    ),
+  );
+  expect(analytics.ok()).toBeTruthy();
+  const metrics = await analytics.json();
+  expect(metrics.averageScore.denominator).toBe(1);
+  expect(metrics.averageScore.value).toBeCloseTo(0.5, 5);
+  expect(metrics.attempts).toBe(1);
+  expect(metrics.reviewHistory).toHaveLength(1);
+  expect(metrics.streak.currentDays).toBe(1);
+  await page.goto("/learning");
+  const analyticsPanel = page.getByTestId("learner-analytics");
+  await expect(analyticsPanel).toBeVisible();
+  await expect(analyticsPanel.getByText("50%")).toBeVisible();
 });
 
 test("flink golden journey seeds deterministically and routes a code submission to manual review", async ({

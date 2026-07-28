@@ -437,6 +437,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning/journeys/{id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/journeys/{id}/export": {
         parameters: {
             query?: never;
@@ -1351,6 +1367,21 @@ export interface components {
         };
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
+        LearnerAnalyticsResponse: {
+            /** Format: int32 */
+            attempts: number;
+            averageScore: components["schemas"]["RatioMetric"];
+            completionRate: components["schemas"]["RatioMetric"];
+            definitions: string[];
+            /** Format: uuid */
+            journeyId: string;
+            masteryTrend: components["schemas"]["MasteryPoint"][];
+            privacyBoundary: string;
+            reviewHistory: components["schemas"]["ReviewHistoryPoint"][];
+            streak: components["schemas"]["StreakMetric"];
+            timeSpent: components["schemas"]["TimeMetric"];
+            timezone: string;
+        };
         LearningActivityResponse: {
             /** Format: uuid */
             chapterId?: string | null;
@@ -1512,6 +1543,14 @@ export interface components {
             email: string;
             password: string;
         };
+        MasteryPoint: {
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: float */
+            value: number;
+        };
         MeResponse: {
             /** Format: date-time */
             createdAt: string;
@@ -1613,6 +1652,14 @@ export interface components {
         RateReviewBody: {
             rating: components["schemas"]["ReviewRating"];
         };
+        RatioMetric: {
+            /** Format: int32 */
+            denominator: number;
+            /** Format: float */
+            numerator: number;
+            /** Format: float */
+            value?: number | null;
+        };
         RecommendationBody: {
             objectives: components["schemas"]["ObjectiveActivityBody"][];
         };
@@ -1641,6 +1688,19 @@ export interface components {
             /** Format: uuid */
             sourceActivityId: string;
             variantKind: components["schemas"]["VariantKind"];
+        };
+        ReviewHistoryPoint: {
+            /** Format: date-time */
+            dueAfter: string;
+            /** Format: date-time */
+            dueBefore: string;
+            /** Format: int32 */
+            intervalDays: number;
+            rating: string;
+            /** Format: uuid */
+            reviewItemId: string;
+            /** Format: date-time */
+            reviewedAt: string;
         };
         ReviewItemResponse: {
             /** Format: uuid */
@@ -1787,6 +1847,14 @@ export interface components {
             qualifyingDay: string;
             qualifyingEventKey: string;
         };
+        StreakMetric: {
+            /** Format: int32 */
+            bestDays: number;
+            /** Format: int32 */
+            currentDays: number;
+            /** Format: int32 */
+            qualifyingDays: number;
+        };
         StreakResponse: {
             /** Format: uuid */
             activityId: string;
@@ -1857,6 +1925,12 @@ export interface components {
             burst: number;
             /** Format: int32 */
             rate: number;
+        };
+        TimeMetric: {
+            /** Format: int32 */
+            finishedSessions: number;
+            /** Format: int64 */
+            seconds: number;
         };
         TimelineEventResponse: {
             /** Format: uuid */
@@ -2845,6 +2919,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_analytics: {
+        parameters: {
+            query: {
+                timezone: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerAnalyticsResponse"];
+                };
             };
         };
     };

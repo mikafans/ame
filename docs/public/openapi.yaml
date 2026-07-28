@@ -775,6 +775,32 @@ paths:
           description: Journey does not exist for this learner
       security:
       - bearer_auth: []
+  /api/v1/learning/journeys/{id}/analytics:
+    get:
+      tags:
+      - analytics
+      operationId: get_analytics
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: timezone
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerAnalyticsResponse'
+      security:
+      - bearer: []
   /api/v1/learning/journeys/{id}/export:
     get:
       tags:
@@ -2594,6 +2620,52 @@ components:
       - paused
       - completed
       - failed
+    LearnerAnalyticsResponse:
+      type: object
+      required:
+      - journeyId
+      - timezone
+      - privacyBoundary
+      - streak
+      - completionRate
+      - averageScore
+      - attempts
+      - timeSpent
+      - masteryTrend
+      - reviewHistory
+      - definitions
+      properties:
+        attempts:
+          type: integer
+          format: int32
+          minimum: 0
+        averageScore:
+          $ref: '#/components/schemas/RatioMetric'
+        completionRate:
+          $ref: '#/components/schemas/RatioMetric'
+        definitions:
+          type: array
+          items:
+            type: string
+        journeyId:
+          type: string
+          format: uuid
+        masteryTrend:
+          type: array
+          items:
+            $ref: '#/components/schemas/MasteryPoint'
+        privacyBoundary:
+          type: string
+        reviewHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewHistoryPoint'
+        streak:
+          $ref: '#/components/schemas/StreakMetric'
+        timeSpent:
+          $ref: '#/components/schemas/TimeMetric'
+        timezone:
+          type: string
     LearningActivityResponse:
       type: object
       required:
@@ -2994,6 +3066,22 @@ components:
           type: string
         password:
           type: string
+    MasteryPoint:
+      type: object
+      required:
+      - objectiveId
+      - value
+      - occurredAt
+      properties:
+        objectiveId:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        value:
+          type: number
+          format: float
     MeResponse:
       type: object
       required:
@@ -3257,6 +3345,24 @@ components:
       properties:
         rating:
           $ref: '#/components/schemas/ReviewRating'
+    RatioMetric:
+      type: object
+      required:
+      - numerator
+      - denominator
+      properties:
+        denominator:
+          type: integer
+          format: int32
+          minimum: 0
+        numerator:
+          type: number
+          format: float
+        value:
+          type:
+          - number
+          - 'null'
+          format: float
     RecommendationBody:
       type: object
       required:
@@ -3333,6 +3439,34 @@ components:
           format: uuid
         variantKind:
           $ref: '#/components/schemas/VariantKind'
+    ReviewHistoryPoint:
+      type: object
+      required:
+      - reviewItemId
+      - rating
+      - reviewedAt
+      - dueBefore
+      - dueAfter
+      - intervalDays
+      properties:
+        dueAfter:
+          type: string
+          format: date-time
+        dueBefore:
+          type: string
+          format: date-time
+        intervalDays:
+          type: integer
+          format: int32
+          minimum: 0
+        rating:
+          type: string
+        reviewItemId:
+          type: string
+          format: uuid
+        reviewedAt:
+          type: string
+          format: date-time
     ReviewItemResponse:
       type: object
       required:
@@ -3674,6 +3808,25 @@ components:
           type: string
         qualifyingEventKey:
           type: string
+    StreakMetric:
+      type: object
+      required:
+      - currentDays
+      - bestDays
+      - qualifyingDays
+      properties:
+        bestDays:
+          type: integer
+          format: int32
+          minimum: 0
+        currentDays:
+          type: integer
+          format: int32
+          minimum: 0
+        qualifyingDays:
+          type: integer
+          format: int32
+          minimum: 0
     StreakResponse:
       type: object
       required:
@@ -3857,6 +4010,20 @@ components:
         rate:
           type: integer
           format: int32
+          minimum: 0
+    TimeMetric:
+      type: object
+      required:
+      - seconds
+      - finishedSessions
+      properties:
+        finishedSessions:
+          type: integer
+          format: int32
+          minimum: 0
+        seconds:
+          type: integer
+          format: int64
           minimum: 0
     TimelineEventResponse:
       type: object

@@ -180,6 +180,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["schemaVersion","ownerId","journeyId","exportedAt","checksum","payload"],"properties":{"schemaVersion":{"const":"ame.journey-history.v1"},"ownerId":{"type":"string","format":"uuid"},"journeyId":{"type":"string","format":"uuid"},"exportedAt":{"type":"string","format":"date-time"},"checksum":{"type":"string"},"payload":{"type":"object"}}}),
         ),
         endpoint(
+            "learning.analytics.get",
+            "Read owner-only event-derived retention and progress metrics with explicit timezone, numerators, denominators, and definitions.",
+            "GET",
+            "/api/v1/learning/journeys/{id}/analytics",
+            json!({"type":"object","required":["id","timezone"],"properties":{"id":{"type":"string","format":"uuid"},"timezone":{"type":"string","description":"IANA timezone, for example Asia/Tokyo"}}}),
+        ),
+        endpoint(
             "learning.session.finish",
             "Finish a learning session and persist the learner's evidence and responses.",
             "POST",

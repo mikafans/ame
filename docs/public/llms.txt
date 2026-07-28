@@ -153,6 +153,7 @@ PATCH /api/v1/learning-variants/{id}
 PATCH /api/v1/task-submissions/{submission_id}/revise
 GET  /api/v1/learning/journeys/{id}/export
 POST /api/v1/learning/imports
+GET  /api/v1/learning/journeys/{id}/analytics?timezone={timezone}
 ```
 
 `kind: url` fetches public HTTPS text with redirects disabled, private-address

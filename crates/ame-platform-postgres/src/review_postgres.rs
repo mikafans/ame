@@ -107,8 +107,35 @@ impl ReviewRepository for PgReviewRepository {
         .fetch_one(&mut *transaction)
         .await
         .map_err(storage)?;
+        sqlx::query(
+            "INSERT INTO tb_review_events
+                (id, subject_user_id, journey_id, review_item_id, rating,
+                 reviewed_at, due_before, due_after, interval_days)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(input.subject_user_id)
+        .bind(current.journey_id)
+        .bind(input.review_item_id)
+        .bind(rating_name(input.rating))
+        .bind(schedule.reviewed_at)
+        .bind(current.due_at)
+        .bind(schedule.due_at)
+        .bind(schedule.interval_days as i32)
+        .execute(&mut *transaction)
+        .await
+        .map_err(storage)?;
         transaction.commit().await.map_err(storage)?;
         Ok(map_row(&row))
+    }
+}
+
+fn rating_name(rating: crate::domain::review::ReviewRating) -> &'static str {
+    match rating {
+        crate::domain::review::ReviewRating::Again => "again",
+        crate::domain::review::ReviewRating::Hard => "hard",
+        crate::domain::review::ReviewRating::Good => "good",
+        crate::domain::review::ReviewRating::Easy => "easy",
     }
 }
 
@@ -125,12 +152,12 @@ fn map_row(row: &sqlx::postgres::PgRow) -> ReviewItem {
         due_at: row.get("due_at"),
         last_reviewed_at: row.get("last_reviewed_at"),
         interval_days: row.get::<i32, _>("interval_days") as u32,
-        memory_state: stability.zip(difficulty).map(|(stability, difficulty)| {
-            ReviewMemoryState {
+        memory_state: stability
+            .zip(difficulty)
+            .map(|(stability, difficulty)| ReviewMemoryState {
                 stability,
                 difficulty,
-            }
-        }),
+            }),
         review_count: row.get::<i32, _>("review_count") as u32,
     }
 }

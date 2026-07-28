@@ -596,6 +596,29 @@
       "path": "/api/v1/learning/imports"
     },
     {
+      "description": "Read owner-only event-derived retention and progress metrics with explicit timezone, numerators, denominators, and definitions.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "timezone": {
+            "description": "IANA timezone, for example Asia/Tokyo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "timezone"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.analytics.get",
+      "path": "/api/v1/learning/journeys/{id}/analytics"
+    },
+    {
       "description": "Finish a learning session and persist the learner's evidence and responses.",
       "input_schema": {
         "properties": {

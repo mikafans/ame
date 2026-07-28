@@ -115,6 +115,7 @@ pub async fn import_journey(
         ("taskSubmissions", "tb_task_submissions"),
         ("evidence", "tb_mastery_evidence"),
         ("reviews", "tb_review_items"),
+        ("reviewEvents", "tb_review_events"),
         ("notes", "tb_learner_notes"),
         ("variants", "tb_learning_variants"),
     ] {
@@ -188,6 +189,7 @@ fn validate_manifest(manifest: &JourneyExportManifest, owner_id: Uuid) -> Result
         "taskSubmissions",
         "evidence",
         "reviews",
+        "reviewEvents",
         "notes",
         "variants",
         "history",
@@ -251,6 +253,7 @@ async fn build_payload(pool: &PgPool, owner: Uuid, journey: Uuid) -> Result<Valu
     let activity_objectives = rows(pool, "SELECT to_jsonb(ao) AS value FROM tb_activity_objectives ao JOIN tb_activities a ON a.id = ao.activity_id WHERE a.journey_id = $1 AND a.subject_user_id = $2", journey, owner).await?;
     let evidence = rows(pool, "SELECT to_jsonb(e) AS value FROM tb_mastery_evidence e WHERE e.journey_id = $1 AND e.subject_user_id = $2 ORDER BY e.created_at", journey, owner).await?;
     let reviews = rows(pool, "SELECT to_jsonb(r) AS value FROM tb_review_items r WHERE r.journey_id = $1 AND r.subject_user_id = $2 ORDER BY r.created_at", journey, owner).await?;
+    let review_events = rows(pool, "SELECT to_jsonb(r) AS value FROM tb_review_events r WHERE r.journey_id = $1 AND r.subject_user_id = $2 ORDER BY r.reviewed_at", journey, owner).await?;
     let notes = rows(pool, "SELECT to_jsonb(n) AS value FROM tb_learner_notes n WHERE n.journey_id = $1 AND n.subject_user_id = $2 ORDER BY n.created_at", journey, owner).await?;
     let mut submissions = rows(pool, "SELECT to_jsonb(s) AS value FROM tb_task_submissions s WHERE s.journey_id = $1 AND s.subject_user_id = $2 ORDER BY s.created_at", journey, owner).await?;
     if let Some(archived) = archived_payload(pool, journey, owner).await? {
@@ -307,6 +310,7 @@ async fn build_payload(pool: &PgPool, owner: Uuid, journey: Uuid) -> Result<Valu
         "taskSubmissions": submissions,
         "evidence": evidence,
         "reviews": reviews,
+        "reviewEvents": review_events,
         "notes": notes,
         "variants": variants,
         "history": history,
@@ -382,6 +386,7 @@ async fn restore_rows(
         "tb_task_submissions",
         "tb_mastery_evidence",
         "tb_review_items",
+        "tb_review_events",
         "tb_learner_notes",
         "tb_learning_variants",
     ];
@@ -494,7 +499,7 @@ mod tests {
             "objectives": [], "activities": [], "activityObjectives": [],
             "generationRuns": [], "sources": [], "sourceImportRuns": [],
             "sourceSnapshots": [], "citations": [], "taskSubmissions": [],
-            "evidence": [], "reviews": [], "notes": [], "variants": [], "history": []
+            "evidence": [], "reviews": [], "reviewEvents": [], "notes": [], "variants": [], "history": []
         });
         let mut value = manifest(owner, journey, payload).unwrap();
         assert!(validate_manifest(&value, owner).is_ok());

@@ -14,6 +14,7 @@ import {
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { PortabilityPanel } from "@/components/learning/PortabilityPanel";
+import { LearnerAnalytics } from "@/components/learning/LearnerAnalytics";
 
 type JourneySummary = {
   id: string;
@@ -384,6 +385,10 @@ export default function LearningHomePage() {
 
       {!loading && journeys.length > 0 && (
         <PortabilityPanel journeys={journeys} />
+      )}
+
+      {!loading && journeys[0] && (
+        <LearnerAnalytics journeyId={journeys[0].id} />
       )}
 
       {loading ? (
