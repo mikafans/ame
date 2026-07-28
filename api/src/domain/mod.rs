@@ -2,7 +2,7 @@
 
 pub use ame_learning_domain as learning;
 pub use ame_platform_domain::{
-    assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz, task,
-    timeline, user,
+    assessment, attempt, auth, citation, deep_dive, generation, identity, note, progress, question,
+    quiz, review, source, task, timeline, user,
 };
 pub mod error;

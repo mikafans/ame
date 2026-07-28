@@ -3,6 +3,7 @@ use axum::{
     extract::{Path, State},
 };
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -11,7 +12,9 @@ use crate::{
     auth::extractor::AuthenticatedUser,
     domain::error::ApiError,
     domain::progress::{EvidenceSource, MasteryEvidenceInput},
-    domain::task::TaskEvaluationMethod,
+    domain::task::{
+        RubricScore, SubmissionArtifact, TaskEvaluationMethod, TaskRubric, score_task_rubric,
+    },
     http::AppState,
     progress::ProgressRepository,
     progress_postgres::PgProgressRepository,
@@ -23,6 +26,8 @@ use ame_platform_application::task::TaskSubmissionRepository;
 pub struct StartTaskSubmissionBody {
     pub content_version: u32,
     pub response: serde_json::Value,
+    #[serde(default)]
+    pub artifacts: Vec<SubmissionArtifact>,
     #[serde(default = "default_evaluation_method")]
     pub evaluation_method: TaskEvaluationMethod,
 }
@@ -39,11 +44,18 @@ pub struct TaskSubmissionResponse {
     pub journey_id: Uuid,
     pub content_version: u32,
     pub response: serde_json::Value,
+    pub artifacts: Vec<SubmissionArtifact>,
+    pub revision: u32,
+    pub parent_submission_id: Option<Uuid>,
     pub evaluation_method: TaskEvaluationMethod,
     pub status: crate::domain::task::TaskSubmissionStatus,
     pub review_status: crate::domain::task::TaskReviewStatus,
     pub score: Option<f32>,
     pub feedback: Option<serde_json::Value>,
+    pub reviewer_user_id: Option<Uuid>,
+    pub rubric_scores: Option<Vec<RubricScore>>,
+    pub review_provenance: Option<serde_json::Value>,
+    pub rubric: Option<TaskRubric>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -52,6 +64,16 @@ pub struct ReviewTaskSubmissionBody {
     pub outcome: ReviewTaskOutcome,
     pub score: Option<f32>,
     pub feedback: Option<serde_json::Value>,
+    pub rubric_scores: Option<Vec<RubricScore>>,
+    pub review_provenance: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviseTaskSubmissionBody {
+    pub response: serde_json::Value,
+    #[serde(default)]
+    pub artifacts: Vec<SubmissionArtifact>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -83,6 +105,7 @@ pub async fn start_submission(
                 task_id,
                 content_version: body.content_version,
                 response: body.response,
+                artifacts: body.artifacts,
                 evaluation_method: body.evaluation_method,
             })
             .await
@@ -118,11 +141,18 @@ fn response(submission: ame_platform_application::task::TaskSubmission) -> TaskS
         journey_id: submission.journey_id,
         content_version: submission.envelope.content_version,
         response: submission.envelope.response,
+        artifacts: submission.envelope.artifacts,
+        revision: submission.revision,
+        parent_submission_id: submission.parent_submission_id,
         evaluation_method: submission.envelope.evaluation_method,
         status: submission.envelope.status,
         review_status: submission.envelope.review_status,
         score: submission.envelope.score,
         feedback: submission.envelope.feedback,
+        reviewer_user_id: submission.reviewer_user_id,
+        rubric_scores: submission.rubric_scores,
+        review_provenance: submission.review_provenance,
+        rubric: submission.rubric,
     }
 }
 
@@ -145,6 +175,34 @@ pub async fn get_submission(
             .await
             .map_err(map_task_error)?;
     Ok(Json(response(submission)))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/task-submissions/{submission_id}/revise",
+    params(("submission_id" = Uuid, Path)),
+    request_body = ReviseTaskSubmissionBody,
+    responses((status = 201, body = TaskSubmissionResponse)),
+    security(("bearer" = [])),
+    tag = "tasks"
+)]
+pub async fn revise_submission(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(submission_id): Path<Uuid>,
+    Json(body): Json<ReviseTaskSubmissionBody>,
+) -> Result<(axum::http::StatusCode, Json<TaskSubmissionResponse>), ApiError> {
+    let submission =
+        ame_platform_postgres::task_postgres::PgTaskSubmissionRepository::new(state.pool)
+            .revise(
+                auth.owner_id(),
+                submission_id,
+                body.response,
+                body.artifacts,
+            )
+            .await
+            .map_err(map_task_error)?;
+    Ok((axum::http::StatusCode::CREATED, Json(response(submission))))
 }
 
 #[utoipa::path(
@@ -182,6 +240,57 @@ pub async fn review_submission(
     Json(body): Json<ReviewTaskSubmissionBody>,
 ) -> Result<Json<TaskSubmissionResponse>, ApiError> {
     let is_reviewed = matches!(body.outcome, ReviewTaskOutcome::Reviewed);
+    let row = sqlx::query(
+        "SELECT a.rubric FROM tb_task_submissions s
+         JOIN tb_activities a ON a.id = s.task_id
+         WHERE s.id = $1",
+    )
+    .bind(submission_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|error| ApiError::Internal(anyhow::anyhow!(error)))?
+    .ok_or(ApiError::NotFound {
+        resource: "task submission",
+    })?;
+    if let Some(rubric) = row.get::<Option<serde_json::Value>, _>("rubric") {
+        let rubric: TaskRubric = serde_json::from_value(rubric)
+            .map_err(|error| ApiError::Internal(anyhow::anyhow!(error)))?;
+        let rubric_scores = body.rubric_scores.as_deref().ok_or_else(|| {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "rubricScores".into(),
+                message: "must score every published rubric criterion".into(),
+            }])
+        })?;
+        let calculated = score_task_rubric(&rubric, rubric_scores).map_err(|error| {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "rubricScores".into(),
+                message: error.to_string(),
+            }])
+        })?;
+        if body
+            .score
+            .is_none_or(|score| (score - calculated).abs() > 0.0001)
+        {
+            return Err(ApiError::Validation(vec![
+                crate::domain::error::FieldError {
+                    field: "score".into(),
+                    message: "must equal the normalized rubric score".into(),
+                },
+            ]));
+        }
+    }
+    if body
+        .review_provenance
+        .as_ref()
+        .is_some_and(|value| !value.is_object())
+    {
+        return Err(ApiError::Validation(vec![
+            crate::domain::error::FieldError {
+                field: "reviewProvenance".into(),
+                message: "must be an object".into(),
+            },
+        ]));
+    }
     let outcome = match body.outcome {
         ReviewTaskOutcome::Reviewed => ame_platform_application::task::TaskReviewOutcome::Reviewed,
         ReviewTaskOutcome::Rejected => ame_platform_application::task::TaskReviewOutcome::Rejected,
@@ -195,6 +304,8 @@ pub async fn review_submission(
             outcome,
             score: body.score,
             feedback: body.feedback,
+            rubric_scores: body.rubric_scores,
+            review_provenance: body.review_provenance,
         })
         .await
         .map_err(map_task_error)?;

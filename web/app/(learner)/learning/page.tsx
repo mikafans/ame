@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { PortabilityPanel } from "@/components/learning/PortabilityPanel";
+import { LearnerAnalytics } from "@/components/learning/LearnerAnalytics";
 
 type JourneySummary = {
   id: string;
@@ -44,6 +46,32 @@ type TimelineEvent = {
   title: string;
   occurredAt: string;
 };
+type ReviewItem = {
+  id: string;
+  journeyId: string;
+  activityId: string;
+  dueAt: string;
+  intervalDays: number;
+  reviewCount: number;
+};
+type SourceSnapshot = {
+  id: string;
+  mediaType: string;
+  contentSha256: string;
+  byteLength: number;
+  content: string;
+};
+type Citation = {
+  id: string;
+  snapshotId: string;
+  quote: string;
+  startByte: number;
+  endByte: number;
+  groundingStatus: string;
+  groundingNote: string;
+  licenseStatus: string;
+  licenseName?: string | null;
+};
 
 function activityStatusLabel(status: string) {
   if (status === "completed") return "Complete";
@@ -66,15 +94,36 @@ export default function LearningHomePage() {
   const [timelines, setTimelines] = useState<Record<string, TimelineEvent[]>>(
     {},
   );
+  const [dueReviews, setDueReviews] = useState<ReviewItem[]>([]);
+  const [ratingReviewId, setRatingReviewId] = useState<string | null>(null);
+  const [sources, setSources] = useState<SourceSnapshot[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const { data, response } = await api.GET(
-        "/api/v1/learning/journeys" as never,
-      );
+      const [
+        { data, response },
+        reviews,
+        sourceSnapshots,
+        citationCertificates,
+      ] = await Promise.all([
+        api.GET("/api/v1/learning/journeys" as never),
+        api.GET("/api/v1/reviews/due"),
+        api.GET("/api/v1/source-snapshots"),
+        api.GET("/api/v1/citations"),
+      ]);
       if (response.ok && data) {
         const nextJourneys = data as JourneySummary[];
         setJourneys(nextJourneys);
+      }
+      if (reviews.response.ok && reviews.data) {
+        setDueReviews(reviews.data as ReviewItem[]);
+      }
+      if (sourceSnapshots.response.ok && sourceSnapshots.data) {
+        setSources(sourceSnapshots.data as SourceSnapshot[]);
+      }
+      if (citationCertificates.response.ok && citationCertificates.data) {
+        setCitations(citationCertificates.data as Citation[]);
       }
       setLoading(false);
     })();
@@ -195,6 +244,20 @@ export default function LearningHomePage() {
     })();
   }, [journeys]);
 
+  async function rateReview(reviewItemId: string, rating: string) {
+    setRatingReviewId(reviewItemId);
+    const result = await api.POST("/api/v1/reviews/{review_item_id}/ratings", {
+      params: { path: { review_item_id: reviewItemId } },
+      body: { rating: rating as "again" | "hard" | "good" | "easy" },
+    });
+    if (result.response.ok) {
+      setDueReviews((items) =>
+        items.filter((item) => item.id !== reviewItemId),
+      );
+    }
+    setRatingReviewId(null);
+  }
+
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-8 sm:py-12">
       <section className="rounded-3xl border border-border bg-card p-7 shadow-sm sm:p-10">
@@ -214,6 +277,119 @@ export default function LearningHomePage() {
           </Link>
         </Button>
       </section>
+
+      {!loading && dueReviews.length > 0 && (
+        <section
+          className="rounded-3xl border border-primary/30 bg-card p-7"
+          data-testid="due-review-queue"
+        >
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            Due for review
+          </p>
+          <h2 className="mt-2 text-2xl font-bold">
+            Strengthen what you learned
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Rate how recall felt. AME schedules the next review from your own
+            review history.
+          </p>
+          <div className="mt-5 space-y-4">
+            {dueReviews.map((review) => (
+              <article
+                className="rounded-2xl border border-border p-5"
+                key={review.id}
+              >
+                <Link
+                  className="font-semibold hover:text-primary"
+                  href={`/learning/journeys/${review.journeyId}#activity-${review.activityId}`}
+                >
+                  Review learning activity
+                </Link>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {review.reviewCount === 0
+                    ? "First scheduled review"
+                    : `${review.reviewCount} reviews completed`}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(["again", "hard", "good", "easy"] as const).map(
+                    (rating) => (
+                      <Button
+                        disabled={ratingReviewId === review.id}
+                        key={rating}
+                        onClick={() => void rateReview(review.id, rating)}
+                        size="sm"
+                        type="button"
+                        variant={rating === "good" ? "default" : "outline"}
+                      >
+                        {rating[0].toUpperCase() + rating.slice(1)}
+                      </Button>
+                    ),
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && sources.length > 0 && (
+        <section
+          className="rounded-3xl border border-border bg-card p-7"
+          data-testid="source-library"
+        >
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            Source library
+          </p>
+          <h2 className="mt-2 text-2xl font-bold">What your learning uses</h2>
+          <div className="mt-5 grid gap-3">
+            {sources.map((source) => (
+              <details
+                className="rounded-2xl border border-border p-4"
+                key={source.id}
+              >
+                <summary className="cursor-pointer font-semibold">
+                  {source.mediaType} · {source.byteLength} bytes
+                </summary>
+                <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+                  SHA-256 {source.contentSha256}
+                </p>
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-4 text-xs">
+                  {source.content}
+                </pre>
+                {citations
+                  .filter((citation) => citation.snapshotId === source.id)
+                  .map((citation) => (
+                    <blockquote
+                      className="mt-3 border-l-2 border-primary pl-4 text-sm"
+                      data-testid={`citation-${citation.id}`}
+                      key={citation.id}
+                    >
+                      “{citation.quote}”
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        Bytes {citation.startByte}–{citation.endByte} ·{" "}
+                        {citation.groundingStatus} · {citation.licenseStatus}
+                        {citation.licenseName
+                          ? ` (${citation.licenseName})`
+                          : ""}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {citation.groundingNote}
+                      </span>
+                    </blockquote>
+                  ))}
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && journeys.length > 0 && (
+        <PortabilityPanel journeys={journeys} />
+      )}
+
+      {!loading && journeys[0] && (
+        <LearnerAnalytics journeyId={journeys[0].id} />
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading journeys…</p>

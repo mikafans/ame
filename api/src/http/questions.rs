@@ -86,6 +86,14 @@ pub async fn create_question(
     auth: AuthenticatedUser,
     Json(body): Json<CreateQuestionBody>,
 ) -> Result<Json<QuestionResponse>, ApiError> {
+    if body.review_status == ContentReviewStatus::Approved {
+        crate::http::citations::certify_references(
+            state.pool.clone(),
+            auth.owner_id(),
+            &body.source_references,
+        )
+        .await?;
+    }
     let repository = PgQuestionRepository::new(state.pool);
     let (_, version) = repository
         .create_question(CreateQuestion {
@@ -123,6 +131,14 @@ pub async fn create_question_version(
     Path(question_id): Path<Uuid>,
     Json(body): Json<CreateQuestionBody>,
 ) -> Result<Json<QuestionResponse>, ApiError> {
+    if body.review_status == ContentReviewStatus::Approved {
+        crate::http::citations::certify_references(
+            state.pool.clone(),
+            auth.owner_id(),
+            &body.source_references,
+        )
+        .await?;
+    }
     let repository = PgQuestionRepository::new(state.pool);
     let version = repository
         .create_version(

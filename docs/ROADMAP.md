@@ -40,6 +40,13 @@ licensing checks, learner notes, alternate explanations, richer submissions,
 and journey-history export/import. Each addition needs a real user story,
 domain contract, happy/evil/edge tests, and local-stack or browser evidence.
 
+Execution is tracked by GitHub milestone
+[`0.4 — retention and source-grounded learning`](https://github.com/mikafans/ame/milestone/1)
+and parent issue
+[`#39`](https://github.com/mikafans/ame/issues/39). The parent issue checklist
+is mirrored in the Asobi epic `ame:0.4-retention-grounding`; GitHub issue order
+is the Asobi dispatch order.
+
 ## Later, only after the contracts stabilize
 
 Reusable interactive activities, diagrams, simulations, collaborative

@@ -105,6 +105,14 @@ pub async fn create(
     auth: AuthenticatedUser,
     Json(body): Json<CreateDeepDiveBody>,
 ) -> Result<Json<DeepDiveResponse>, ApiError> {
+    if body.review_status == ContentReviewStatus::Approved {
+        crate::http::citations::certify_references(
+            state.pool.clone(),
+            auth.owner_id(),
+            &body.source_references,
+        )
+        .await?;
+    }
     let value = PgDeepDiveRepository::new(state.pool)
         .create(CreateDeepDive {
             subject_user_id: auth.owner_id(),

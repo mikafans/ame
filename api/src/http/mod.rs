@@ -79,9 +79,11 @@ pub async fn maintenance_mode_middleware(
 
 pub mod admin;
 pub mod agents;
+pub mod analytics;
 pub mod assessments;
 pub mod attempts;
 pub mod auth;
+pub mod citations;
 pub mod db;
 pub mod deep_dives;
 pub mod generation;
@@ -89,11 +91,16 @@ pub mod health;
 pub mod idempotency;
 pub mod learning;
 pub mod me;
+pub mod notes;
 pub mod onboarding;
 pub mod openapi;
+pub mod portability;
 pub mod progress;
 pub mod questions;
+pub mod reviews;
+pub mod sources;
 pub mod tasks;
+pub mod variants;
 
 pub fn metrics_layer() -> (PrometheusMetricLayer<'static>, Router) {
     let (layer, handle) = PrometheusMetricLayer::pair();
@@ -179,6 +186,13 @@ pub fn router(pool: PgPool) -> Router {
         .merge(assessments::router(state.clone()))
         .merge(attempts::router(state.clone()))
         .merge(progress::router(state.clone()))
+        .merge(reviews::router(state.clone()))
+        .merge(sources::router(state.clone()))
+        .merge(citations::router(state.clone()))
+        .merge(notes::router(state.clone()))
+        .merge(variants::router(state.clone()))
+        .merge(portability::router(state.clone()))
+        .merge(analytics::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(
@@ -192,6 +206,10 @@ pub fn router(pool: PgPool) -> Router {
         .route(
             "/v1/task-submissions/{submission_id}",
             get(tasks::get_submission),
+        )
+        .route(
+            "/v1/task-submissions/{submission_id}/revise",
+            patch(tasks::revise_submission),
         )
         .route(
             "/v1/admin/task-submissions",

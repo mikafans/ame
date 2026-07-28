@@ -225,6 +225,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/citations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_citations"];
+        put?: never;
+        post: operations["create_citation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/citations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_citation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/deep-dives": {
         parameters: {
             query?: never;
@@ -289,6 +321,38 @@ export interface paths {
         patch: operations["transition"];
         trace?: never;
     };
+    "/api/v1/learning-variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_variants"];
+        put?: never;
+        post: operations["request_variant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-variants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["publish_variant"];
+        trace?: never;
+    };
     "/api/v1/learning/activities/{activity_id}/content": {
         parameters: {
             query?: never;
@@ -323,6 +387,22 @@ export interface paths {
         patch: operations["author_activity_rubric"];
         trace?: never;
     };
+    "/api/v1/learning/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_journey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/journeys": {
         parameters: {
             query?: never;
@@ -349,6 +429,38 @@ export interface paths {
         };
         /** GET /api/v1/learning/journeys/{id} — retrieve the caller's resumable journey. */
         get: operations["get_journey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_analytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_journey"];
         put?: never;
         post?: never;
         delete?: never;
@@ -439,6 +551,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_notes"];
+        put?: never;
+        post: operations["create_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_note"];
+        options?: never;
+        head?: never;
+        patch: operations["update_note"];
         trace?: never;
     };
     "/api/v1/progress/evidence": {
@@ -585,6 +729,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["seed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reviews/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_due"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reviews/{review_item_id}/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/source-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_imports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/source-snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/source-snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_one"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sources/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/task-submissions/{submission_id}": {
         parameters: {
             query?: never;
@@ -615,6 +871,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["review_submission"];
+        trace?: never;
+    };
+    "/api/v1/task-submissions/{submission_id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["revise_submission"];
         trace?: never;
     };
     "/api/v1/task-submissions/{submission_id}/submit": {
@@ -878,6 +1150,25 @@ export interface components {
             rubric: components["schemas"]["TaskRubric"];
             sourceReferences: string[];
         };
+        CitationResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: int32 */
+            endByte: number;
+            extractionMethod: components["schemas"]["ExtractionMethod"];
+            groundingNote: string;
+            groundingStatus: components["schemas"]["GroundingStatus"];
+            /** Format: uuid */
+            id: string;
+            licenseName?: string | null;
+            licenseStatus: components["schemas"]["LicenseStatus"];
+            licenseUrl?: string | null;
+            quote: string;
+            /** Format: uuid */
+            snapshotId: string;
+            /** Format: int32 */
+            startByte: number;
+        };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
         CreateAssessmentBody: {
@@ -886,6 +1177,21 @@ export interface components {
             items: components["schemas"]["AssessmentItemBody"][];
             mode: components["schemas"]["AssessmentMode"];
             status?: components["schemas"]["AssessmentStatus"];
+        };
+        CreateCitationBody: {
+            /** Format: int32 */
+            endByte: number;
+            extractionMethod: components["schemas"]["ExtractionMethod"];
+            groundingNote: string;
+            groundingStatus: components["schemas"]["GroundingStatus"];
+            licenseName?: string | null;
+            licenseStatus: components["schemas"]["LicenseStatus"];
+            licenseUrl?: string | null;
+            quote: string;
+            /** Format: uuid */
+            snapshotId: string;
+            /** Format: int32 */
+            startByte: number;
         };
         CreateDeepDiveBody: {
             /** Format: uuid */
@@ -905,6 +1211,16 @@ export interface components {
             title: string;
             /** Format: uuid */
             triggeringEvidenceId: string;
+        };
+        CreateNoteBody: {
+            /** Format: uuid */
+            activityId?: string | null;
+            body: string;
+            /** Format: int32 */
+            contentVersion?: number | null;
+            /** Format: uuid */
+            journeyId: string;
+            retryKey: string;
         };
         CreateQuestionBody: {
             acceptedAnswers?: string[];
@@ -948,6 +1264,10 @@ export interface components {
             /** Format: uuid */
             triggeringEvidenceId: string;
         };
+        DueReviewQuery: {
+            /** Format: date-time */
+            dueBefore?: string | null;
+        };
         EffectiveSettings: {
             maintenanceMode: boolean;
             ratelimit: components["schemas"]["RateLimitSettings"];
@@ -990,6 +1310,8 @@ export interface components {
             /** Format: float */
             value: number;
         };
+        /** @enum {string} */
+        ExtractionMethod: "exact_quote" | "manual_selection";
         FieldError: {
             field: string;
             message: string;
@@ -1018,7 +1340,48 @@ export interface components {
         /** @enum {string} */
         GoalStatus: "proposed" | "active" | "paused" | "completed" | "failed";
         /** @enum {string} */
+        GroundingStatus: "supported" | "contradicted" | "unverified";
+        ImportReceipt: {
+            alreadyImported: boolean;
+            checksum: string;
+            /** Format: uuid */
+            journeyId: string;
+        };
+        ImportSourceBody: {
+            content?: string | null;
+            kind: components["schemas"]["SourceKind"];
+            locator: string;
+            mediaType?: string | null;
+            retryKey: string;
+        };
+        JourneyExportManifest: {
+            checksum: string;
+            /** Format: date-time */
+            exportedAt: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            ownerId: string;
+            payload: unknown;
+            schemaVersion: string;
+        };
+        /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
+        LearnerAnalyticsResponse: {
+            /** Format: int32 */
+            attempts: number;
+            averageScore: components["schemas"]["RatioMetric"];
+            completionRate: components["schemas"]["RatioMetric"];
+            definitions: string[];
+            /** Format: uuid */
+            journeyId: string;
+            masteryTrend: components["schemas"]["MasteryPoint"][];
+            privacyBoundary: string;
+            reviewHistory: components["schemas"]["ReviewHistoryPoint"][];
+            streak: components["schemas"]["StreakMetric"];
+            timeSpent: components["schemas"]["TimeMetric"];
+            timezone: string;
+        };
         LearningActivityResponse: {
             /** Format: uuid */
             chapterId?: string | null;
@@ -1164,6 +1527,8 @@ export interface components {
         };
         /** @enum {string} */
         LearningSessionStatus: "in_progress" | "finished" | "abandoned";
+        /** @enum {string} */
+        LicenseStatus: "allowed" | "restricted" | "unknown";
         ListAuditLogsResponse: {
             logs: components["schemas"]["AuditLogEntry"][];
             /** Format: int64 */
@@ -1178,6 +1543,14 @@ export interface components {
             email: string;
             password: string;
         };
+        MasteryPoint: {
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            /** Format: float */
+            value: number;
+        };
         MeResponse: {
             /** Format: date-time */
             createdAt: string;
@@ -1186,6 +1559,23 @@ export interface components {
             /** Format: uuid */
             id: string;
             role: components["schemas"]["Role"];
+        };
+        NoteResponse: {
+            /** Format: uuid */
+            activityId?: string | null;
+            body: string;
+            /** Format: int32 */
+            contentVersion?: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: int32 */
+            revision: number;
+            /** Format: date-time */
+            updatedAt: string;
         };
         ObjectiveActivityBody: {
             /** Format: uuid */
@@ -1223,6 +1613,10 @@ export interface components {
             successCriteria: string;
             verb: string;
         };
+        PublishVariantBody: {
+            content: unknown;
+            sourceReferences: string[];
+        };
         /** @enum {string} */
         QuestionKind: "multiple_choice" | "true_false" | "short_answer" | "numeric" | "essay" | "code";
         QuestionOption: {
@@ -1255,6 +1649,17 @@ export interface components {
             free: components["schemas"]["TierLimit"];
             premium: components["schemas"]["TierLimit"];
         };
+        RateReviewBody: {
+            rating: components["schemas"]["ReviewRating"];
+        };
+        RatioMetric: {
+            /** Format: int32 */
+            denominator: number;
+            /** Format: float */
+            numerator: number;
+            /** Format: float */
+            value?: number | null;
+        };
         RecommendationBody: {
             objectives: components["schemas"]["ObjectiveActivityBody"][];
         };
@@ -1273,22 +1678,82 @@ export interface components {
             name: string;
             password: string;
         };
+        RequestVariantBody: {
+            /** Format: uuid */
+            objectiveId: string;
+            provider?: string | null;
+            recommendationReason: string;
+            requestedDifficulty?: string | null;
+            retryKey: string;
+            /** Format: uuid */
+            sourceActivityId: string;
+            variantKind: components["schemas"]["VariantKind"];
+        };
+        ReviewHistoryPoint: {
+            /** Format: date-time */
+            dueAfter: string;
+            /** Format: date-time */
+            dueBefore: string;
+            /** Format: int32 */
+            intervalDays: number;
+            rating: string;
+            /** Format: uuid */
+            reviewItemId: string;
+            /** Format: date-time */
+            reviewedAt: string;
+        };
+        ReviewItemResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: int32 */
+            contentVersion: number;
+            /** Format: date-time */
+            dueAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            intervalDays: number;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: uuid */
+            objectiveId: string;
+            /** Format: int32 */
+            reviewCount: number;
+        };
+        /** @enum {string} */
+        ReviewRating: "again" | "hard" | "good" | "easy";
         /** @enum {string} */
         ReviewTaskOutcome: "reviewed" | "rejected";
         ReviewTaskSubmissionBody: {
             feedback?: unknown;
             outcome: components["schemas"]["ReviewTaskOutcome"];
+            reviewProvenance?: unknown;
+            rubricScores?: components["schemas"]["RubricScore"][] | null;
             /** Format: float */
             score?: number | null;
         };
+        ReviseTaskSubmissionBody: {
+            artifacts?: components["schemas"]["SubmissionArtifact"][];
+            response: unknown;
+        };
         /** @enum {string} */
         Role: "user" | "admin";
+        RubricScore: {
+            criterionId: string;
+            feedback: string;
+            /** Format: float */
+            points: number;
+        };
         SaveAnswerBody: {
             /** Format: uuid */
             assessmentItemId: string;
             /** Format: uuid */
             questionVersionId: string;
             response: unknown;
+        };
+        SeedReviewBody: {
+            /** Format: uuid */
+            evidenceId: string;
         };
         SnapshotResponse: {
             calculatedAt: string;
@@ -1302,6 +1767,38 @@ export interface components {
             mastery: number;
             /** Format: uuid */
             objectiveId: string;
+        };
+        SourceImportRunResponse: {
+            /** Format: date-time */
+            completedAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            errorCode?: string | null;
+            /** Format: uuid */
+            id: string;
+            retryKey: string;
+            /** Format: uuid */
+            sourceId: string;
+            status: components["schemas"]["SourceImportStatus"];
+        };
+        /** @enum {string} */
+        SourceImportStatus: "requested" | "completed" | "failed";
+        /** @enum {string} */
+        SourceKind: "url" | "document" | "local_file";
+        SourceSnapshotResponse: {
+            /** Format: int32 */
+            byteLength: number;
+            content: string;
+            contentSha256: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            importRunId: string;
+            mediaType: string;
+            /** Format: uuid */
+            sourceId: string;
         };
         StartAttemptBody: {
             /** Format: uuid */
@@ -1335,6 +1832,7 @@ export interface components {
             userId: string;
         };
         StartTaskSubmissionBody: {
+            artifacts?: components["schemas"]["SubmissionArtifact"][];
             /** Format: int32 */
             contentVersion: number;
             evaluationMethod?: components["schemas"]["TaskEvaluationMethod"];
@@ -1349,6 +1847,14 @@ export interface components {
             qualifyingDay: string;
             qualifyingEventKey: string;
         };
+        StreakMetric: {
+            /** Format: int32 */
+            bestDays: number;
+            /** Format: int32 */
+            currentDays: number;
+            /** Format: int32 */
+            qualifyingDays: number;
+        };
         StreakResponse: {
             /** Format: uuid */
             activityId: string;
@@ -1358,6 +1864,12 @@ export interface components {
             journeyId: string;
             qualifyingDay: string;
             qualifyingEventKey: string;
+        };
+        SubmissionArtifact: {
+            content: string;
+            kind: string;
+            mediaType: string;
+            name: string;
         };
         /** @enum {string} */
         TaskEvaluationMethod: "self_review" | "automatic" | "agent" | "manual";
@@ -1380,6 +1892,7 @@ export interface components {
             required: boolean;
         };
         TaskSubmissionResponse: {
+            artifacts: components["schemas"]["SubmissionArtifact"][];
             /** Format: int32 */
             contentVersion: number;
             evaluationMethod: components["schemas"]["TaskEvaluationMethod"];
@@ -1388,8 +1901,17 @@ export interface components {
             id: string;
             /** Format: uuid */
             journeyId: string;
+            /** Format: uuid */
+            parentSubmissionId?: string | null;
             response: unknown;
+            reviewProvenance?: unknown;
             reviewStatus: components["schemas"]["TaskReviewStatus"];
+            /** Format: uuid */
+            reviewerUserId?: string | null;
+            /** Format: int32 */
+            revision: number;
+            rubric?: null | components["schemas"]["TaskRubric"];
+            rubricScores?: components["schemas"]["RubricScore"][] | null;
             /** Format: float */
             score?: number | null;
             status: components["schemas"]["TaskSubmissionStatus"];
@@ -1404,6 +1926,12 @@ export interface components {
             /** Format: int32 */
             rate: number;
         };
+        TimeMetric: {
+            /** Format: int32 */
+            finishedSessions: number;
+            /** Format: int64 */
+            seconds: number;
+        };
         TimelineEventResponse: {
             /** Format: uuid */
             activityId?: string | null;
@@ -1417,6 +1945,11 @@ export interface components {
         TransitionGenerationRunBody: {
             error?: unknown;
             status: components["schemas"]["GenerationStatus"];
+        };
+        UpdateNoteBody: {
+            body: string;
+            /** Format: int32 */
+            expectedRevision: number;
         };
         /** @description Partial update for platform settings — any omitted field is left unchanged. */
         UpdateSettingsBody: {
@@ -1442,6 +1975,25 @@ export interface components {
         };
         /** @enum {string} */
         UserStatus: "active" | "deactivated";
+        /** @enum {string} */
+        VariantKind: "explanation" | "example" | "difficulty";
+        VariantResponse: {
+            content?: unknown;
+            error?: unknown;
+            /** Format: uuid */
+            generationRunId: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            objectiveId: string;
+            recommendationReason: string;
+            requestedDifficulty?: string | null;
+            /** Format: uuid */
+            sourceActivityId: string;
+            sourceReferences: string[];
+            status: components["schemas"]["GenerationStatus"];
+            variantKind: components["schemas"]["VariantKind"];
+        };
     };
     responses: never;
     parameters: never;
@@ -1894,6 +2446,69 @@ export interface operations {
             };
         };
     };
+    list_citations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationResponse"][];
+                };
+            };
+        };
+    };
+    create_citation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCitationBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationResponse"];
+                };
+            };
+        };
+    };
+    get_citation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CitationResponse"];
+                };
+            };
+        };
+    };
     get_for_activity: {
         parameters: {
             query: {
@@ -2041,6 +2656,75 @@ export interface operations {
             };
         };
     };
+    list_variants: {
+        parameters: {
+            query: {
+                activityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantResponse"][];
+                };
+            };
+        };
+    };
+    request_variant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestVariantBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantResponse"];
+                };
+            };
+        };
+    };
+    publish_variant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishVariantBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantResponse"];
+                };
+            };
+        };
+    };
     author_activity_content: {
         parameters: {
             query?: never;
@@ -2151,6 +2835,29 @@ export interface operations {
             };
         };
     };
+    import_journey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JourneyExportManifest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReceipt"];
+                };
+            };
+        };
+    };
     list_journeys: {
         parameters: {
             query?: never;
@@ -2212,6 +2919,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_analytics: {
+        parameters: {
+            query: {
+                timezone: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerAnalyticsResponse"];
+                };
+            };
+        };
+    };
+    export_journey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyExportManifest"];
+                };
             };
         };
     };
@@ -2407,6 +3158,95 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_notes: {
+        parameters: {
+            query: {
+                journeyId: string;
+                activityId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"][];
+                };
+            };
+        };
+    };
+    create_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNoteBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
+            };
+        };
+    };
+    delete_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNoteBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
             };
         };
     };
@@ -2621,6 +3461,157 @@ export interface operations {
             };
         };
     };
+    seed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedReviewBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemResponse"];
+                };
+            };
+        };
+    };
+    list_due: {
+        parameters: {
+            query?: {
+                dueBefore?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemResponse"][];
+                };
+            };
+        };
+    };
+    rate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RateReviewBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemResponse"];
+                };
+            };
+        };
+    };
+    list_imports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceImportRunResponse"][];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSnapshotResponse"][];
+                };
+            };
+        };
+    };
+    get_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSnapshotResponse"];
+                };
+            };
+        };
+    };
+    import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportSourceBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSnapshotResponse"];
+                };
+            };
+        };
+    };
     get_submission: {
         parameters: {
             query?: never;
@@ -2660,6 +3651,31 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSubmissionResponse"];
+                };
+            };
+        };
+    };
+    revise_submission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseTaskSubmissionBody"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

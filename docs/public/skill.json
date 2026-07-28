@@ -163,6 +163,462 @@
       "path": "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start"
     },
     {
+      "description": "Import bounded learner-owned source text as an immutable SHA-256 snapshot. URL imports accept public HTTPS only; document and local-file imports accept agent-supplied text and never read server filesystem paths.",
+      "input_schema": {
+        "properties": {
+          "content": {
+            "description": "Required for document and local_file; ignored for URL.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "url",
+              "document",
+              "local_file"
+            ],
+            "type": "string"
+          },
+          "locator": {
+            "type": "string"
+          },
+          "mediaType": {
+            "enum": [
+              "text/plain",
+              "text/markdown",
+              "text/html",
+              "application/json"
+            ],
+            "type": "string"
+          },
+          "retryKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "locator",
+          "retryKey"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.source.import",
+      "path": "/api/v1/sources/imports"
+    },
+    {
+      "description": "Inspect completed and failed source import runs for the authenticated learner, including stable failure codes.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.source.import.list",
+      "path": "/api/v1/source-imports"
+    },
+    {
+      "description": "List the authenticated learner's immutable source snapshots.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.source.snapshot.list",
+      "path": "/api/v1/source-snapshots"
+    },
+    {
+      "description": "Read one authenticated learner's immutable source snapshot and digest.",
+      "input_schema": {
+        "properties": {
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshotId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.source.snapshot.get",
+      "path": "/api/v1/source-snapshots/{snapshot_id}"
+    },
+    {
+      "description": "Certify an exact byte range in an immutable source snapshot with grounding and licensing review metadata.",
+      "input_schema": {
+        "properties": {
+          "endByte": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "extractionMethod": {
+            "enum": [
+              "exact_quote",
+              "manual_selection"
+            ],
+            "type": "string"
+          },
+          "groundingNote": {
+            "type": "string"
+          },
+          "groundingStatus": {
+            "enum": [
+              "supported",
+              "contradicted",
+              "unverified"
+            ],
+            "type": "string"
+          },
+          "licenseName": {
+            "type": "string"
+          },
+          "licenseStatus": {
+            "enum": [
+              "allowed",
+              "restricted",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "licenseUrl": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "snapshotId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "startByte": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "snapshotId",
+          "startByte",
+          "endByte",
+          "quote",
+          "extractionMethod",
+          "groundingStatus",
+          "groundingNote",
+          "licenseStatus"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.citation.create",
+      "path": "/api/v1/citations"
+    },
+    {
+      "description": "Inspect learner-owned citation certificates and their immutable snapshot anchors.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.citation.list",
+      "path": "/api/v1/citations"
+    },
+    {
+      "description": "Read one learner-owned citation certificate, grounding decision, and licensing metadata.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.citation.get",
+      "path": "/api/v1/citations/{id}"
+    },
+    {
+      "description": "Create an idempotent private learner note anchored to a journey or an exact activity content version.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "contentVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "retryKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "body",
+          "retryKey"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.note.create",
+      "path": "/api/v1/notes"
+    },
+    {
+      "description": "Resume private notes for an owned journey or activity, preserving their original content-version anchors.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.note.list",
+      "path": "/api/v1/notes?journeyId={journey_id}&activityId={activity_id}"
+    },
+    {
+      "description": "Edit a private note using its revision for optimistic concurrency.",
+      "input_schema": {
+        "properties": {
+          "body": {
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "expectedRevision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision",
+          "body"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.note.update",
+      "path": "/api/v1/notes/{id}"
+    },
+    {
+      "description": "Permanently delete one private learner note.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "DELETE",
+      "name": "learning.note.delete",
+      "path": "/api/v1/notes/{id}"
+    },
+    {
+      "description": "Request another explanation, example, or difficulty variant through the existing generation lifecycle without creating mastery evidence.",
+      "input_schema": {
+        "properties": {
+          "objectiveId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "recommendationReason": {
+            "type": "string"
+          },
+          "requestedDifficulty": {
+            "type": "string"
+          },
+          "retryKey": {
+            "type": "string"
+          },
+          "sourceActivityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "variantKind": {
+            "enum": [
+              "explanation",
+              "example",
+              "difficulty"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceActivityId",
+          "objectiveId",
+          "variantKind",
+          "recommendationReason",
+          "retryKey"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.variant.request",
+      "path": "/api/v1/learning-variants"
+    },
+    {
+      "description": "Inspect pending, failed, review-required, and available variants for an owned activity.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.variant.list",
+      "path": "/api/v1/learning-variants?activityId={activity_id}"
+    },
+    {
+      "description": "Attach reviewed, citation-certified content after the linked generation run is published.",
+      "input_schema": {
+        "properties": {
+          "content": {
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceReferences": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "sourceReferences"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.variant.publish",
+      "path": "/api/v1/learning-variants/{id}"
+    },
+    {
+      "description": "Export an owned journey and learner history as a versioned, checksummed application manifest.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.portability.export",
+      "path": "/api/v1/learning/journeys/{id}/export"
+    },
+    {
+      "description": "Validate and idempotently restore a same-owner journey manifest, reporting tampering and conflicts explicitly.",
+      "input_schema": {
+        "properties": {
+          "checksum": {
+            "type": "string"
+          },
+          "exportedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "schemaVersion": {
+            "const": "ame.journey-history.v1"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "ownerId",
+          "journeyId",
+          "exportedAt",
+          "checksum",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.portability.import",
+      "path": "/api/v1/learning/imports"
+    },
+    {
+      "description": "Read owner-only event-derived retention and progress metrics with explicit timezone, numerators, denominators, and definitions.",
+      "input_schema": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "timezone": {
+            "description": "IANA timezone, for example Asia/Tokyo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "timezone"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.analytics.get",
+      "path": "/api/v1/learning/journeys/{id}/analytics"
+    },
+    {
       "description": "Finish a learning session and persist the learner's evidence and responses.",
       "input_schema": {
         "properties": {
@@ -210,6 +666,18 @@
       "description": "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
       "input_schema": {
         "properties": {
+          "artifacts": {
+            "items": {
+              "required": [
+                "kind",
+                "name",
+                "mediaType",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "contentVersion": {
             "minimum": 1,
             "type": "integer"
@@ -1089,6 +1557,40 @@
       "method": "PATCH",
       "name": "learning.generation.transition",
       "path": "/api/v1/generation-runs/{id}"
+    },
+    {
+      "description": "Create a new immutable revision from a rejected learner submission while preserving its task, objective, and content-version lineage.",
+      "input_schema": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "required": [
+                "kind",
+                "name",
+                "mediaType",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "response": {
+            "type": "object"
+          },
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submissionId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "method": "PATCH",
+      "name": "learning.task.revise",
+      "path": "/api/v1/task-submissions/{submission_id}/revise"
     }
   ]
 }

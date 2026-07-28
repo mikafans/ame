@@ -13,6 +13,12 @@ use uuid::Uuid;
 pub struct TaskSubmission {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub revision: u32,
+    pub parent_submission_id: Option<Uuid>,
+    pub reviewer_user_id: Option<Uuid>,
+    pub rubric_scores: Option<Vec<crate::domain::task::RubricScore>>,
+    pub review_provenance: Option<serde_json::Value>,
+    pub rubric: Option<crate::domain::task::TaskRubric>,
     pub envelope: TaskSubmissionEnvelope,
 }
 
@@ -22,6 +28,7 @@ pub struct StartTaskSubmission {
     pub task_id: Uuid,
     pub content_version: u32,
     pub response: serde_json::Value,
+    pub artifacts: Vec<crate::domain::task::SubmissionArtifact>,
     pub evaluation_method: TaskEvaluationMethod,
 }
 
@@ -32,6 +39,8 @@ pub struct ReviewTaskSubmission {
     pub outcome: TaskReviewOutcome,
     pub score: Option<f32>,
     pub feedback: Option<serde_json::Value>,
+    pub rubric_scores: Option<Vec<crate::domain::task::RubricScore>>,
+    pub review_provenance: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +94,14 @@ pub trait TaskSubmissionRepository: Send + Sync {
     async fn review(
         &self,
         input: ReviewTaskSubmission,
+    ) -> Result<TaskSubmission, TaskSubmissionError>;
+
+    async fn revise(
+        &self,
+        subject_user_id: Uuid,
+        submission_id: Uuid,
+        response: serde_json::Value,
+        artifacts: Vec<crate::domain::task::SubmissionArtifact>,
     ) -> Result<TaskSubmission, TaskSubmissionError>;
 }
 
@@ -157,6 +174,7 @@ impl TaskSubmissionRepository for InMemoryTaskSubmissionRepository {
             subject_user_id: input.subject_user_id,
             content_version: input.content_version,
             response: input.response,
+            artifacts: input.artifacts,
             evaluation_method: input.evaluation_method,
             status: TaskSubmissionStatus::InProgress,
             review_status: TaskReviewStatus::NotRequired,
@@ -168,6 +186,12 @@ impl TaskSubmissionRepository for InMemoryTaskSubmissionRepository {
         let submission = TaskSubmission {
             id: Uuid::now_v7(),
             journey_id: task.journey_id,
+            revision: 1,
+            parent_submission_id: None,
+            reviewer_user_id: None,
+            rubric_scores: None,
+            review_provenance: None,
+            rubric: None,
             envelope,
         };
         state.submissions.insert(submission.id, submission.clone());
@@ -235,7 +259,70 @@ impl TaskSubmissionRepository for InMemoryTaskSubmissionRepository {
         submission.envelope.review_status = TaskReviewStatus::Complete;
         submission.envelope.score = input.score;
         submission.envelope.feedback = input.feedback;
+        submission.reviewer_user_id = Some(input.reviewer_user_id);
+        submission.rubric_scores = input.rubric_scores;
+        submission.review_provenance = input.review_provenance;
         Ok(submission.clone())
+    }
+
+    async fn revise(
+        &self,
+        subject_user_id: Uuid,
+        submission_id: Uuid,
+        response: serde_json::Value,
+        artifacts: Vec<crate::domain::task::SubmissionArtifact>,
+    ) -> Result<TaskSubmission, TaskSubmissionError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|error| TaskSubmissionError::Storage(error.to_string()))?;
+        let previous = state
+            .submissions
+            .get(&submission_id)
+            .cloned()
+            .ok_or(TaskSubmissionError::NotFound)?;
+        if previous.envelope.subject_user_id != subject_user_id {
+            return Err(TaskSubmissionError::SubjectMismatch);
+        }
+        validate_task_submission_transition(
+            previous.envelope.status,
+            TaskSubmissionStatus::InProgress,
+        )
+        .map_err(TaskSubmissionError::InvalidTransition)?;
+        if let Some(existing) = state
+            .submissions
+            .values()
+            .find(|candidate| candidate.parent_submission_id == Some(submission_id))
+        {
+            if existing.envelope.response == response && existing.envelope.artifacts == artifacts {
+                return Ok(existing.clone());
+            }
+            return Err(TaskSubmissionError::InvalidContract(
+                "revision payload conflicts with the existing successor".into(),
+            ));
+        }
+        let mut envelope = previous.envelope.clone();
+        envelope.response = response;
+        envelope.artifacts = artifacts;
+        envelope.status = TaskSubmissionStatus::InProgress;
+        envelope.review_status = TaskReviewStatus::NotRequired;
+        envelope.score = None;
+        envelope.feedback = None;
+        validate_task_submission(&envelope)
+            .map_err(|error| TaskSubmissionError::InvalidContract(error.to_string()))?;
+        let revision = TaskSubmission {
+            id: Uuid::now_v7(),
+            journey_id: previous.journey_id,
+            revision: previous.revision + 1,
+            parent_submission_id: Some(previous.id),
+            reviewer_user_id: None,
+            rubric_scores: None,
+            review_provenance: None,
+            rubric: previous.rubric,
+            envelope,
+        };
+        state.submissions.insert(revision.id, revision.clone());
+        Ok(revision)
     }
 }
 
@@ -256,6 +343,7 @@ mod tests {
                 task_id: task,
                 content_version: 1,
                 response: serde_json::json!({"choice": "late-events"}),
+                artifacts: vec![],
                 evaluation_method: TaskEvaluationMethod::SelfReview,
             })
             .await;
@@ -266,6 +354,7 @@ mod tests {
                 task_id: task,
                 content_version: 2,
                 response: serde_json::json!({"choice": "late-events"}),
+                artifacts: vec![],
                 evaluation_method: TaskEvaluationMethod::SelfReview,
             })
             .await;
@@ -284,6 +373,7 @@ mod tests {
                 task_id: task,
                 content_version: 1,
                 response: serde_json::json!({"answer": "inspect watermarks"}),
+                artifacts: vec![],
                 evaluation_method: TaskEvaluationMethod::SelfReview,
             })
             .await
@@ -308,6 +398,7 @@ mod tests {
                 task_id: task,
                 content_version: 1,
                 response: serde_json::json!({"artifact": "watermark analysis"}),
+                artifacts: vec![],
                 evaluation_method: TaskEvaluationMethod::Agent,
             })
             .await
@@ -323,10 +414,71 @@ mod tests {
                 outcome: TaskReviewOutcome::Reviewed,
                 score: Some(0.9),
                 feedback: Some(serde_json::json!({"note": "Good diagnosis"})),
+                rubric_scores: None,
+                review_provenance: Some(serde_json::json!({"model": "reviewer-v1"})),
             })
             .await
             .expect("review task");
         assert_eq!(reviewed.envelope.status, TaskSubmissionStatus::Reviewed);
         assert_eq!(reviewed.envelope.score, Some(0.9));
+    }
+
+    #[tokio::test]
+    async fn rejected_project_creates_an_idempotent_artifact_revision() {
+        let repository = InMemoryTaskSubmissionRepository::default();
+        let owner = Uuid::now_v7();
+        let task = Uuid::now_v7();
+        repository.register_task(task, owner, Uuid::now_v7(), 3);
+        let first = repository
+            .start(StartTaskSubmission {
+                subject_user_id: owner,
+                task_id: task,
+                content_version: 3,
+                response: serde_json::json!({"report": "first"}),
+                artifacts: vec![],
+                evaluation_method: TaskEvaluationMethod::Agent,
+            })
+            .await
+            .unwrap();
+        let submitted = repository.submit(owner, first.id).await.unwrap();
+        repository
+            .review(ReviewTaskSubmission {
+                reviewer_user_id: Uuid::now_v7(),
+                submission_id: submitted.id,
+                outcome: TaskReviewOutcome::Rejected,
+                score: Some(0.4),
+                feedback: Some(serde_json::json!({"note": "add evidence"})),
+                rubric_scores: None,
+                review_provenance: Some(serde_json::json!({"method": "manual"})),
+            })
+            .await
+            .unwrap();
+        let artifact = crate::domain::task::SubmissionArtifact {
+            kind: "report".into(),
+            name: "revision.md".into(),
+            media_type: "text/markdown".into(),
+            content: "Revised evidence".into(),
+        };
+        let revised = repository
+            .revise(
+                owner,
+                first.id,
+                serde_json::json!({"report": "revised"}),
+                vec![artifact.clone()],
+            )
+            .await
+            .unwrap();
+        let retry = repository
+            .revise(
+                owner,
+                first.id,
+                serde_json::json!({"report": "revised"}),
+                vec![artifact],
+            )
+            .await
+            .unwrap();
+        assert_eq!(revised, retry);
+        assert_eq!(revised.revision, 2);
+        assert_eq!(revised.parent_submission_id, Some(first.id));
     }
 }

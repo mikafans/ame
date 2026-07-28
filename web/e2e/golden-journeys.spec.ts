@@ -37,6 +37,39 @@ async function publishedGenerationRun(page: Page, operation: string) {
   return run.id as string;
 }
 
+async function supportedCitation(page: Page, content: string, quote: string) {
+  const source = await page.request.post(apiUrl("/api/v1/sources/imports"), {
+    data: {
+      kind: "document",
+      locator: `golden/${Date.now()}-${Math.random()}.txt`,
+      mediaType: "text/plain",
+      content,
+      retryKey: `golden-source-${Date.now()}-${Math.random()}`,
+    },
+  });
+  expect(source.ok()).toBeTruthy();
+  const snapshot = await source.json();
+  const startByte = new TextEncoder().encode(
+    content.slice(0, content.indexOf(quote)),
+  ).length;
+  const endByte = startByte + new TextEncoder().encode(quote).length;
+  const certificate = await page.request.post(apiUrl("/api/v1/citations"), {
+    data: {
+      snapshotId: snapshot.id,
+      startByte,
+      endByte,
+      quote,
+      extractionMethod: "exact_quote",
+      groundingStatus: "supported",
+      groundingNote: "Seeded golden source directly supports the tested item.",
+      licenseStatus: "allowed",
+      licenseName: "Test fixture",
+    },
+  });
+  expect(certificate.ok()).toBeTruthy();
+  return (await certificate.json()).id as string;
+}
+
 async function onboardIntoJourney(
   page: Page,
   prompt: string,
@@ -65,6 +98,150 @@ async function onboardIntoJourney(
   return { journeyId: journeyId as string, journey };
 }
 
+test("learner writes, resumes, edits, and deletes a version-anchored private note", async ({
+  page,
+}) => {
+  await onboardIntoJourney(
+    page,
+    "I would like to learn physics",
+    "Note Learner",
+    `note-golden-${Date.now()}@example.com`,
+    "note-golden-2026",
+  );
+  const editor = page.getByLabel("Private note");
+  await expect(editor).toBeVisible();
+  await editor.fill("Velocity is a vector.");
+  await page.getByRole("button", { name: "Add note" }).click();
+  await expect(page.getByText("Velocity is a vector.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("Velocity is a vector.")).toBeVisible();
+  await page.getByRole("button", { name: "Edit" }).click();
+  await editor.fill("Velocity includes direction.");
+  await page.getByRole("button", { name: "Save edit" }).click();
+  await expect(page.getByText("Velocity includes direction.")).toBeVisible();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Velocity includes direction.")).toHaveCount(0);
+});
+
+test("owner inspects an export and repeated import does not duplicate learner state", async ({
+  page,
+}) => {
+  await onboardIntoJourney(
+    page,
+    "I would like to learn physics",
+    "Portable Learner",
+    `portable-golden-${Date.now()}@example.com`,
+    "portable-golden-2026",
+  );
+  await page.goto("/learning");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export JSON" }).click();
+  await download;
+  const artifact = page.getByLabel("Journey portability artifact");
+  await expect(artifact).toHaveValue(/ame\.journey-history\.v1/);
+  await expect(artifact).toHaveValue(/"checksum"/);
+  await page.getByRole("button", { name: "Import JSON" }).click();
+  await expect(
+    page.getByText("Already imported; no learner state was duplicated."),
+  ).toBeVisible();
+});
+
+test("learner sees variant failure, retries, and uses reviewed source-backed content without mastery", async ({
+  page,
+}) => {
+  const { journey } = await onboardIntoJourney(
+    page,
+    "I would like to learn physics",
+    "Variant Learner",
+    `variant-golden-${Date.now()}@example.com`,
+    "variant-golden-2026",
+  );
+  const activity = journey.activities[0];
+  const objective = journey.objectives[0];
+  const masteryBefore = await page.request.get(
+    apiUrl(`/api/v1/progress/${journey.id}/objectives/${objective.id}`),
+  );
+  const failedRequest = await page.request.post(
+    apiUrl("/api/v1/learning-variants"),
+    {
+      data: {
+        sourceActivityId: activity.id,
+        objectiveId: objective.id,
+        variantKind: "explanation",
+        recommendationReason: "I need another mental model.",
+        retryKey: `failed-${Date.now()}`,
+      },
+    },
+  );
+  expect(failedRequest.ok()).toBeTruthy();
+  const failed = await failedRequest.json();
+  for (const [status, error] of [
+    ["running", undefined],
+    ["failed", { code: "provider_unavailable" }],
+  ] as const) {
+    const transition = await page.request.patch(
+      apiUrl(`/api/v1/generation-runs/${failed.generationRunId}`),
+      { data: { status, error } },
+    );
+    expect(transition.ok()).toBeTruthy();
+  }
+  await page.reload();
+  await expect(page.getByText(/explanation · failed/)).toBeVisible();
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByText(/explanation · requested/)).toBeVisible();
+
+  const availableRequest = await page.request.post(
+    apiUrl("/api/v1/learning-variants"),
+    {
+      data: {
+        sourceActivityId: activity.id,
+        objectiveId: objective.id,
+        variantKind: "example",
+        recommendationReason: "A concrete case will connect the equation.",
+        retryKey: `available-${Date.now()}`,
+      },
+    },
+  );
+  expect(availableRequest.ok()).toBeTruthy();
+  const available = await availableRequest.json();
+  for (const status of ["running", "review_required", "published"]) {
+    const transition = await page.request.patch(
+      apiUrl(`/api/v1/generation-runs/${available.generationRunId}`),
+      { data: { status } },
+    );
+    expect(transition.ok()).toBeTruthy();
+  }
+  const citationId = await supportedCitation(
+    page,
+    "A car accelerating at two meters per second squared gains two meters per second of velocity each second.",
+    "gains two meters per second of velocity each second",
+  );
+  const publish = await page.request.patch(
+    apiUrl(`/api/v1/learning-variants/${available.id}`),
+    {
+      data: {
+        content: {
+          heading: "A concrete acceleration example",
+          body: "After three seconds, the velocity change is six m/s.",
+        },
+        sourceReferences: [citationId],
+      },
+    },
+  );
+  expect(publish.ok()).toBeTruthy();
+  await page.reload();
+  await expect(page.getByText(/example · available/)).toBeVisible();
+  await expect(page.getByText(/velocity change is six m\/s/)).toBeVisible();
+  const masteryAfter = await page.request.get(
+    apiUrl(`/api/v1/progress/${journey.id}/objectives/${objective.id}`),
+  );
+  expect(masteryAfter.status()).toBe(masteryBefore.status());
+  if (masteryBefore.ok()) {
+    expect(await masteryAfter.json()).toEqual(await masteryBefore.json());
+  }
+});
+
 test("physics golden journey seeds deterministically and grades numeric answers by tolerance", async ({
   page,
 }) => {
@@ -92,6 +269,16 @@ test("physics golden journey seeds deterministically and grades numeric answers 
     page,
     "question.compose",
   );
+  const kinematicsCitation = await supportedCitation(
+    page,
+    "For constant acceleration, velocity equals acceleration multiplied by elapsed time.",
+    "velocity equals acceleration multiplied by elapsed time",
+  );
+  const forceCitation = await supportedCitation(
+    page,
+    "Net force equals mass multiplied by acceleration.",
+    "Net force equals mass multiplied by acceleration",
+  );
 
   const withinToleranceQuestion = await page.request.post(
     apiUrl("/api/v1/questions"),
@@ -104,7 +291,7 @@ test("physics golden journey seeds deterministically and grades numeric answers 
         acceptedAnswers: ["19.6", "0.5"],
         points: 1,
         reviewStatus: "approved",
-        sourceReferences: ["https://example.com/kinematics"],
+        sourceReferences: [kinematicsCitation],
       },
     },
   );
@@ -122,7 +309,7 @@ test("physics golden journey seeds deterministically and grades numeric answers 
         acceptedAnswers: ["100", "1"],
         points: 1,
         reviewStatus: "approved",
-        sourceReferences: ["https://example.com/newtons-second-law"],
+        sourceReferences: [forceCitation],
       },
     },
   );
@@ -216,6 +403,75 @@ test("physics golden journey seeds deterministically and grades numeric answers 
   expect(gradedInTolerance.evaluationStatus).toBe("correct");
   expect(gradedOutOfTolerance.evaluationStatus).toBe("incorrect");
   expect(finished.score).toBeCloseTo(0.5, 5);
+  const evidence = await page.request.post(
+    apiUrl("/api/v1/progress/evidence"),
+    {
+      data: {
+        journeyId: journey.id,
+        objectiveId: objective.id,
+        activityId: activity.id,
+        attemptId: attempt.id,
+        contentVersion: activity.contentVersion,
+        value: 0.5,
+        derivationVersion: 1,
+      },
+    },
+  );
+  expect(evidence.ok()).toBeTruthy();
+  const due = await page.request.get(apiUrl("/api/v1/reviews/due"));
+  const dueReviews = await due.json();
+  const review = dueReviews.find(
+    (candidate: { activityId: string }) => candidate.activityId === activity.id,
+  );
+  expect(review).toBeTruthy();
+  const rating = await page.request.post(
+    apiUrl(`/api/v1/reviews/${review.id}/ratings`),
+    { data: { rating: "good", learnerTimezone: "Asia/Tokyo" } },
+  );
+  expect(rating.ok()).toBeTruthy();
+  const dayParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(new Date())
+    .reduce<Record<string, string>>((parts, part) => {
+      parts[part.type] = part.value;
+      return parts;
+    }, {});
+  const qualifyingDay = `${dayParts.year}-${dayParts.month}-${dayParts.day}`;
+  const streak = await page.request.post(apiUrl("/api/v1/progress/streaks"), {
+    data: {
+      journeyId: journey.id,
+      activityId: activity.id,
+      qualifyingEventKey: `physics-review-${review.id}`,
+      learnerTimezone: "Asia/Tokyo",
+      qualifyingDay,
+    },
+  });
+  expect(streak.ok()).toBeTruthy();
+  const finishedSession = await page.request.post(
+    apiUrl(`/api/v1/learning/sessions/${session.id}/finish`),
+    { data: { completed: true, responses: [] } },
+  );
+  expect(finishedSession.ok()).toBeTruthy();
+  const analytics = await page.request.get(
+    apiUrl(
+      `/api/v1/learning/journeys/${journey.id}/analytics?timezone=Asia%2FTokyo`,
+    ),
+  );
+  expect(analytics.ok()).toBeTruthy();
+  const metrics = await analytics.json();
+  expect(metrics.averageScore.denominator).toBe(1);
+  expect(metrics.averageScore.value).toBeCloseTo(0.5, 5);
+  expect(metrics.attempts).toBe(1);
+  expect(metrics.reviewHistory).toHaveLength(1);
+  expect(metrics.streak.currentDays).toBe(1);
+  await page.goto("/learning");
+  const analyticsPanel = page.getByTestId("learner-analytics");
+  await expect(analyticsPanel).toBeVisible();
+  await expect(analyticsPanel.getByText("50%")).toBeVisible();
 });
 
 test("flink golden journey seeds deterministically and routes a code submission to manual review", async ({
@@ -245,6 +501,11 @@ test("flink golden journey seeds deterministically and routes a code submission 
     page,
     "question.compose",
   );
+  const codeCitation = await supportedCitation(
+    page,
+    "A Python function can return the sum of its two integer parameters.",
+    "return the sum of its two integer parameters",
+  );
 
   const codeQuestion = await page.request.post(apiUrl("/api/v1/questions"), {
     data: {
@@ -254,7 +515,7 @@ test("flink golden journey seeds deterministically and routes a code submission 
         "Write a Python function `add(a, b)` that returns the sum of two integers.",
       points: 1,
       reviewStatus: "approved",
-      sourceReferences: ["https://example.com/flink-python-exercise"],
+      sourceReferences: [codeCitation],
     },
   });
   expect(codeQuestion.ok()).toBeTruthy();

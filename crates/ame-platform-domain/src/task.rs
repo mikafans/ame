@@ -68,6 +68,23 @@ pub struct TaskRubric {
     pub passing_score: Option<f32>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmissionArtifact {
+    pub kind: String,
+    pub name: String,
+    pub media_type: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RubricScore {
+    pub criterion_id: String,
+    pub points: f32,
+    pub feedback: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskSubmissionEnvelope {
@@ -75,6 +92,7 @@ pub struct TaskSubmissionEnvelope {
     pub subject_user_id: Uuid,
     pub content_version: u32,
     pub response: serde_json::Value,
+    pub artifacts: Vec<SubmissionArtifact>,
     pub evaluation_method: TaskEvaluationMethod,
     pub status: TaskSubmissionStatus,
     pub review_status: TaskReviewStatus,
@@ -148,6 +166,42 @@ pub fn validate_task_rubric(rubric: &TaskRubric) -> Result<(), TaskContractError
     Ok(())
 }
 
+pub fn score_task_rubric(
+    rubric: &TaskRubric,
+    scores: &[RubricScore],
+) -> Result<f32, TaskContractError> {
+    validate_task_rubric(rubric)?;
+    if scores.len() != rubric.criteria.len() {
+        return Err(TaskContractError::InvalidRubric(
+            "every rubric criterion must be scored exactly once".into(),
+        ));
+    }
+    let mut earned = 0.0;
+    let mut possible = 0.0;
+    for criterion in &rubric.criteria {
+        let matches = scores
+            .iter()
+            .filter(|score| score.criterion_id == criterion.id)
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            return Err(TaskContractError::InvalidRubric(
+                "every rubric criterion must be scored exactly once".into(),
+            ));
+        }
+        let score = matches[0];
+        if !(0.0..=criterion.max_points as f32).contains(&score.points)
+            || score.feedback.trim().is_empty()
+        {
+            return Err(TaskContractError::InvalidRubric(
+                "criterion points must be in range and include feedback".into(),
+            ));
+        }
+        earned += score.points;
+        possible += criterion.max_points as f32;
+    }
+    Ok(earned / possible)
+}
+
 pub fn validate_task_submission(
     submission: &TaskSubmissionEnvelope,
 ) -> Result<(), TaskContractError> {
@@ -161,11 +215,29 @@ pub fn validate_task_submission(
             "response must be present".to_string(),
         ));
     }
+    validate_submission_artifacts(&submission.artifacts)?;
     if submission.status == TaskSubmissionStatus::InProgress
         && submission.review_status != TaskReviewStatus::NotRequired
     {
         return Err(TaskContractError::InvalidSubmission(
             "an in-progress submission cannot be under review".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn validate_submission_artifacts(
+    artifacts: &[SubmissionArtifact],
+) -> Result<(), TaskContractError> {
+    if artifacts.iter().any(|artifact| {
+        artifact.kind.trim().is_empty()
+            || artifact.name.trim().is_empty()
+            || artifact.media_type.trim().is_empty()
+            || artifact.content.trim().is_empty()
+            || artifact.content.len() > 256 * 1024
+    }) {
+        return Err(TaskContractError::InvalidSubmission(
+            "artifacts require kind, name, media type, and bounded content".to_string(),
         ));
     }
     Ok(())
@@ -291,6 +363,12 @@ mod tests {
             subject_user_id: uuid::Uuid::now_v7(),
             content_version: 3,
             response: serde_json::json!({"answer": "Use event time."}),
+            artifacts: vec![SubmissionArtifact {
+                kind: "report".into(),
+                name: "design.md".into(),
+                media_type: "text/markdown".into(),
+                content: "# Design".into(),
+            }],
             evaluation_method: TaskEvaluationMethod::Agent,
             status: TaskSubmissionStatus::Submitted,
             review_status: TaskReviewStatus::Pending,
@@ -325,6 +403,7 @@ mod tests {
             subject_user_id: uuid::Uuid::now_v7(),
             content_version: 1,
             response: serde_json::Value::Null,
+            artifacts: vec![],
             evaluation_method: TaskEvaluationMethod::SelfReview,
             status: TaskSubmissionStatus::InProgress,
             review_status: TaskReviewStatus::NotRequired,
@@ -335,5 +414,42 @@ mod tests {
             validate_task_submission(&submission),
             Err(TaskContractError::InvalidSubmission(_))
         ));
+    }
+
+    #[test]
+    fn structured_rubric_scores_each_criterion_and_normalizes_total() {
+        let rubric = TaskRubric {
+            version: 1,
+            criteria: vec![
+                TaskRubricCriterion {
+                    id: "design".into(),
+                    objective_id: Uuid::now_v7(),
+                    description: "Explains the design".into(),
+                    max_points: 3,
+                    required: true,
+                },
+                TaskRubricCriterion {
+                    id: "tradeoff".into(),
+                    objective_id: Uuid::now_v7(),
+                    description: "Explains a tradeoff".into(),
+                    max_points: 2,
+                    required: true,
+                },
+            ],
+            passing_score: Some(0.6),
+        };
+        let scores = vec![
+            RubricScore {
+                criterion_id: "design".into(),
+                points: 2.0,
+                feedback: "Clear design.".into(),
+            },
+            RubricScore {
+                criterion_id: "tradeoff".into(),
+                points: 1.0,
+                feedback: "Add operational detail.".into(),
+            },
+        ];
+        assert_eq!(score_task_rubric(&rubric, &scores), Ok(0.6));
     }
 }

@@ -32,6 +32,39 @@ async function publishedGenerationRun(page: Page, operation: string) {
   return run.id as string;
 }
 
+async function supportedCitation(page: Page, content: string, quote: string) {
+  const source = await page.request.post(apiUrl("/api/v1/sources/imports"), {
+    data: {
+      kind: "document",
+      locator: `uiux/${Date.now()}-${Math.random()}.txt`,
+      mediaType: "text/plain",
+      content,
+      retryKey: `uiux-source-${Date.now()}-${Math.random()}`,
+    },
+  });
+  expect(source.ok()).toBeTruthy();
+  const snapshot = await source.json();
+  const startByte = new TextEncoder().encode(
+    content.slice(0, content.indexOf(quote)),
+  ).length;
+  const endByte = startByte + new TextEncoder().encode(quote).length;
+  const certificate = await page.request.post(apiUrl("/api/v1/citations"), {
+    data: {
+      snapshotId: snapshot.id,
+      startByte,
+      endByte,
+      quote,
+      extractionMethod: "exact_quote",
+      groundingStatus: "supported",
+      groundingNote: "Seeded UI fixture directly supports the tested item.",
+      licenseStatus: "allowed",
+      licenseName: "Test fixture",
+    },
+  });
+  expect(certificate.ok()).toBeTruthy();
+  return (await certificate.json()).id as string;
+}
+
 test("learner can turn an intent into an evidence-backed next step", async ({
   page,
 }) => {
@@ -150,6 +183,11 @@ test("learner can turn an intent into an evidence-backed next step", async ({
     page,
     "learning.activity.content.compose",
   );
+  const subjectCitation = await supportedCitation(
+    page,
+    "A useful starting model begins with one observable mechanism and then applies it to a concrete situation.",
+    "one observable mechanism",
+  );
   const kindMismatchResponse = await page.request.patch(
     apiUrl(`/api/v1/learning/activities/${explanation.id}/content`),
     {
@@ -162,7 +200,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
           steps: ["Do not store this."],
           reflection: "Try the matching activity instead.",
         },
-        sourceReferences: ["https://example.test/subject/intro"],
+        sourceReferences: [subjectCitation],
         reviewStatus: "approved",
       },
     },
@@ -180,7 +218,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
       data: {
         generationRunId: contentGenerationRunId,
         content: groundedContent,
-        sourceReferences: ["https://example.test/subject/intro"],
+        sourceReferences: [subjectCitation],
         reviewStatus: "approved",
       },
     },
@@ -212,7 +250,7 @@ test("learner can turn an intent into an evidence-backed next step", async ({
       data: {
         generationRunId: contentGenerationRunId,
         content: workedExampleContent,
-        sourceReferences: ["https://example.test/subject/example"],
+        sourceReferences: [subjectCitation],
         reviewStatus: "approved",
       },
     },
@@ -560,6 +598,11 @@ test("learner can complete an agent-provided assessment and open its deep dive",
     page,
     "question.compose",
   );
+  const distributedSystemsCitation = await supportedCitation(
+    page,
+    "A coordinator tracks shared work and helps workers agree on progress in a distributed system.",
+    "A coordinator tracks shared work",
+  );
 
   const questionResponse = await page.request.post(
     apiUrl("/api/v1/questions"),
@@ -574,7 +617,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
         ],
         points: 1,
         reviewStatus: "approved",
-        sourceReferences: ["https://example.com/distributed-systems"],
+        sourceReferences: [distributedSystemsCitation],
       },
     },
   );
@@ -659,7 +702,7 @@ test("learner can complete an agent-provided assessment and open its deep dive",
         body: "A coordinator tracks shared work and helps workers agree on progress.",
         example: "A scheduler assigns work while workers execute it.",
         caveats: ["The exact responsibilities vary by system design."],
-        sourceReferences: ["https://example.com/distributed-systems"],
+        sourceReferences: [distributedSystemsCitation],
         applicationTask:
           "Describe which component coordinates your next example.",
         reviewStatus: "approved",
@@ -776,6 +819,11 @@ test("learner can finish a manual-review assessment without false progress", asy
     page,
     "question.compose",
   );
+  const learningCitation = await supportedCitation(
+    page,
+    "A learner can explain a first principle in their own words and revise the explanation after review.",
+    "explain a first principle",
+  );
   const questionResponse = await page.request.post(
     apiUrl("/api/v1/questions"),
     {
@@ -785,7 +833,7 @@ test("learner can finish a manual-review assessment without false progress", asy
         prompt: "Explain the first principle in your own words.",
         points: 2,
         reviewStatus: "approved",
-        sourceReferences: ["https://example.com/learning"],
+        sourceReferences: [learningCitation],
       },
     },
   );

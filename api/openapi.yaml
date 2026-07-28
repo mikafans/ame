@@ -378,6 +378,62 @@ paths:
       responses:
         '200':
           description: Logged out
+  /api/v1/citations:
+    get:
+      tags:
+      - citations
+      operationId: list_citations
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CitationResponse'
+      security:
+      - bearer: []
+    post:
+      tags:
+      - citations
+      operationId: create_citation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCitationBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationResponse'
+      security:
+      - bearer: []
+  /api/v1/citations/{id}:
+    get:
+      tags:
+      - citations
+      operationId: get_citation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationResponse'
+      security:
+      - bearer: []
   /api/v1/deep-dives:
     get:
       tags:
@@ -510,6 +566,75 @@ paths:
                 $ref: '#/components/schemas/GenerationRunResponse'
       security:
       - bearer: []
+  /api/v1/learning-variants:
+    get:
+      tags:
+      - variants
+      operationId: list_variants
+      parameters:
+      - name: activityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VariantResponse'
+      security:
+      - bearer: []
+    post:
+      tags:
+      - variants
+      operationId: request_variant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestVariantBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariantResponse'
+      security:
+      - bearer: []
+  /api/v1/learning-variants/{id}:
+    patch:
+      tags:
+      - variants
+      operationId: publish_variant
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishVariantBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariantResponse'
+      security:
+      - bearer: []
   /api/v1/learning/activities/{activity_id}/content:
     patch:
       tags:
@@ -584,6 +709,26 @@ paths:
           description: Rubric, provenance, or review status is invalid
       security:
       - bearer_auth: []
+  /api/v1/learning/imports:
+    post:
+      tags:
+      - portability
+      operationId: import_journey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JourneyExportManifest'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportReceipt'
+      security:
+      - bearer: []
   /api/v1/learning/journeys:
     get:
       tags:
@@ -630,6 +775,53 @@ paths:
           description: Journey does not exist for this learner
       security:
       - bearer_auth: []
+  /api/v1/learning/journeys/{id}/analytics:
+    get:
+      tags:
+      - analytics
+      operationId: get_analytics
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: timezone
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerAnalyticsResponse'
+      security:
+      - bearer: []
+  /api/v1/learning/journeys/{id}/export:
+    get:
+      tags:
+      - portability
+      operationId: export_journey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyExportManifest'
+      security:
+      - bearer: []
   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
     post:
       tags:
@@ -771,6 +963,97 @@ paths:
                 $ref: '#/components/schemas/MeResponse'
         '401':
           description: Unauthorized
+      security:
+      - bearer: []
+  /api/v1/notes:
+    get:
+      tags:
+      - notes
+      operationId: list_notes
+      parameters:
+      - name: journeyId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: activityId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NoteResponse'
+      security:
+      - bearer: []
+    post:
+      tags:
+      - notes
+      operationId: create_note
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNoteBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+      security:
+      - bearer: []
+  /api/v1/notes/{id}:
+    delete:
+      tags:
+      - notes
+      operationId: delete_note
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: ''
+      security:
+      - bearer: []
+    patch:
+      tags:
+      - notes
+      operationId: update_note
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNoteBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
       security:
       - bearer: []
   /api/v1/progress/evidence:
@@ -991,6 +1274,149 @@ paths:
                 $ref: '#/components/schemas/QuestionResponse'
       security:
       - bearer: []
+  /api/v1/reviews:
+    post:
+      tags:
+      - reviews
+      operationId: seed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeedReviewBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewItemResponse'
+      security:
+      - bearer: []
+  /api/v1/reviews/due:
+    get:
+      tags:
+      - reviews
+      operationId: list_due
+      parameters:
+      - name: dueBefore
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReviewItemResponse'
+      security:
+      - bearer: []
+  /api/v1/reviews/{review_item_id}/ratings:
+    post:
+      tags:
+      - reviews
+      operationId: rate
+      parameters:
+      - name: review_item_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateReviewBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewItemResponse'
+      security:
+      - bearer: []
+  /api/v1/source-imports:
+    get:
+      tags:
+      - sources
+      operationId: list_imports
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceImportRunResponse'
+      security:
+      - bearer: []
+  /api/v1/source-snapshots:
+    get:
+      tags:
+      - sources
+      operationId: list
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceSnapshotResponse'
+      security:
+      - bearer: []
+  /api/v1/source-snapshots/{snapshot_id}:
+    get:
+      tags:
+      - sources
+      operationId: get_one
+      parameters:
+      - name: snapshot_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSnapshotResponse'
+      security:
+      - bearer: []
+  /api/v1/sources/imports:
+    post:
+      tags:
+      - sources
+      operationId: import
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportSourceBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSnapshotResponse'
+      security:
+      - bearer: []
   /api/v1/task-submissions/{submission_id}:
     get:
       tags:
@@ -1034,6 +1460,33 @@ paths:
         required: true
       responses:
         '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmissionResponse'
+      security:
+      - bearer: []
+  /api/v1/task-submissions/{submission_id}/revise:
+    patch:
+      tags:
+      - tasks
+      operationId: revise_submission
+      parameters:
+      - name: submission_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviseTaskSubmissionBody'
+        required: true
+      responses:
+        '201':
           description: ''
           content:
             application/json:
@@ -1614,6 +2067,55 @@ components:
           type: array
           items:
             type: string
+    CitationResponse:
+      type: object
+      required:
+      - id
+      - snapshotId
+      - startByte
+      - endByte
+      - quote
+      - extractionMethod
+      - groundingStatus
+      - groundingNote
+      - licenseStatus
+      - createdAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        endByte:
+          type: integer
+          format: int32
+          minimum: 0
+        extractionMethod:
+          $ref: '#/components/schemas/ExtractionMethod'
+        groundingNote:
+          type: string
+        groundingStatus:
+          $ref: '#/components/schemas/GroundingStatus'
+        id:
+          type: string
+          format: uuid
+        licenseName:
+          type:
+          - string
+          - 'null'
+        licenseStatus:
+          $ref: '#/components/schemas/LicenseStatus'
+        licenseUrl:
+          type:
+          - string
+          - 'null'
+        quote:
+          type: string
+        snapshotId:
+          type: string
+          format: uuid
+        startByte:
+          type: integer
+          format: int32
+          minimum: 0
     ContentReviewStatus:
       type: string
       enum:
@@ -1640,6 +2142,47 @@ components:
           $ref: '#/components/schemas/AssessmentMode'
         status:
           $ref: '#/components/schemas/AssessmentStatus'
+    CreateCitationBody:
+      type: object
+      required:
+      - snapshotId
+      - startByte
+      - endByte
+      - quote
+      - extractionMethod
+      - groundingStatus
+      - groundingNote
+      - licenseStatus
+      properties:
+        endByte:
+          type: integer
+          format: int32
+          minimum: 0
+        extractionMethod:
+          $ref: '#/components/schemas/ExtractionMethod'
+        groundingNote:
+          type: string
+        groundingStatus:
+          $ref: '#/components/schemas/GroundingStatus'
+        licenseName:
+          type:
+          - string
+          - 'null'
+        licenseStatus:
+          $ref: '#/components/schemas/LicenseStatus'
+        licenseUrl:
+          type:
+          - string
+          - 'null'
+        quote:
+          type: string
+        snapshotId:
+          type: string
+          format: uuid
+        startByte:
+          type: integer
+          format: int32
+          minimum: 0
     CreateDeepDiveBody:
       type: object
       required:
@@ -1688,6 +2231,30 @@ components:
         triggeringEvidenceId:
           type: string
           format: uuid
+    CreateNoteBody:
+      type: object
+      required:
+      - journeyId
+      - body
+      - retryKey
+      properties:
+        activityId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        body:
+          type: string
+        contentVersion:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        journeyId:
+          type: string
+          format: uuid
+        retryKey:
+          type: string
     CreateQuestionBody:
       type: object
       required:
@@ -1799,6 +2366,14 @@ components:
         triggeringEvidenceId:
           type: string
           format: uuid
+    DueReviewQuery:
+      type: object
+      properties:
+        dueBefore:
+          type:
+          - string
+          - 'null'
+          format: date-time
     EffectiveSettings:
       type: object
       required:
@@ -1893,6 +2468,11 @@ components:
         value:
           type: number
           format: float
+    ExtractionMethod:
+      type: string
+      enum:
+      - exact_quote
+      - manual_selection
     FieldError:
       type: object
       required:
@@ -1967,6 +2547,71 @@ components:
       - paused
       - completed
       - failed
+    GroundingStatus:
+      type: string
+      enum:
+      - supported
+      - contradicted
+      - unverified
+    ImportReceipt:
+      type: object
+      required:
+      - journeyId
+      - checksum
+      - alreadyImported
+      properties:
+        alreadyImported:
+          type: boolean
+        checksum:
+          type: string
+        journeyId:
+          type: string
+          format: uuid
+    ImportSourceBody:
+      type: object
+      required:
+      - kind
+      - locator
+      - retryKey
+      properties:
+        content:
+          type:
+          - string
+          - 'null'
+        kind:
+          $ref: '#/components/schemas/SourceKind'
+        locator:
+          type: string
+        mediaType:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type: string
+    JourneyExportManifest:
+      type: object
+      required:
+      - schemaVersion
+      - ownerId
+      - journeyId
+      - exportedAt
+      - checksum
+      - payload
+      properties:
+        checksum:
+          type: string
+        exportedAt:
+          type: string
+          format: date-time
+        journeyId:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        payload: {}
+        schemaVersion:
+          type: string
     JourneyStatus:
       type: string
       enum:
@@ -1975,6 +2620,52 @@ components:
       - paused
       - completed
       - failed
+    LearnerAnalyticsResponse:
+      type: object
+      required:
+      - journeyId
+      - timezone
+      - privacyBoundary
+      - streak
+      - completionRate
+      - averageScore
+      - attempts
+      - timeSpent
+      - masteryTrend
+      - reviewHistory
+      - definitions
+      properties:
+        attempts:
+          type: integer
+          format: int32
+          minimum: 0
+        averageScore:
+          $ref: '#/components/schemas/RatioMetric'
+        completionRate:
+          $ref: '#/components/schemas/RatioMetric'
+        definitions:
+          type: array
+          items:
+            type: string
+        journeyId:
+          type: string
+          format: uuid
+        masteryTrend:
+          type: array
+          items:
+            $ref: '#/components/schemas/MasteryPoint'
+        privacyBoundary:
+          type: string
+        reviewHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewHistoryPoint'
+        streak:
+          $ref: '#/components/schemas/StreakMetric'
+        timeSpent:
+          $ref: '#/components/schemas/TimeMetric'
+        timezone:
+          type: string
     LearningActivityResponse:
       type: object
       required:
@@ -2333,6 +3024,12 @@ components:
       - in_progress
       - finished
       - abandoned
+    LicenseStatus:
+      type: string
+      enum:
+      - allowed
+      - restricted
+      - unknown
     ListAuditLogsResponse:
       type: object
       required:
@@ -2369,6 +3066,22 @@ components:
           type: string
         password:
           type: string
+    MasteryPoint:
+      type: object
+      required:
+      - objectiveId
+      - value
+      - occurredAt
+      properties:
+        objectiveId:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        value:
+          type: number
+          format: float
     MeResponse:
       type: object
       required:
@@ -2391,6 +3104,43 @@ components:
           format: uuid
         role:
           $ref: '#/components/schemas/Role'
+    NoteResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - body
+      - revision
+      - createdAt
+      - updatedAt
+      properties:
+        activityId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        body:
+          type: string
+        contentVersion:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          format: int32
+        updatedAt:
+          type: string
+          format: date-time
     ObjectiveActivityBody:
       type: object
       required:
@@ -2483,6 +3233,17 @@ components:
           type: string
         verb:
           type: string
+    PublishVariantBody:
+      type: object
+      required:
+      - content
+      - sourceReferences
+      properties:
+        content: {}
+        sourceReferences:
+          type: array
+          items:
+            type: string
     QuestionKind:
       type: string
       enum:
@@ -2577,6 +3338,31 @@ components:
           $ref: '#/components/schemas/TierLimit'
         premium:
           $ref: '#/components/schemas/TierLimit'
+    RateReviewBody:
+      type: object
+      required:
+      - rating
+      properties:
+        rating:
+          $ref: '#/components/schemas/ReviewRating'
+    RatioMetric:
+      type: object
+      required:
+      - numerator
+      - denominator
+      properties:
+        denominator:
+          type: integer
+          format: int32
+          minimum: 0
+        numerator:
+          type: number
+          format: float
+        value:
+          type:
+          - number
+          - 'null'
+          format: float
     RecommendationBody:
       type: object
       required:
@@ -2624,6 +3410,109 @@ components:
           type: string
         password:
           type: string
+    RequestVariantBody:
+      type: object
+      required:
+      - sourceActivityId
+      - objectiveId
+      - variantKind
+      - recommendationReason
+      - retryKey
+      properties:
+        objectiveId:
+          type: string
+          format: uuid
+        provider:
+          type:
+          - string
+          - 'null'
+        recommendationReason:
+          type: string
+        requestedDifficulty:
+          type:
+          - string
+          - 'null'
+        retryKey:
+          type: string
+        sourceActivityId:
+          type: string
+          format: uuid
+        variantKind:
+          $ref: '#/components/schemas/VariantKind'
+    ReviewHistoryPoint:
+      type: object
+      required:
+      - reviewItemId
+      - rating
+      - reviewedAt
+      - dueBefore
+      - dueAfter
+      - intervalDays
+      properties:
+        dueAfter:
+          type: string
+          format: date-time
+        dueBefore:
+          type: string
+          format: date-time
+        intervalDays:
+          type: integer
+          format: int32
+          minimum: 0
+        rating:
+          type: string
+        reviewItemId:
+          type: string
+          format: uuid
+        reviewedAt:
+          type: string
+          format: date-time
+    ReviewItemResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - objectiveId
+      - activityId
+      - contentVersion
+      - dueAt
+      - intervalDays
+      - reviewCount
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        contentVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        dueAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        intervalDays:
+          type: integer
+          format: int32
+          minimum: 0
+        journeyId:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        reviewCount:
+          type: integer
+          format: int32
+          minimum: 0
+    ReviewRating:
+      type: string
+      enum:
+      - again
+      - hard
+      - good
+      - easy
     ReviewTaskOutcome:
       type: string
       enum:
@@ -2637,16 +3526,47 @@ components:
         feedback: {}
         outcome:
           $ref: '#/components/schemas/ReviewTaskOutcome'
+        reviewProvenance: {}
+        rubricScores:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/RubricScore'
         score:
           type:
           - number
           - 'null'
           format: float
+    ReviseTaskSubmissionBody:
+      type: object
+      required:
+      - response
+      properties:
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionArtifact'
+        response: {}
     Role:
       type: string
       enum:
       - user
       - admin
+    RubricScore:
+      type: object
+      required:
+      - criterionId
+      - points
+      - feedback
+      properties:
+        criterionId:
+          type: string
+        feedback:
+          type: string
+        points:
+          type: number
+          format: float
     SaveAnswerBody:
       type: object
       required:
@@ -2661,6 +3581,14 @@ components:
           type: string
           format: uuid
         response: {}
+    SeedReviewBody:
+      type: object
+      required:
+      - evidenceId
+      properties:
+        evidenceId:
+          type: string
+          format: uuid
     SnapshotResponse:
       type: object
       required:
@@ -2687,6 +3615,83 @@ components:
           type: number
           format: float
         objectiveId:
+          type: string
+          format: uuid
+    SourceImportRunResponse:
+      type: object
+      required:
+      - id
+      - sourceId
+      - retryKey
+      - status
+      - createdAt
+      properties:
+        completedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        errorCode:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+          format: uuid
+        retryKey:
+          type: string
+        sourceId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/SourceImportStatus'
+    SourceImportStatus:
+      type: string
+      enum:
+      - requested
+      - completed
+      - failed
+    SourceKind:
+      type: string
+      enum:
+      - url
+      - document
+      - local_file
+    SourceSnapshotResponse:
+      type: object
+      required:
+      - id
+      - sourceId
+      - importRunId
+      - mediaType
+      - contentSha256
+      - byteLength
+      - content
+      - createdAt
+      properties:
+        byteLength:
+          type: integer
+          format: int32
+          minimum: 0
+        content:
+          type: string
+        contentSha256:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        importRunId:
+          type: string
+          format: uuid
+        mediaType:
+          type: string
+        sourceId:
           type: string
           format: uuid
     StartAttemptBody:
@@ -2771,6 +3776,10 @@ components:
       - contentVersion
       - response
       properties:
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionArtifact'
         contentVersion:
           type: integer
           format: int32
@@ -2799,6 +3808,25 @@ components:
           type: string
         qualifyingEventKey:
           type: string
+    StreakMetric:
+      type: object
+      required:
+      - currentDays
+      - bestDays
+      - qualifyingDays
+      properties:
+        bestDays:
+          type: integer
+          format: int32
+          minimum: 0
+        currentDays:
+          type: integer
+          format: int32
+          minimum: 0
+        qualifyingDays:
+          type: integer
+          format: int32
+          minimum: 0
     StreakResponse:
       type: object
       required:
@@ -2820,6 +3848,22 @@ components:
         qualifyingDay:
           type: string
         qualifyingEventKey:
+          type: string
+    SubmissionArtifact:
+      type: object
+      required:
+      - kind
+      - name
+      - mediaType
+      - content
+      properties:
+        content:
+          type: string
+        kind:
+          type: string
+        mediaType:
+          type: string
+        name:
           type: string
     TaskEvaluationMethod:
       type: string
@@ -2883,10 +3927,16 @@ components:
       - journeyId
       - contentVersion
       - response
+      - artifacts
+      - revision
       - evaluationMethod
       - status
       - reviewStatus
       properties:
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionArtifact'
         contentVersion:
           type: integer
           format: int32
@@ -2900,9 +3950,34 @@ components:
         journeyId:
           type: string
           format: uuid
+        parentSubmissionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         response: {}
+        reviewProvenance: {}
         reviewStatus:
           $ref: '#/components/schemas/TaskReviewStatus'
+        reviewerUserId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        revision:
+          type: integer
+          format: int32
+          minimum: 0
+        rubric:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/TaskRubric'
+        rubricScores:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/RubricScore'
         score:
           type:
           - number
@@ -2936,6 +4011,20 @@ components:
           type: integer
           format: int32
           minimum: 0
+    TimeMetric:
+      type: object
+      required:
+      - seconds
+      - finishedSessions
+      properties:
+        finishedSessions:
+          type: integer
+          format: int32
+          minimum: 0
+        seconds:
+          type: integer
+          format: int64
+          minimum: 0
     TimelineEventResponse:
       type: object
       required:
@@ -2967,6 +4056,17 @@ components:
         error: {}
         status:
           $ref: '#/components/schemas/GenerationStatus'
+    UpdateNoteBody:
+      type: object
+      required:
+      - expectedRevision
+      - body
+      properties:
+        body:
+          type: string
+        expectedRevision:
+          type: integer
+          format: int32
     UpdateSettingsBody:
       type: object
       description: Partial update for platform settings — any omitted field is left unchanged.
@@ -3026,3 +4126,49 @@ components:
       enum:
       - active
       - deactivated
+    VariantKind:
+      type: string
+      enum:
+      - explanation
+      - example
+      - difficulty
+    VariantResponse:
+      type: object
+      required:
+      - id
+      - sourceActivityId
+      - objectiveId
+      - generationRunId
+      - variantKind
+      - recommendationReason
+      - status
+      - sourceReferences
+      properties:
+        content: {}
+        error: {}
+        generationRunId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        objectiveId:
+          type: string
+          format: uuid
+        recommendationReason:
+          type: string
+        requestedDifficulty:
+          type:
+          - string
+          - 'null'
+        sourceActivityId:
+          type: string
+          format: uuid
+        sourceReferences:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/GenerationStatus'
+        variantKind:
+          $ref: '#/components/schemas/VariantKind'

@@ -315,6 +315,12 @@ pub async fn author_activity_content(
         "learning.activity.content.compose",
     )
     .map_err(crate::http::generation::map_error)?;
+    crate::http::citations::certify_references(
+        state.pool.clone(),
+        auth.owner_id(),
+        &body.source_references,
+    )
+    .await?;
     let activity = PgLearningRepository::new(state.pool)
         .author_activity_content(AuthorActivityContent {
             subject_user_id: auth.owner_id(),
@@ -367,6 +373,12 @@ pub async fn author_activity_rubric(
         "learning.activity.rubric.compose",
     )
     .map_err(crate::http::generation::map_error)?;
+    crate::http::citations::certify_references(
+        state.pool.clone(),
+        auth.owner_id(),
+        &body.source_references,
+    )
+    .await?;
     let rubric = serde_json::to_value(&body.rubric)
         .map_err(|error| ApiError::Internal(anyhow::anyhow!(error)))?;
     let activity = PgLearningRepository::new(state.pool)
