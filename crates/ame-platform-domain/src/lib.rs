@@ -9,6 +9,7 @@ pub mod identity;
 pub mod progress;
 pub mod question;
 pub mod quiz;
+pub mod review;
 pub mod task;
 pub mod timeline;
 pub mod user;
@@ -16,8 +17,8 @@ pub mod user;
 /// Compatibility namespace for code being migrated from `api::domain`.
 pub mod domain {
     pub use crate::{
-        assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz, task,
-        timeline, user,
+        assessment, attempt, auth, deep_dive, generation, identity, progress, question, quiz,
+        review, task, timeline, user,
     };
     pub use ame_learning_domain as learning;
 }
