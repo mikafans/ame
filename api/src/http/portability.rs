@@ -318,8 +318,8 @@ async fn build_payload(pool: &PgPool, owner: Uuid, journey: Uuid) -> Result<Valu
 }
 
 async fn history_rows(pool: &PgPool, journey: Uuid, owner: Uuid) -> Result<Vec<Value>, ApiError> {
-    let sessions = rows(pool, "SELECT jsonb_build_object('kind', 'learning_session', 'record', to_jsonb(s)) AS value FROM tb_learning_sessions s WHERE s.journey_id = $1 AND s.subject_user_id = $2 ORDER BY s.created_at", journey, owner).await?;
-    let attempts = rows(pool, "SELECT jsonb_build_object('kind', 'assessment_attempt', 'record', to_jsonb(a)) AS value FROM tb_attempts a WHERE a.journey_id = $1 AND a.subject_user_id = $2 ORDER BY a.created_at", journey, owner).await?;
+    let sessions = rows(pool, "SELECT jsonb_build_object('kind', 'learning_session', 'record', to_jsonb(s)) AS value FROM tb_learning_sessions s WHERE s.journey_id = $1 AND s.subject_user_id = $2 ORDER BY s.started_at", journey, owner).await?;
+    let attempts = rows(pool, "SELECT jsonb_build_object('kind', 'assessment_attempt', 'record', to_jsonb(a)) AS value FROM tb_attempts a JOIN tb_learning_sessions s ON s.id = a.learning_session_id WHERE s.journey_id = $1 AND a.subject_user_id = $2 ORDER BY a.created_at", journey, owner).await?;
     let live = sessions.into_iter().chain(attempts).collect::<Vec<_>>();
     if !live.is_empty() {
         return Ok(live);

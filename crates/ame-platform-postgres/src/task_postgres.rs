@@ -60,7 +60,7 @@ impl PgTaskSubmissionRepository {
              FROM tb_task_submissions s
              JOIN tb_activities a ON a.id = s.task_id
              WHERE s.status IN ('submitted', 'in_review') AND s.review_status = 'pending'
-             ORDER BY submitted_at ASC NULLS LAST, created_at ASC
+             ORDER BY s.submitted_at ASC NULLS LAST, s.created_at ASC
              LIMIT 100",
         )
         .fetch_all(&self.pool)
