@@ -6,6 +6,17 @@ Agent-friendly learning platform with one owner-scoped journey API. Rust (Axum) 
 
 **License**: [GPL-3.0](./LICENSE)
 
+![Landing page](docs/assets/screenshots/landing.png)
+
+<details>
+<summary>More screenshots — active session, learner analytics</summary>
+
+![Active learning session with private notes and alternate-angle variants](docs/assets/screenshots/learning-desk.png)
+
+![Learning desk with course progress and retention analytics](docs/assets/screenshots/analytics.png)
+
+</details>
+
 ## Quick start
 
 The toolchain is provided by the Nix devShell — run `direnv allow` (auto-loads
