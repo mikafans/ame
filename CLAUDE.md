@@ -22,7 +22,7 @@ specs were fine. It was *validate the need* and *test-first the refactor*.
 
 **Always use `make` — never raw commands.**
 
-- `make init-env` — one-time setup on a fresh checkout: web deps + Playwright browsers (language runtimes and `sqlx-cli` come from the Nix devShell, not this target)
+- `make init-env` — one-time setup on a fresh checkout: web deps + Playwright browsers (language runtimes and `sqlx-cli` come from mise, not this target)
 - `make dev` — start the full stack (kills stale procs, migrates, starts API + frontend)
 - `make stop` — stop everything
 - `make check` — pre-commit gate (fmt-check + lint + test)
@@ -49,7 +49,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - Access remotely via Tailscale: `make dev API_HOST=harus-mini` → http://harus-mini:23000
 - **DB**: Postgres 18 via docker/podman compose (`db/docker-compose.yml`)
 - **Schema**: OpenAPI at `api/openapi.yaml`; regenerate with `make openapi`
-- **Toolchain**: Rust edition 2024, Axum 0.8, Tokio, sqlx; Next.js 16 / React 19 / Tailwind CSS 4 + shadcn/ui. The Nix devShell (`flake.nix`, pinned to `nixpkgs-unstable`) provides the toolchain — rust, bun, uv, python 3.14, sqlx-cli. Enter it with `direnv allow` (auto-loads via `.envrc`) or `nix develop`; in non-interactive shells prefix targets with `nix develop -c make <target>`. Migrations: `sqlx migrate run`; SQL lint: `uvx sqlfluff`; SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`.
+- **Toolchain**: Rust edition 2024, Axum 0.8, Tokio, sqlx; Next.js 16 / React 19 / Tailwind CSS 4 + shadcn/ui. `mise.toml` provides the toolchain — rust (+ rustfmt/clippy), bun, uv, python 3.14, sqlx-cli, podman-compose. Run `mise install` once; tools then activate automatically on `cd` into the repo (mise's shell hook), or explicitly via `mise x -- <command>` in non-interactive shells (e.g. `mise x -- make <target>`). `rust-analyzer` is not mise-managed — install it via your editor's Rust extension or `rustup component add rust-analyzer`. Migrations: `sqlx migrate run`; SQL lint: `uvx sqlfluff`; SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`.
 - **Canonical spec**: `docs/plans/2026-07-19-agent-first-learning-rework.md` (design, user stories, contracts, and TDD matrix for the current 0.3 agent-first rework; see `docs/ROADMAP.md`). The earlier `docs/specs/2026-05-20-harus-platform-design.md` was retired once its content landed in code. Implementation plans in `docs/plans/`.
 
 ## Architecture
