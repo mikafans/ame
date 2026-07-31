@@ -4,11 +4,12 @@ Thanks for considering a contribution. ame is a small project; the bar is "works
 
 ## Setup
 
-The toolchain (rust, bun, uv, python, sqlx-cli) comes from the Nix devShell.
-Enter it with `direnv allow` (auto-loads via `.envrc`) or `nix develop`; then:
+The toolchain (rust, bun, uv, python, sqlx-cli) comes from mise.
+Run `mise install` once; tools then activate automatically on `cd` into the
+repo, or explicitly via `mise x -- <command>` in non-interactive shells. Then:
 
 ```bash
-make init-env      # web deps + playwright browsers (toolchain is from nix)
+make init-env      # web deps + playwright browsers (toolchain is from mise)
 make db-up         # start Postgres in Docker/Podman
 make dev           # API on :28080, frontend on :23000
 make db-seed       # seed demo users, quizzes, questions

@@ -55,11 +55,15 @@ impl ReviewRepository for PgReviewRepository {
     async fn list_due(
         &self,
         subject_user_id: Uuid,
-        due_before: time::OffsetDateTime,
+        due_before: Option<time::OffsetDateTime>,
     ) -> Result<Vec<ReviewItem>, ReviewScheduleError> {
+        // due_at is stamped by this same database's clock (seed_review_item_from_evidence
+        // trigger), so an unspecified due_before must resolve via the database's own now()
+        // rather than the API process's clock — otherwise clock skew between hosts can hide
+        // a review item that was just seeded moments ago.
         sqlx::query(
             "SELECT * FROM tb_review_items
-             WHERE subject_user_id = $1 AND due_at <= $2
+             WHERE subject_user_id = $1 AND due_at <= COALESCE($2, now())
              ORDER BY due_at, created_at",
         )
         .bind(subject_user_id)

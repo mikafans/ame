@@ -141,7 +141,7 @@ pub async fn get_analytics(
     let scores = sqlx::query(
         "SELECT COALESCE(sum(value), 0)::float4 AS score_sum, count(*)::bigint AS scored
          FROM (
-            SELECT (a.score / NULLIF(a.max_score, 0))::float4 AS value
+            SELECT a.score::float4 AS value
             FROM tb_attempts a
             JOIN tb_learning_sessions s ON s.id = a.learning_session_id
             WHERE a.subject_user_id = $1 AND s.journey_id = $2

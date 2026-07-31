@@ -51,33 +51,16 @@ function ActivityProvenance({
 }: {
   sourceReferences: string[];
 }) {
-  const safeSources = sourceReferences.filter((source) => {
-    try {
-      return new URL(source).protocol === "https:";
-    } catch {
-      return false;
-    }
-  });
-  if (safeSources.length === 0) return null;
+  if (sourceReferences.length === 0) return null;
   return (
     <div className="rounded-xl border border-primary/20 bg-background/70 p-4">
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
         Source-backed activity
       </p>
-      <ul className="mt-2 space-y-1 text-sm">
-        {safeSources.map((source) => (
-          <li key={source}>
-            <a
-              href={source}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline underline-offset-4"
-            >
-              {source}
-            </a>
-          </li>
-        ))}
-      </ul>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Grounded in {sourceReferences.length} cited source
+        {sourceReferences.length === 1 ? "" : "s"}.
+      </p>
     </div>
   );
 }

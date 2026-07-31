@@ -16,11 +16,6 @@ next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 
-# Nix
-result
-result-*
-.direnv/
-
 # Docker / db
 db/data/
 db/data.*-backup-*/

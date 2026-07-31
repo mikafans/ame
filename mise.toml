@@ -1,0 +1,17 @@
+[tools]
+rust = { version = "stable", components = "rustfmt,clippy" }
+bun = "latest"
+uv = "latest"
+python = "3.14"
+"cargo:sqlx-cli" = "latest"
+# podman-compose drives the podman CLI directly (over the machine's SSH
+# connection) — no docker-compose provider, no DOCKER_HOST socket. The
+# `podman` binary itself is a separate, machine-wide install (Homebrew /
+# Podman Desktop), not managed here.
+"pipx:podman-compose" = "latest"
+
+[env]
+RUST_BACKTRACE = "1"
+# uv resolves deps and runs uvx tools, but the interpreter is the
+# mise-provided python 3.14 — one source of truth, no downloaded CPython.
+UV_PYTHON_PREFERENCE = "only-system"
