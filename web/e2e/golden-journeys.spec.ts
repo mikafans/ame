@@ -70,6 +70,13 @@ async function supportedCitation(page: Page, content: string, quote: string) {
   return (await certificate.json()).id as string;
 }
 
+async function openActivity(page: Page) {
+  await page
+    .getByRole("button", { name: /^(Begin|Resume)$/ })
+    .last()
+    .click();
+}
+
 async function onboardIntoJourney(
   page: Page,
   prompt: string,
@@ -108,6 +115,7 @@ test("learner writes, resumes, edits, and deletes a version-anchored private not
     `note-golden-${Date.now()}@example.com`,
     "note-golden-2026",
   );
+  await openActivity(page);
   const editor = page.getByLabel("Private note");
   await expect(editor).toBeVisible();
   await editor.fill("Velocity is a vector.");
@@ -115,6 +123,7 @@ test("learner writes, resumes, edits, and deletes a version-anchored private not
   await expect(page.getByText("Velocity is a vector.")).toBeVisible();
 
   await page.reload();
+  await openActivity(page);
   await expect(page.getByText("Velocity is a vector.")).toBeVisible();
   await page.getByRole("button", { name: "Edit" }).click();
   await editor.fill("Velocity includes direction.");
@@ -187,6 +196,7 @@ test("learner sees variant failure, retries, and uses reviewed source-backed con
     expect(transition.ok()).toBeTruthy();
   }
   await page.reload();
+  await openActivity(page);
   await expect(page.getByText(/explanation · failed/)).toBeVisible();
   await page.getByRole("button", { name: "Retry" }).click();
   await expect(page.getByText(/explanation · requested/)).toBeVisible();
@@ -231,6 +241,7 @@ test("learner sees variant failure, retries, and uses reviewed source-backed con
   );
   expect(publish.ok()).toBeTruthy();
   await page.reload();
+  await openActivity(page);
   await expect(page.getByText(/example · available/)).toBeVisible();
   await expect(page.getByText(/velocity change is six m\/s/)).toBeVisible();
   const masteryAfter = await page.request.get(
@@ -445,7 +456,7 @@ test("physics golden journey seeds deterministically and grades numeric answers 
     data: {
       journeyId: journey.id,
       activityId: activity.id,
-      qualifyingEventKey: `physics-review-${review.id}`,
+      qualifyingEventKey: `attempt:${attempt.id}`,
       learnerTimezone: "Asia/Tokyo",
       qualifyingDay,
     },
@@ -471,7 +482,11 @@ test("physics golden journey seeds deterministically and grades numeric answers 
   await page.goto("/learning");
   const analyticsPanel = page.getByTestId("learner-analytics");
   await expect(analyticsPanel).toBeVisible();
-  await expect(analyticsPanel.getByText("50%")).toBeVisible();
+  const averageScoreCard = analyticsPanel
+    .locator("div")
+    .filter({ hasText: "Average score" })
+    .last();
+  await expect(averageScoreCard.getByText("50%")).toBeVisible();
 });
 
 test("flink golden journey seeds deterministically and routes a code submission to manual review", async ({

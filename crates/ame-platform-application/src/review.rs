@@ -39,7 +39,7 @@ pub trait ReviewRepository: Send + Sync {
     async fn list_due(
         &self,
         subject_user_id: Uuid,
-        due_before: OffsetDateTime,
+        due_before: Option<OffsetDateTime>,
     ) -> Result<Vec<ReviewItem>, ReviewScheduleError>;
 
     async fn rate(&self, input: RateReview) -> Result<ReviewItem, ReviewScheduleError>;

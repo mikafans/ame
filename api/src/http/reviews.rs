@@ -85,10 +85,7 @@ pub async fn list_due(
     Query(query): Query<DueReviewQuery>,
 ) -> Result<Json<Vec<ReviewItemResponse>>, ApiError> {
     PgReviewRepository::new(state.pool)
-        .list_due(
-            auth.owner_id(),
-            query.due_before.unwrap_or_else(OffsetDateTime::now_utc),
-        )
+        .list_due(auth.owner_id(), query.due_before)
         .await
         .map(|items| Json(items.into_iter().map(response).collect()))
         .map_err(map_error)

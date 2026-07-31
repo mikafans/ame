@@ -26,7 +26,7 @@ async fn evidence_seeds_an_owner_scoped_due_review_and_rating_reschedules_it() {
     let repository = PgReviewRepository::new(pool);
 
     let due = repository
-        .list_due(subject, OffsetDateTime::now_utc())
+        .list_due(subject, None)
         .await
         .expect("list due review");
     assert_eq!(due.len(), 1);
@@ -35,7 +35,7 @@ async fn evidence_seeds_an_owner_scoped_due_review_and_rating_reschedules_it() {
     assert_eq!(due[0].activity_id, activity);
     assert!(
         repository
-            .list_due(other, OffsetDateTime::now_utc())
+            .list_due(other, None)
             .await
             .expect("other learner due queue")
             .is_empty()
