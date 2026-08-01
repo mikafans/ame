@@ -1,0 +1,101 @@
+{
+  "contractVersion": "1.0.0",
+  "title": "AME learning contract",
+  "purpose": "The public rules that keep learner state, source-backed material, and agent actions trustworthy.",
+  "audiences": [
+    "learner",
+    "authorized-agent",
+    "self-host-operator"
+  ],
+  "readBefore": [
+    "starting or resuming a journey for another person",
+    "recording learner work or progress",
+    "creating source-backed learning content",
+    "running a fixture or simulation"
+  ],
+  "stories": [
+    {
+      "id": "C1",
+      "title": "A learner starts one owner-scoped journey",
+      "summary": "A learner-selected prompt or reviewed catalog set creates or resumes one journey for that learner through the shared API."
+    },
+    {
+      "id": "C2",
+      "title": "Learning material has inspectable provenance",
+      "summary": "Questions and explanations identify their version, source or provider, and review state before they are presented as approved material."
+    },
+    {
+      "id": "C3",
+      "title": "Only demonstrated work can advance learning state",
+      "summary": "Practice, graded assessment, and reviewed task work have distinct states; pending or abandoned work is not mastery evidence."
+    },
+    {
+      "id": "C4",
+      "title": "An agent can help without inventing progress",
+      "summary": "An authorized agent may explain a weak topic from owned evidence and reviewed sources, but generated content does not change mastery on its own."
+    },
+    {
+      "id": "C5",
+      "title": "Browser and agent see the same durable state",
+      "summary": "Authorized clients observe the same owner-scoped journey, activity history, evidence, recommendation, and provenance after a restart."
+    },
+    {
+      "id": "N1",
+      "title": "A reviewed catalog set is an additive starting point",
+      "summary": "A catalog selection records its stable ID and version, preserves the one learner model, and never creates a second API or identity."
+    },
+    {
+      "id": "N4",
+      "title": "Catalog journeys remain agent-readable",
+      "summary": "The browser and an authorized agent use the same catalog-created journey and can inspect its source and review state."
+    }
+  ],
+  "rules": [
+    {
+      "id": "owner-scoped-state",
+      "requirement": "Read and write only the authenticated learner's resources. Reuse a stable idempotency key when starting a journey."
+    },
+    {
+      "id": "learner-work-is-not-agent-work",
+      "requirement": "Do not submit invented learner responses, finish a session, create an attempt, rate a review, or record a streak on a learner's behalf unless the action represents that learner's actual work and instruction."
+    },
+    {
+      "id": "evidence-is-derived",
+      "requirement": "Mastery evidence must reference exactly one graded assessment attempt or reviewed task from the same learner, journey, objective, activity, and content version. Generated text, selected options, unfinished sessions, practice scores, and pending review are not mastery evidence."
+    },
+    {
+      "id": "source-and-review-visible",
+      "requirement": "Material presented as reviewed must expose its source declaration, version, licensing or attribution information where applicable, and review state at the appropriate learner and agent boundary."
+    },
+    {
+      "id": "fixture-state-is-explicit",
+      "requirement": "Synthetic data is fixture state, never learner history. A fixture uses a dedicated disposable learner, carries explicit fixture provenance, and cannot be represented as real mastery, review, streak, recommendation, or analytics data."
+    },
+    {
+      "id": "catalog-is-not-a-progress-claim",
+      "requirement": "Selecting a reviewed catalog journey may create a learner-owned starting point, but it does not claim that the learner completed, understood, or retained its material."
+    }
+  ],
+  "verificationScenarios": [
+    {
+      "id": "V1",
+      "title": "Normal catalog enrolment",
+      "expected": "A learner can select a reviewed catalog set once, inspect its provenance, and begin with zero evidence."
+    },
+    {
+      "id": "V2",
+      "title": "Pending and abandoned work",
+      "expected": "Neither pending review nor abandoned work creates mastery evidence, a completed review, a streak, or a misleading recommendation."
+    },
+    {
+      "id": "V3",
+      "title": "Fixture isolation",
+      "expected": "A fixture learner's simulated state remains visibly marked and leaves a normal learner's sessions, evidence, reviews, progress, analytics, and streaks unchanged."
+    },
+    {
+      "id": "V4",
+      "title": "Shared inspectability",
+      "expected": "The browser and an authorized agent receive the same journey origin, catalog provenance, source/review state, and evidence boundary after a stack restart."
+    }
+  ]
+}
