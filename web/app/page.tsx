@@ -166,8 +166,6 @@ export default function LandingPage() {
   const signedIn = !!user;
   const entryHref = signedIn ? "/learning" : "/login?tab=signup";
   const entryLabel = signedIn ? "Open learning desk" : "Sign up free";
-  const sampleHref = signedIn ? "/learning" : "#benefits";
-  const sampleLabel = signedIn ? "Open learning desk" : "See how it works";
 
   async function handlePreview(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -282,13 +280,15 @@ export default function LandingPage() {
                       <ArrowRight className="size-4" />
                     </Link>
                   </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="rounded-full border-primary/50 bg-transparent px-6 py-3 text-[var(--ame-sugar)] hover:border-primary hover:bg-primary/10 hover:text-[var(--ame-sugar)]"
-                  >
-                    <Link href={sampleHref}>{sampleLabel}</Link>
-                  </Button>
+                  {!signedIn && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="rounded-full border-primary/50 bg-transparent px-6 py-3 text-[var(--ame-sugar)] hover:border-primary hover:bg-primary/10 hover:text-[var(--ame-sugar)]"
+                    >
+                      <Link href="#benefits">See how it works</Link>
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="space-y-4 md:pt-8">
