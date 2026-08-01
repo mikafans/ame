@@ -60,11 +60,14 @@ test("saved color mode is applied before the first page render", async ({
   page,
 }) => {
   await page.addInitScript(() => {
-    window.localStorage.setItem("ame.colorMode", "dark");
+    window.localStorage.setItem("ame.theme", "night-study");
   });
   await page.goto("/");
 
-  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-ame-theme",
+    "night-study",
+  );
   await expect(
     page.getByRole("button", { name: "Use light mode" }),
   ).toBeVisible();

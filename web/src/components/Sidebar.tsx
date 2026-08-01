@@ -11,18 +11,16 @@ import {
   LayoutDashboard,
   Lightbulb,
   LogOut,
-  Moon,
   Pencil,
   Play,
   Settings,
   Shield,
-  Sun,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
-import { useColorMode } from "@/components/ThemeRegistry";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { APP_VERSION } from "@/version";
 
 export const DRAWER_WIDTH = 232;
@@ -71,7 +69,6 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const { user, logout: logoutContext } = useAuth();
-  const { mode, toggle } = useColorMode();
 
   const adminItems: NavigationItem[] =
     user?.role === "admin"
@@ -196,19 +193,7 @@ export function Sidebar({
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
             {displayName}
           </span>
-          <button
-            type="button"
-            title={mode === "dark" ? "Use light mode" : "Use dark mode"}
-            aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
-            onClick={toggle}
-            className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {mode === "dark" ? (
-              <Sun className="size-4" />
-            ) : (
-              <Moon className="size-4" />
-            )}
-          </button>
+          <ThemeSelector className="min-w-0" />
           <button
             type="button"
             title="Sign out"
