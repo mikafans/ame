@@ -16,6 +16,9 @@ import os
 import subprocess
 import sys
 import time
+import json
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from container_runtime import compose as run_compose, engine
@@ -113,6 +116,86 @@ $$;
     )
 
 
+def fixture_account() -> None:
+    """Create the disposable simulation learner and its explicit fixture journey."""
+    email = "fixture-simulation@example.test"
+    password = "password123"
+    registration = urllib.request.Request(
+        "http://localhost:28800/public/v1/auth/register",
+        data=json.dumps(
+            {"email": email, "name": "Fixture Simulation", "password": password}
+        ).encode(),
+        method="POST",
+        headers={"content-type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(registration, timeout=30) as response:
+            if response.status != 201:
+                raise SystemExit("fixture registration did not create an account")
+    except urllib.error.HTTPError as error:
+        if error.code != 422:
+            raise SystemExit(f"fixture registration failed: {error.code}") from error
+
+    compose(
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "ame",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        """
+        INSERT INTO tb_fixture_accounts (user_id, fixture_key)
+        SELECT id, 'local-simulation'
+        FROM tb_users
+        WHERE email_canonical = 'fixture-simulation@example.test'
+        ON CONFLICT (user_id) DO NOTHING;
+        """,
+    )
+    compose(
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "ame",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        """
+        WITH fixture AS (
+            SELECT id FROM tb_users WHERE email_canonical = 'fixture-simulation@example.test'
+        ), goal AS (
+            INSERT INTO tb_learning_goals (
+                subject_user_id, source_actor_id, raw_intent, normalized_statement
+            )
+            SELECT id, id, 'fixture simulation', 'Fixture simulation'
+            FROM fixture
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM tb_learning_journeys j
+                JOIN tb_users u ON u.id = j.subject_user_id
+                WHERE u.email_canonical = 'fixture-simulation@example.test'
+                  AND j.origin = 'fixture'
+            )
+            RETURNING id, subject_user_id
+        )
+        INSERT INTO tb_learning_journeys (
+            goal_id, subject_user_id, source_actor_id, promise, origin
+        )
+        SELECT id, subject_user_id, subject_user_id, 'Fixture-only simulation', 'fixture'
+        FROM goal;
+        """,
+    )
+    print(f"fixture learner ready → {email} / {password}")
+
+
 def run_uiux() -> None:
     env = {
         **os.environ,
@@ -182,6 +265,7 @@ def seed_stack(*, force: bool = False) -> None:
         cwd=ROOT,
         check=True,
     )
+    fixture_account()
 
 
 def main() -> int:

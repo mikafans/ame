@@ -48,6 +48,40 @@ def _published_generation_run(client, headers, operation):
     return run_id
 
 
+def _certified_reference(client, headers):
+    content = "A supported source statement."
+    source = client.post(
+        "/api/v1/sources/imports",
+        headers=headers,
+        json={
+            "kind": "document",
+            "locator": "test://grounding/source.txt",
+            "mediaType": "text/plain",
+            "content": content,
+            "retryKey": f"citation-source-{uuid.uuid4()}",
+        },
+    )
+    assert source.status_code == 200, source.text
+    citation = client.post(
+        "/api/v1/citations",
+        headers=headers,
+        json={
+            "snapshotId": source.json()["id"],
+            "startByte": 0,
+            "endByte": len(content),
+            "quote": content,
+            "extractionMethod": "exact_quote",
+            "groundingStatus": "supported",
+            "groundingNote": "The exact immutable source text supports this test content.",
+            "licenseStatus": "allowed",
+            "licenseName": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        },
+    )
+    assert citation.status_code == 200, citation.text
+    return [citation.json()["id"]]
+
+
 def _recommendation_candidates(journey_body):
     return [
         {"objectiveId": objective_id, "activityId": activity["id"]}
@@ -59,6 +93,7 @@ def _recommendation_candidates(journey_body):
 
 def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     started, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
     journey_id = started["journeyId"]
     journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
     assert journey.status_code == 200, journey.text
@@ -172,7 +207,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         json={
             "generationRunId": generation_run_id,
             "content": content,
-            "sourceReferences": ["https://example.test/subject/intro"],
+            "sourceReferences": references,
             "reviewStatus": "approved",
         },
     )
@@ -181,7 +216,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     assert grounded.json()["payload"]["contentProvenance"] == {
         "generationRunId": generation_run_id,
         "reviewStatus": "approved",
-        "sourceReferences": ["https://example.test/subject/intro"],
+        "sourceReferences": references,
     }
     worked_grounded = client.patch(
         f"/api/v1/learning/activities/{worked_example['id']}/content",
@@ -189,7 +224,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         json={
             "generationRunId": generation_run_id,
             "content": worked_example_content,
-            "sourceReferences": ["https://example.test/subject/example"],
+            "sourceReferences": references,
             "reviewStatus": "approved",
         },
     )
@@ -197,7 +232,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     assert worked_grounded.json()["payload"]["content"] == worked_example_content
     assert worked_grounded.json()["payload"]["contentProvenance"][
         "sourceReferences"
-    ] == ["https://example.test/subject/example"]
+    ] == references
 
     invalid_content = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",
@@ -303,7 +338,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         json={
             "generationRunId": generation_run_id,
             "content": content,
-            "sourceReferences": ["https://example.test/subject/intro"],
+            "sourceReferences": references,
             "reviewStatus": "approved",
         },
     )
@@ -322,6 +357,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert empty_preview.status_code == 422
 
     started, headers = _start_learner(client, prompt)
+    references = _certified_reference(client, headers)
     journey_id = started["journeyId"]
 
     journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
@@ -380,7 +416,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "reviewStatus": "approved",
             "explanation": "The JobManager coordinates scheduling and execution.",
             "difficulty": "introductory",
-            "sourceReferences": ["https://nightlies.apache.org/flink/"],
+            "sourceReferences": references,
         },
     )
     assert question_response.status_code == 200, question_response.text
@@ -661,7 +697,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "caveats": [
                 "Deployment behavior depends on the configured operator version."
             ],
-            "sourceReferences": ["https://nightlies.apache.org/flink/"],
+            "sourceReferences": references,
             "applicationTask": "Explain the scheduling path in your own words.",
             "reviewStatus": "approved",
         },
