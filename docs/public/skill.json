@@ -564,7 +564,7 @@
       "path": "/api/v1/learning-variants/{id}"
     },
     {
-      "description": "Export an owned journey and learner history as a versioned, checksummed application manifest.",
+      "description": "Export an owned journey and learner history as a versioned, checksummed application manifest that preserves its immutable learner or fixture origin.",
       "input_schema": {
         "properties": {
           "id": {

@@ -6,7 +6,8 @@ use crate::domain::identity::{
 };
 use crate::domain::learning::{
     ActivityKind, ActivityStatus, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
-    CreateObjective, LearningGoal, LearningJourney, LearningRepository, LearningRepositoryError,
+    CreateObjective, JourneyOrigin, LearningGoal, LearningJourney, LearningRepository,
+    LearningRepositoryError,
 };
 use crate::templates::{
     builtin_catalog, find_native_journey_blueprint, find_template_blueprint, find_topic_blueprint,
@@ -27,6 +28,7 @@ pub struct BootstrapPlan {
     pub template_version_id: Option<Uuid>,
     pub catalog_entry_id: Option<String>,
     pub catalog_entry_version: Option<u32>,
+    pub origin: JourneyOrigin,
     pub idempotency_key: String,
 }
 
@@ -202,22 +204,26 @@ impl LearningPromptInterpreter for CatalogPromptInterpreter {
 }
 
 impl CatalogPromptInterpreter {
-    pub fn interpret_catalog_entry(id: &str) -> Result<PromptInterpretation, PromptInterpretationError> {
+    pub fn interpret_catalog_entry(
+        id: &str,
+    ) -> Result<PromptInterpretation, PromptInterpretationError> {
         let topic = find_native_journey_blueprint(id)
             .map_err(PromptInterpretationError::InvalidTemplateCatalog)?
             .ok_or_else(|| PromptInterpretationError::UnknownCatalogEntry(id.to_string()))?;
-        let catalog = topic.catalog.ok_or_else(|| {
-            PromptInterpretationError::UnknownCatalogEntry(id.to_string())
-        })?;
+        let catalog = topic
+            .catalog
+            .ok_or_else(|| PromptInterpretationError::UnknownCatalogEntry(id.to_string()))?;
         let template = builtin_catalog()
             .map_err(PromptInterpretationError::InvalidTemplateCatalog)?
             .templates
             .into_iter()
             .find(|template| template.id == topic.template_id)
-            .ok_or_else(|| PromptInterpretationError::InvalidTemplateCatalog(format!(
-                "native catalog entry {id} references missing template {}",
-                topic.template_id
-            )))?;
+            .ok_or_else(|| {
+                PromptInterpretationError::InvalidTemplateCatalog(format!(
+                    "native catalog entry {id} references missing template {}",
+                    topic.template_id
+                ))
+            })?;
         Ok(PromptInterpretation {
             normalized_statement: catalog.title,
             promise: template.promise,
@@ -281,6 +287,7 @@ where
                 promise: plan.promise.clone(),
                 catalog_entry_id: plan.catalog_entry_id.clone(),
                 catalog_entry_version: plan.catalog_entry_version,
+                origin: plan.origin,
             })
             .await?;
 
@@ -456,7 +463,7 @@ fn starter_blueprint(
         .map_err(BootstrapError::InvalidTopicBlueprint)?
         .flatten()
         .or(find_topic_blueprint(&plan.normalized_statement)
-        .map_err(BootstrapError::InvalidTopicBlueprint)?)
+            .map_err(BootstrapError::InvalidTopicBlueprint)?)
         .or(find_template_blueprint(&plan.template_id)
             .map_err(BootstrapError::InvalidTopicBlueprint)?);
     let topic = topic.ok_or_else(|| {
@@ -618,6 +625,7 @@ where
                 template_version_id: interpretation.template_version_id,
                 catalog_entry_id: interpretation.catalog_entry_id.clone(),
                 catalog_entry_version: interpretation.catalog_entry_version,
+                origin: JourneyOrigin::Learner,
                 idempotency_key: "preview".to_string(),
             },
             Uuid::nil(),
@@ -701,6 +709,7 @@ where
                 template_version_id: request.template_version_id,
                 catalog_entry_id: request.catalog_entry_id,
                 catalog_entry_version: request.catalog_entry_version,
+                origin: JourneyOrigin::Learner,
                 idempotency_key: request.idempotency_key,
             })
             .await?;
@@ -798,7 +807,9 @@ mod tests {
         StartLearningRequest,
     };
     use crate::domain::identity::RegistrationMode;
-    use crate::domain::learning::{ActivityKind, LearningRepository, LearningRepositoryError};
+    use crate::domain::learning::{
+        ActivityKind, JourneyOrigin, LearningRepository, LearningRepositoryError,
+    };
     use crate::identity::InMemoryIdentityRepository;
     use crate::learning::InMemoryLearningRepository;
     use uuid::Uuid;
@@ -815,6 +826,7 @@ mod tests {
             template_version_id: None,
             catalog_entry_id: None,
             catalog_entry_version: None,
+            origin: JourneyOrigin::Learner,
             idempotency_key: "onboarding/learner-selected-topic".to_string(),
         }
     }
@@ -869,17 +881,30 @@ mod tests {
     #[tokio::test]
     async fn catalog_selection_persists_the_reviewed_entry_on_goal_and_journey() {
         let repository = InMemoryLearningRepository::default();
-        let service = SelfHostOnboardingService::new(InMemoryIdentityRepository::default(), repository);
+        let service =
+            SelfHostOnboardingService::new(InMemoryIdentityRepository::default(), repository);
         let result = service
             .start_from_catalog_entry(start_learning_prompt_request(), "flink-cs-starter")
             .await
             .expect("catalog onboarding succeeds");
 
-        assert_eq!(result.bootstrap.goal.catalog_entry_id.as_deref(), Some("flink-cs-starter"));
+        assert_eq!(
+            result.bootstrap.goal.catalog_entry_id.as_deref(),
+            Some("flink-cs-starter")
+        );
         assert_eq!(result.bootstrap.goal.catalog_entry_version, Some(1));
-        assert_eq!(result.bootstrap.journey.catalog_entry_id.as_deref(), Some("flink-cs-starter"));
+        assert_eq!(
+            result.bootstrap.journey.catalog_entry_id.as_deref(),
+            Some("flink-cs-starter")
+        );
         assert_eq!(result.bootstrap.journey.catalog_entry_version, Some(1));
-        assert!(result.bootstrap.goal.normalized_statement.contains("Apache Flink"));
+        assert!(
+            result
+                .bootstrap
+                .goal
+                .normalized_statement
+                .contains("Apache Flink")
+        );
     }
 
     #[tokio::test]

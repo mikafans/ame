@@ -22,7 +22,7 @@ use crate::{
         learning::{
             ActivityKind, ActivityStatus, AuthorActivityContent, AuthorActivityRubric,
             CreateLearningSession, FinishLearningSession as FinishLearningSessionInput, GoalStatus,
-            JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
+            JourneyOrigin, JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
             LearningRepository, LearningSession, LearningSessionStatus, ObjectiveStatus,
         },
         task::{TaskRubric, validate_task_rubric},
@@ -165,6 +165,7 @@ pub struct LearningJourneyResponse {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub promise: String,
+    pub origin: JourneyOrigin,
     pub status: JourneyStatus,
     #[serde(with = "time::serde::rfc3339")]
     #[schema(value_type = String, format = DateTime)]
@@ -183,6 +184,7 @@ pub struct LearningJourneyResponse {
 pub struct LearningJourneySummaryResponse {
     pub id: Uuid,
     pub promise: String,
+    pub origin: JourneyOrigin,
     pub status: JourneyStatus,
     pub raw_intent: String,
     pub next_activity_id: Option<Uuid>,
@@ -275,6 +277,7 @@ pub async fn list_journeys(
         response.push(LearningJourneySummaryResponse {
             id: journey.id,
             promise: journey.promise,
+            origin: journey.origin,
             status: journey.status,
             raw_intent: goal.raw_intent,
             next_activity_id: next_activity.as_ref().map(|activity| activity.id),
@@ -454,6 +457,7 @@ pub async fn get_journey(
         subject_user_id: journey.subject_user_id,
         source_actor_id: journey.source_actor_id,
         promise: journey.promise,
+        origin: journey.origin,
         status: journey.status,
         created_at: journey.created_at,
         goal: LearningGoalResponse {

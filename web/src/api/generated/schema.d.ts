@@ -1382,6 +1382,12 @@ export interface components {
             payload: unknown;
             schemaVersion: string;
         };
+        /**
+         * @description Immutable reason the journey exists. Catalog selection is separate metadata:
+         *     it never changes a learner journey into a fixture.
+         * @enum {string}
+         */
+        JourneyOrigin: "learner" | "fixture";
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
         LearnerAnalyticsResponse: {
@@ -1473,6 +1479,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             objectives: components["schemas"]["LearningObjectiveResponse"][];
+            origin: components["schemas"]["JourneyOrigin"];
             promise: string;
             recommendation?: null | components["schemas"]["LearningRecommendationResponse"];
             /** Format: uuid */
@@ -1490,6 +1497,7 @@ export interface components {
             /** Format: uuid */
             nextActivityId?: string | null;
             nextActivityTitle?: string | null;
+            origin: components["schemas"]["JourneyOrigin"];
             promise: string;
             rawIntent: string;
             status: components["schemas"]["JourneyStatus"];
@@ -1879,6 +1887,7 @@ export interface components {
             goalId: string;
             /** Format: uuid */
             journeyId: string;
+            origin: components["schemas"]["JourneyOrigin"];
             templateId: string;
             /** Format: int32 */
             templateVersion: number;

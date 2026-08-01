@@ -132,6 +132,11 @@ content version. Recommendations, timeline events, and streak events are
 derived from durable activity and evidence state rather than from generated
 text alone.
 
+Each journey has an immutable `origin`: `learner` for real learner work or
+`fixture` for an explicitly designated simulation. A catalog selection never
+changes this value. Authenticated journey reads and portability exports expose
+it; agents must preserve it rather than infer it from progress or content.
+
 ## Native journey catalog
 
 `GET /public/v1/catalog/journeys` returns selectable native journeys. Catalog

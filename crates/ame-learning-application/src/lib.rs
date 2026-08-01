@@ -3,11 +3,12 @@
 use ame_learning_domain::{
     ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
     AuthorActivityRubric, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
-    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
-    LearningActivity, LearningChapter, LearningGoal, LearningJourney, LearningObjective,
-    LearningRepository, LearningRepositoryError, LearningSession, LearningSessionStatus,
-    ObjectiveStatus, validate_activity, validate_activity_content, validate_activity_rubric,
-    validate_chapter, validate_goal, validate_journey, validate_objective,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyOrigin,
+    JourneyStatus, LearningActivity, LearningChapter, LearningGoal, LearningJourney,
+    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
+    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_activity_content,
+    validate_activity_rubric, validate_chapter, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -202,6 +203,7 @@ impl LearningRepository for InMemoryLearningRepository {
             promise: input.promise,
             catalog_entry_id: input.catalog_entry_id,
             catalog_entry_version: input.catalog_entry_version,
+            origin: input.origin,
             status: JourneyStatus::Onboarding,
             created_at: OffsetDateTime::now_utc(),
         };
@@ -828,6 +830,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         promise: "Identify notes, intervals, and basic chords".to_string(),
         catalog_entry_id: None,
         catalog_entry_version: None,
+        origin: JourneyOrigin::Learner,
     };
     let journey = repository
         .ensure_journey(journey_input.clone())
@@ -1125,7 +1128,8 @@ mod contract_tests {
     };
     use ame_learning_domain::{
         ActivityKind, ActivityPublicationStatus, ActivityStatus, CreateActivity, CreateChapter,
-        CreateGoal, CreateJourney, CreateObjective, LearningRepository, LearningRepositoryError,
+        CreateGoal, CreateJourney, CreateObjective, JourneyOrigin, LearningRepository,
+        LearningRepositoryError,
     };
     use uuid::Uuid;
 
@@ -1164,6 +1168,7 @@ mod contract_tests {
                 promise: "Read query plans and choose useful indexes".to_string(),
                 catalog_entry_id: None,
                 catalog_entry_version: None,
+                origin: JourneyOrigin::Learner,
             })
             .await
             .expect("journey creates");

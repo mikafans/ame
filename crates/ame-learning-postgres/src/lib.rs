@@ -3,11 +3,12 @@
 use ame_learning_domain::{
     ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
     AuthorActivityRubric, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
-    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
-    LearningActivity, LearningChapter, LearningGoal, LearningJourney, LearningObjective,
-    LearningRepository, LearningRepositoryError, LearningSession, LearningSessionStatus,
-    ObjectiveStatus, validate_activity, validate_activity_content, validate_activity_rubric,
-    validate_chapter, validate_goal, validate_journey, validate_objective,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyOrigin,
+    JourneyStatus, LearningActivity, LearningChapter, LearningGoal, LearningJourney,
+    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
+    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_activity_content,
+    validate_activity_rubric, validate_chapter, validate_goal, validate_journey,
+    validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -48,7 +49,7 @@ impl PgLearningRepository {
     ) -> Result<Option<LearningJourney>, LearningRepositoryError> {
         sqlx::query(
             r#"
-            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, origin, status, created_at
             FROM tb_learning_journeys
             WHERE id = $1
             "#,
@@ -66,7 +67,7 @@ impl PgLearningRepository {
     ) -> Result<Option<LearningJourney>, LearningRepositoryError> {
         sqlx::query(
             r#"
-            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, origin, status, created_at
             FROM tb_learning_journeys
             WHERE goal_id = $1
             "#,
@@ -173,12 +174,12 @@ impl LearningRepository for PgLearningRepository {
         let inserted = sqlx::query(
             r#"
             INSERT INTO tb_learning_journeys (
-                goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status
+                goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, origin, status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, 'onboarding')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'onboarding')
             ON CONFLICT (goal_id)
                 DO NOTHING
-            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
+            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, origin, status, created_at
             "#,
         )
         .bind(goal.id)
@@ -187,6 +188,7 @@ impl LearningRepository for PgLearningRepository {
         .bind(&input.promise)
         .bind(&input.catalog_entry_id)
         .bind(input.catalog_entry_version.map(i32::try_from).transpose().map_err(LearningRepositoryError::storage)?)
+        .bind(journey_origin_value(input.origin))
         .fetch_optional(&self.pool)
         .await
         .map_err(storage_error)?
@@ -223,7 +225,7 @@ impl LearningRepository for PgLearningRepository {
     ) -> Result<Vec<LearningJourney>, LearningRepositoryError> {
         let rows = sqlx::query(
             r#"
-            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, origin, status, created_at
             FROM tb_learning_journeys
             WHERE subject_user_id = $1
             ORDER BY created_at DESC
@@ -247,7 +249,7 @@ impl LearningRepository for PgLearningRepository {
             UPDATE tb_learning_journeys
             SET status = $3, updated_at = now()
             WHERE id = $1 AND subject_user_id = $2
-            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
+            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, origin, status, created_at
             "#,
         )
         .bind(journey_id)
@@ -864,7 +866,9 @@ fn goal_from_row(row: sqlx::postgres::PgRow) -> LearningGoal {
         source_actor_id: row.get("source_actor_id"),
         template_version_id: row.get("template_version_id"),
         catalog_entry_id: row.get("catalog_entry_id"),
-        catalog_entry_version: row.get::<Option<i32>, _>("catalog_entry_version").map(|version| version as u32),
+        catalog_entry_version: row
+            .get::<Option<i32>, _>("catalog_entry_version")
+            .map(|version| version as u32),
         raw_intent: row.get("raw_intent"),
         normalized_statement: row.get("normalized_statement"),
         status: goal_status(row.get::<String, _>("status").as_str()),
@@ -881,7 +885,10 @@ fn journey_from_row(row: sqlx::postgres::PgRow) -> LearningJourney {
         source_actor_id: row.get("source_actor_id"),
         promise: row.get("promise"),
         catalog_entry_id: row.get("catalog_entry_id"),
-        catalog_entry_version: row.get::<Option<i32>, _>("catalog_entry_version").map(|version| version as u32),
+        catalog_entry_version: row
+            .get::<Option<i32>, _>("catalog_entry_version")
+            .map(|version| version as u32),
+        origin: journey_origin(row.get::<String, _>("origin").as_str()),
         status: journey_status(row.get::<String, _>("status").as_str()),
         created_at: row.get("created_at"),
     }
@@ -916,6 +923,20 @@ fn journey_status(value: &str) -> JourneyStatus {
         "completed" => JourneyStatus::Completed,
         "failed" => JourneyStatus::Failed,
         _ => JourneyStatus::Onboarding,
+    }
+}
+
+fn journey_origin(value: &str) -> JourneyOrigin {
+    match value {
+        "fixture" => JourneyOrigin::Fixture,
+        _ => JourneyOrigin::Learner,
+    }
+}
+
+fn journey_origin_value(origin: JourneyOrigin) -> &'static str {
+    match origin {
+        JourneyOrigin::Learner => "learner",
+        JourneyOrigin::Fixture => "fixture",
     }
 }
 

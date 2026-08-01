@@ -102,3 +102,37 @@ def test_native_catalog_exposes_structured_reviewed_provenance(client):
         assert journey["contentReview"]["status"] == "reviewed"
         assert journey["contentReview"]["reviewedAt"]
         assert journey["contentReview"]["reviewer"]
+
+
+def test_learner_journey_origin_is_explicit_in_authenticated_reads(client):
+    email = f"origin-{uuid.uuid4()}@example.test"
+    registration = client.post(
+        "/public/v1/auth/register",
+        json={"email": email, "name": "Origin Learner", "password": "password123"},
+    )
+    assert registration.status_code == 201, registration.text
+    token = registration.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    started = client.post(
+        "/public/v1/onboarding/start",
+        json={
+            "email": email,
+            "displayName": "Origin Learner",
+            "prompt": "I would like to learn linear algebra",
+            "idempotencyKey": f"origin-{uuid.uuid4()}",
+        },
+        headers=headers,
+    )
+    assert started.status_code == 201, started.text
+    payload = started.json()
+    assert payload["origin"] == "learner"
+
+    journeys = client.get("/api/v1/learning/journeys", headers=headers)
+    assert journeys.status_code == 200, journeys.text
+    assert journeys.json()[0]["origin"] == "learner"
+
+    journey = client.get(
+        f"/api/v1/learning/journeys/{payload['journeyId']}", headers=headers
+    )
+    assert journey.status_code == 200, journey.text
+    assert journey.json()["origin"] == "learner"

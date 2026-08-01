@@ -119,6 +119,7 @@ pub struct StartLearningResponse {
     pub template_version: u32,
     pub catalog_id: Option<String>,
     pub catalog_version: Option<u32>,
+    pub origin: crate::domain::learning::JourneyOrigin,
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
@@ -282,6 +283,7 @@ pub async fn start_learning(
             template_version: started.bootstrap.template_version,
             catalog_id: started.bootstrap.goal.catalog_entry_id,
             catalog_version: started.bootstrap.goal.catalog_entry_version,
+            origin: started.bootstrap.journey.origin,
         }),
     ))
 }

@@ -27,6 +27,15 @@ pub enum JourneyStatus {
     Failed,
 }
 
+/// Immutable reason the journey exists. Catalog selection is separate metadata:
+/// it never changes a learner journey into a fixture.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum JourneyOrigin {
+    Learner,
+    Fixture,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectiveStatus {
@@ -112,6 +121,7 @@ pub struct CreateJourney {
     pub promise: String,
     pub catalog_entry_id: Option<String>,
     pub catalog_entry_version: Option<u32>,
+    pub origin: JourneyOrigin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,6 +133,7 @@ pub struct LearningJourney {
     pub promise: String,
     pub catalog_entry_id: Option<String>,
     pub catalog_entry_version: Option<u32>,
+    pub origin: JourneyOrigin,
     pub status: JourneyStatus,
     pub created_at: OffsetDateTime,
 }

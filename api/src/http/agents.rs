@@ -181,7 +181,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.portability.export",
-            "Export an owned journey and learner history as a versioned, checksummed application manifest.",
+            "Export an owned journey and learner history as a versioned, checksummed application manifest that preserves its immutable learner or fixture origin.",
             "GET",
             "/api/v1/learning/journeys/{id}/export",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
