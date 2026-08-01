@@ -83,9 +83,12 @@ async function onboardIntoJourney(
   name: string,
   email: string,
   password: string,
+  catalogId?: string,
 ) {
-  await page.goto("/start");
-  await page.getByLabel("What would you like to learn?").fill(prompt);
+  await page.goto(catalogId ? `/start?catalogId=${catalogId}` : "/start");
+  if (!catalogId) {
+    await page.getByLabel("What would you like to learn?").fill(prompt);
+  }
   await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email identifier").fill(email);
   await page.getByLabel("Password").fill(password);
@@ -104,6 +107,45 @@ async function onboardIntoJourney(
   const journey = await journeyResponse.json();
   return { journeyId: journeyId as string, journey };
 }
+
+test("native catalog lists eight reviewed journeys and previews each deterministically", async ({
+  page,
+}) => {
+  const catalogResponse = await page.request.get(
+    apiUrl("/public/v1/catalog/journeys"),
+  );
+  expect(catalogResponse.ok()).toBeTruthy();
+  const catalog = await catalogResponse.json();
+  const ids = catalog.map((entry: { id: string }) => entry.id);
+  expect(ids).toEqual([
+    "learning-science-starter",
+    "rust-ownership-starter",
+    "python-foundations-starter",
+    "sql-foundations-starter",
+    "linear-algebra-starter",
+    "technical-writing-starter",
+    "flink-cs-starter",
+    "physics-mechanics-starter",
+  ]);
+  expect(
+    catalog.every(
+      (entry: { reviewStatus: string; outcomes: string[] }) =>
+        entry.reviewStatus === "reviewed" && entry.outcomes.length > 0,
+    ),
+  ).toBeTruthy();
+
+  for (const id of ids) {
+    const preview = await page.request.post(
+      apiUrl("/public/v1/onboarding/preview"),
+      { data: { prompt: "", catalogId: id } },
+    );
+    expect(preview.ok(), id).toBeTruthy();
+    const body = await preview.json();
+    expect(body.catalogId).toBe(id);
+    expect(body.catalogVersion).toBe(1);
+    expect(body.objectives.length).toBeGreaterThan(0);
+  }
+});
 
 test("learner writes, resumes, edits, and deletes a version-anchored private note", async ({
   page,
@@ -263,7 +305,11 @@ test("physics golden journey seeds deterministically and grades numeric answers 
     "Physics Learner",
     email,
     "physics-golden-2026",
+    "physics-mechanics-starter",
   );
+
+  expect(journey.goal.catalogEntryId).toBe("physics-mechanics-starter");
+  expect(journey.goal.catalogEntryVersion).toBe(1);
 
   expect(
     journey.chapters.map((chapter: { title: string }) => chapter.title),
@@ -499,7 +545,11 @@ test("flink golden journey seeds deterministically and routes a code submission 
     "Flink Learner",
     email,
     "flink-golden-2026",
+    "flink-cs-starter",
   );
+
+  expect(journey.goal.catalogEntryId).toBe("flink-cs-starter");
+  expect(journey.goal.catalogEntryVersion).toBe(1);
 
   expect(
     journey.chapters.map((chapter: { title: string }) => chapter.title),
