@@ -290,6 +290,11 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Your learning, with a next move." }),
   ).toBeVisible();
+  const recommendedNext = page.getByTestId("recommended-next");
+  await expect(recommendedNext).toContainText("Recommended next");
+  await expect(
+    recommendedNext.getByRole("link", { name: "Continue learning" }),
+  ).toHaveAttribute("href", /#activity-[0-9a-f-]+$/);
   await expect(
     page.getByText("I would like to learn a new subject", { exact: true }),
   ).toBeVisible();

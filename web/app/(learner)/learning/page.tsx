@@ -271,12 +271,60 @@ export default function LearningHomePage() {
           An agent can shape the plan, but you always see what it means: the
           intent, the next activity, and the evidence behind your progress.
         </p>
-        <Button asChild className="mt-7 rounded-full">
+        <Button asChild className="mt-7 rounded-full" variant="outline">
           <Link href="/start">
             Start another journey <ArrowRight className="size-4" />
           </Link>
         </Button>
       </section>
+
+      {!loading && journeys[0] && (
+        <section
+          className="rounded-3xl border border-primary/35 bg-card p-7 shadow-sm sm:p-9"
+          data-testid="recommended-next"
+        >
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+                Recommended next
+              </p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+                {journeys[0].nextActivityTitle ?? "Review your journey"}
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {journeys[0].nextActivityTitle
+                  ? "This is the next available activity in your course path."
+                  : journeys[0].promise}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full bg-muted px-3 py-1.5">
+                  {journeys[0].status.replaceAll("_", " ")}
+                </span>
+                {streaks[journeys[0].id] !== undefined && (
+                  <span className="rounded-full bg-muted px-3 py-1.5">
+                    {streaks[journeys[0].id]} qualifying{" "}
+                    {streaks[journeys[0].id] === 1 ? "day" : "days"}
+                  </span>
+                )}
+              </div>
+            </div>
+            <Button asChild className="rounded-full px-6">
+              <Link
+                href={
+                  journeys[0].nextActivityId
+                    ? `/learning/journeys/${journeys[0].id}#activity-${journeys[0].nextActivityId}`
+                    : `/learning/journeys/${journeys[0].id}`
+                }
+              >
+                {journeys[0].nextActivityId
+                  ? "Continue learning"
+                  : "Review journey"}
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        </section>
+      )}
 
       {!loading && dueReviews.length > 0 && (
         <section
