@@ -1,12 +1,12 @@
 "use client";
 
-import { ThemeProvider, useTheme } from "next-themes";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from "react";
 
 type ColorMode = "light" | "dark";
@@ -38,7 +38,7 @@ export type AmeTheme = (typeof AME_THEMES)[number]["id"];
 
 const DEFAULT_THEME: AmeTheme = "study-atelier";
 
-function isAmeTheme(theme: string | undefined): theme is AmeTheme {
+function isAmeTheme(theme: string | null): theme is AmeTheme {
   return AME_THEMES.some((candidate) => candidate.id === theme);
 }
 
@@ -54,49 +54,8 @@ const ColorModeContext = createContext<{
   setTheme: () => {},
 });
 
-/**
- * Compatibility wrapper for existing AME consumers.
- * next-themes owns persistence, SSR-safe class switching, and system behavior;
- * consumers only need AME's small mode/toggle contract.
- */
 export function useColorMode() {
   return useContext(ColorModeContext);
-}
-
-function ColorModeBridge({ children }: { children: React.ReactNode }) {
-  const { theme, setTheme } = useTheme();
-  const selectedTheme = isAmeTheme(theme) ? theme : DEFAULT_THEME;
-  const mode: ColorMode = selectedTheme === "night-study" ? "dark" : "light";
-
-  useEffect(() => {
-    if (
-      theme !== undefined ||
-      localStorage.getItem("ame.colorMode") !== "dark"
-    ) {
-      return;
-    }
-    setTheme("night-study");
-  }, [setTheme, theme]);
-
-  const toggle = useCallback(
-    () => setTheme(mode === "dark" ? DEFAULT_THEME : "night-study"),
-    [mode, setTheme],
-  );
-  const value = useMemo(
-    () => ({
-      mode,
-      toggle,
-      theme: selectedTheme,
-      setTheme: (nextTheme: AmeTheme) => setTheme(nextTheme),
-    }),
-    [mode, selectedTheme, setTheme, toggle],
-  );
-
-  return (
-    <ColorModeContext.Provider value={value}>
-      {children}
-    </ColorModeContext.Provider>
-  );
 }
 
 export default function ThemeRegistry({
@@ -104,16 +63,34 @@ export default function ThemeRegistry({
 }: {
   children: React.ReactNode;
 }) {
+  const [theme, setStoredTheme] = useState<AmeTheme>(DEFAULT_THEME);
+
+  const setTheme = useCallback((nextTheme: AmeTheme) => {
+    setStoredTheme(nextTheme);
+    localStorage.setItem("ame.theme", nextTheme);
+    document.documentElement.dataset.ameTheme = nextTheme;
+  }, []);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("ame.theme");
+    const initialTheme = isAmeTheme(savedTheme) ? savedTheme : DEFAULT_THEME;
+    setStoredTheme(initialTheme);
+    document.documentElement.dataset.ameTheme = initialTheme;
+  }, []);
+
+  const mode: ColorMode = theme === "night-study" ? "dark" : "light";
+  const toggle = useCallback(
+    () => setTheme(mode === "dark" ? DEFAULT_THEME : "night-study"),
+    [mode, setTheme],
+  );
+  const value = useMemo(
+    () => ({ mode, toggle, theme, setTheme }),
+    [mode, setTheme, theme, toggle],
+  );
+
   return (
-    <ThemeProvider
-      attribute="data-ame-theme"
-      defaultTheme={DEFAULT_THEME}
-      enableSystem={false}
-      storageKey="ame.theme"
-      themes={AME_THEMES.map((theme) => theme.id)}
-      disableTransitionOnChange
-    >
-      <ColorModeBridge>{children}</ColorModeBridge>
-    </ThemeProvider>
+    <ColorModeContext.Provider value={value}>
+      {children}
+    </ColorModeContext.Provider>
   );
 }

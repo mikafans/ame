@@ -213,6 +213,18 @@
   border-radius: 0 !important;
 }
 
+.brand-mark-dark {
+  display: none;
+}
+
+[data-ame-theme="night-study"] .brand-mark-light {
+  display: none;
+}
+
+[data-ame-theme="night-study"] .brand-mark-dark {
+  display: block;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

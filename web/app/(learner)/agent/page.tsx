@@ -1,156 +1,131 @@
-import { ExternalLink, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { HighlightedCode } from "@/components/HighlightedCode";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 
-const startExample = `POST /public/v1/onboarding/start
-Content-Type: application/json
-
+const onboardingExample = `POST /public/v1/onboarding/start
 {
   "email": "learner@example.com",
   "displayName": "Learner",
-  "prompt": "I'd like to learn a new subject",
-  "idempotencyKey": "first-music-journey"
+  "prompt": "Help me learn distributed systems",
+  "idempotencyKey": "first-journey"
 }`;
 
-const loopExample = `GET /api/v1/learning/journeys
-GET /api/v1/learning/journeys/{id}
-POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
-POST /api/v1/learning/sessions/{id}/finish`;
+const publicResources = [
+  ["Agent guide", "/public/llms.txt"],
+  ["Skill manifest", "/public/skill.json"],
+  ["OpenAPI", "/public/openapi.yaml"],
+  ["Learning contract", "/public/learning-contract.json"],
+] as const;
 
 export default function AgentPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-4 border-b border-border px-4 sm:px-8">
-        <Link href="/" aria-label="AME home">
-          <Logo size={28} />
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            Home
-          </Link>
-          <Link
-            href="/login"
-            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            Sign in
-          </Link>
+      <header className="border-b border-border">
+        <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+          <Logo size={24} />
+          <div className="flex items-center gap-4 text-sm">
+            <Link
+              href="/"
+              className="font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              Home
+            </Link>
+            <Link
+              href="/login"
+              className="font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
       </header>
-      <PageShell
-        kicker="Public agent setup · OpenAPI 3.1"
-        title="Bring your agent to AME"
-        subtitle="Start here before a learner has a browser session. Your agent can create the durable journey, shape the first course material, and leave the learner a clear next move."
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
-              <a href="/public/skill.json" target="_blank" rel="noreferrer">
-                Skill manifest <ExternalLink />
-              </a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/public/openapi.yaml" target="_blank" rel="noreferrer">
-                OpenAPI <ExternalLink />
-              </a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a
-                href="/public/learning-contract.json"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Learning contract <ExternalLink />
-              </a>
-            </Button>
-          </div>
-        }
-      >
-        <div className="grid gap-5 lg:grid-cols-3">
-          <Step
-            number="01"
-            title="Start with intent"
-            body="Send an email identifier and a first prompt. ame returns a learner token and creates the first journey."
-          />
-          <Step
-            number="02"
-            title="Read the next move"
-            body="The journey exposes its promise, objectives, activities, and the next useful activity."
-          />
-          <Step
-            number="03"
-            title="Record evidence"
-            body="Start a session, let the learner work, and finish it with responses. The web app sees the same result."
-          />
-        </div>
 
-        <section className="mt-6 grid gap-6 rounded-2xl border border-border bg-card p-6 lg:grid-cols-2">
+      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+        <section className="grid gap-10 border-b border-border pb-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-end">
           <div>
-            <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-              <Sparkles className="size-5" />
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+              Public agent setup · OpenAPI 3.1
+            </p>
+            <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-[-0.045em] sm:text-5xl">
+              Give your agent AME. Keep the learner out of setup.
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+              Your agent discovers the public contract, creates the durable
+              journey, and shapes the course. The learner opens AME when there
+              is something useful to learn.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              {publicResources.map(([label, href]) => (
+                <Button key={href} asChild variant="outline" size="sm">
+                  <a href={href} target="_blank" rel="noreferrer">
+                    {label} <ExternalLink className="size-3.5" />
+                  </a>
+                </Button>
+              ))}
             </div>
-            <h2 className="text-xl font-semibold">
-              Nothing separate to configure
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              The token identifies the learner, not a second product identity.
-              Authentication, rate limiting, request IDs, and audit records
-              apply equally to browser and agent requests.
-            </p>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              In self-host mode, email is an account identifier. ame does not
-              send mail and does not require SMTP for this flow.
-            </p>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Before changing learner state, read the learning contract: an
-              agent must not turn generated text, simulated answers, or pending
-              review into a claim about what a learner knows.
-            </p>
           </div>
-          <div>
-            <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              First request
+
+          <section className="min-w-0 border border-border bg-card p-5 sm:p-6">
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              The first durable action
             </p>
-            <HighlightedCode code={startExample} language="http" />
+            <pre className="mt-4 overflow-x-auto border border-border bg-muted p-4 text-xs leading-6 text-foreground sm:text-sm">
+              <code>{onboardingExample}</code>
+            </pre>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              An email identifier establishes the learner-owned journey. It is
+              not a separate agent identity or another browser signup step.
+            </p>
+          </section>
+        </section>
+
+        <section className="py-12">
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            Three moves
+          </p>
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <GuideStep
+              number="01"
+              title="Read the boundary"
+              body="Read the public learning contract before changing state. It keeps generated material separate from learner evidence."
+            />
+            <GuideStep
+              number="02"
+              title="Shape the beginning"
+              body="Preview a goal or select a reviewed native journey. The agent can make the first lesson useful before the learner arrives."
+            />
+            <GuideStep
+              number="03"
+              title="Hand off a course"
+              body="Use the same owner-scoped API to continue, assess, and recommend. The browser sees the exact durable state the agent created."
+            />
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            The learning loop
-          </p>
-          <h2 className="mt-3 text-xl font-semibold">
-            One contract, two experiences
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Agents can orchestrate learning without importing assessments or
-            maintaining a parallel activity model. Learners can open the web app
-            at any time and continue exactly where the agent left them.
-          </p>
-          <div className="mt-5">
-            <HighlightedCode code={loopExample} language="http" />
+        <section className="grid gap-6 border-t border-border pt-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">
+              The browser is the course workspace.
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              AME does not make the learner repeat the agent&apos;s setup. Once
+              a journey exists, the learner can inspect, practise, and continue
+              it in the learning desk.
+            </p>
           </div>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button asChild>
-              <a href="/public/llms.txt" target="_blank" rel="noreferrer">
-                Read the agent guide <ExternalLink />
-              </a>
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/self-hosting">Self-hosting guide</a>
-            </Button>
-          </div>
+          <Button asChild className="w-fit rounded-full">
+            <a href="/public/llms.txt" target="_blank" rel="noreferrer">
+              Read the agent guide <ArrowRight className="size-4" />
+            </a>
+          </Button>
         </section>
-      </PageShell>
+      </main>
     </div>
   );
 }
 
-function Step({
+function GuideStep({
   number,
   title,
   body,
@@ -160,12 +135,12 @@ function Step({
   body: string;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <p className="font-mono text-xs tracking-[0.2em] text-primary">
+    <article className="border border-border bg-card p-5">
+      <p className="font-mono text-xs tracking-[0.14em] text-primary">
         {number}
       </p>
-      <h2 className="mt-4 font-semibold">{title}</h2>
+      <h2 className="mt-5 text-lg font-semibold">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
-    </section>
+    </article>
   );
 }
