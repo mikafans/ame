@@ -46,7 +46,10 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
             <Menu className="size-5" />
           </button>
           <Logo size={22} />
-          <nav aria-label="Main navigation" className="hidden h-16 items-stretch gap-1 md:flex">
+          <nav
+            aria-label="Main navigation"
+            className="hidden h-16 items-stretch gap-1 md:flex"
+          >
             {[
               ["learning", "Learning desk"],
               ["agent", "Agent API"],
@@ -79,7 +82,9 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
           </div>
         </div>
       </header>
-      <main className="mx-auto min-w-0 max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className="mx-auto min-w-0 max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+        {children}
+      </main>
     </div>
   );
 }

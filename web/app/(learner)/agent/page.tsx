@@ -37,7 +37,11 @@ export default function AgentPage() {
             </a>
           </Button>
           <Button variant="outline" asChild>
-            <a href="/public/learning-contract.json" target="_blank" rel="noreferrer">
+            <a
+              href="/public/learning-contract.json"
+              target="_blank"
+              rel="noreferrer"
+            >
               Learning contract <ExternalLink />
             </a>
           </Button>

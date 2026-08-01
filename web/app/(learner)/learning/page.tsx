@@ -519,12 +519,14 @@ export default function LearningHomePage() {
                       >
                         {source.title}
                       </a>
-                      {source.locator ? ` · ${source.locator}` : ""} · {source.license}
+                      {source.locator ? ` · ${source.locator}` : ""} ·{" "}
+                      {source.license}
                     </li>
                   ))}
                 </ul>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {journey.contentReview.status} by {journey.contentReview.reviewer} ·{" "}
+                  {journey.contentReview.status} by{" "}
+                  {journey.contentReview.reviewer} ·{" "}
                   {journey.contentReview.reviewedAt}
                 </p>
                 <Button asChild className="mt-5 rounded-full" size="sm">

@@ -208,13 +208,8 @@
   --sidebar-ring: var(--ring);
 }
 
-[data-ame-theme="high-contrast"] :is(
-  button,
-  select,
-  input,
-  textarea,
-  [data-slot="button"]
-) {
+[data-ame-theme="high-contrast"]
+  :is(button, select, input, textarea, [data-slot="button"]) {
   border-radius: 0 !important;
 }
 
