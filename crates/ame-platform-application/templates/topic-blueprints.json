@@ -366,6 +366,90 @@
     ]
   },
   {
+    "id": "learning-science-starter",
+    "template_id": "understand-a-subject",
+    "field": "learning science",
+    "catalog": { "version": 1, "title": "Learning how to learn", "description": "Build a practical study loop with retrieval, spacing, and feedback.", "level": "Beginner", "estimated_minutes": 45, "outcomes": ["Choose a retrieval cue", "Plan spaced review", "Use feedback to select the next step"], "source_summary": "Reviewed from Dunlosky et al., Psychological Science in the Public Interest (2013), effective learning techniques.", "review_status": "reviewed" },
+    "aliases": ["learning science", "study skills", "how to learn", "retrieval practice"],
+    "objectives": [
+      { "verb": "explain", "statement": "Explain why retrieving an answer strengthens a study session", "success_criteria": "Contrast retrieval with passive rereading" },
+      { "verb": "plan", "statement": "Plan a spaced review loop", "success_criteria": "Name a cue, a recall attempt, and a later revisit" },
+      { "verb": "adjust", "statement": "Use feedback to choose a next study action", "success_criteria": "Choose review or progress from an honest recall signal" }
+    ],
+    "chapters": [
+      { "title": "Retrieve before reviewing", "summary": "Make recall visible before looking at the answer.", "activity_orders": [0, 1] },
+      { "title": "Space and adjust", "summary": "Return later and use the result to choose the next step.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a useful learning signal", "purpose": "orientation", "estimated_minutes": 5, "context": "Choose one small idea you want to remember and describe what you can recall without looking.", "instructions": "Name the idea and your current recall confidence.", "questions": [{ "id": "confidence", "kind": "single_choice", "prompt": "How confidently can you recall the idea now?", "options": ["not_yet", "partly", "clearly"] }, { "id": "target", "kind": "short_text", "prompt": "What small idea will you practice recalling?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "explanation", "title": "Use retrieval as the first check", "objective_orders": [0, 1], "payload": { "purpose": "first_explanation", "estimated_minutes": 8, "content": { "type": "explanation", "heading": "Recall first, then inspect", "body": "Attempting to retrieve an answer makes the gap visible. Check the source after the attempt, then record the one cue that would help you retrieve it next time.", "key_points": ["Start with a cue, not the answer.", "Treat an incomplete recall as useful feedback.", "Schedule a later attempt instead of cramming repetitions."] } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose your next spaced recall", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "rust-ownership-starter",
+    "template_id": "understand-a-subject",
+    "field": "cs",
+    "catalog": { "version": 1, "title": "Rust ownership foundations", "description": "Reason about moves, borrowing, and references without a garbage collector.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Predict a move", "Choose shared or mutable borrowing", "Explain why references have rules"], "source_summary": "Reviewed from The Rust Programming Language, Chapter 4: Understanding Ownership.", "review_status": "reviewed" },
+    "aliases": ["rust ownership", "rust borrowing", "rust references", "learn rust"],
+    "objectives": [
+      { "verb": "predict", "statement": "Predict when assigning a Rust value moves ownership", "success_criteria": "Identify the binding that remains usable" },
+      { "verb": "choose", "statement": "Choose an appropriate borrow", "success_criteria": "Distinguish shared from one mutable reference" },
+      { "verb": "explain", "statement": "Explain Rust's reference rules", "success_criteria": "Connect the rule to memory safety" }
+    ],
+    "chapters": [
+      { "title": "Values and moves", "summary": "Track which binding owns a non-Copy value.", "activity_orders": [0, 1] },
+      { "title": "Borrow safely", "summary": "Read and change values through references.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Locate your Rust starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Rust ownership makes memory safety explicit. Start by naming your experience with values and references.", "instructions": "Choose your current familiarity and a Rust question you want to answer.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with Rust?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "What ownership question do you want to answer first?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "explanation", "title": "Track ownership before borrowing", "objective_orders": [0, 2], "payload": { "purpose": "first_explanation", "estimated_minutes": 10, "content": { "type": "code_example", "title": "A move changes which binding owns a String", "language": "rust", "code": "let first = String::from(\"note\");\nlet second = first;\n// first is no longer usable here", "explanation": "A String owns heap data. Assigning it transfers ownership, so Rust prevents use through the old binding." } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Review the next ownership question", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "python-foundations-starter",
+    "template_id": "understand-a-subject",
+    "field": "cs",
+    "catalog": { "version": 1, "title": "Python foundations", "description": "Use values, collections, and control flow to express small programs clearly.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Evaluate expressions", "Choose a built-in collection", "Trace a small loop"], "source_summary": "Reviewed from Python 3 Tutorial, informal introduction and control-flow chapters.", "review_status": "reviewed" },
+    "aliases": ["python foundations", "learn python", "python basics", "python programming"],
+    "objectives": [
+      { "verb": "evaluate", "statement": "Evaluate basic Python expressions and assignments", "success_criteria": "Predict a value and its type" },
+      { "verb": "model", "statement": "Model a small collection of values", "success_criteria": "Choose a list, string, or mapping for the task" },
+      { "verb": "trace", "statement": "Trace a small Python control-flow path", "success_criteria": "Explain each iteration or branch" }
+    ],
+    "chapters": [
+      { "title": "Values and collections", "summary": "Use Python's built-in values deliberately.", "activity_orders": [0, 1] },
+      { "title": "Make flow visible", "summary": "Trace a condition or loop one step at a time.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a Python starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Python is easiest to learn through small, observable examples.", "instructions": "Name your familiarity and one task you would like Python to help with.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with Python?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "What small task would you like to automate or understand?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Trace a small Python calculation", "objective_orders": [0, 2], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "code_example", "title": "A loop builds a running total", "language": "python", "code": "total = 0\nfor number in [2, 4, 6]:\n    total = total + number\nprint(total)", "explanation": "Trace the value of total after each iteration: 2, then 6, then 12. AME explains this example; it does not execute learner code." } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next Python practice", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "sql-foundations-starter",
+    "template_id": "understand-a-subject",
+    "field": "data",
+    "catalog": { "version": 1, "title": "SQL foundations", "description": "Ask precise questions of relational tables with filtering, joins, and aggregates.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Read a SELECT query", "Filter rows with WHERE", "Explain a simple join and aggregate"], "source_summary": "Reviewed from the PostgreSQL Tutorial: SQL language, querying, joins, and aggregate functions.", "review_status": "reviewed" },
+    "aliases": ["sql foundations", "learn sql", "sql basics", "database queries"],
+    "objectives": [
+      { "verb": "read", "statement": "Read the shape of a SELECT query", "success_criteria": "Identify requested columns and table" },
+      { "verb": "filter", "statement": "Filter a relation with a clear condition", "success_criteria": "Explain which rows remain" },
+      { "verb": "combine", "statement": "Explain a small join or aggregate", "success_criteria": "State how rows are paired or summarized" }
+    ],
+    "chapters": [
+      { "title": "Ask one-table questions", "summary": "Read tables, columns, and filters as a single question.", "activity_orders": [0, 1] },
+      { "title": "Combine and summarize", "summary": "Connect related rows and count or group results.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a SQL starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Start from a question about rows, not from syntax to memorize.", "instructions": "Name your familiarity and a small question you want a database to answer.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with SQL?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "What data question would you like to answer first?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Read a filtered SQL question", "objective_orders": [0, 1], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "code_example", "title": "Select the rows that meet a condition", "language": "sql", "code": "SELECT title, minutes\nFROM lessons\nWHERE minutes <= 10\nORDER BY minutes;", "explanation": "The query asks for two columns from lessons, keeps only short lessons, and sorts the remaining rows. AME does not run database queries in this journey." } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next SQL question", "objective_orders": [2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
     "id": "flink-cs-starter",
     "template_id": "understand-a-subject",
     "field": "cs",

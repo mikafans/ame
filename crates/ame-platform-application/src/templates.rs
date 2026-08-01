@@ -373,7 +373,18 @@ mod tests {
     fn native_journeys_expose_only_reviewed_metadata() {
         let journeys = native_journey_blueprints().expect("native journey catalog must parse");
 
-        assert_eq!(journeys.len(), 1);
+        assert_eq!(journeys.len(), 5);
+        let ids: Vec<_> = journeys.iter().map(|journey| journey.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "learning-science-starter",
+                "rust-ownership-starter",
+                "python-foundations-starter",
+                "sql-foundations-starter",
+                "flink-cs-starter"
+            ]
+        );
         let flink = find_native_journey_blueprint("flink-cs-starter")
             .expect("native journey catalog must parse")
             .expect("Flink is catalog-ready");
