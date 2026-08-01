@@ -197,7 +197,7 @@
   --chart-3: oklch(0.45 0.17 30);
   --chart-4: oklch(0.45 0.12 90);
   --chart-5: oklch(0.12 0 0);
-  --radius: 0.25rem;
+  --radius: 0;
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.12 0 0);
   --sidebar-primary: var(--primary);
@@ -206,6 +206,16 @@
   --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
+}
+
+[data-ame-theme="high-contrast"] :is(
+  button,
+  select,
+  input,
+  textarea,
+  [data-slot="button"]
+) {
+  border-radius: 0 !important;
 }
 
 @layer base {

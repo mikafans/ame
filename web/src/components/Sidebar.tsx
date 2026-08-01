@@ -43,6 +43,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
 interface SidebarProps {
   route: string;
   setRoute: (route: string) => void;
+  desktop?: boolean;
   mobileOpen?: boolean;
   onClose?: () => void;
 }
@@ -65,6 +66,7 @@ function stringToColor(value: string): string {
 export function Sidebar({
   route,
   setRoute,
+  desktop = true,
   mobileOpen = false,
   onClose,
 }: SidebarProps) {
@@ -213,7 +215,13 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="sticky top-4 z-20 ml-4 hidden h-[calc(100vh-2rem)] w-[232px] shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-background shadow-sm md:flex">
+      <aside
+        className={
+          desktop
+            ? "sticky top-0 z-20 hidden h-screen w-[232px] shrink-0 border-r border-border bg-background md:flex"
+            : "hidden"
+        }
+      >
         {navigation}
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose?.()}>
