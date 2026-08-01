@@ -5,9 +5,10 @@ use the same owner-scoped learner API. An agent can start a journey, compose a
 course-like path, help the learner study and demonstrate knowledge, and read
 the same progress that appears in the browser.
 
-This is the concise agent entry guide. Use `/public/skill.json` to discover
-named operations and `/public/openapi.yaml` for complete request and response
-schemas.
+This is the concise agent entry guide. Before mutating learner state or running
+a simulation, read `/public/learning-contract.json`; the learner-facing version
+is `/public/learning-principles.md`. Use `/public/skill.json` to discover named
+operations and `/public/openapi.yaml` for complete request and response schemas.
 
 ## Start a learner journey
 
@@ -194,6 +195,8 @@ GET  /api/v1/deep-dives/{id}
 
 ## Discovery and rules
 
+- `GET /public/learning-contract.json` — required learning, evidence, source, and fixture-simulation rules.
+- `GET /public/learning-principles.md` — human-readable explanation of the same rules.
 - `GET /public/skill.json` — named agent operations and lightweight input schemas.
 - `GET /public/openapi.yaml` — complete HTTP contract for code generation and validation.
 - `GET /public/llms.txt` — this concise agent entry guide.

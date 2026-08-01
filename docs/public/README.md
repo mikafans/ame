@@ -8,6 +8,8 @@ users and external clients.
 - [`k3s.md`](k3s.md) — k3s image build and release workflow.
 - [`llms.txt`](llms.txt) — agent discovery and API usage contract, served at `/public/llms.txt`.
 - [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/public/skill.json`.
+- [`learning-contract.json`](learning-contract.json) — versioned learning stories, evidence rules, and fixture-simulation boundary, served at `/public/learning-contract.json`.
+- [`learning-principles.md`](learning-principles.md) — learner-readable explanation of the learning contract, served at `/public/learning-principles.md`.
 
 Build and runtime projections must consume these files; do not create parallel
 copies under `api/`, `deploy/`, or `web/`. The Compose Caddy container and the

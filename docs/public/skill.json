@@ -65,6 +65,16 @@
       "path": "/public/v1/auth/login"
     },
     {
+      "description": "Read AME's public learning rules, user stories, evidence boundary, and fixture-simulation policy before mutating learner state.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.contract.get",
+      "path": "/public/learning-contract.json"
+    },
+    {
       "description": "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt.",
       "input_schema": {
         "properties": {},

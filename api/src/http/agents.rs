@@ -33,6 +33,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["email","password"],"properties":{"email":{"type":"string","format":"email"},"password":{"type":"string"}}}),
         ),
         endpoint(
+            "learning.contract.get",
+            "Read AME's public learning rules, user stories, evidence boundary, and fixture-simulation policy before mutating learner state.",
+            "GET",
+            "/public/learning-contract.json",
+            empty.clone(),
+        ),
+        endpoint(
             "learning.catalog.list",
             "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt.",
             "GET",

@@ -36,6 +36,11 @@ export default function AgentPage() {
               OpenAPI <ExternalLink />
             </a>
           </Button>
+          <Button variant="outline" asChild>
+            <a href="/public/learning-contract.json" target="_blank" rel="noreferrer">
+              Learning contract <ExternalLink />
+            </a>
+          </Button>
         </div>
       }
     >
@@ -73,6 +78,11 @@ export default function AgentPage() {
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             In self-host mode, email is an account identifier. ame does not send
             mail and does not require SMTP for this flow.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Before changing learner state, read the learning contract: an agent
+            must not turn generated text, simulated answers, or pending review
+            into a claim about what a learner knows.
           </p>
         </div>
         <div>
