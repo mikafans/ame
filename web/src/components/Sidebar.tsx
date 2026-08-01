@@ -148,7 +148,10 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-3">
+      <nav
+        aria-label="Main navigation"
+        className="min-h-0 flex-1 overflow-y-auto py-3"
+      >
         {sections.map((section) => {
           const sectionItems = items.filter((item) => item.section === section);
           if (!sectionItems.length) return null;
@@ -193,7 +196,6 @@ export function Sidebar({
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
             {displayName}
           </span>
-          <ThemeSelector className="min-w-0" />
           <button
             type="button"
             title="Sign out"
@@ -204,13 +206,14 @@ export function Sidebar({
             <LogOut className="size-4" />
           </button>
         </div>
+        <ThemeSelector className="mt-3 min-w-0" />
       </div>
     </div>
   );
 
   return (
     <>
-      <aside className="relative z-20 hidden w-[232px] shrink-0 border-r border-border md:flex">
+      <aside className="sticky top-4 z-20 ml-4 hidden h-[calc(100vh-2rem)] w-[232px] shrink-0 self-start overflow-hidden rounded-2xl border border-border bg-background shadow-sm md:flex">
         {navigation}
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose?.()}>
