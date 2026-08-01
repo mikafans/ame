@@ -52,7 +52,6 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
           >
             {[
               ["learning", "Learning desk"],
-              ["agent", "Agent API"],
               ...(user?.role === "admin" ? [["admin-dashboard", "Admin"]] : []),
             ].map(([id, label]) => (
               <button

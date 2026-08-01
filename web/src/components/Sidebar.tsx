@@ -3,7 +3,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  Bot,
   Compass,
   FileQuestion,
   GraduationCap,
@@ -32,7 +31,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   author: Pencil,
   grade: GraduationCap,
   "deep-dives": Lightbulb,
-  agent: Bot,
   "admin-dashboard": Shield,
   "admin-users": Users,
   "admin-audit": History,
@@ -115,14 +113,9 @@ export function Sidebar({
       icon: "explore",
       section: "Learn",
     },
-    { id: "agent", label: "Agent API", icon: "agent", section: "Integrate" },
     ...adminItems,
   ];
-  const sections = [
-    "Learn",
-    "Integrate",
-    ...(user?.role === "admin" ? ["Admin"] : []),
-  ];
+  const sections = ["Learn", ...(user?.role === "admin" ? ["Admin"] : [])];
   const initials =
     user?.displayName
       ?.split(" ")

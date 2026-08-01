@@ -16,6 +16,7 @@ const PUBLIC_PATHS = new Set([
   "/",
   "/login",
   "/start",
+  "/agent",
   "/self-hosting",
   "/public/llms.txt",
   "/public/skill.json",

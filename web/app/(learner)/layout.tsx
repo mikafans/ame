@@ -13,12 +13,17 @@ export default function LearnerLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicAgentGuide = pathname === "/agent";
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isPublicAgentGuide && !loading && !user) {
       window.location.href = "/login";
     }
-  }, [loading, user]);
+  }, [isPublicAgentGuide, loading, user]);
+
+  if (isPublicAgentGuide) {
+    return children;
+  }
 
   const getRouteId = () => {
     if (pathname.startsWith("/admin/users")) return "admin-users";
@@ -27,7 +32,6 @@ export default function LearnerLayout({
     if (pathname.startsWith("/admin/health")) return "admin-health";
     if (pathname.startsWith("/admin")) return "admin-dashboard";
     if (pathname.startsWith("/learning")) return "learning";
-    if (pathname.startsWith("/agent")) return "agent";
     return "explore";
   };
 
@@ -39,7 +43,6 @@ export default function LearnerLayout({
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
       learning: "/learning",
-      agent: "/agent",
     };
     router.push(routeMap[route] || "/learning");
   };

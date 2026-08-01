@@ -1,5 +1,7 @@
 import { ExternalLink, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { HighlightedCode } from "@/components/HighlightedCode";
+import { Logo } from "@/components/Logo";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 
@@ -20,110 +22,131 @@ POST /api/v1/learning/sessions/{id}/finish`;
 
 export default function AgentPage() {
   return (
-    <PageShell
-      kicker="One learning API · OpenAPI 3.1"
-      title="Bring your agent to ame"
-      subtitle="An agent can create a learner, shape the first journey, and keep it moving. People and agents use the same owner-scoped data."
-      action={
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <a href="/public/skill.json" target="_blank" rel="noreferrer">
-              Skill manifest <ExternalLink />
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href="/public/openapi.yaml" target="_blank" rel="noreferrer">
-              OpenAPI <ExternalLink />
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a
-              href="/public/learning-contract.json"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Learning contract <ExternalLink />
-            </a>
-          </Button>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-4 border-b border-border px-4 sm:px-8">
+        <Link href="/" aria-label="AME home">
+          <Logo size={28} />
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            Home
+          </Link>
+          <Link
+            href="/login"
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            Sign in
+          </Link>
         </div>
-      }
-    >
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Step
-          number="01"
-          title="Start with intent"
-          body="Send an email identifier and a first prompt. ame returns a learner token and creates the first journey."
-        />
-        <Step
-          number="02"
-          title="Read the next move"
-          body="The journey exposes its promise, objectives, activities, and the next useful activity."
-        />
-        <Step
-          number="03"
-          title="Record evidence"
-          body="Start a session, let the learner work, and finish it with responses. The web app sees the same result."
-        />
-      </div>
-
-      <section className="mt-6 grid gap-6 rounded-2xl border border-border bg-card p-6 lg:grid-cols-2">
-        <div>
-          <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <Sparkles className="size-5" />
+      </header>
+      <PageShell
+        kicker="Public agent setup · OpenAPI 3.1"
+        title="Bring your agent to AME"
+        subtitle="Start here before a learner has a browser session. Your agent can create the durable journey, shape the first course material, and leave the learner a clear next move."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <a href="/public/skill.json" target="_blank" rel="noreferrer">
+                Skill manifest <ExternalLink />
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a href="/public/openapi.yaml" target="_blank" rel="noreferrer">
+                OpenAPI <ExternalLink />
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a
+                href="/public/learning-contract.json"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Learning contract <ExternalLink />
+              </a>
+            </Button>
           </div>
-          <h2 className="text-xl font-semibold">
-            Nothing separate to configure
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            The token identifies the learner, not a second product identity.
-            Authentication, rate limiting, request IDs, and audit records apply
-            equally to browser and agent requests.
-          </p>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            In self-host mode, email is an account identifier. ame does not send
-            mail and does not require SMTP for this flow.
-          </p>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Before changing learner state, read the learning contract: an agent
-            must not turn generated text, simulated answers, or pending review
-            into a claim about what a learner knows.
-          </p>
+        }
+      >
+        <div className="grid gap-5 lg:grid-cols-3">
+          <Step
+            number="01"
+            title="Start with intent"
+            body="Send an email identifier and a first prompt. ame returns a learner token and creates the first journey."
+          />
+          <Step
+            number="02"
+            title="Read the next move"
+            body="The journey exposes its promise, objectives, activities, and the next useful activity."
+          />
+          <Step
+            number="03"
+            title="Record evidence"
+            body="Start a session, let the learner work, and finish it with responses. The web app sees the same result."
+          />
         </div>
-        <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            First request
-          </p>
-          <HighlightedCode code={startExample} language="http" />
-        </div>
-      </section>
 
-      <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          The learning loop
-        </p>
-        <h2 className="mt-3 text-xl font-semibold">
-          One contract, two experiences
-        </h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Agents can orchestrate learning without importing assessments or
-          maintaining a parallel activity model. Learners can open the web app
-          at any time and continue exactly where the agent left them.
-        </p>
-        <div className="mt-5">
-          <HighlightedCode code={loopExample} language="http" />
-        </div>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button asChild>
-            <a href="/public/llms.txt" target="_blank" rel="noreferrer">
-              Read the agent guide <ExternalLink />
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href="/self-hosting">Self-hosting guide</a>
-          </Button>
-        </div>
-      </section>
-    </PageShell>
+        <section className="mt-6 grid gap-6 rounded-2xl border border-border bg-card p-6 lg:grid-cols-2">
+          <div>
+            <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <Sparkles className="size-5" />
+            </div>
+            <h2 className="text-xl font-semibold">
+              Nothing separate to configure
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              The token identifies the learner, not a second product identity.
+              Authentication, rate limiting, request IDs, and audit records
+              apply equally to browser and agent requests.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              In self-host mode, email is an account identifier. ame does not
+              send mail and does not require SMTP for this flow.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Before changing learner state, read the learning contract: an
+              agent must not turn generated text, simulated answers, or pending
+              review into a claim about what a learner knows.
+            </p>
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              First request
+            </p>
+            <HighlightedCode code={startExample} language="http" />
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-border bg-card p-6">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            The learning loop
+          </p>
+          <h2 className="mt-3 text-xl font-semibold">
+            One contract, two experiences
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Agents can orchestrate learning without importing assessments or
+            maintaining a parallel activity model. Learners can open the web app
+            at any time and continue exactly where the agent left them.
+          </p>
+          <div className="mt-5">
+            <HighlightedCode code={loopExample} language="http" />
+          </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button asChild>
+              <a href="/public/llms.txt" target="_blank" rel="noreferrer">
+                Read the agent guide <ExternalLink />
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a href="/self-hosting">Self-hosting guide</a>
+            </Button>
+          </div>
+        </section>
+      </PageShell>
+    </div>
   );
 }
 
