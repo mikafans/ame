@@ -270,7 +270,7 @@ export default function LandingPage() {
                     </p>
                   )}
                 </form>
-                <div className="flex flex-col gap-3 border-t border-primary/30 pt-5 sm:flex-row">
+                <div className="border-t border-primary/30 pt-5">
                   <Button
                     asChild
                     className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90"
@@ -280,15 +280,6 @@ export default function LandingPage() {
                       <ArrowRight className="size-4" />
                     </Link>
                   </Button>
-                  {!signedIn && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="rounded-full border-primary/50 bg-transparent px-6 py-3 text-[var(--ame-sugar)] hover:border-primary hover:bg-primary/10 hover:text-[var(--ame-sugar)]"
-                    >
-                      <Link href="#benefits">See how it works</Link>
-                    </Button>
-                  )}
                 </div>
               </div>
               <div className="space-y-4 md:pt-8">
