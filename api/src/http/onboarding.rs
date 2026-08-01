@@ -54,7 +54,26 @@ pub struct NativeJourneyCatalogResponse {
     pub estimated_minutes: i64,
     pub outcomes: Vec<String>,
     pub source_summary: String,
-    pub review_status: String,
+    pub sources: Vec<NativeJourneySourceResponse>,
+    pub content_review: NativeJourneyContentReviewResponse,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeJourneySourceResponse {
+    pub title: String,
+    pub url: String,
+    pub locator: Option<String>,
+    pub license: String,
+    pub source_version: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeJourneyContentReviewResponse {
+    pub status: String,
+    pub reviewed_at: String,
+    pub reviewer: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -133,7 +152,22 @@ pub async fn list_native_journeys() -> Result<Json<Vec<NativeJourneyCatalogRespo
                 estimated_minutes: catalog.estimated_minutes,
                 outcomes: catalog.outcomes,
                 source_summary: catalog.source_summary,
-                review_status: catalog.review_status,
+                sources: catalog
+                    .sources
+                    .into_iter()
+                    .map(|source| NativeJourneySourceResponse {
+                        title: source.title,
+                        url: source.url,
+                        locator: source.locator,
+                        license: source.license,
+                        source_version: source.source_version,
+                    })
+                    .collect(),
+                content_review: NativeJourneyContentReviewResponse {
+                    status: catalog.content_review.status,
+                    reviewed_at: catalog.content_review.reviewed_at,
+                    reviewer: catalog.content_review.reviewer,
+                },
             })
         })
         .collect();

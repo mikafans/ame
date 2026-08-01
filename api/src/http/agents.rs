@@ -41,7 +41,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.catalog.list",
-            "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt.",
+            "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt. Each entry includes structured source links, licenses, optional locators or source versions, and an explicit content-review record.",
             "GET",
             "/public/v1/catalog/journeys",
             empty.clone(),

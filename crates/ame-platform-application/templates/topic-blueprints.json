@@ -369,7 +369,7 @@
     "id": "learning-science-starter",
     "template_id": "understand-a-subject",
     "field": "learning science",
-    "catalog": { "version": 1, "title": "Learning how to learn", "description": "Build a practical study loop with retrieval, spacing, and feedback.", "level": "Beginner", "estimated_minutes": 45, "outcomes": ["Choose a retrieval cue", "Plan spaced review", "Use feedback to select the next step"], "source_summary": "Reviewed from Dunlosky et al., Psychological Science in the Public Interest (2013), effective learning techniques.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "Learning how to learn", "description": "Build a practical study loop with retrieval, spacing, and feedback.", "level": "Beginner", "estimated_minutes": 45, "outcomes": ["Choose a retrieval cue", "Plan spaced review", "Use feedback to select the next step"], "source_summary": "Reviewed from Dunlosky et al., Psychological Science in the Public Interest (2013), effective learning techniques.", "sources": [{ "title": "Improving Students' Learning With Effective Learning Techniques", "url": "https://journals.sagepub.com/doi/10.1177/1529100612453266", "locator": "retrieval practice and distributed practice", "license": "publisher access terms", "source_version": "2013" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["learning science", "study skills", "how to learn", "retrieval practice"],
     "objectives": [
       { "verb": "explain", "statement": "Explain why retrieving an answer strengthens a study session", "success_criteria": "Contrast retrieval with passive rereading" },
@@ -390,7 +390,7 @@
     "id": "rust-ownership-starter",
     "template_id": "understand-a-subject",
     "field": "cs",
-    "catalog": { "version": 1, "title": "Rust ownership foundations", "description": "Reason about moves, borrowing, and references without a garbage collector.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Predict a move", "Choose shared or mutable borrowing", "Explain why references have rules"], "source_summary": "Reviewed from The Rust Programming Language, Chapter 4: Understanding Ownership.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "Rust ownership foundations", "description": "Reason about moves, borrowing, and references without a garbage collector.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Predict a move", "Choose shared or mutable borrowing", "Explain why references have rules"], "source_summary": "Reviewed from The Rust Programming Language, Chapter 4: Understanding Ownership.", "sources": [{ "title": "The Rust Programming Language", "url": "https://doc.rust-lang.org/book/ch04-00-understanding-ownership.html", "locator": "Chapter 4: Understanding Ownership", "license": "CC BY-SA 4.0 and MIT", "source_version": "current online edition" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["rust ownership", "rust borrowing", "rust references", "learn rust"],
     "objectives": [
       { "verb": "predict", "statement": "Predict when assigning a Rust value moves ownership", "success_criteria": "Identify the binding that remains usable" },
@@ -411,7 +411,7 @@
     "id": "python-foundations-starter",
     "template_id": "understand-a-subject",
     "field": "cs",
-    "catalog": { "version": 1, "title": "Python foundations", "description": "Use values, collections, and control flow to express small programs clearly.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Evaluate expressions", "Choose a built-in collection", "Trace a small loop"], "source_summary": "Reviewed from Python 3 Tutorial, informal introduction and control-flow chapters.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "Python foundations", "description": "Use values, collections, and control flow to express small programs clearly.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Evaluate expressions", "Choose a built-in collection", "Trace a small loop"], "source_summary": "Reviewed from Python 3 Tutorial, informal introduction and control-flow chapters.", "sources": [{ "title": "The Python Tutorial", "url": "https://docs.python.org/3/tutorial/", "locator": "An Informal Introduction to Python and More Control Flow Tools", "license": "PSF License", "source_version": "Python 3 documentation" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["python foundations", "learn python", "python basics", "python programming"],
     "objectives": [
       { "verb": "evaluate", "statement": "Evaluate basic Python expressions and assignments", "success_criteria": "Predict a value and its type" },
@@ -432,7 +432,7 @@
     "id": "sql-foundations-starter",
     "template_id": "understand-a-subject",
     "field": "data",
-    "catalog": { "version": 1, "title": "SQL foundations", "description": "Ask precise questions of relational tables with filtering, joins, and aggregates.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Read a SELECT query", "Filter rows with WHERE", "Explain a simple join and aggregate"], "source_summary": "Reviewed from the PostgreSQL Tutorial: SQL language, querying, joins, and aggregate functions.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "SQL foundations", "description": "Ask precise questions of relational tables with filtering, joins, and aggregates.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Read a SELECT query", "Filter rows with WHERE", "Explain a simple join and aggregate"], "source_summary": "Reviewed from the PostgreSQL Tutorial: SQL language, querying, joins, and aggregate functions.", "sources": [{ "title": "PostgreSQL Tutorial", "url": "https://www.postgresql.org/docs/current/tutorial.html", "locator": "SQL language, joins, and aggregate functions", "license": "PostgreSQL Documentation License", "source_version": "current documentation" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["sql foundations", "learn sql", "sql basics", "database queries"],
     "objectives": [
       { "verb": "read", "statement": "Read the shape of a SELECT query", "success_criteria": "Identify requested columns and table" },
@@ -453,7 +453,7 @@
     "id": "linear-algebra-starter",
     "template_id": "understand-a-subject",
     "field": "mathematics",
-    "catalog": { "version": 1, "title": "Linear algebra essentials", "description": "Build intuition for vectors, matrices, linear systems, and transformations.", "level": "Beginner", "estimated_minutes": 60, "outcomes": ["Interpret a vector and matrix", "Solve a small linear system", "Describe a linear transformation"], "source_summary": "Reviewed from MIT OpenCourseWare linear algebra materials on vectors, matrices, and linearity.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "Linear algebra essentials", "description": "Build intuition for vectors, matrices, linear systems, and transformations.", "level": "Beginner", "estimated_minutes": 60, "outcomes": ["Interpret a vector and matrix", "Solve a small linear system", "Describe a linear transformation"], "source_summary": "Reviewed from MIT OpenCourseWare linear algebra materials on vectors, matrices, and linearity.", "sources": [{ "title": "MIT OpenCourseWare Linear Algebra", "url": "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/", "locator": "vectors, matrices, and linearity", "license": "CC BY-NC-SA 4.0", "source_version": "Spring 2010" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["linear algebra", "vectors and matrices", "matrix algebra", "linear systems"],
     "objectives": [
       { "verb": "interpret", "statement": "Interpret vectors and matrices as mathematical objects", "success_criteria": "Name dimensions and the role of an entry" },
@@ -474,7 +474,7 @@
     "id": "technical-writing-starter",
     "template_id": "understand-a-subject",
     "field": "communication",
-    "catalog": { "version": 1, "title": "Technical writing for engineers", "description": "Make engineering explanations clear, concise, and useful to a defined audience.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Name an audience and purpose", "Revise a sentence for clarity", "Organize a short technical explanation"], "source_summary": "Reviewed from Google Technical Writing One: clarity, concision, active voice, lists, and paragraph structure.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "Technical writing for engineers", "description": "Make engineering explanations clear, concise, and useful to a defined audience.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Name an audience and purpose", "Revise a sentence for clarity", "Organize a short technical explanation"], "source_summary": "Reviewed from Google Technical Writing One: clarity, concision, active voice, lists, and paragraph structure.", "sources": [{ "title": "Technical Writing One", "url": "https://developers.google.com/tech-writing/one", "locator": "clarity, active voice, lists, and paragraphs", "license": "Google Terms of Service", "source_version": "current online course" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["technical writing", "engineering writing", "write documentation", "documentation writing"],
     "objectives": [
       { "verb": "identify", "statement": "Identify an audience and purpose for a technical explanation", "success_criteria": "State what the reader needs to do or understand" },
@@ -507,7 +507,8 @@
         "Deploy a bounded Flink job with the Kubernetes Operator"
       ],
       "source_summary": "Reviewed from Apache Flink documentation and Kubernetes Operator guides.",
-      "review_status": "reviewed"
+      "sources": [{ "title": "Apache Flink Documentation", "url": "https://nightlies.apache.org/flink/flink-docs-stable/", "locator": "state, time, and checkpointing", "license": "Apache License 2.0", "source_version": "stable documentation" }, { "title": "Apache Flink Kubernetes Operator", "url": "https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/", "locator": "deployment and operations", "license": "Apache License 2.0", "source_version": "stable documentation" }],
+      "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" }
     },
     "aliases": ["flink", "apache flink", "stream processing"],
     "objectives": [
@@ -743,7 +744,7 @@
     "id": "physics-mechanics-starter",
     "template_id": "understand-a-subject",
     "field": "physics",
-    "catalog": { "version": 1, "title": "Classical mechanics", "description": "Model motion, forces, energy, and momentum in bounded physical systems.", "level": "Beginner", "estimated_minutes": 75, "outcomes": ["Relate position, velocity, and acceleration", "Apply net force to predict motion", "Use energy and momentum conservation in a bounded problem"], "source_summary": "Reviewed from OpenStax University Physics mechanics materials covering Newton's laws, energy, and momentum.", "review_status": "reviewed" },
+    "catalog": { "version": 1, "title": "Classical mechanics", "description": "Model motion, forces, energy, and momentum in bounded physical systems.", "level": "Beginner", "estimated_minutes": 75, "outcomes": ["Relate position, velocity, and acceleration", "Apply net force to predict motion", "Use energy and momentum conservation in a bounded problem"], "source_summary": "Reviewed from OpenStax University Physics mechanics materials covering Newton's laws, energy, and momentum.", "sources": [{ "title": "OpenStax University Physics Volume 1", "url": "https://openstax.org/details/books/university-physics-volume-1", "locator": "mechanics, energy, and momentum", "license": "CC BY 4.0", "source_version": "current online edition" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["physics", "classical mechanics", "kinematics", "newtonian"],
     "objectives": [
       {

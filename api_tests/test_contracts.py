@@ -84,3 +84,21 @@ def test_manifest_exposes_public_account_operations():
     tools = {(tool["name"], tool["method"], tool["path"]) for tool in manifest["tools"]}
     assert ("identity.register", "POST", "/public/v1/auth/register") in tools
     assert ("identity.login", "POST", "/public/v1/auth/login") in tools
+
+
+def test_native_catalog_exposes_structured_reviewed_provenance(client):
+    response = client.get("/public/v1/catalog/journeys")
+    assert response.status_code == 200, response.text
+
+    journeys = response.json()
+    assert journeys
+    for journey in journeys:
+        assert journey["sourceSummary"]
+        assert journey["sources"]
+        for source in journey["sources"]:
+            assert source["title"]
+            assert source["url"].startswith("https://")
+            assert source["license"]
+        assert journey["contentReview"]["status"] == "reviewed"
+        assert journey["contentReview"]["reviewedAt"]
+        assert journey["contentReview"]["reviewer"]

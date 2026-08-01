@@ -132,6 +132,15 @@ content version. Recommendations, timeline events, and streak events are
 derived from durable activity and evidence state rather than from generated
 text alone.
 
+## Native journey catalog
+
+`GET /public/v1/catalog/journeys` returns selectable native journeys. Catalog
+availability is not learner progress: every entry includes a structured
+`sources` list (title, HTTPS URL, license, and optional locator or version) and
+an explicit `contentReview` record. Treat those records as the public
+provenance and review boundary for the catalog; do not fabricate learner work
+from a catalog selection.
+
 ## Immutable source snapshots
 
 Import bounded source text before using it for grounded content:

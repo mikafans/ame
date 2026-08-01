@@ -81,7 +81,18 @@ type NativeJourney = {
   estimatedMinutes: number;
   outcomes: string[];
   sourceSummary: string;
-  reviewStatus: string;
+  sources: {
+    title: string;
+    url: string;
+    locator?: string | null;
+    license: string;
+    sourceVersion?: string | null;
+  }[];
+  contentReview: {
+    status: string;
+    reviewedAt: string;
+    reviewer: string;
+  };
 };
 
 function activityStatusLabel(status: string) {
@@ -496,6 +507,25 @@ export default function LearningHomePage() {
                 </ul>
                 <p className="mt-4 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
                   Source and review: {journey.sourceSummary}
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {journey.sources.map((source) => (
+                    <li key={source.url}>
+                      <a
+                        className="underline underline-offset-2 hover:text-foreground"
+                        href={source.url}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {source.title}
+                      </a>
+                      {source.locator ? ` · ${source.locator}` : ""} · {source.license}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {journey.contentReview.status} by {journey.contentReview.reviewer} ·{" "}
+                  {journey.contentReview.reviewedAt}
                 </p>
                 <Button asChild className="mt-5 rounded-full" size="sm">
                   <Link

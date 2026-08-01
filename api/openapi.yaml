@@ -3141,8 +3141,11 @@ components:
       - estimatedMinutes
       - outcomes
       - sourceSummary
-      - reviewStatus
+      - sources
+      - contentReview
       properties:
+        contentReview:
+          $ref: '#/components/schemas/NativeJourneyContentReviewResponse'
         description:
           type: string
         estimatedMinutes:
@@ -3158,16 +3161,52 @@ components:
           type: array
           items:
             type: string
-        reviewStatus:
-          type: string
         sourceSummary:
           type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeJourneySourceResponse'
         title:
           type: string
         version:
           type: integer
           format: int32
           minimum: 0
+    NativeJourneyContentReviewResponse:
+      type: object
+      required:
+      - status
+      - reviewedAt
+      - reviewer
+      properties:
+        reviewedAt:
+          type: string
+        reviewer:
+          type: string
+        status:
+          type: string
+    NativeJourneySourceResponse:
+      type: object
+      required:
+      - title
+      - url
+      - license
+      properties:
+        license:
+          type: string
+        locator:
+          type:
+          - string
+          - 'null'
+        sourceVersion:
+          type:
+          - string
+          - 'null'
+        title:
+          type: string
+        url:
+          type: string
     NoteResponse:
       type: object
       required:

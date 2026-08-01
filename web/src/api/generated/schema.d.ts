@@ -1581,6 +1581,7 @@ export interface components {
             role: components["schemas"]["Role"];
         };
         NativeJourneyCatalogResponse: {
+            contentReview: components["schemas"]["NativeJourneyContentReviewResponse"];
             description: string;
             /** Format: int64 */
             estimatedMinutes: number;
@@ -1588,11 +1589,23 @@ export interface components {
             id: string;
             level: string;
             outcomes: string[];
-            reviewStatus: string;
             sourceSummary: string;
+            sources: components["schemas"]["NativeJourneySourceResponse"][];
             title: string;
             /** Format: int32 */
             version: number;
+        };
+        NativeJourneyContentReviewResponse: {
+            reviewedAt: string;
+            reviewer: string;
+            status: string;
+        };
+        NativeJourneySourceResponse: {
+            license: string;
+            locator?: string | null;
+            sourceVersion?: string | null;
+            title: string;
+            url: string;
         };
         NoteResponse: {
             /** Format: uuid */

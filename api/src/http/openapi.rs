@@ -28,7 +28,8 @@ use crate::http::{
     me::MeResponse,
     notes::{CreateNoteBody, NoteResponse, UpdateNoteBody},
     onboarding::{
-        NativeJourneyCatalogResponse, PreviewActivityResponse, PreviewLearningBody,
+        NativeJourneyCatalogResponse, NativeJourneyContentReviewResponse,
+        NativeJourneySourceResponse, PreviewActivityResponse, PreviewLearningBody,
         PreviewLearningResponse, PreviewObjectiveResponse, StartLearningBody,
         StartLearningResponse,
     },
@@ -132,6 +133,8 @@ use crate::http::{
         UserInfo,
         PreviewLearningBody,
         NativeJourneyCatalogResponse,
+        NativeJourneySourceResponse,
+        NativeJourneyContentReviewResponse,
         PreviewLearningResponse,
         PreviewObjectiveResponse,
         PreviewActivityResponse,
