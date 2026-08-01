@@ -450,6 +450,48 @@
     ]
   },
   {
+    "id": "linear-algebra-starter",
+    "template_id": "understand-a-subject",
+    "field": "mathematics",
+    "catalog": { "version": 1, "title": "Linear algebra essentials", "description": "Build intuition for vectors, matrices, linear systems, and transformations.", "level": "Beginner", "estimated_minutes": 60, "outcomes": ["Interpret a vector and matrix", "Solve a small linear system", "Describe a linear transformation"], "source_summary": "Reviewed from MIT OpenCourseWare linear algebra materials on vectors, matrices, and linearity.", "review_status": "reviewed" },
+    "aliases": ["linear algebra", "vectors and matrices", "matrix algebra", "linear systems"],
+    "objectives": [
+      { "verb": "interpret", "statement": "Interpret vectors and matrices as mathematical objects", "success_criteria": "Name dimensions and the role of an entry" },
+      { "verb": "solve", "statement": "Solve a small linear system", "success_criteria": "Check a proposed solution by substitution" },
+      { "verb": "describe", "statement": "Describe a linear transformation", "success_criteria": "Explain what matrix multiplication does to a vector" }
+    ],
+    "chapters": [
+      { "title": "Vectors and matrices", "summary": "Read the objects before applying an operation.", "activity_orders": [0, 1] },
+      { "title": "Systems and transformations", "summary": "Use a matrix to express constraints and change vectors.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a linear algebra starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Linear algebra is a language for quantities that vary together and transformations between them.", "instructions": "Choose your familiarity and one setting where you have seen vectors or matrices.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with vectors and matrices?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "Where would you like to use linear algebra first?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Read a matrix-vector product", "objective_orders": [0, 2], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "worked_example", "heading": "A matrix combines vector coordinates", "prompt": "Apply [[2, 1], [0, 3]] to [4, 2].", "steps": ["Multiply the first row: 2 × 4 + 1 × 2 = 10.", "Multiply the second row: 0 × 4 + 3 × 2 = 6.", "The transformed vector is [10, 6]."], "reflection": "Which row determines each output coordinate?" } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next linear algebra problem", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "technical-writing-starter",
+    "template_id": "understand-a-subject",
+    "field": "communication",
+    "catalog": { "version": 1, "title": "Technical writing for engineers", "description": "Make engineering explanations clear, concise, and useful to a defined audience.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Name an audience and purpose", "Revise a sentence for clarity", "Organize a short technical explanation"], "source_summary": "Reviewed from Google Technical Writing One: clarity, concision, active voice, lists, and paragraph structure.", "review_status": "reviewed" },
+    "aliases": ["technical writing", "engineering writing", "write documentation", "documentation writing"],
+    "objectives": [
+      { "verb": "identify", "statement": "Identify an audience and purpose for a technical explanation", "success_criteria": "State what the reader needs to do or understand" },
+      { "verb": "revise", "statement": "Revise a sentence for clarity and directness", "success_criteria": "Remove ambiguity and use an active construction when appropriate" },
+      { "verb": "organize", "statement": "Organize a short technical explanation", "success_criteria": "Lead with the key point and group related details" }
+    ],
+    "chapters": [
+      { "title": "Write for a reader", "summary": "Set a purpose before choosing words.", "activity_orders": [0, 1] },
+      { "title": "Make structure visible", "summary": "Use direct sentences, useful lists, and focused paragraphs.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a writing starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Technical writing helps a specific reader act or understand with less effort.", "instructions": "Name the kind of document you want to improve and the person who will read it.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with technical writing?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "audience", "kind": "short_text", "prompt": "Who is the reader you want to help?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Revise a deployment instruction", "objective_orders": [1, 2], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "worked_example", "heading": "Put the action first", "prompt": "Revise: 'The configuration file should be updated by the operator before deployment.'", "steps": ["Name the reader who acts.", "Use a direct verb.", "State when the action matters: 'Before deployment, update the configuration file.'"], "reflection": "What detail would a first-time operator still need?" } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next writing revision", "objective_orders": [0, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
     "id": "flink-cs-starter",
     "template_id": "understand-a-subject",
     "field": "cs",
@@ -701,6 +743,7 @@
     "id": "physics-mechanics-starter",
     "template_id": "understand-a-subject",
     "field": "physics",
+    "catalog": { "version": 1, "title": "Classical mechanics", "description": "Model motion, forces, energy, and momentum in bounded physical systems.", "level": "Beginner", "estimated_minutes": 75, "outcomes": ["Relate position, velocity, and acceleration", "Apply net force to predict motion", "Use energy and momentum conservation in a bounded problem"], "source_summary": "Reviewed from OpenStax University Physics mechanics materials covering Newton's laws, energy, and momentum.", "review_status": "reviewed" },
     "aliases": ["physics", "classical mechanics", "kinematics", "newtonian"],
     "objectives": [
       {
