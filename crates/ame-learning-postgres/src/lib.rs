@@ -29,7 +29,7 @@ impl PgLearningRepository {
     ) -> Result<Option<LearningGoal>, LearningRepositoryError> {
         sqlx::query(
             r#"
-            SELECT id, subject_user_id, source_actor_id, template_version_id,
+            SELECT id, subject_user_id, source_actor_id, template_version_id, catalog_entry_id, catalog_entry_version,
                    raw_intent, normalized_statement, status, idempotency_key, created_at
             FROM tb_learning_goals
             WHERE id = $1
@@ -48,7 +48,7 @@ impl PgLearningRepository {
     ) -> Result<Option<LearningJourney>, LearningRepositoryError> {
         sqlx::query(
             r#"
-            SELECT id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
             FROM tb_learning_journeys
             WHERE id = $1
             "#,
@@ -66,7 +66,7 @@ impl PgLearningRepository {
     ) -> Result<Option<LearningJourney>, LearningRepositoryError> {
         sqlx::query(
             r#"
-            SELECT id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
             FROM tb_learning_journeys
             WHERE goal_id = $1
             "#,
@@ -90,20 +90,22 @@ impl LearningRepository for PgLearningRepository {
         let inserted = sqlx::query(
             r#"
             INSERT INTO tb_learning_goals (
-                subject_user_id, source_actor_id, template_version_id,
+                subject_user_id, source_actor_id, template_version_id, catalog_entry_id, catalog_entry_version,
                 raw_intent, normalized_statement, status, idempotency_key
             )
-            VALUES ($1, $2, $3, $4, $5, 'proposed', $6)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'proposed', $8)
             ON CONFLICT (subject_user_id, idempotency_key)
                 WHERE idempotency_key IS NOT NULL
                 DO NOTHING
-            RETURNING id, subject_user_id, source_actor_id, template_version_id,
+            RETURNING id, subject_user_id, source_actor_id, template_version_id, catalog_entry_id, catalog_entry_version,
                       raw_intent, normalized_statement, status, idempotency_key, created_at
             "#,
         )
         .bind(input.subject_user_id)
         .bind(input.source_actor_id)
         .bind(input.template_version_id)
+        .bind(&input.catalog_entry_id)
+        .bind(input.catalog_entry_version.map(i32::try_from).transpose().map_err(LearningRepositoryError::storage)?)
         .bind(&input.raw_intent)
         .bind(&input.normalized_statement)
         .bind(&input.idempotency_key)
@@ -123,7 +125,7 @@ impl LearningRepository for PgLearningRepository {
         };
         let existing = sqlx::query(
             r#"
-            SELECT id, subject_user_id, source_actor_id, template_version_id,
+            SELECT id, subject_user_id, source_actor_id, template_version_id, catalog_entry_id, catalog_entry_version,
                    raw_intent, normalized_statement, status, idempotency_key, created_at
             FROM tb_learning_goals
             WHERE subject_user_id = $1 AND idempotency_key = $2
@@ -140,6 +142,8 @@ impl LearningRepository for PgLearningRepository {
             && existing.normalized_statement == input.normalized_statement
             && existing.source_actor_id == input.source_actor_id
             && existing.template_version_id == input.template_version_id
+            && existing.catalog_entry_id == input.catalog_entry_id
+            && existing.catalog_entry_version == input.catalog_entry_version
         {
             Ok(existing)
         } else {
@@ -169,18 +173,20 @@ impl LearningRepository for PgLearningRepository {
         let inserted = sqlx::query(
             r#"
             INSERT INTO tb_learning_journeys (
-                goal_id, subject_user_id, source_actor_id, promise, status
+                goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status
             )
-            VALUES ($1, $2, $3, $4, 'onboarding')
+            VALUES ($1, $2, $3, $4, $5, $6, 'onboarding')
             ON CONFLICT (goal_id)
                 DO NOTHING
-            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
             "#,
         )
         .bind(goal.id)
         .bind(input.subject_user_id)
         .bind(input.source_actor_id)
         .bind(&input.promise)
+        .bind(&input.catalog_entry_id)
+        .bind(input.catalog_entry_version.map(i32::try_from).transpose().map_err(LearningRepositoryError::storage)?)
         .fetch_optional(&self.pool)
         .await
         .map_err(storage_error)?
@@ -217,7 +223,7 @@ impl LearningRepository for PgLearningRepository {
     ) -> Result<Vec<LearningJourney>, LearningRepositoryError> {
         let rows = sqlx::query(
             r#"
-            SELECT id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            SELECT id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
             FROM tb_learning_journeys
             WHERE subject_user_id = $1
             ORDER BY created_at DESC
@@ -241,7 +247,7 @@ impl LearningRepository for PgLearningRepository {
             UPDATE tb_learning_journeys
             SET status = $3, updated_at = now()
             WHERE id = $1 AND subject_user_id = $2
-            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, status, created_at
+            RETURNING id, goal_id, subject_user_id, source_actor_id, promise, catalog_entry_id, catalog_entry_version, status, created_at
             "#,
         )
         .bind(journey_id)
@@ -857,6 +863,8 @@ fn goal_from_row(row: sqlx::postgres::PgRow) -> LearningGoal {
         subject_user_id: row.get("subject_user_id"),
         source_actor_id: row.get("source_actor_id"),
         template_version_id: row.get("template_version_id"),
+        catalog_entry_id: row.get("catalog_entry_id"),
+        catalog_entry_version: row.get::<Option<i32>, _>("catalog_entry_version").map(|version| version as u32),
         raw_intent: row.get("raw_intent"),
         normalized_statement: row.get("normalized_statement"),
         status: goal_status(row.get::<String, _>("status").as_str()),
@@ -872,6 +880,8 @@ fn journey_from_row(row: sqlx::postgres::PgRow) -> LearningJourney {
         subject_user_id: row.get("subject_user_id"),
         source_actor_id: row.get("source_actor_id"),
         promise: row.get("promise"),
+        catalog_entry_id: row.get("catalog_entry_id"),
+        catalog_entry_version: row.get::<Option<i32>, _>("catalog_entry_version").map(|version| version as u32),
         status: journey_status(row.get::<String, _>("status").as_str()),
         created_at: row.get("created_at"),
     }

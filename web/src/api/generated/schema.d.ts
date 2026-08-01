@@ -955,6 +955,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/v1/catalog/journeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /public/v1/catalog/journeys — list reviewed, selectable native journeys. */
+        get: operations["list_native_journeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/v1/onboarding/preview": {
         parameters: {
             query?: never;
@@ -1427,6 +1444,9 @@ export interface components {
             title: string;
         };
         LearningGoalResponse: {
+            catalogEntryId?: string | null;
+            /** Format: int32 */
+            catalogEntryVersion?: number | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1560,6 +1580,20 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        NativeJourneyCatalogResponse: {
+            description: string;
+            /** Format: int64 */
+            estimatedMinutes: number;
+            field: string;
+            id: string;
+            level: string;
+            outcomes: string[];
+            reviewStatus: string;
+            sourceSummary: string;
+            title: string;
+            /** Format: int32 */
+            version: number;
+        };
         NoteResponse: {
             /** Format: uuid */
             activityId?: string | null;
@@ -1597,9 +1631,13 @@ export interface components {
             title: string;
         };
         PreviewLearningBody: {
+            catalogId?: string | null;
             prompt: string;
         };
         PreviewLearningResponse: {
+            catalogId?: string | null;
+            /** Format: int32 */
+            catalogVersion?: number | null;
             firstActivity: components["schemas"]["PreviewActivityResponse"];
             normalizedStatement: string;
             objectives: components["schemas"]["PreviewObjectiveResponse"][];
@@ -1812,12 +1850,16 @@ export interface components {
             retryKey?: string | null;
         };
         StartLearningBody: {
+            catalogId?: string | null;
             displayName: string;
             email: string;
             idempotencyKey: string;
             prompt: string;
         };
         StartLearningResponse: {
+            catalogId?: string | null;
+            /** Format: int32 */
+            catalogVersion?: number | null;
             displayName: string;
             email: string;
             /** Format: uuid */
@@ -3792,6 +3834,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_native_journeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reviewed native journeys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeJourneyCatalogResponse"][];
+                };
             };
         };
     };

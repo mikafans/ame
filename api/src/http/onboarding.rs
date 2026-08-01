@@ -1,6 +1,11 @@
 //! Public self-host onboarding boundary.
 
-use axum::{Extension, Json, Router, extract::State, http::StatusCode, routing::post};
+use axum::{
+    Extension, Json, Router,
+    extract::State,
+    http::StatusCode,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
 use time::Duration;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -26,6 +31,7 @@ pub struct StartLearningBody {
     pub email: String,
     pub display_name: String,
     pub prompt: String,
+    pub catalog_id: Option<String>,
     pub idempotency_key: String,
 }
 
@@ -33,6 +39,22 @@ pub struct StartLearningBody {
 #[serde(rename_all = "camelCase")]
 pub struct PreviewLearningBody {
     pub prompt: String,
+    pub catalog_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeJourneyCatalogResponse {
+    pub id: String,
+    pub version: u32,
+    pub title: String,
+    pub description: String,
+    pub field: String,
+    pub level: String,
+    pub estimated_minutes: i64,
+    pub outcomes: Vec<String>,
+    pub source_summary: String,
+    pub review_status: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -42,6 +64,8 @@ pub struct PreviewLearningResponse {
     pub promise: String,
     pub template_id: String,
     pub template_version: u32,
+    pub catalog_id: Option<String>,
+    pub catalog_version: Option<u32>,
     pub objectives: Vec<PreviewObjectiveResponse>,
     pub first_activity: PreviewActivityResponse,
 }
@@ -74,14 +98,46 @@ pub struct StartLearningResponse {
     pub journey_id: Uuid,
     pub template_id: String,
     pub template_version: u32,
+    pub catalog_id: Option<String>,
+    pub catalog_version: Option<u32>,
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/v1/catalog/journeys", get(list_native_journeys))
         .route("/v1/onboarding/preview", post(preview_learning))
         .route("/v1/onboarding/start", post(start_learning))
         .layer(RequestBodyLimitLayer::new(64 * 1024))
         .with_state(state)
+}
+
+/// GET /public/v1/catalog/journeys — list reviewed, selectable native journeys.
+#[utoipa::path(
+    get,
+    path = "/public/v1/catalog/journeys",
+    responses((status = 200, description = "Reviewed native journeys", body = [NativeJourneyCatalogResponse])),
+    tag = "onboarding"
+)]
+pub async fn list_native_journeys() -> Result<Json<Vec<NativeJourneyCatalogResponse>>, ApiError> {
+    let journeys = crate::templates::native_journey_blueprints()
+        .map_err(|error| ApiError::Internal(anyhow::anyhow!(error)))?
+        .into_iter()
+        .filter_map(|topic| {
+            topic.catalog.map(|catalog| NativeJourneyCatalogResponse {
+                id: topic.id,
+                version: catalog.version,
+                title: catalog.title,
+                description: catalog.description,
+                field: topic.field,
+                level: catalog.level,
+                estimated_minutes: catalog.estimated_minutes,
+                outcomes: catalog.outcomes,
+                source_summary: catalog.source_summary,
+                review_status: catalog.review_status,
+            })
+        })
+        .collect();
+    Ok(Json(journeys))
 }
 
 /// POST /public/v1/onboarding/preview — explain the first journey without creating state.
@@ -102,10 +158,15 @@ pub async fn preview_learning(
     let identity = PgIdentityRepository::new(state.pool.clone());
     let onboarding =
         SelfHostOnboardingService::new(identity, PgLearningRepository::new(state.pool.clone()));
-    let preview = onboarding
-        .preview_from_prompt(&body.prompt, &CatalogPromptInterpreter)
-        .await
-        .map_err(map_preview_error)?;
+    let preview = match body.catalog_id.as_deref() {
+        Some(catalog_id) => onboarding.preview_from_catalog_entry(catalog_id).await,
+        None => {
+            onboarding
+                .preview_from_prompt(&body.prompt, &CatalogPromptInterpreter)
+                .await
+        }
+    }
+    .map_err(map_preview_error)?;
     Ok(Json(preview_response(preview)))
 }
 
@@ -140,20 +201,27 @@ pub async fn start_learning(
         PgLearningRepository::new(state.pool.clone()),
     );
     let auth_user_id = authenticated.map(|Extension(user)| user.owner_id());
-    let started = onboarding
-        .start_from_prompt(
-            StartLearningPromptRequest {
-                authenticated_user_id: auth_user_id,
-                email: body.email,
-                display_name: body.display_name,
-                raw_prompt: body.prompt,
-                idempotency_key: body.idempotency_key,
-                registration_mode: state.config.registration.mode,
-            },
-            &CatalogPromptInterpreter,
-        )
-        .await
-        .map_err(map_start_learning_error)?;
+    let request = StartLearningPromptRequest {
+        authenticated_user_id: auth_user_id,
+        email: body.email,
+        display_name: body.display_name,
+        raw_prompt: body.prompt,
+        idempotency_key: body.idempotency_key,
+        registration_mode: state.config.registration.mode,
+    };
+    let started = match body.catalog_id.as_deref() {
+        Some(catalog_id) => {
+            onboarding
+                .start_from_catalog_entry(request, catalog_id)
+                .await
+        }
+        None => {
+            onboarding
+                .start_from_prompt(request, &CatalogPromptInterpreter)
+                .await
+        }
+    }
+    .map_err(map_start_learning_error)?;
 
     let issued = BrowserSessionService::new(identity)
         .issue(
@@ -178,6 +246,8 @@ pub async fn start_learning(
             journey_id: started.bootstrap.journey.id,
             template_id: started.bootstrap.template_id,
             template_version: started.bootstrap.template_version,
+            catalog_id: started.bootstrap.goal.catalog_entry_id,
+            catalog_version: started.bootstrap.goal.catalog_entry_version,
         }),
     ))
 }
@@ -205,6 +275,12 @@ fn map_start_learning_error(error: StartLearningError) -> ApiError {
                 message: "must not be empty".into(),
             }])
         }
+        StartLearningError::Prompt(
+            crate::onboarding::PromptInterpretationError::UnknownCatalogEntry(id),
+        ) => ApiError::Validation(vec![crate::domain::error::FieldError {
+            field: "catalogId".into(),
+            message: format!("native journey catalog entry is unavailable: {id}"),
+        }]),
         StartLearningError::Prompt(error) => ApiError::Internal(error.into()),
         StartLearningError::AuthenticationRequired => ApiError::Unauthorized,
         StartLearningError::Bootstrap(error) => ApiError::Internal(error.into()),
@@ -223,6 +299,12 @@ fn map_preview_error(error: crate::onboarding::PromptInterpretationError) -> Api
                 message: "must not be empty".into(),
             }])
         }
+        crate::onboarding::PromptInterpretationError::UnknownCatalogEntry(id) => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "catalogId".into(),
+                message: format!("native journey catalog entry is unavailable: {id}"),
+            }])
+        }
         error => ApiError::Internal(error.into()),
     }
 }
@@ -233,6 +315,8 @@ fn preview_response(preview: LearningPreview) -> PreviewLearningResponse {
         promise: preview.interpretation.promise,
         template_id: preview.interpretation.template_id,
         template_version: preview.interpretation.template_version,
+        catalog_id: preview.interpretation.catalog_entry_id,
+        catalog_version: preview.interpretation.catalog_entry_version,
         objectives: preview
             .objectives
             .into_iter()

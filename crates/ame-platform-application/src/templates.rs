@@ -49,11 +49,25 @@ pub struct TopicBlueprint {
     pub template_id: String,
     #[serde(default)]
     pub field: String,
+    #[serde(default)]
+    pub catalog: Option<NativeJourneyCatalog>,
     pub aliases: Vec<String>,
     pub objectives: Vec<TopicObjective>,
     pub chapters: Vec<TopicChapter>,
     pub first_activity: TopicFirstActivity,
     pub follow_up_activities: Vec<TopicActivity>,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct NativeJourneyCatalog {
+    pub version: u32,
+    pub title: String,
+    pub description: String,
+    pub level: String,
+    pub estimated_minutes: i64,
+    pub outcomes: Vec<String>,
+    pub source_summary: String,
+    pub review_status: String,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -116,6 +130,23 @@ pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
             );
         }
 
+        if let Some(catalog) = &topic.catalog
+            && (catalog.version == 0
+                || catalog.title.trim().is_empty()
+                || catalog.description.trim().is_empty()
+                || catalog.level.trim().is_empty()
+                || catalog.estimated_minutes <= 0
+                || catalog.outcomes.is_empty()
+                || catalog.outcomes.iter().any(|outcome| outcome.trim().is_empty())
+                || catalog.source_summary.trim().is_empty()
+                || catalog.review_status != "reviewed")
+        {
+            return Err(format!(
+                "native catalog entry {} must have reviewed learner metadata",
+                topic.id
+            ));
+        }
+
         let mut activity_orders: Vec<i32> = topic
             .chapters
             .iter()
@@ -148,6 +179,19 @@ pub fn find_topic_blueprint(prompt: &str) -> Result<Option<TopicBlueprint>, Stri
                 .any(|alias| normalized.contains(&alias.to_lowercase()))
         })
     })
+}
+
+pub fn native_journey_blueprints() -> Result<Vec<TopicBlueprint>, String> {
+    topic_blueprints().map(|topics| {
+        topics
+            .into_iter()
+            .filter(|topic| topic.catalog.is_some())
+            .collect()
+    })
+}
+
+pub fn find_native_journey_blueprint(id: &str) -> Result<Option<TopicBlueprint>, String> {
+    native_journey_blueprints().map(|topics| topics.into_iter().find(|topic| topic.id == id))
 }
 
 pub fn find_template_blueprint(template_id: &str) -> Result<Option<TopicBlueprint>, String> {
@@ -253,7 +297,8 @@ fn validate_catalog(catalog: &TemplateCatalog) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        TemplateRecommendation, builtin_catalog, find_topic_blueprint, recommend_builtin_template,
+        TemplateRecommendation, builtin_catalog, find_native_journey_blueprint,
+        find_topic_blueprint, native_journey_blueprints, recommend_builtin_template,
     };
 
     #[test]
@@ -322,6 +367,23 @@ mod tests {
                 .expect("topic blueprint catalog must parse")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn native_journeys_expose_only_reviewed_metadata() {
+        let journeys = native_journey_blueprints().expect("native journey catalog must parse");
+
+        assert_eq!(journeys.len(), 1);
+        let flink = find_native_journey_blueprint("flink-cs-starter")
+            .expect("native journey catalog must parse")
+            .expect("Flink is catalog-ready");
+        let metadata = flink.catalog.expect("Flink metadata is present");
+        assert_eq!(metadata.version, 1);
+        assert_eq!(metadata.review_status, "reviewed");
+        assert!(!metadata.outcomes.is_empty());
+        assert!(find_native_journey_blueprint("subject-starter")
+            .expect("native journey catalog must parse")
+            .is_none());
     }
 
     #[test]

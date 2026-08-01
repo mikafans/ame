@@ -130,6 +130,8 @@ impl LearningRepository for InMemoryLearningRepository {
                 && existing.normalized_statement == input.normalized_statement
                 && existing.source_actor_id == input.source_actor_id
                 && existing.template_version_id == input.template_version_id
+                && existing.catalog_entry_id == input.catalog_entry_id
+                && existing.catalog_entry_version == input.catalog_entry_version
             {
                 return Ok(existing.clone());
             }
@@ -141,6 +143,8 @@ impl LearningRepository for InMemoryLearningRepository {
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
             template_version_id: input.template_version_id,
+            catalog_entry_id: input.catalog_entry_id,
+            catalog_entry_version: input.catalog_entry_version,
             raw_intent: input.raw_intent,
             normalized_statement: input.normalized_statement,
             status: GoalStatus::Proposed,
@@ -196,6 +200,8 @@ impl LearningRepository for InMemoryLearningRepository {
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
             promise: input.promise,
+            catalog_entry_id: input.catalog_entry_id,
+            catalog_entry_version: input.catalog_entry_version,
             status: JourneyStatus::Onboarding,
             created_at: OffsetDateTime::now_utc(),
         };
@@ -769,6 +775,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         subject_user_id: subject,
         source_actor_id: actor,
         template_version_id: None,
+        catalog_entry_id: None,
+        catalog_entry_version: None,
         raw_intent: "I would like to learn a learner-selected topic".to_string(),
         normalized_statement: "Understand the learner-selected topic".to_string(),
         idempotency_key: idempotency_key.clone(),
@@ -798,6 +806,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
                 subject_user_id: subject,
                 source_actor_id: actor,
                 template_version_id: None,
+                catalog_entry_id: None,
+                catalog_entry_version: None,
                 raw_intent: String::new(),
                 normalized_statement: "Different goal".to_string(),
                 idempotency_key,
@@ -816,6 +826,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         subject_user_id: subject,
         source_actor_id: actor,
         promise: "Identify notes, intervals, and basic chords".to_string(),
+        catalog_entry_id: None,
+        catalog_entry_version: None,
     };
     let journey = repository
         .ensure_journey(journey_input.clone())
@@ -1136,6 +1148,8 @@ mod contract_tests {
                 subject_user_id: subject,
                 source_actor_id: actor,
                 template_version_id: None,
+                catalog_entry_id: None,
+                catalog_entry_version: None,
                 raw_intent: "Learn indexing".to_string(),
                 normalized_statement: "Learn database indexing".to_string(),
                 idempotency_key: None,
@@ -1148,6 +1162,8 @@ mod contract_tests {
                 subject_user_id: subject,
                 source_actor_id: actor,
                 promise: "Read query plans and choose useful indexes".to_string(),
+                catalog_entry_id: None,
+                catalog_entry_version: None,
             })
             .await
             .expect("journey creates");
@@ -1229,6 +1245,8 @@ mod contract_tests {
                     subject_user_id: subject,
                     source_actor_id: actor,
                     template_version_id: None,
+                    catalog_entry_id: None,
+                    catalog_entry_version: None,
                     raw_intent: " ".to_string(),
                     normalized_statement: "Valid".to_string(),
                     idempotency_key: None,

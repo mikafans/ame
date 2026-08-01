@@ -369,6 +369,20 @@
     "id": "flink-cs-starter",
     "template_id": "understand-a-subject",
     "field": "cs",
+    "catalog": {
+      "version": 1,
+      "title": "Apache Flink foundations",
+      "description": "Build a practical model of streaming dataflow, time, state, and operation.",
+      "level": "Intermediate",
+      "estimated_minutes": 70,
+      "outcomes": [
+        "Explain event time and processing time",
+        "Reason about state and checkpoint recovery",
+        "Deploy a bounded Flink job with the Kubernetes Operator"
+      ],
+      "source_summary": "Reviewed from Apache Flink documentation and Kubernetes Operator guides.",
+      "review_status": "reviewed"
+    },
     "aliases": ["flink", "apache flink", "stream processing"],
     "objectives": [
       {

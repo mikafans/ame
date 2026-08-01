@@ -82,6 +82,8 @@ pub struct CreateGoal {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
     pub raw_intent: String,
     pub normalized_statement: String,
     pub idempotency_key: Option<String>,
@@ -93,6 +95,8 @@ pub struct LearningGoal {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
     pub raw_intent: String,
     pub normalized_statement: String,
     pub status: GoalStatus,
@@ -106,6 +110,8 @@ pub struct CreateJourney {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub promise: String,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +121,8 @@ pub struct LearningJourney {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub promise: String,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
     pub status: JourneyStatus,
     pub created_at: OffsetDateTime,
 }

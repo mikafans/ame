@@ -13,6 +13,7 @@ function StartLearningForm() {
   const searchParams = useSearchParams();
   const { refresh, user } = useAuth();
   const routePrompt = searchParams.get("prompt") ?? "";
+  const routeCatalogId = searchParams.get("catalogId") ?? "";
   const [prompt, setPrompt] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -56,6 +57,7 @@ function StartLearningForm() {
             email,
             idempotencyKey: crypto.randomUUID(),
             prompt,
+            ...(routeCatalogId ? { catalogId: routeCatalogId } : {}),
           },
         },
       );
@@ -98,7 +100,7 @@ function StartLearningForm() {
           </label>
           <textarea
             id="start-prompt"
-            required
+            required={!routeCatalogId}
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             rows={3}

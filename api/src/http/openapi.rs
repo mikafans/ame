@@ -28,8 +28,9 @@ use crate::http::{
     me::MeResponse,
     notes::{CreateNoteBody, NoteResponse, UpdateNoteBody},
     onboarding::{
-        PreviewActivityResponse, PreviewLearningBody, PreviewLearningResponse,
-        PreviewObjectiveResponse, StartLearningBody, StartLearningResponse,
+        NativeJourneyCatalogResponse, PreviewActivityResponse, PreviewLearningBody,
+        PreviewLearningResponse, PreviewObjectiveResponse, StartLearningBody,
+        StartLearningResponse,
     },
     portability::{ImportReceipt, JourneyExportManifest},
     progress::{
@@ -55,6 +56,7 @@ use crate::http::{
         crate::http::auth::logout,
         crate::http::onboarding::start_learning,
         crate::http::onboarding::preview_learning,
+        crate::http::onboarding::list_native_journeys,
         crate::http::learning::get_journey,
         crate::http::learning::list_journeys,
         crate::http::learning::get_learning_session,
@@ -129,6 +131,7 @@ use crate::http::{
         RegisterBody,
         UserInfo,
         PreviewLearningBody,
+        NativeJourneyCatalogResponse,
         PreviewLearningResponse,
         PreviewObjectiveResponse,
         PreviewActivityResponse,

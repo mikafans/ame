@@ -33,18 +33,25 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["email","password"],"properties":{"email":{"type":"string","format":"email"},"password":{"type":"string"}}}),
         ),
         endpoint(
+            "learning.catalog.list",
+            "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt.",
+            "GET",
+            "/public/v1/catalog/journeys",
+            empty.clone(),
+        ),
+        endpoint(
             "learning.preview",
             "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
             "POST",
             "/public/v1/onboarding/preview",
-            json!({"type":"object","required":["prompt"],"properties":{"prompt":{"type":"string"}}}),
+            json!({"type":"object","required":["prompt"],"properties":{"prompt":{"type":"string"},"catalogId":{"type":"string"}}}),
         ),
         endpoint(
             "learning.start",
             "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
             "POST",
             "/public/v1/onboarding/start",
-            json!({"type":"object","required":["email","displayName","prompt","idempotencyKey"],"properties":{"email":{"type":"string","format":"email"},"displayName":{"type":"string"},"prompt":{"type":"string"},"idempotencyKey":{"type":"string"}}}),
+            json!({"type":"object","required":["email","displayName","prompt","idempotencyKey"],"properties":{"email":{"type":"string","format":"email"},"displayName":{"type":"string"},"prompt":{"type":"string"},"catalogId":{"type":"string"},"idempotencyKey":{"type":"string"}}}),
         ),
         endpoint(
             "learning.journey.list",
