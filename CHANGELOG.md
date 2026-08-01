@@ -5,6 +5,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project is pre-1.0; releases are not yet tagged.
 
+## [0.3.1] - 2026-08-01
+
+### Added
+
+- Study Atelier learner workspace with four named, persistent semantic themes.
+- Eight reviewed native journeys: learning science, Rust, Python, SQL, linear
+  algebra, technical writing, Apache Flink, and classical mechanics.
+- A learner-facing native journey catalog with stable IDs, outcomes, source and
+  review summaries, and the same owner-scoped onboarding contract used by
+  freeform intents.
+- Catalog selection persistence on goals and journeys, plus deterministic
+  catalog preview and golden-journey browser coverage.
+
+### Fixed
+
+- Ensure the desktop sidebar remains above page content so its sign-out action
+  remains reliably accessible.
+
 ## [0.3.0] - 2026-07-02
 
 ### Added

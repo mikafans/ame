@@ -3,7 +3,7 @@
 The expanded product roadmap is now in
 [`plans/2026-07-22-agent-native-learning-platform-roadmap.md`](plans/2026-07-22-agent-native-learning-platform-roadmap.md).
 It supersedes the narrow release sequencing below for future planning while
-the current `0.3.0` implementation boundary remains unchanged.
+the current `0.3.1` implementation boundary includes the reviewed native journey catalog.
 
 AME is rebuilding toward a stable 0.3 agent-first learning loop. The release
 is deliberately centered on one product story: a learner gives an external

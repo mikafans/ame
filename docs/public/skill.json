@@ -65,9 +65,22 @@
       "path": "/public/v1/auth/login"
     },
     {
+      "description": "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.catalog.list",
+      "path": "/public/v1/catalog/journeys"
+    },
+    {
       "description": "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
       "input_schema": {
         "properties": {
+          "catalogId": {
+            "type": "string"
+          },
           "prompt": {
             "type": "string"
           }
@@ -85,6 +98,9 @@
       "description": "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
       "input_schema": {
         "properties": {
+          "catalogId": {
+            "type": "string"
+          },
           "displayName": {
             "type": "string"
           },

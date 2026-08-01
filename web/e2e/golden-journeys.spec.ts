@@ -147,6 +147,37 @@ test("native catalog lists eight reviewed journeys and previews each determinist
   }
 });
 
+test("new learner discovers a native journey card from the learning desk", async ({
+  page,
+}) => {
+  const email = `native-catalog-${Date.now()}@example.com`;
+  const registration = await page.request.post(
+    apiUrl("/public/v1/auth/register"),
+    { data: { email, name: "Catalog Learner", password: "catalog-2026" } },
+  );
+  expect(registration.ok()).toBeTruthy();
+  const { token } = await registration.json();
+  await page.context().addCookies([
+    {
+      name: "ame_token",
+      value: token,
+      url: process.env.E2E_BASE_URL ?? "http://localhost:23000",
+    },
+  ]);
+
+  await page.goto("/learning");
+  const catalog = page.getByTestId("native-journey-catalog");
+  await expect(catalog).toBeVisible();
+  await expect(
+    catalog.getByRole("heading", { name: "SQL foundations" }),
+  ).toBeVisible();
+  await expect(catalog.getByText("sql-foundations-starter")).toBeVisible();
+  await catalog
+    .locator('a[href="/start?catalogId=learning-science-starter"]')
+    .click();
+  await expect(page).toHaveURL(/\/start\?catalogId=learning-science-starter$/);
+});
+
 test("learner writes, resumes, edits, and deletes a version-anchored private note", async ({
   page,
 }) => {
@@ -186,10 +217,9 @@ test("owner inspects an export and repeated import does not duplicate learner st
     "portable-golden-2026",
   );
   await page.goto("/learning");
-  const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON" }).click();
-  await download;
   const artifact = page.getByLabel("Journey portability artifact");
+  await expect(artifact).toBeVisible();
   await expect(artifact).toHaveValue(/ame\.journey-history\.v1/);
   await expect(artifact).toHaveValue(/"checksum"/);
   await page.getByRole("button", { name: "Import JSON" }).click();

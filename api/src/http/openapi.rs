@@ -214,7 +214,7 @@ use crate::http::{
     )),
     info(
         title = "ame API",
-        version = "0.3.0",
+        version = "0.3.1",
         description = "ame — an agent-friendly learning API with one owner-scoped learner model."
     )
 )]

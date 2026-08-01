@@ -129,7 +129,7 @@ make db-down
 ## Roadmap
 
 [`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the certifiable agent-first learning
-loop and its later milestones. Current: **v0.3.0** — one unified learner API,
+loop and its later milestones. Current: **v0.3.1** — one unified learner API,
 durable journeys, question-backed practice and exams, evidence-based progress,
 deep dives, and a self-hostable Postgres + Valkey + API + web + Caddy origin.
 The canonical design and user stories are in

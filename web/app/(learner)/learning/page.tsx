@@ -11,7 +11,7 @@ import {
   History,
   Sparkles,
 } from "lucide-react";
-import { api } from "@/api/client";
+import { api, publicApi } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { PortabilityPanel } from "@/components/learning/PortabilityPanel";
 import { LearnerAnalytics } from "@/components/learning/LearnerAnalytics";
@@ -72,6 +72,17 @@ type Citation = {
   licenseStatus: string;
   licenseName?: string | null;
 };
+type NativeJourney = {
+  id: string;
+  title: string;
+  description: string;
+  field: string;
+  level: string;
+  estimatedMinutes: number;
+  outcomes: string[];
+  sourceSummary: string;
+  reviewStatus: string;
+};
 
 function activityStatusLabel(status: string) {
   if (status === "completed") return "Complete";
@@ -98,6 +109,7 @@ export default function LearningHomePage() {
   const [ratingReviewId, setRatingReviewId] = useState<string | null>(null);
   const [sources, setSources] = useState<SourceSnapshot[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
+  const [nativeJourneys, setNativeJourneys] = useState<NativeJourney[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -106,11 +118,13 @@ export default function LearningHomePage() {
         reviews,
         sourceSnapshots,
         citationCertificates,
+        nativeCatalog,
       ] = await Promise.all([
         api.GET("/api/v1/learning/journeys" as never),
         api.GET("/api/v1/reviews/due"),
         api.GET("/api/v1/source-snapshots"),
         api.GET("/api/v1/citations"),
+        publicApi.GET("/public/v1/catalog/journeys"),
       ]);
       if (response.ok && data) {
         const nextJourneys = data as JourneySummary[];
@@ -124,6 +138,9 @@ export default function LearningHomePage() {
       }
       if (citationCertificates.response.ok && citationCertificates.data) {
         setCitations(citationCertificates.data as Citation[]);
+      }
+      if (nativeCatalog.response.ok && nativeCatalog.data) {
+        setNativeJourneys(nativeCatalog.data as NativeJourney[]);
       }
       setLoading(false);
     })();
@@ -442,15 +459,54 @@ export default function LearningHomePage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading journeys…</p>
       ) : journeys.length === 0 ? (
-        <section className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <Compass className="mx-auto size-8 text-primary" />
-          <h2 className="mt-4 text-xl font-bold">
-            Your first journey is one prompt away.
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            Tell AME what you want to learn and it will shape a grounded first
-            step.
-          </p>
+        <section className="space-y-5" data-testid="native-journey-catalog">
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+            <Compass className="mx-auto size-8 text-primary" />
+            <h2 className="mt-4 text-xl font-bold">
+              Choose a reviewed starting journey.
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              Start from a maintained set below, or use a freeform intent when
+              your topic is not listed.
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {nativeJourneys.map((journey) => (
+              <article
+                className="rounded-2xl border border-border bg-card p-6"
+                key={journey.id}
+              >
+                <p className="font-mono text-xs uppercase tracking-[0.12em] text-primary">
+                  {journey.field} · {journey.id}
+                </p>
+                <h3 className="mt-2 text-xl font-bold">{journey.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {journey.description}
+                </p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {journey.level} · about {journey.estimatedMinutes} minutes
+                </p>
+                <ul className="mt-4 space-y-2 text-sm">
+                  {journey.outcomes.map((outcome) => (
+                    <li className="flex gap-2" key={outcome}>
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <span>{outcome}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
+                  Source and review: {journey.sourceSummary}
+                </p>
+                <Button asChild className="mt-5 rounded-full" size="sm">
+                  <Link
+                    href={`/start?catalogId=${encodeURIComponent(journey.id)}`}
+                  >
+                    Start this journey <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              </article>
+            ))}
+          </div>
         </section>
       ) : (
         <section className="grid gap-4">

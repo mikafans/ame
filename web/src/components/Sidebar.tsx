@@ -210,7 +210,7 @@ export function Sidebar({
 
   return (
     <>
-      <aside className="hidden w-[232px] shrink-0 border-r border-border md:flex">
+      <aside className="relative z-20 hidden w-[232px] shrink-0 border-r border-border md:flex">
         {navigation}
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose?.()}>
