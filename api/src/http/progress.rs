@@ -18,6 +18,7 @@ use crate::{
         timeline::TimelineRepository,
     },
     http::AppState,
+    http::fixture::require_learner_journey,
     learning_postgres::PgLearningRepository,
     progress::ProgressRepository,
     progress_postgres::PgProgressRepository,
@@ -137,6 +138,7 @@ pub async fn record_evidence(
     auth: AuthenticatedUser,
     Json(body): Json<EvidenceBody>,
 ) -> Result<Json<EvidenceResponse>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), body.journey_id).await?;
     let source = match (body.attempt_id, body.task_submission_id) {
         (Some(attempt_id), None) => EvidenceSource::Assessment { attempt_id },
         (None, Some(submission_id)) => EvidenceSource::Task { submission_id },
@@ -185,6 +187,7 @@ pub async fn snapshot(
     auth: AuthenticatedUser,
     Path((journey_id, objective_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<SnapshotResponse>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), journey_id).await?;
     let learning = PgLearningRepository::new(state.pool.clone());
     learning
         .get_journey(auth.owner_id(), journey_id)
@@ -194,7 +197,10 @@ pub async fn snapshot(
         .list_objectives(auth.owner_id(), journey_id)
         .await
         .map_err(map_snapshot_learning_error)?;
-    if !objectives.iter().any(|objective| objective.id == objective_id) {
+    if !objectives
+        .iter()
+        .any(|objective| objective.id == objective_id)
+    {
         return Err(ApiError::NotFound {
             resource: "objective",
         });
@@ -243,6 +249,7 @@ pub async fn list_streaks(
     auth: AuthenticatedUser,
     Path(journey_id): Path<Uuid>,
 ) -> Result<Json<Vec<StreakResponse>>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), journey_id).await?;
     PgLearningRepository::new(state.pool.clone())
         .list_activities(auth.owner_id(), journey_id)
         .await
@@ -286,6 +293,7 @@ pub async fn list_timeline(
     auth: AuthenticatedUser,
     Path(journey_id): Path<Uuid>,
 ) -> Result<Json<Vec<TimelineEventResponse>>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), journey_id).await?;
     PgLearningRepository::new(state.pool.clone())
         .get_journey(auth.owner_id(), journey_id)
         .await
@@ -323,6 +331,7 @@ pub async fn recommend(
     Path(journey_id): Path<Uuid>,
     Json(body): Json<RecommendationBody>,
 ) -> Result<Json<RecommendationResponse>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), journey_id).await?;
     let objectives = body
         .objectives
         .into_iter()
@@ -347,6 +356,7 @@ pub async fn record_streak(
     auth: AuthenticatedUser,
     Json(body): Json<StreakBody>,
 ) -> Result<Json<StreakResponse>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), body.journey_id).await?;
     let day = time::Date::parse(
         &body.qualifying_day,
         &time::format_description::well_known::Iso8601::DEFAULT,
@@ -408,11 +418,9 @@ fn map_snapshot_learning_error(
 ) -> ApiError {
     match error {
         crate::domain::learning::LearningRepositoryError::NotFound { .. }
-        | crate::domain::learning::LearningRepositoryError::SubjectMismatch => {
-            ApiError::NotFound {
-                resource: "journey",
-            }
-        }
+        | crate::domain::learning::LearningRepositoryError::SubjectMismatch => ApiError::NotFound {
+            resource: "journey",
+        },
         other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
     }
 }

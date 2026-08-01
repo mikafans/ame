@@ -86,6 +86,7 @@ pub mod auth;
 pub mod citations;
 pub mod db;
 pub mod deep_dives;
+pub mod fixture;
 pub mod generation;
 pub mod health;
 pub mod idempotency;

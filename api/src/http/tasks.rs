@@ -16,6 +16,7 @@ use crate::{
         RubricScore, SubmissionArtifact, TaskEvaluationMethod, TaskRubric, score_task_rubric,
     },
     http::AppState,
+    http::fixture::require_learner_journey,
     progress::ProgressRepository,
     progress_postgres::PgProgressRepository,
 };
@@ -241,7 +242,7 @@ pub async fn review_submission(
 ) -> Result<Json<TaskSubmissionResponse>, ApiError> {
     let is_reviewed = matches!(body.outcome, ReviewTaskOutcome::Reviewed);
     let row = sqlx::query(
-        "SELECT a.rubric FROM tb_task_submissions s
+        "SELECT a.rubric, s.journey_id, s.subject_user_id FROM tb_task_submissions s
          JOIN tb_activities a ON a.id = s.task_id
          WHERE s.id = $1",
     )
@@ -252,6 +253,12 @@ pub async fn review_submission(
     .ok_or(ApiError::NotFound {
         resource: "task submission",
     })?;
+    require_learner_journey(
+        &state.pool,
+        row.get("subject_user_id"),
+        row.get("journey_id"),
+    )
+    .await?;
     if let Some(rubric) = row.get::<Option<serde_json::Value>, _>("rubric") {
         let rubric: TaskRubric = serde_json::from_value(rubric)
             .map_err(|error| ApiError::Internal(anyhow::anyhow!(error)))?;
