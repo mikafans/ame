@@ -333,7 +333,7 @@
       "path": "/api/v1/learning/journeys/{journey_id}/objectives"
     },
     {
-      "description": "Run the server-side course validator. It reports stable blocking diagnostics for missing source grounding, module instruction/example coverage, formative rationale/feedback, assessment/task mastery coverage, rubrics, and review state.",
+      "description": "Run the server-side course validator. It reports stable blocking diagnostics for missing source grounding, module instruction/example coverage, formative rationale and learner explanation feedback, assessment/task mastery coverage, rubrics, and review state.",
       "input_schema": {
         "properties": {
           "journeyId": {
@@ -356,7 +356,7 @@
       "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate"
     },
     {
-      "description": "Move a valid owned draft course revision to review, recording the review metadata after the server-side validator passes.",
+      "description": "Move a valid owned draft course revision to review, recording the approval metadata after the server-side validator passes. Review must include non-empty reviewer, decision=approved, and notes.",
       "input_schema": {
         "properties": {
           "journeyId": {
@@ -364,6 +364,27 @@
             "type": "string"
           },
           "review": {
+            "properties": {
+              "decision": {
+                "enum": [
+                  "approved"
+                ],
+                "type": "string"
+              },
+              "notes": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "reviewer": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "reviewer",
+              "decision",
+              "notes"
+            ],
             "type": "object"
           },
           "revisionId": {
@@ -1305,7 +1326,7 @@
       "path": "/api/v1/learning/activities/{activity_id}/rubric"
     },
     {
-      "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
+      "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory. For a course formative check, set both rationale and explanation: explanation is the learner-facing correct-answer feedback (there is no feedback field).",
       "input_schema": {
         "properties": {
           "acceptedAnswers": {
@@ -1318,6 +1339,7 @@
             "type": "string"
           },
           "explanation": {
+            "description": "Learner-facing correct-answer feedback; required alongside rationale for a publishable formative check.",
             "type": "string"
           },
           "generationRunId": {
@@ -1346,6 +1368,7 @@
             "type": "string"
           },
           "rationale": {
+            "description": "Why this question assesses the linked objective; required alongside explanation for a publishable formative check.",
             "type": "string"
           },
           "reviewStatus": {
@@ -1428,7 +1451,7 @@
       "path": "/api/v1/questions/{question_id}/versions"
     },
     {
-      "description": "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision.",
+      "description": "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision. From a question response, use questionId (logical ID) and version (integer) for each item; do not use id, which is the immutable version UUID.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -1952,7 +1975,7 @@
       "path": "/api/v1/generation-runs/{id}"
     },
     {
-      "description": "Advance an owned generation run or record a provider failure; failed runs cannot be published.",
+      "description": "Advance an owned generation run or record a provider failure; failed runs cannot be published. The successful path is requested -> running -> review_required -> published; do not skip states. A failure may be recorded from a nonterminal state.",
       "input_schema": {
         "properties": {
           "error": {

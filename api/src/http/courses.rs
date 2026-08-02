@@ -537,6 +537,7 @@ pub async fn review_course_revision(
     let revision =
         load_owned_revision(&state.pool, auth.owner_id(), journey_id, revision_id).await?;
     require_draft(&revision)?;
+    validate_review_record(&body.review)?;
     let issues = validate_course(&state.pool, auth.owner_id(), &revision).await?;
     store_validation(&state.pool, revision_id, &issues).await?;
     if issues.iter().any(|issue| issue.blocking) {
@@ -710,6 +711,28 @@ fn validate_brief_shape(brief: &Value) -> Result<(), ApiError> {
             "brief",
             "must contain a title, audience, positive estimatedMinutes, and non-empty outcomes and modules",
         ));
+    }
+    Ok(())
+}
+
+fn validate_review_record(review: &Value) -> Result<(), ApiError> {
+    let Some(review) = review.as_object() else {
+        return Err(field_error("review", "must be an object"));
+    };
+    for field in ["reviewer", "decision", "notes"] {
+        if review
+            .get(field)
+            .and_then(Value::as_str)
+            .is_none_or(|value| value.trim().is_empty())
+        {
+            return Err(field_error(
+                "review",
+                &format!("must include a non-empty {field}"),
+            ));
+        }
+    }
+    if review.get("decision").and_then(Value::as_str) != Some("approved") {
+        return Err(field_error("review.decision", "must be approved"));
     }
     Ok(())
 }

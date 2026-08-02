@@ -177,6 +177,14 @@ def test_course_revision_returns_server_side_publish_diagnostics(client):
     issue_codes = {issue["code"] for issue in validated.json()["validation"]}
     assert issue_codes == {"missing_modules", "missing_outcomes"}
 
+    invalid_review = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/review",
+        headers=headers,
+        json={"review": {"reviewer": "agent", "decision": "approved"}},
+    )
+    assert invalid_review.status_code == 422, invalid_review.text
+    assert invalid_review.json()["error"]["fields"][0]["field"] == "review"
+
     publish = client.post(
         f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/publish",
         headers=headers,

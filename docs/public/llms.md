@@ -161,21 +161,30 @@ course from a generic onboarding journey or skip the source/review boundary.
    `journeyId` and `revision.id` from the response.
 4. For every observable outcome, create an objective with `revisionId`. Create
    its module/chapter, then an instruction and worked-example activity linked
-   to that objective. Draft activities are private.
-5. Start and publish a matching `learning.activity.content.compose` generation
-   run; use it to attach approved, source-backed explanation/example content.
-   Create an approved `question.compose` question with a rationale, feedback,
-   and source references, then attach it as a published `practice` assessment
-   to the instructional activity.
+   to that objective. Start explanation/example rows with `"payload": {}`;
+   the approved content-authoring command replaces that placeholder. Draft
+   activities are private.
+5. Start a matching `learning.activity.content.compose` generation run and
+   transition it strictly through `requested` → `running` →
+   `review_required` → `published`; the server rejects skipped states. Use the
+   published run to attach approved, source-backed explanation/example content.
+   Create an approved `question.compose` question with both `rationale` and
+   `explanation`; `explanation` is the learner-facing correct-answer feedback
+   (there is no `feedback` request field). Add source references, then attach
+   it as a published `practice` assessment to the instructional activity. The
+   question response's `questionId` and numeric `version` are the assessment
+   item fields `questionId` and `questionVersion`; do not pass response `id`
+   (that is the immutable version UUID).
 6. Add a distinct `graded` assessment and/or an `application` activity for
    every objective. An application activity needs a source-backed,
    `learning.activity.rubric.compose` rubric with objective-specific criteria.
 7. Submit every activity with `POST /api/v1/learning/activities/{activity_id}/review`
    and the same `revisionId`. Run the course `validate` command and resolve
    every returned blocking diagnostic.
-8. Submit the valid revision for review with a review record, then publish it.
-   Publishing is atomic and is the only action that makes the whole graph
-   learner-visible.
+8. Submit the valid revision for review with
+   `{"reviewer":"agent-name","decision":"approved","notes":"what was checked"}`,
+   then publish it. Publishing is atomic and is the only action that makes the
+   whole graph learner-visible.
 9. After a learner completes an assessment or receives a terminal task review,
    read the objective evidence and server recommendation. Adapt only from that
    durable evidence; an agent must never invent learner answers or mastery.
@@ -209,7 +218,8 @@ Course publication is a server command, not an activity-row transition. Before
 publication, an agent must run `validate`, resolve every blocking diagnostic,
 then submit the revision to `review` with review metadata, and finally call
 `publish`. The validator requires source-backed instruction and worked examples
-in every module, approved formative questions with rationales and feedback,
+in every module, approved formative questions with a `rationale` and an
+`explanation` (learner feedback),
 and graded assessment or rubric-backed application coverage for every
 objective. The old activity publish endpoint returns a migration error; it
 cannot expose a single activity outside this course gate. Read completed work

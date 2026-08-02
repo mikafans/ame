@@ -111,17 +111,17 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.course.revision.validate",
-            "Run the server-side course validator. It reports stable blocking diagnostics for missing source grounding, module instruction/example coverage, formative rationale/feedback, assessment/task mastery coverage, rubrics, and review state.",
+            "Run the server-side course validator. It reports stable blocking diagnostics for missing source grounding, module instruction/example coverage, formative rationale and learner explanation feedback, assessment/task mastery coverage, rubrics, and review state.",
             "POST",
             "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate",
             json!({"type":"object","required":["journeyId","revisionId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.course.revision.review",
-            "Move a valid owned draft course revision to review, recording the review metadata after the server-side validator passes.",
+            "Move a valid owned draft course revision to review, recording the approval metadata after the server-side validator passes. Review must include non-empty reviewer, decision=approved, and notes.",
             "POST",
             "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review",
-            json!({"type":"object","required":["journeyId","revisionId","review"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"review":{"type":"object"}}}),
+            json!({"type":"object","required":["journeyId","revisionId","review"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"review":{"type":"object","required":["reviewer","decision","notes"],"properties":{"reviewer":{"type":"string","minLength":1},"decision":{"type":"string","enum":["approved"]},"notes":{"type":"string","minLength":1}}}}}),
         ),
         endpoint(
             "learning.course.revision.publish",
@@ -335,10 +335,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.question.create",
-            "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
+            "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory. For a course formative check, set both rationale and explanation: explanation is the learner-facing correct-answer feedback (there is no feedback field).",
             "POST",
             "/api/v1/questions",
-            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","numeric","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"rationale":{"type":"string"},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
+            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","numeric","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string","description":"Learner-facing correct-answer feedback; required alongside rationale for a publishable formative check."},"rationale":{"type":"string","description":"Why this question assesses the linked objective; required alongside explanation for a publishable formative check."},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
         ),
         endpoint(
             "learning.question.get",
@@ -356,7 +356,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.assessment.create",
-            "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision.",
+            "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision. From a question response, use questionId (logical ID) and version (integer) for each item; do not use id, which is the immutable version UUID.",
             "POST",
             "/api/v1/assessments",
             json!({"type":"object","required":["revisionId","activityId","mode","items"],"properties":{"revisionId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array","items":{"type":"object","required":["objectiveId","questionId","questionVersion","orderIndex","points"],"properties":{"objectiveId":{"type":"string","format":"uuid"},"questionId":{"type":"string","format":"uuid"},"questionVersion":{"type":"integer"},"orderIndex":{"type":"integer"},"points":{"type":"integer","minimum":1}}}},"status":{"type":"string"}}}),
@@ -489,7 +489,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.generation.transition",
-            "Advance an owned generation run or record a provider failure; failed runs cannot be published.",
+            "Advance an owned generation run or record a provider failure; failed runs cannot be published. The successful path is requested -> running -> review_required -> published; do not skip states. A failure may be recorded from a nonterminal state.",
             "PATCH",
             "/api/v1/generation-runs/{id}",
             json!({"type":"object","required":["id","status"],"properties":{"id":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["requested","running","review_required","published","failed"]},"error":{"type":"object"}}}),
