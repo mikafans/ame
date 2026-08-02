@@ -91,6 +91,8 @@ POST   /api/v1/learning/sessions/{id}/finish
 GET    /api/v1/learning/activities/{activity_id}/content
 PATCH  /api/v1/learning/activities/{activity_id}/content
 PATCH  /api/v1/learning/activities/{activity_id}/rubric
+POST   /api/v1/learning/activities/{activity_id}/review
+POST   /api/v1/learning/activities/{activity_id}/publish
 
 POST   /api/v1/questions
 GET    /api/v1/questions/{question_id}/versions/{version}
@@ -137,8 +139,10 @@ to assemble a course. AME assigns the next order. Mark only the learner's next
 activity `ready`; keep later activities `proposed` so ordinary completion
 unlocks them in sequence. Use a `practice` activity as the target for a
 published assessment and an `application` activity as the target for a
-reviewed task rubric. Read completed work with the activity-content `GET`; do
-not restart a completed activity.
+reviewed task rubric. Agent-created activities begin as private drafts: submit
+them for review, then publish them before a learner can start them. Read
+completed work with the activity-content `GET`; do not restart a completed
+activity.
 
 Task submissions carry the exact activity `contentVersion`, response, review
 state, evaluation method, optional score, and feedback. A task contributes

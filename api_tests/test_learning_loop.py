@@ -143,7 +143,7 @@ def test_agent_authored_activity_stays_private_until_review_and_publish(client):
         headers=headers,
         json={"questionPlan": {}},
     )
-    assert started_activity.status_code == 200, started_activity.text
+    assert started_activity.status_code == 201, started_activity.text
 
 
 def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):

@@ -46,10 +46,6 @@ function isStarterContent(content: unknown): content is StarterContent {
   );
 }
 
-function usesAssessment(activity: Journey["activities"][number] | undefined) {
-  return activity?.kind === "practice" || activity?.kind === "timed_practice";
-}
-
 function ActivityProvenance({
   sourceReferences,
 }: {
@@ -322,10 +318,7 @@ export default function LearningJourneyPage() {
           const completedActivity = journeyResult.data.activities
             .filter((activity) => activity.status === "completed")
             .sort((left, right) => right.orderIndex - left.orderIndex)[0];
-          if (
-            completedActivity &&
-            journeyResult.data.recommendation?.evidenceIds.length
-          ) {
+          if (completedActivity) {
             await loadDeepDive(completedActivity.id);
           }
           return;
@@ -343,18 +336,7 @@ export default function LearningJourneyPage() {
         }
         setSession(sessionResult.data);
         if (sessionResult.data.status === "in_progress") {
-          if (
-            usesAssessment(
-              journeyResult.data.activities.find(
-                (activity) => activity.id === sessionResult.data.activityId,
-              ),
-            )
-          ) {
-            await loadAssessment(
-              sessionResult.data.activityId,
-              storedSessionId,
-            );
-          }
+          await loadAssessment(sessionResult.data.activityId, storedSessionId);
         } else {
           await loadDeepDive(sessionResult.data.activityId);
         }
@@ -393,13 +375,7 @@ export default function LearningJourneyPage() {
       setDeepDive(null);
       setReviewActivityId(null);
       window.localStorage.setItem(`ame-learning-session:${params.id}`, data.id);
-      if (
-        usesAssessment(
-          journey?.activities.find((activity) => activity.id === activityId),
-        )
-      ) {
-        await loadAssessment(activityId, data.id);
-      }
+      await loadAssessment(activityId, data.id);
     } catch (startError) {
       setError(
         startError instanceof Error
@@ -502,9 +478,7 @@ export default function LearningJourneyPage() {
       });
       if (refreshed.response.ok && refreshed.data) {
         setJourney(refreshed.data);
-        if (refreshed.data.recommendation?.evidenceIds.length) {
-          await loadDeepDive(session.activityId);
-        }
+        await loadDeepDive(session.activityId);
       }
       await loadAttemptHistory();
     } catch (finishError) {

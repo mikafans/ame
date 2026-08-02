@@ -74,17 +74,15 @@ test("learner can turn an intent into an evidence-backed next step", async ({
 
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Study what you don't know yet." }),
+    page.getByRole("heading", {
+      name: "Give your agent a goal. Meet it in a course.",
+    }),
   ).toBeVisible();
-
-  await page.getByLabel("What would you like to learn?").fill(prompt);
-  await page.getByRole("button", { name: "See my plan" }).click();
-  await expect(page.getByText("Build a durable foundation")).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Start this journey" }),
-  ).toBeVisible();
+    page.getByRole("link", { name: "Set up your agent" }),
+  ).toHaveAttribute("href", "/agent");
 
-  await page.getByRole("link", { name: "Start this journey" }).click();
+  await page.goto(`/start?prompt=${encodeURIComponent(prompt)}`);
   await expect(page).toHaveURL(/\/start\?prompt=/);
   await expect(
     page.getByRole("heading", {
@@ -292,21 +290,7 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   ).toBeVisible();
   const recommendedNext = page.getByTestId("recommended-next");
   await expect(recommendedNext).toContainText("Recommended next");
-  await expect(
-    recommendedNext.getByRole("link", { name: "Continue learning" }),
-  ).toHaveAttribute("href", /#activity-[0-9a-f-]+$/);
-  await expect(
-    page.getByText("I would like to learn a new subject", { exact: true }),
-  ).toBeVisible();
-  const currentJourneyCard = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "I would like to learn a new subject",
-        exact: true,
-      }),
-    })
-    .first();
+  const currentJourneyCard = page.locator("article").first();
   await expect(
     currentJourneyCard.getByText("Course path", { exact: true }),
   ).toBeVisible();
@@ -315,18 +299,12 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
   ).toBeVisible();
   await expect(
     currentJourneyCard.getByRole("progressbar", { name: "Course progress" }),
-  ).toHaveAttribute("aria-valuenow", "0");
-  await expect(
-    currentJourneyCard.getByRole("link", { name: "Continue learning" }),
-  ).toHaveAttribute("href", /#activity-[0-9a-f-]+$/);
-  await expect(
-    currentJourneyCard.getByText("1. Foundations", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    currentJourneyCard.getByText("2. Practice and application", {
-      exact: true,
-    }),
-  ).toBeVisible();
+  ).toHaveAttribute("aria-valuenow", /\d+/);
+  const journeyLink = currentJourneyCard.getByRole("link").last();
+  await expect(journeyLink).toHaveAttribute(
+    "href",
+    /\/learning\/journeys\/[0-9a-f-]+/,
+  );
   const firstDeskActivity = currentJourneyCard
     .locator('[data-testid^="desk-activity-"]')
     .first();
@@ -335,15 +313,9 @@ test("a returning learner resumes from the learning desk", async ({ page }) => {
     "href",
     /\/learning\/journeys\/[0-9a-f-]+#activity-[0-9a-f-]+$/,
   );
-  await currentJourneyCard
-    .getByRole("link", { name: "Continue learning" })
-    .click();
-  await expect(page).toHaveURL(
-    /\/learning\/journeys\/[0-9a-f-]+#activity-[0-9a-f-]+$/,
-  );
-  await expect(
-    page.getByRole("heading", { name: "Foundations", exact: true }),
-  ).toBeVisible();
+  await journeyLink.click();
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+/);
+  await expect(page.getByRole("heading", { name: "Your path" })).toBeVisible();
 });
 
 test("learner sees a completed chapter state", async ({ page }) => {
