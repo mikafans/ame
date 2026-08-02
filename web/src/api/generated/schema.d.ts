@@ -1315,8 +1315,15 @@ export interface components {
             /** Format: float */
             correctness?: number | null;
             evaluationStatus: string;
+            explanation?: string | null;
             /** Format: uuid */
             questionVersionId: string;
+            /**
+             * @description Learner-facing feedback from the immutable question version. It is
+             *     returned with a finished attempt so a formative check never records an
+             *     opaque correct/incorrect state.
+             */
+            rationale?: string | null;
             response: unknown;
         };
         AttemptResponse: {

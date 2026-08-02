@@ -674,6 +674,9 @@ def test_reference_courses_publish_and_adapt_after_weak_evidence(client, course)
         built["headers"],
     )
     assert finished["score"] == 0
+    assert finished["items"][0]["evaluationStatus"] == "incorrect"
+    assert finished["items"][0]["explanation"] == course["modules"][0]["feedback"]
+    assert finished["items"][0]["rationale"] == course["modules"][0]["rationale"]
     evidence = request(
         client,
         "post",

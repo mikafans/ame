@@ -2311,9 +2311,21 @@ components:
           format: float
         evaluationStatus:
           type: string
+        explanation:
+          type:
+          - string
+          - 'null'
         questionVersionId:
           type: string
           format: uuid
+        rationale:
+          type:
+          - string
+          - 'null'
+          description: |-
+            Learner-facing feedback from the immutable question version. It is
+            returned with a finished attempt so a formative check never records an
+            opaque correct/incorrect state.
         response: {}
     AttemptResponse:
       type: object

@@ -40,18 +40,28 @@ export function AssessmentResultFeedback({ attempt }: { attempt: Attempt }) {
             return (
               <li
                 key={item.assessmentItemId}
-                className="flex items-center justify-between gap-4 rounded-lg bg-background/60 px-3 py-2"
+                className="rounded-lg bg-background/60 px-3 py-2"
               >
-                <span>Question result</span>
-                <span
-                  className={
-                    isCorrect
-                      ? "font-semibold text-primary"
-                      : "font-semibold text-destructive"
-                  }
-                >
-                  {item.evaluationStatus.replaceAll("_", " ")}
-                </span>
+                <div className="flex items-center justify-between gap-4">
+                  <span>Question result</span>
+                  <span
+                    className={
+                      isCorrect
+                        ? "font-semibold text-primary"
+                        : "font-semibold text-destructive"
+                    }
+                  >
+                    {item.evaluationStatus.replaceAll("_", " ")}
+                  </span>
+                </div>
+                {(item.explanation || item.rationale) && (
+                  <div className="mt-2 space-y-1 text-muted-foreground">
+                    {item.explanation && <p>{item.explanation}</p>}
+                    {item.rationale && (
+                      <p className="text-xs">Why this matters: {item.rationale}</p>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}
