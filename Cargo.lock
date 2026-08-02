@@ -25,7 +25,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "ame-api"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "ame-learning-application",
  "ame-learning-domain",
@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "ame-learning-application"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "ame-learning-domain",
  "async-trait",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "ame-learning-domain"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "serde",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "ame-learning-postgres"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "ame-learning-application",
  "ame-learning-domain",
@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "ame-platform-application"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "ame-learning-application",
  "ame-learning-domain",
@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "ame-platform-domain"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "ame-learning-domain",
  "async-trait",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "ame-platform-postgres"
-version = "0.3.1"
+version = "0.5.0"
 dependencies = [
  "ame-learning-domain",
  "ame-learning-postgres",

@@ -2,8 +2,8 @@
 
 ## 0.5.0 — agent-authored courses
 
-Status: planned. This is the next product release; it does not authorize a
-release, tag, push, or hosted publication.
+Status: locally certified. This is the next product release; it does not
+authorize a release, tag, push, or hosted publication.
 
 AME is the durable learning system an authorized agent uses to create and
 operate a real course for one learner. It is not a catalog of generic

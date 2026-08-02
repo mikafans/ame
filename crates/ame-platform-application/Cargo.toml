@@ -1,6 +1,6 @@
 [package]
 name = "ame-platform-application"
-version = "0.3.1"
+version = "0.5.0"
 edition = "2024"
 publish = false
 

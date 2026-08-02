@@ -1,5 +1,5 @@
 project: ame
-version: 0.3.1
+version: 0.5.0
 description: Agent-first, self-hostable learning platform with one owner-scoped learner API.
 
 runtime:
