@@ -655,6 +655,9 @@ def test_reference_courses_publish_and_adapt_after_weak_evidence(client, course)
         built["headers"],
         json={"learningSessionId": session["id"]},
     )
+    assert attempt["items"][0]["assessmentItemId"]
+    assert attempt["items"][0]["questionVersionId"]
+    assert attempt["items"][0]["evaluationStatus"] == "unanswered"
     item = formative["items"][0]
     request(
         client,

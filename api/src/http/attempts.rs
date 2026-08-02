@@ -283,9 +283,20 @@ async fn attempt_response(
                 .map(|item| item.awarded_points.unwrap_or_default())
                 .reduce(|total, points| total + points)
         });
-    let question_ids = answer_results
+    let answers = answer_results
+        .into_iter()
+        .map(|item| (item.assessment_item_id, item))
+        .collect::<HashMap<_, _>>();
+    let assessment_items = sqlx::query(
+        "SELECT id, question_version_id FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
+    )
+    .bind(attempt.input.assessment_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?;
+    let question_ids = assessment_items
         .iter()
-        .map(|item| item.question_version_id)
+        .map(|item| item.get::<Uuid, _>("question_version_id"))
         .collect::<Vec<_>>();
     let feedback = sqlx::query(
         "SELECT id, rationale, explanation FROM tb_question_versions WHERE id = ANY($1)",
@@ -319,21 +330,30 @@ async fn attempt_response(
         assessment_mode: attempt.assessment_mode,
         review_status: attempt.review_status,
         responses: attempt.responses,
-        items: answer_results
+        items: assessment_items
             .into_iter()
-            .map(|item| AttemptItemResponse {
-                assessment_item_id: item.assessment_item_id,
-                question_version_id: item.question_version_id,
-                response: item.response,
-                correctness: item.correctness,
-                awarded_points: item.awarded_points,
-                evaluation_status: item.evaluation_status,
-                rationale: feedback
-                    .get(&item.question_version_id)
-                    .and_then(|(rationale, _)| rationale.clone()),
-                explanation: feedback
-                    .get(&item.question_version_id)
-                    .and_then(|(_, explanation)| explanation.clone()),
+            .map(|assessment_item| {
+                let assessment_item_id: Uuid = assessment_item.get("id");
+                let question_version_id: Uuid = assessment_item.get("question_version_id");
+                let answer = answers.get(&assessment_item_id);
+                AttemptItemResponse {
+                    assessment_item_id,
+                    question_version_id,
+                    response: answer
+                        .map(|item| item.response.clone())
+                        .unwrap_or(Value::Null),
+                    correctness: answer.and_then(|item| item.correctness),
+                    awarded_points: answer.and_then(|item| item.awarded_points),
+                    evaluation_status: answer
+                        .map(|item| item.evaluation_status.clone())
+                        .unwrap_or_else(|| "unanswered".into()),
+                    rationale: feedback
+                        .get(&question_version_id)
+                        .and_then(|(rationale, _)| rationale.clone()),
+                    explanation: feedback
+                        .get(&question_version_id)
+                        .and_then(|(_, explanation)| explanation.clone()),
+                }
             })
             .collect(),
         score: grade
