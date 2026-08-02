@@ -166,6 +166,156 @@
       "path": "/api/v1/learning/journeys/{id}"
     },
     {
+      "description": "Create an empty, owner-scoped draft course from the learner brief and approved citation certificates. This never inserts generic starter material; author outcomes, modules, instruction, checks, assessment/task work, validate, then publish.",
+      "input_schema": {
+        "properties": {
+          "brief": {
+            "required": [
+              "title",
+              "audience",
+              "estimatedMinutes",
+              "prerequisites",
+              "outcomes",
+              "modules"
+            ],
+            "type": "object"
+          },
+          "idempotencyKey": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rawIntent": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sourceReferences": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "rawIntent",
+          "idempotencyKey",
+          "brief",
+          "sourceReferences"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.create",
+      "path": "/api/v1/learning/courses"
+    },
+    {
+      "description": "Append a measurable outcome before linking instructional activities, formative checks, or mastery work to it.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "statement": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "successCriteria": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "verb": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "verb",
+          "statement",
+          "successCriteria"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.objective.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/objectives"
+    },
+    {
+      "description": "Run the server-side course validator. It reports stable blocking diagnostics for missing source grounding, module instruction/example coverage, formative rationale/feedback, assessment/task mastery coverage, rubrics, and review state.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.validate",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate"
+    },
+    {
+      "description": "Move a valid owned draft course revision to review, recording the review metadata after the server-side validator passes.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "review": {
+            "type": "object"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId",
+          "review"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.review",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review"
+    },
+    {
+      "description": "Publish a reviewed course revision. This is the only agent-facing publication command for a course; it revalidates atomically and exposes reviewed activities only if no blocking diagnostic remains.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.publish",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish"
+    },
+    {
       "description": "Append a named chapter to an owned journey. Create chapters before the activities they contain; AME assigns the next stable chapter order.",
       "input_schema": {
         "properties": {
@@ -194,7 +344,7 @@
       "path": "/api/v1/learning/journeys/{journey_id}/chapters"
     },
     {
-      "description": "Append an objective-linked draft course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. It remains private until learning.course.activity.review then learning.course.activity.publish succeed. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
+      "description": "Append an objective-linked draft course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. It remains private until course-level validation, review, and publication succeed. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
       "input_schema": {
         "properties": {
           "chapterId": {
@@ -274,24 +424,6 @@
       "method": "POST",
       "name": "learning.course.activity.review",
       "path": "/api/v1/learning/activities/{activity_id}/review"
-    },
-    {
-      "description": "Publish an owned reviewed activity so a learner can start it. A draft cannot be started or published directly.",
-      "input_schema": {
-        "properties": {
-          "activityId": {
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "activityId"
-        ],
-        "type": "object"
-      },
-      "method": "POST",
-      "name": "learning.course.activity.publish",
-      "path": "/api/v1/learning/activities/{activity_id}/publish"
     },
     {
       "description": "Start an activity in an owned journey.",

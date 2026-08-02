@@ -702,7 +702,9 @@ paths:
     post:
       tags:
       - learning
-      summary: POST /api/v1/learning/activities/{activity_id}/publish — expose a reviewed activity to its learner.
+      summary: |-
+        POST /api/v1/learning/activities/{activity_id}/publish — retained only to
+        return a migration-safe error; course revisions are the publication boundary.
       operationId: publish_activity
       parameters:
       - name: activity_id
@@ -713,12 +715,6 @@ paths:
           type: string
           format: uuid
       responses:
-        '200':
-          description: Published learner activity
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LearningActivityResponse'
         '401':
           description: Missing or invalid token
         '404':
@@ -791,6 +787,32 @@ paths:
           description: Generation is not published or activity is completed
         '422':
           description: Rubric, provenance, or review status is invalid
+      security:
+      - bearer_auth: []
+  /api/v1/learning/courses:
+    post:
+      tags:
+      - learning
+      summary: |-
+        Create an empty, learner-owned course aggregate. This intentionally does
+        not seed generic material: agents must add outcomes, modules, instruction,
+        checks, and assessment/task work before the revision can publish.
+      operationId: create_course
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCourseResponse'
+        '422':
+          description: Brief or source set is invalid
       security:
       - bearer_auth: []
   /api/v1/learning/imports:
@@ -1036,6 +1058,189 @@ paths:
           description: Journey does not exist for this learner
         '422':
           description: Chapter is invalid
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/course-revisions:
+    post:
+      tags:
+      - learning
+      operationId: create_course_revision
+      parameters:
+      - name: journey_id
+        in: path
+        description: Owned journey to author as a course
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseRevisionBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRevisionResponse'
+        '409':
+          description: An editable course revision already exists
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}:
+    get:
+      tags:
+      - learning
+      operationId: get_course_revision
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revision_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRevisionResponse'
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish:
+    post:
+      tags:
+      - learning
+      operationId: publish_course_revision
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revision_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRevisionResponse'
+        '422':
+          description: Course has blocking validation issues
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review:
+    post:
+      tags:
+      - learning
+      operationId: review_course_revision
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revision_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCourseRevisionBody'
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRevisionResponse'
+        '422':
+          description: Course has blocking validation issues
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate:
+    post:
+      tags:
+      - learning
+      operationId: validate_course_revision
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revision_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRevisionResponse'
+      security:
+      - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/objectives:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/journeys/{journey_id}/objectives — append a measurable course outcome.
+      operationId: create_objective
+      parameters:
+      - name: journey_id
+        in: path
+        description: Journey to extend
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateObjectiveBody'
+        required: true
+      responses:
+        '200':
+          description: Appended objective
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningObjectiveResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Journey does not exist for this learner
+        '422':
+          description: Objective is invalid
       security:
       - bearer_auth: []
   /api/v1/learning/sessions/{id}:
@@ -1906,6 +2111,9 @@ components:
         - GenerationStateConflict
       - type: string
         enum:
+        - CoursePublicationRequired
+      - type: string
+        enum:
         - TooManyRequests
       - type: string
         enum:
@@ -2291,6 +2499,72 @@ components:
       - approved
       - rejected
       - retired
+    CourseRevisionResponse:
+      type: object
+      required:
+      - id
+      - journeyId
+      - version
+      - status
+      - brief
+      - sourceReferences
+      - validation
+      - createdAt
+      - updatedAt
+      properties:
+        brief:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        publishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        review:
+          type:
+          - object
+          - 'null'
+        sourceReferences:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        validation:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseValidationIssue'
+        version:
+          type: integer
+          format: int32
+          minimum: 0
+    CourseValidationIssue:
+      type: object
+      required:
+      - code
+      - path
+      - message
+      - blocking
+      properties:
+        blocking:
+          type: boolean
+        code:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
     CreateActivityBody:
       type: object
       description: |-
@@ -2391,6 +2665,52 @@ components:
           type: integer
           format: int32
           minimum: 0
+    CreateCourseBody:
+      type: object
+      required:
+      - rawIntent
+      - idempotencyKey
+      - brief
+      - sourceReferences
+      properties:
+        brief:
+          type: object
+        idempotencyKey:
+          type: string
+        rawIntent:
+          type: string
+        sourceReferences:
+          type: array
+          items:
+            type: string
+    CreateCourseResponse:
+      type: object
+      required:
+      - journeyId
+      - revision
+      properties:
+        journeyId:
+          type: string
+          format: uuid
+        revision:
+          $ref: '#/components/schemas/CourseRevisionResponse'
+    CreateCourseRevisionBody:
+      type: object
+      required:
+      - brief
+      - sourceReferences
+      properties:
+        brief:
+          type: object
+          description: |-
+            Learner-facing contract: title, audience, estimatedMinutes,
+            prerequisites, outcomes, and modules. The validator retains it with the
+            release decision rather than trusting an agent's free-form assertion.
+        sourceReferences:
+          type: array
+          items:
+            type: string
+          description: Citation certificate IDs used to ground the course-level source set.
     CreateDeepDiveBody:
       type: object
       required:
@@ -2462,6 +2782,22 @@ components:
           type: string
           format: uuid
         retryKey:
+          type: string
+    CreateObjectiveBody:
+      type: object
+      description: |-
+        A course author declares observable outcomes before linking instruction,
+        formative checks, and mastery work to them.
+      required:
+      - verb
+      - statement
+      - successCriteria
+      properties:
+        statement:
+          type: string
+        successCriteria:
+          type: string
+        verb:
           type: string
     CreateQuestionBody:
       type: object
@@ -3763,6 +4099,13 @@ components:
           format: uuid
         variantKind:
           $ref: '#/components/schemas/VariantKind'
+    ReviewCourseRevisionBody:
+      type: object
+      required:
+      - review
+      properties:
+        review:
+          type: object
     ReviewHistoryPoint:
       type: object
       required:

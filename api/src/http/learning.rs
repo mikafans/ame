@@ -22,8 +22,8 @@ use crate::{
         learning::{
             ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
             AuthorActivityRubric, CreateActivity, CreateChapter, CreateLearningSession,
-            FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyOrigin,
-            JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
+            CreateObjective, FinishLearningSession as FinishLearningSessionInput, GoalStatus,
+            JourneyOrigin, JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
             LearningRepository, LearningSession, LearningSessionStatus, ObjectiveStatus,
             TransitionActivityPublication,
         },
@@ -201,6 +201,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route("/v1/learning/journeys", get(list_journeys))
         .route("/v1/learning/journeys/{id}", get(get_journey))
         .route(
+            "/v1/learning/journeys/{journey_id}/objectives",
+            post(create_objective),
+        )
+        .route(
             "/v1/learning/journeys/{journey_id}/chapters",
             post(create_chapter),
         )
@@ -265,6 +269,16 @@ pub struct AuthorActivityRubricBody {
 pub struct CreateChapterBody {
     pub title: String,
     pub summary: String,
+}
+
+/// A course author declares observable outcomes before linking instruction,
+/// formative checks, and mastery work to them.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateObjectiveBody {
+    pub verb: String,
+    pub statement: String,
+    pub success_criteria: String,
 }
 
 /// A course author supplies the activity semantics and objective links; AME owns
@@ -373,6 +387,48 @@ pub async fn create_chapter(
     Ok(Json(chapter_response(chapter, &[])))
 }
 
+/// POST /api/v1/learning/journeys/{journey_id}/objectives — append a measurable course outcome.
+#[utoipa::path(
+    post,
+    path = "/api/v1/learning/journeys/{journey_id}/objectives",
+    params(("journey_id" = Uuid, Path, description = "Journey to extend")),
+    request_body = CreateObjectiveBody,
+    responses(
+        (status = 200, description = "Appended objective", body = LearningObjectiveResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Journey does not exist for this learner"),
+        (status = 422, description = "Objective is invalid")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn create_objective(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+    Json(body): Json<CreateObjectiveBody>,
+) -> Result<Json<LearningObjectiveResponse>, ApiError> {
+    let repository = PgLearningRepository::new(state.pool);
+    let order_index = repository
+        .list_objectives(auth.owner_id(), journey_id)
+        .await
+        .map_err(map_learning_error)?
+        .last()
+        .map_or(0, |objective| objective.order_index + 1);
+    let objective = repository
+        .create_objective(CreateObjective {
+            journey_id,
+            subject_user_id: auth.owner_id(),
+            verb: body.verb,
+            statement: body.statement,
+            success_criteria: body.success_criteria,
+            order_index,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(objective_response(objective)))
+}
+
 /// POST /api/v1/learning/journeys/{journey_id}/activities — append a course activity.
 #[utoipa::path(
     post,
@@ -472,13 +528,14 @@ pub async fn submit_activity_for_review(
     Ok(Json(activity_response(activity)))
 }
 
-/// POST /api/v1/learning/activities/{activity_id}/publish — expose a reviewed activity to its learner.
+/// POST /api/v1/learning/activities/{activity_id}/publish — retained only to
+/// return a migration-safe error; course revisions are the publication boundary.
 #[utoipa::path(
     post,
     path = "/api/v1/learning/activities/{activity_id}/publish",
     params(("activity_id" = Uuid, Path, description = "Reviewed activity to publish")),
     responses(
-        (status = 200, description = "Published learner activity", body = LearningActivityResponse),
+        (status = 409, description = "Course-level publication validation is required"),
         (status = 401, description = "Missing or invalid token"),
         (status = 404, description = "Activity does not exist for this learner"),
         (status = 409, description = "Activity is not in review")
@@ -487,20 +544,11 @@ pub async fn submit_activity_for_review(
     tag = "learning"
 )]
 pub async fn publish_activity(
-    State(state): State<AppState>,
-    auth: AuthenticatedUser,
-    Path(activity_id): Path<Uuid>,
+    State(_state): State<AppState>,
+    _auth: AuthenticatedUser,
+    Path(_activity_id): Path<Uuid>,
 ) -> Result<Json<LearningActivityResponse>, ApiError> {
-    let activity = PgLearningRepository::new(state.pool)
-        .transition_activity_publication(TransitionActivityPublication {
-            subject_user_id: auth.owner_id(),
-            activity_id,
-            from: ActivityPublicationStatus::Review,
-            to: ActivityPublicationStatus::Published,
-        })
-        .await
-        .map_err(map_learning_error)?;
-    Ok(Json(activity_response(activity)))
+    Err(ApiError::CoursePublicationRequired)
 }
 
 /// GET /api/v1/learning/activities/{activity_id}/content — read immutable activity content without starting a session.

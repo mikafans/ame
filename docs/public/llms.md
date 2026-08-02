@@ -83,8 +83,13 @@ Use these operations with the learner token:
 ```http
 GET    /api/v1/learning/journeys
 GET    /api/v1/learning/journeys/{id}
+POST   /api/v1/learning/courses
+POST   /api/v1/learning/journeys/{journey_id}/objectives
 POST   /api/v1/learning/journeys/{journey_id}/chapters
 POST   /api/v1/learning/journeys/{journey_id}/activities
+POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate
+POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review
+POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish
 POST   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
 GET    /api/v1/learning/sessions/{id}
 POST   /api/v1/learning/sessions/{id}/finish
@@ -92,7 +97,6 @@ GET    /api/v1/learning/activities/{activity_id}/content
 PATCH  /api/v1/learning/activities/{activity_id}/content
 PATCH  /api/v1/learning/activities/{activity_id}/rubric
 POST   /api/v1/learning/activities/{activity_id}/review
-POST   /api/v1/learning/activities/{activity_id}/publish
 
 POST   /api/v1/questions
 GET    /api/v1/questions/{question_id}/versions/{version}
@@ -134,15 +138,23 @@ When saving answers, use the question-kind envelope: multiple choice is
 not send `{"answer":...}`; it is preserved as a response but does not match a
 deterministically graded numeric question.
 
-Agents can append a chapter and objective-linked activities to an owned journey
-to assemble a course. AME assigns the next order. Mark only the learner's next
-activity `ready`; keep later activities `proposed` so ordinary completion
-unlocks them in sequence. Use a `practice` activity as the target for a
-published assessment and an `application` activity as the target for a
-reviewed task rubric. Agent-created activities begin as private drafts: submit
-them for review, then publish them before a learner can start them. Read
-completed work with the activity-content `GET`; do not restart a completed
-activity.
+Create a new agent-authored course with `POST /api/v1/learning/courses`; it is
+empty by design and never receives generic starter material. Add measurable
+objectives, ordered chapters, and objective-linked activities. AME assigns the
+next order. Mark only the learner's next activity `ready`; keep later
+activities `proposed` so ordinary completion unlocks them in sequence. Use a
+`practice` activity as the target for a published formative assessment and an
+`application` activity as the target for a reviewed task rubric.
+
+Course publication is a server command, not an activity-row transition. Before
+publication, an agent must run `validate`, resolve every blocking diagnostic,
+then submit the revision to `review` with review metadata, and finally call
+`publish`. The validator requires source-backed instruction and worked examples
+in every module, approved formative questions with rationales and feedback,
+and graded assessment or rubric-backed application coverage for every
+objective. The old activity publish endpoint returns a migration error; it
+cannot expose a single activity outside this course gate. Read completed work
+with the activity-content `GET`; do not restart a completed activity.
 
 Task submissions carry the exact activity `contentVersion`, response, review
 state, evaluation method, optional score, and feedback. A task contributes

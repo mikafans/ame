@@ -84,6 +84,7 @@ pub mod assessments;
 pub mod attempts;
 pub mod auth;
 pub mod citations;
+pub mod courses;
 pub mod db;
 pub mod deep_dives;
 pub mod fixture;
@@ -159,6 +160,7 @@ pub fn router(pool: PgPool) -> Router {
     let logged_router = Router::new()
         .merge(me::current_router(state.clone()))
         .merge(learning::router(state.clone()))
+        .merge(courses::router(state.clone()))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             idempotency::idempotency_middleware,

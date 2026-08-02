@@ -132,18 +132,91 @@ def test_agent_authored_activity_stays_private_until_review_and_publish(client):
     assert review.status_code == 200, review.text
     assert review.json()["publicationStatus"] == "review"
 
-    published = client.post(
+    blocked_course_publish = client.post(
         f"/api/v1/learning/activities/{activity['id']}/publish", headers=headers
     )
-    assert published.status_code == 200, published.text
-    assert published.json()["publicationStatus"] == "published"
+    assert blocked_course_publish.status_code == 409, blocked_course_publish.text
+    assert blocked_course_publish.json()["error"]["code"] == "course_publication_required"
 
-    started_activity = client.post(
+    still_blocked = client.post(
         f"/api/v1/learning/journeys/{journey_id}/activities/{activity['id']}/start",
         headers=headers,
         json={"questionPlan": {}},
     )
-    assert started_activity.status_code == 201, started_activity.text
+    assert still_blocked.status_code == 422, still_blocked.text
+
+
+def test_course_revision_returns_server_side_publish_diagnostics(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
+    journey_id = started["journeyId"]
+    created = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions",
+        headers=headers,
+        json={
+            "brief": {
+                "title": "A source-grounded course",
+                "audience": "A learner with a concrete goal",
+                "estimatedMinutes": 60,
+                "prerequisites": ["None beyond the stated learner level."],
+                "outcomes": ["Explain one verifiable course outcome."],
+                "modules": ["Foundations", "Practice"],
+            },
+            "sourceReferences": references,
+        },
+    )
+    assert created.status_code == 201, created.text
+    revision = created.json()
+    assert revision["status"] == "draft"
+
+    validated = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/validate",
+        headers=headers,
+    )
+    assert validated.status_code == 200, validated.text
+    issue_codes = {issue["code"] for issue in validated.json()["validation"]}
+    assert "activity_not_reviewed" in issue_codes
+    assert "instruction_missing_formative_check" in issue_codes
+    assert "outcome_missing_mastery" in issue_codes
+
+    publish = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/publish",
+        headers=headers,
+    )
+    assert publish.status_code == 409, publish.text
+
+
+def test_agent_can_start_an_empty_course_without_generic_template_material(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
+    created = client.post(
+        "/api/v1/learning/courses",
+        headers=headers,
+        json={
+            "rawIntent": "Design a reliable asynchronous TCP service with Netty.",
+            "idempotencyKey": f"agent-course-{uuid.uuid4()}",
+            "brief": {
+                "title": "Netty service design",
+                "audience": "A Java maintainer",
+                "estimatedMinutes": 90,
+                "prerequisites": ["Basic Java concurrency"],
+                "outcomes": ["Explain a Netty pipeline design"],
+                "modules": ["Event loops"],
+            },
+            "sourceReferences": references,
+        },
+    )
+    assert created.status_code == 201, created.text
+    course = created.json()
+    assert course["journeyId"] != started["journeyId"]
+    assert course["revision"]["status"] == "draft"
+
+    journey = client.get(
+        f"/api/v1/learning/journeys/{course['journeyId']}", headers=headers
+    )
+    assert journey.status_code == 200, journey.text
+    assert journey.json()["activities"] == []
+    assert journey.json()["objectives"] == []
 
 
 def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
