@@ -12,7 +12,7 @@ def test_operational_and_static_public_contracts(client):
     assert readiness.status_code == 200
     assert readiness.json()["postgres"] == "ok"
 
-    llms = client.get("/public/llms.txt")
+    llms = client.get("/public/llms.md")
     assert llms.status_code == 200
     assert "POST /public/v1/auth/register" in llms.text
     assert "POST /public/v1/auth/login" in llms.text
@@ -20,7 +20,7 @@ def test_operational_and_static_public_contracts(client):
 
     skill = client.get("/public/skill.json")
     assert skill.status_code == 200
-    assert skill.json()["entrypoint"] == "/public/llms.txt"
+    assert skill.json()["entrypoint"] == "/public/llms.md"
 
     openapi = client.get("/public/openapi.yaml")
     assert openapi.status_code == 200
@@ -68,7 +68,7 @@ def test_active_docs_do_not_keep_retired_agent_surface():
 
 def test_llms_entry_doc_lists_every_manifest_api_path():
     manifest = json.loads(Path("docs/public/skill.json").read_text())
-    llms = Path("docs/public/llms.txt").read_text()
+    llms = Path("docs/public/llms.md").read_text()
     missing = sorted(
         {
             tool["path"].split("?", 1)[0]

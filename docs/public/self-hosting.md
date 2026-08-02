@@ -3,7 +3,7 @@
 This is the operator guide for running AME on one host with Docker or Podman
 Compose. The recommended deployment includes Caddy in the Compose stack, so the
 browser, API, and public machine-readable documents share one origin. The same
-learner API serves the web app and agents; `llms.txt` is the machine-facing
+learner API serves the web app and agents; `llms.md` is the machine-facing
 entry guide for that shared contract.
 
 ## Production architecture
@@ -16,7 +16,7 @@ Internet -> containerized Caddy :80/:443
 ```
 
 Use one public origin for the browser and API. Containerized Caddy serves the
-canonical documents `/public/llms.txt`, `/public/skill.json`, and
+canonical documents `/public/llms.md`, `/public/skill.json`, and
 `/public/openapi.yaml` directly from `docs/public`; it proxies `/api/*` and
 `/public/v1/*` to the API, and keeps `/healthz`, `/readyz`, and `/metrics` as
 root operational endpoints. All other paths go to Next.js.
@@ -102,12 +102,12 @@ Do not use repository demo passwords on an internet-facing instance.
 After the public origin is live, AI clients can discover AME at:
 
 ```text
-https://ame.example.com/public/llms.txt
+https://ame.example.com/public/llms.md
 https://ame.example.com/public/skill.json
 https://ame.example.com/public/openapi.yaml
 ```
 
-`llms.txt` is an agent discovery contract, not a self-hosting mechanism. These
+`llms.md` is an agent discovery contract, not a self-hosting mechanism. These
 routes advertise the shared learner API. An agent can start onboarding with an
 email identifier and receive the learner bearer token; no separate integration
 identity is needed.

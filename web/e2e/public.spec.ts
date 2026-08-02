@@ -14,8 +14,8 @@ test.describe("public documentation", () => {
       page.getByRole("link", { name: "Agent guide", exact: true }),
     ).toHaveAttribute("href", "/agent");
     await expect(
-      page.getByRole("link", { name: "llms.txt", exact: true }),
-    ).toHaveAttribute("href", "/public/llms.txt");
+      page.getByRole("link", { name: "Agent API guide", exact: true }),
+    ).toHaveAttribute("href", "/public/llms.md");
   });
 
   test("agent guide is public and does not redirect to login", async ({

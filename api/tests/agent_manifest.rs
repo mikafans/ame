@@ -38,7 +38,7 @@ fn skill_manifest_contains_namespaced_unified_learning_tools() {
     assert!(paths.contains(&"/api/v1/learning/journeys/{id}/analytics"));
     assert_eq!(
         manifest["entrypoint"],
-        Value::String("/public/llms.txt".into())
+        Value::String("/public/llms.md".into())
     );
 }
 

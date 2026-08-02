@@ -230,7 +230,7 @@ GET  /api/v1/deep-dives/{id}
 - `GET /public/learning-principles.md` — human-readable explanation of the same rules.
 - `GET /public/skill.json` — named agent operations and lightweight input schemas.
 - `GET /public/openapi.yaml` — complete HTTP contract for code generation and validation.
-- `GET /public/llms.txt` — this concise agent entry guide.
+- `GET /public/llms.md` — this concise agent entry guide.
 - `GET /agent` — human-readable agent integration guide.
 - `GET /self-hosting` — human-readable operator deployment guide.
 

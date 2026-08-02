@@ -5,7 +5,7 @@
     "type": "bearer"
   },
   "description": "ame — study, sweetened. An agent-friendly learning API with one owner-scoped learner model.",
-  "entrypoint": "/public/llms.txt",
+  "entrypoint": "/public/llms.md",
   "name": "ame",
   "principles": [
     "Agents and people use the same authenticated learner API.",

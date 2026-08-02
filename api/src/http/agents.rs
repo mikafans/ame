@@ -449,7 +449,7 @@ pub fn build_skill_manifest() -> Value {
             "format": "ame_token",
             "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required."
         },
-        "entrypoint": "/public/llms.txt",
+        "entrypoint": "/public/llms.md",
         "tools": tools,
         "principles": [
             "Agents and people use the same authenticated learner API.",

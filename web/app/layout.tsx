@@ -39,7 +39,7 @@ export default function RootLayout({
         <link
           rel="alternate"
           type="text/plain"
-          href="/public/llms.txt"
+          href="/public/llms.md"
           title="LLM/Agent Documentation"
         />
       </head>

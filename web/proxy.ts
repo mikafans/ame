@@ -18,7 +18,7 @@ const PUBLIC_PATHS = new Set([
   "/start",
   "/agent",
   "/self-hosting",
-  "/public/llms.txt",
+  "/public/llms.md",
   "/public/skill.json",
   "/public/openapi.yaml",
 ]);

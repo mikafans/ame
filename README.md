@@ -93,7 +93,7 @@ needed.
 
 For a single-host self-hosted installation, follow
 [`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
-`/public/llms.txt` file is the agent discovery contract, served statically by
+`/public/llms.md` file is the agent discovery contract, served statically by
 the recommended proxy rather than by the API.
 
 ```bash
