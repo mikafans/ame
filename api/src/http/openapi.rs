@@ -79,6 +79,7 @@ use crate::http::{
         crate::http::courses::create_course_revision,
         crate::http::courses::create_course,
         crate::http::courses::get_course_revision,
+        crate::http::courses::fork_course_revision,
         crate::http::courses::validate_course_revision,
         crate::http::courses::review_course_revision,
         crate::http::courses::publish_course_revision,

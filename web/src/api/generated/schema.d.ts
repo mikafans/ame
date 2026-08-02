@@ -627,6 +627,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fork a published revision into an editable draft without changing the
+         *     learner-visible graph. Question versions remain immutable shared inputs;
+         *     activities, objectives, chapters, assessments, and assessment items receive
+         *     fresh IDs under the new revision.
+         */
+        post: operations["fork_course_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish": {
         parameters: {
             query?: never;
@@ -3689,6 +3711,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CourseRevisionResponse"];
                 };
+            };
+        };
+    };
+    fork_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+            /** @description A draft revision already exists or the source revision is not published */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

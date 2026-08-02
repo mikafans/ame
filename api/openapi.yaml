@@ -1117,6 +1117,40 @@ paths:
                 $ref: '#/components/schemas/CourseRevisionResponse'
       security:
       - bearer_auth: []
+  /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork:
+    post:
+      tags:
+      - learning
+      summary: |-
+        Fork a published revision into an editable draft without changing the
+        learner-visible graph. Question versions remain immutable shared inputs;
+        activities, objectives, chapters, assessments, and assessment items receive
+        fresh IDs under the new revision.
+      operationId: fork_course_revision
+      parameters:
+      - name: journey_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: revision_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseRevisionResponse'
+        '409':
+          description: A draft revision already exists or the source revision is not published
+      security:
+      - bearer_auth: []
   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish:
     post:
       tags:
