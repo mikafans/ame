@@ -183,7 +183,7 @@ def test_course_revision_returns_server_side_publish_diagnostics(client):
         json={"review": {"reviewer": "agent", "decision": "approved"}},
     )
     assert invalid_review.status_code == 422, invalid_review.text
-    assert invalid_review.json()["error"]["fields"][0]["field"] == "review"
+    assert invalid_review.json()["error"]["details"]["fields"][0]["field"] == "review"
 
     publish = client.post(
         f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/publish",
