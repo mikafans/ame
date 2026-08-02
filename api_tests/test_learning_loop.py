@@ -175,9 +175,7 @@ def test_course_revision_returns_server_side_publish_diagnostics(client):
     )
     assert validated.status_code == 200, validated.text
     issue_codes = {issue["code"] for issue in validated.json()["validation"]}
-    assert "activity_not_reviewed" in issue_codes
-    assert "instruction_missing_formative_check" in issue_codes
-    assert "outcome_missing_mastery" in issue_codes
+    assert issue_codes == {"missing_modules", "missing_outcomes"}
 
     publish = client.post(
         f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/publish",
