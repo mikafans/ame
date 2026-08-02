@@ -80,9 +80,12 @@ Use these operations with the learner token:
 ```http
 GET    /api/v1/learning/journeys
 GET    /api/v1/learning/journeys/{id}
+POST   /api/v1/learning/journeys/{journey_id}/chapters
+POST   /api/v1/learning/journeys/{journey_id}/activities
 POST   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start
 GET    /api/v1/learning/sessions/{id}
 POST   /api/v1/learning/sessions/{id}/finish
+GET    /api/v1/learning/activities/{activity_id}/content
 PATCH  /api/v1/learning/activities/{activity_id}/content
 PATCH  /api/v1/learning/activities/{activity_id}/rubric
 
@@ -119,6 +122,20 @@ return a score. Question `kind` includes `numeric`, graded against
 `"2%"`); omit the tolerance for an exact match. Essay/code answers can finish
 as `submitted` with `reviewStatus: pending`; do not invent a score or evidence
 while review is pending. Abandoned work never creates mastery evidence.
+
+When saving answers, use the question-kind envelope: multiple choice is
+`{"option_id":"option-id"}`; true/false, short answer, and numeric are
+`{"value":...}`. A numeric value may be a JSON number or numeric string. Do
+not send `{"answer":...}`; it is preserved as a response but does not match a
+deterministically graded numeric question.
+
+Agents can append a chapter and objective-linked activities to an owned journey
+to assemble a course. AME assigns the next order. Mark only the learner's next
+activity `ready`; keep later activities `proposed` so ordinary completion
+unlocks them in sequence. Use a `practice` activity as the target for a
+published assessment and an `application` activity as the target for a
+reviewed task rubric. Read completed work with the activity-content `GET`; do
+not restart a completed activity.
 
 Task submissions carry the exact activity `contentVersion`, response, review
 state, evaluation method, optional score, and feedback. A task contributes

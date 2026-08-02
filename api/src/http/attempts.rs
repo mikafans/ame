@@ -38,6 +38,9 @@ pub struct StartAttemptBody {
 pub struct SaveAnswerBody {
     pub assessment_item_id: Uuid,
     pub question_version_id: Uuid,
+    /// Question-kind response envelope: multiple choice uses `{"option_id":"option-id"}`;
+    /// true/false, short answer, and numeric use `{"value": ...}` (numeric accepts a JSON
+    /// number or numeric string); essay and code are retained for manual review.
     pub response: Value,
 }
 

@@ -1267,7 +1267,7 @@
       "path": "/api/v1/assessments/{assessment_id}/attempts"
     },
     {
-      "description": "Save one answer while preserving assessment item and question version identity.",
+      "description": "Save one answer while preserving assessment item and question version identity. Response envelopes are question-kind specific: multiple choice uses {option_id: option-id}; true/false, short answer, and numeric use {value: boolean|string|number}. Numeric accepts a JSON number or numeric string; do not use {answer: ...}.",
       "input_schema": {
         "properties": {
           "assessmentItemId": {
@@ -1283,6 +1283,7 @@
             "type": "string"
           },
           "response": {
+            "description": "multiple_choice: {option_id: string}; true_false, short_answer, numeric: {value: boolean|string|number}; numeric accepts a JSON number or numeric string.",
             "type": "object"
           }
         },

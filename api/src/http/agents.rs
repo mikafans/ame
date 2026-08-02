@@ -321,10 +321,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.attempt.answer",
-            "Save one answer while preserving assessment item and question version identity.",
+            "Save one answer while preserving assessment item and question version identity. Response envelopes are question-kind specific: multiple choice uses {option_id: option-id}; true/false, short answer, and numeric use {value: boolean|string|number}. Numeric accepts a JSON number or numeric string; do not use {answer: ...}.",
             "POST",
             "/api/v1/attempts/{attempt_id}/answers",
-            json!({"type":"object","required":["attemptId","assessmentItemId","questionVersionId","response"],"properties":{"attemptId":{"type":"string","format":"uuid"},"assessmentItemId":{"type":"string","format":"uuid"},"questionVersionId":{"type":"string","format":"uuid"},"response":{"type":"object"}}}),
+            json!({"type":"object","required":["attemptId","assessmentItemId","questionVersionId","response"],"properties":{"attemptId":{"type":"string","format":"uuid"},"assessmentItemId":{"type":"string","format":"uuid"},"questionVersionId":{"type":"string","format":"uuid"},"response":{"type":"object","description":"multiple_choice: {option_id: string}; true_false, short_answer, numeric: {value: boolean|string|number}; numeric accepts a JSON number or numeric string."}}}),
         ),
         endpoint(
             "learning.attempt.finish",

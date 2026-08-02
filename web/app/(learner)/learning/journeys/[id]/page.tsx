@@ -46,6 +46,10 @@ function isStarterContent(content: unknown): content is StarterContent {
   );
 }
 
+function usesAssessment(activity: Journey["activities"][number] | undefined) {
+  return activity?.kind === "practice" || activity?.kind === "timed_practice";
+}
+
 function ActivityProvenance({
   sourceReferences,
 }: {
@@ -318,7 +322,12 @@ export default function LearningJourneyPage() {
           const completedActivity = journeyResult.data.activities
             .filter((activity) => activity.status === "completed")
             .sort((left, right) => right.orderIndex - left.orderIndex)[0];
-          if (completedActivity) await loadDeepDive(completedActivity.id);
+          if (
+            completedActivity &&
+            journeyResult.data.recommendation?.evidenceIds.length
+          ) {
+            await loadDeepDive(completedActivity.id);
+          }
           return;
         }
         const sessionResult = await api.GET("/api/v1/learning/sessions/{id}", {
@@ -334,7 +343,18 @@ export default function LearningJourneyPage() {
         }
         setSession(sessionResult.data);
         if (sessionResult.data.status === "in_progress") {
-          await loadAssessment(sessionResult.data.activityId, storedSessionId);
+          if (
+            usesAssessment(
+              journeyResult.data.activities.find(
+                (activity) => activity.id === sessionResult.data.activityId,
+              ),
+            )
+          ) {
+            await loadAssessment(
+              sessionResult.data.activityId,
+              storedSessionId,
+            );
+          }
         } else {
           await loadDeepDive(sessionResult.data.activityId);
         }
@@ -373,7 +393,13 @@ export default function LearningJourneyPage() {
       setDeepDive(null);
       setReviewActivityId(null);
       window.localStorage.setItem(`ame-learning-session:${params.id}`, data.id);
-      await loadAssessment(activityId, data.id);
+      if (
+        usesAssessment(
+          journey?.activities.find((activity) => activity.id === activityId),
+        )
+      ) {
+        await loadAssessment(activityId, data.id);
+      }
     } catch (startError) {
       setError(
         startError instanceof Error
@@ -474,9 +500,13 @@ export default function LearningJourneyPage() {
       const refreshed = await api.GET("/api/v1/learning/journeys/{id}", {
         params: { path: { id: params.id } },
       });
-      if (refreshed.response.ok && refreshed.data) setJourney(refreshed.data);
+      if (refreshed.response.ok && refreshed.data) {
+        setJourney(refreshed.data);
+        if (refreshed.data.recommendation?.evidenceIds.length) {
+          await loadDeepDive(session.activityId);
+        }
+      }
       await loadAttemptHistory();
-      await loadDeepDive(session.activityId);
     } catch (finishError) {
       setError(
         finishError instanceof Error
@@ -508,6 +538,8 @@ export default function LearningJourneyPage() {
         (activity) => activity.id === reviewActivityId,
       ) ?? null)
     : null;
+  const reviewPayload = reviewActivity?.payload as ActivityPayload | undefined;
+  const reviewContent = reviewPayload?.content ?? null;
   const activeActivityId =
     session?.status === "in_progress" ? session.activityId : null;
   const activePayload = activeActivity?.payload as unknown as
@@ -959,20 +991,42 @@ export default function LearningJourneyPage() {
               This is the published content you completed. Reviewing it does not
               start another session or change your progress.
             </p>
-            <ActivityContentRenderer
-              content={
-                (reviewActivity.payload as unknown as ActivityPayload)
-                  .content ?? null
-              }
-              contentVersion={reviewActivity.contentVersion}
-              rubric={reviewActivity.rubric}
-            />
-            {(reviewActivity.payload as unknown as ActivityPayload)
-              .contentProvenance?.sourceReferences && (
+            {isStarterContent(reviewContent) ? (
+              <div className="mt-5 space-y-5 border-t border-primary/20 pt-5">
+                {reviewContent.context && (
+                  <p className="rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6 text-foreground">
+                    {reviewContent.context}
+                  </p>
+                )}
+                <p className="text-sm font-medium">
+                  {reviewContent.instructions}
+                </p>
+                <ol className="space-y-3">
+                  {reviewContent.questions.map((question, index) => (
+                    <li key={question.id} className="text-sm leading-6">
+                      <span className="font-medium">
+                        {index + 1}. {question.prompt}
+                      </span>
+                      {question.options && (
+                        <p className="mt-1 text-muted-foreground">
+                          Options: {question.options.join(", ")}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : (
+              <ActivityContentRenderer
+                content={reviewContent}
+                contentVersion={reviewActivity.contentVersion}
+                rubric={reviewActivity.rubric}
+              />
+            )}
+            {reviewPayload?.contentProvenance?.sourceReferences && (
               <ActivityProvenance
                 sourceReferences={
-                  (reviewActivity.payload as unknown as ActivityPayload)
-                    .contentProvenance?.sourceReferences ?? []
+                  reviewPayload.contentProvenance.sourceReferences
                 }
               />
             )}

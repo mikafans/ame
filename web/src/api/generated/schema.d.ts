@@ -1861,6 +1861,11 @@ export interface components {
             assessmentItemId: string;
             /** Format: uuid */
             questionVersionId: string;
+            /**
+             * @description Question-kind response envelope: multiple choice uses `{"option_id":"option-id"}`;
+             *     true/false, short answer, and numeric use `{"value": ...}` (numeric accepts a JSON
+             *     number or numeric string); essay and code are retained for manual review.
+             */
             response: unknown;
         };
         SeedReviewBody: {
