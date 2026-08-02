@@ -818,7 +818,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert recommendation.status_code == 200, recommendation.text
 
-    learner_day = datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    submitted_at = finished.json()["submittedAt"]
+    assert submitted_at is not None
+    learner_day = datetime.fromisoformat(submitted_at).astimezone(
+        ZoneInfo("Asia/Tokyo")
+    ).date()
     streak_body = {
         "journeyId": journey_id,
         "activityId": activity_id,
