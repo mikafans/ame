@@ -83,10 +83,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.course.objective.create",
-            "Append a measurable outcome before linking instructional activities, formative checks, or mastery work to it.",
+            "Append a measurable outcome to the active draft revision before linking instructional activities, formative checks, or mastery work to it.",
             "POST",
             "/api/v1/learning/journeys/{journey_id}/objectives",
-            json!({"type":"object","required":["journeyId","verb","statement","successCriteria"],"properties":{"journeyId":{"type":"string","format":"uuid"},"verb":{"type":"string","minLength":1},"statement":{"type":"string","minLength":1},"successCriteria":{"type":"string","minLength":1}}}),
+            json!({"type":"object","required":["journeyId","revisionId","verb","statement","successCriteria"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"verb":{"type":"string","minLength":1},"statement":{"type":"string","minLength":1},"successCriteria":{"type":"string","minLength":1}}}),
         ),
         endpoint(
             "learning.course.revision.validate",
@@ -111,24 +111,24 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.course.chapter.create",
-            "Append a named chapter to an owned journey. Create chapters before the activities they contain; AME assigns the next stable chapter order.",
+            "Append a named chapter to the active draft revision. Create chapters before the activities they contain; AME assigns the next stable chapter order within that revision.",
             "POST",
             "/api/v1/learning/journeys/{journey_id}/chapters",
-            json!({"type":"object","required":["journeyId","title","summary"],"properties":{"journeyId":{"type":"string","format":"uuid"},"title":{"type":"string","minLength":1},"summary":{"type":"string","minLength":1}}}),
+            json!({"type":"object","required":["journeyId","revisionId","title","summary"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"title":{"type":"string","minLength":1},"summary":{"type":"string","minLength":1}}}),
         ),
         endpoint(
             "learning.course.activity.create",
             "Append an objective-linked draft course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. It remains private until course-level validation, review, and publication succeed. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
             "POST",
             "/api/v1/learning/journeys/{journey_id}/activities",
-            json!({"type":"object","required":["journeyId","kind","title","payload","objectiveIds","status"],"properties":{"journeyId":{"type":"string","format":"uuid"},"chapterId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["explanation","example","diagnostic","practice","feedback","application","reflection","milestone","timed_practice","recommendation"]},"title":{"type":"string","minLength":1},"payload":{"type":"object"},"objectiveIds":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1},"status":{"type":"string","enum":["ready","proposed"]}}}),
+            json!({"type":"object","required":["journeyId","revisionId","kind","title","payload","objectiveIds","status"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"chapterId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["explanation","example","diagnostic","practice","feedback","application","reflection","milestone","timed_practice","recommendation"]},"title":{"type":"string","minLength":1},"payload":{"type":"object"},"objectiveIds":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1},"status":{"type":"string","enum":["ready","proposed"]}}}),
         ),
         endpoint(
             "learning.course.activity.review",
-            "Move an owned draft activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
+            "Move an owned draft-revision activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
             "POST",
             "/api/v1/learning/activities/{activity_id}/review",
-            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
+            json!({"type":"object","required":["activityId","revisionId"],"properties":{"activityId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.activity.start",
@@ -303,14 +303,14 @@ pub fn build_skill_manifest() -> Value {
             "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
             "PATCH",
             "/api/v1/learning/activities/{activity_id}/content",
-            json!({"type":"object","required":["activityId","generationRunId","content","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"content":{"type":"object","required":["type"],"description":"The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings."},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved content is learner-visible."}}}),
+            json!({"type":"object","required":["activityId","revisionId","generationRunId","content","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"content":{"type":"object","required":["type"],"description":"The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings."},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved content is learner-visible."}}}),
         ),
         endpoint(
             "learning.activity.rubric.author",
             "Attach a structured scoring rubric to a task/application activity from a published learning.activity.rubric.compose generation run. Criteria and points guide manual/agent review; learners see the criteria. Provenance is mandatory.",
             "PATCH",
             "/api/v1/learning/activities/{activity_id}/rubric",
-            json!({"type":"object","required":["activityId","generationRunId","rubric","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"rubric":{"type":"object","required":["version","criteria"],"description":"Structured rubric: version, criteria[] (each id, objectiveId, description, maxPoints>=1, required), optional passingScore 0..1.","properties":{"version":{"type":"integer","minimum":1},"criteria":{"type":"array","minItems":1,"items":{"type":"object","required":["id","objectiveId","description","maxPoints","required"],"properties":{"id":{"type":"string"},"objectiveId":{"type":"string","format":"uuid"},"description":{"type":"string"},"maxPoints":{"type":"integer","minimum":1},"required":{"type":"boolean"}}}},"passingScore":{"type":"number","minimum":0,"maximum":1}}},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved rubrics are learner-visible."}}}),
+            json!({"type":"object","required":["activityId","revisionId","generationRunId","rubric","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"rubric":{"type":"object","required":["version","criteria"],"description":"Structured rubric: version, criteria[] (each id, objectiveId, description, maxPoints>=1, required), optional passingScore 0..1.","properties":{"version":{"type":"integer","minimum":1},"criteria":{"type":"array","minItems":1,"items":{"type":"object","required":["id","objectiveId","description","maxPoints","required"],"properties":{"id":{"type":"string"},"objectiveId":{"type":"string","format":"uuid"},"description":{"type":"string"},"maxPoints":{"type":"integer","minimum":1},"required":{"type":"boolean"}}}},"passingScore":{"type":"number","minimum":0,"maximum":1}}},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved rubrics are learner-visible."}}}),
         ),
         endpoint(
             "learning.question.create",
@@ -335,10 +335,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.assessment.create",
-            "Compose approved question versions into a learner-owned practice or graded assessment.",
+            "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision.",
             "POST",
             "/api/v1/assessments",
-            json!({"type":"object","required":["activityId","mode","items"],"properties":{"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array","items":{"type":"object","required":["objectiveId","questionId","questionVersion","orderIndex","points"],"properties":{"objectiveId":{"type":"string","format":"uuid"},"questionId":{"type":"string","format":"uuid"},"questionVersion":{"type":"integer"},"orderIndex":{"type":"integer"},"points":{"type":"integer","minimum":1}}}},"status":{"type":"string"}}}),
+            json!({"type":"object","required":["revisionId","activityId","mode","items"],"properties":{"revisionId":{"type":"string","format":"uuid"},"activityId":{"type":"string","format":"uuid"},"mode":{"type":"string","enum":["practice","graded"]},"items":{"type":"array","items":{"type":"object","required":["objectiveId","questionId","questionVersion","orderIndex","points"],"properties":{"objectiveId":{"type":"string","format":"uuid"},"questionId":{"type":"string","format":"uuid"},"questionVersion":{"type":"integer"},"orderIndex":{"type":"integer"},"points":{"type":"integer","minimum":1}}}},"status":{"type":"string"}}}),
         ),
         endpoint(
             "learning.assessment.get",

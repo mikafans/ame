@@ -210,10 +210,14 @@
       "path": "/api/v1/learning/courses"
     },
     {
-      "description": "Append a measurable outcome before linking instructional activities, formative checks, or mastery work to it.",
+      "description": "Append a measurable outcome to the active draft revision before linking instructional activities, formative checks, or mastery work to it.",
       "input_schema": {
         "properties": {
           "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
             "format": "uuid",
             "type": "string"
           },
@@ -232,6 +236,7 @@
         },
         "required": [
           "journeyId",
+          "revisionId",
           "verb",
           "statement",
           "successCriteria"
@@ -316,10 +321,14 @@
       "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish"
     },
     {
-      "description": "Append a named chapter to an owned journey. Create chapters before the activities they contain; AME assigns the next stable chapter order.",
+      "description": "Append a named chapter to the active draft revision. Create chapters before the activities they contain; AME assigns the next stable chapter order within that revision.",
       "input_schema": {
         "properties": {
           "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
             "format": "uuid",
             "type": "string"
           },
@@ -334,6 +343,7 @@
         },
         "required": [
           "journeyId",
+          "revisionId",
           "title",
           "summary"
         ],
@@ -381,6 +391,10 @@
           "payload": {
             "type": "object"
           },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "status": {
             "enum": [
               "ready",
@@ -395,6 +409,7 @@
         },
         "required": [
           "journeyId",
+          "revisionId",
           "kind",
           "title",
           "payload",
@@ -408,16 +423,21 @@
       "path": "/api/v1/learning/journeys/{journey_id}/activities"
     },
     {
-      "description": "Move an owned draft activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
+      "description": "Move an owned draft-revision activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
       "input_schema": {
         "properties": {
           "activityId": {
             "format": "uuid",
             "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
           }
         },
         "required": [
-          "activityId"
+          "activityId",
+          "revisionId"
         ],
         "type": "object"
       },
@@ -1076,6 +1096,10 @@
             ],
             "type": "string"
           },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "sourceReferences": {
             "items": {
               "type": "string"
@@ -1086,6 +1110,7 @@
         },
         "required": [
           "activityId",
+          "revisionId",
           "generationRunId",
           "content",
           "sourceReferences",
@@ -1114,6 +1139,10 @@
             "enum": [
               "approved"
             ],
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
             "type": "string"
           },
           "rubric": {
@@ -1178,6 +1207,7 @@
         },
         "required": [
           "activityId",
+          "revisionId",
           "generationRunId",
           "rubric",
           "sourceReferences",
@@ -1313,7 +1343,7 @@
       "path": "/api/v1/questions/{question_id}/versions"
     },
     {
-      "description": "Compose approved question versions into a learner-owned practice or graded assessment.",
+      "description": "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -1360,11 +1390,16 @@
             ],
             "type": "string"
           },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "status": {
             "type": "string"
           }
         },
         "required": [
+          "revisionId",
           "activityId",
           "mode",
           "items"

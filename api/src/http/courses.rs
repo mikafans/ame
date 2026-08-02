@@ -95,6 +95,43 @@ pub struct CreateCourseResponse {
     pub revision: CourseRevisionResponse,
 }
 
+/// A course graph is editable only through the active draft revision. Legacy
+/// journeys without a revision ledger retain their existing authoring path.
+pub(crate) async fn require_editable_revision(
+    pool: &sqlx::PgPool,
+    subject_user_id: Uuid,
+    journey_id: Uuid,
+    requested_revision_id: Option<Uuid>,
+) -> Result<Option<Uuid>, ApiError> {
+    let active = sqlx::query(
+        "SELECT id, status FROM tb_course_revisions WHERE journey_id = $1 AND subject_user_id = $2 AND status IN ('draft', 'review')",
+    )
+    .bind(journey_id)
+    .bind(subject_user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(db_error)?;
+    match active {
+        None if requested_revision_id.is_none() => Ok(None),
+        None => Err(ApiError::NotFound {
+            resource: "course revision",
+        }),
+        Some(revision) => {
+            let revision_id: Uuid = revision.get("id");
+            if requested_revision_id != Some(revision_id) {
+                return Err(field_error(
+                    "revisionId",
+                    "must identify this journey's active course revision",
+                ));
+            }
+            if revision.get::<String, _>("status") != "draft" {
+                return Err(ApiError::GenerationStateConflict);
+            }
+            Ok(Some(revision_id))
+        }
+    }
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/learning/courses", post(create_course))
@@ -347,10 +384,18 @@ pub async fn publish_course_revision(
 
     let mut transaction = state.pool.begin().await.map_err(db_error)?;
     sqlx::query(
-        "UPDATE tb_activities SET publication_status = 'published', updated_at = now() WHERE journey_id = $1 AND subject_user_id = $2 AND publication_status = 'review'",
+        "UPDATE tb_activities SET publication_status = 'published', updated_at = now() WHERE course_revision_id = $1 AND subject_user_id = $2 AND publication_status = 'review'",
+    )
+    .bind(revision_id)
+    .bind(auth.owner_id())
+    .execute(&mut *transaction)
+    .await
+    .map_err(db_error)?;
+    sqlx::query(
+        "UPDATE tb_course_revisions SET status = 'retired', updated_at = now() WHERE journey_id = $1 AND id <> $2 AND status = 'published'",
     )
     .bind(journey_id)
-    .bind(auth.owner_id())
+    .bind(revision_id)
     .execute(&mut *transaction)
     .await
     .map_err(db_error)?;
@@ -532,9 +577,9 @@ async fn validate_course(
     }
 
     let objectives: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM tb_journey_objectives WHERE journey_id = $1 AND subject_user_id = $2",
+        "SELECT COUNT(*) FROM tb_journey_objectives WHERE course_revision_id = $1 AND subject_user_id = $2",
     )
-    .bind(revision.journey_id)
+    .bind(revision.id)
     .bind(subject_user_id)
     .fetch_one(pool)
     .await
@@ -547,8 +592,8 @@ async fn validate_course(
         ));
     }
 
-    let chapters = sqlx::query("SELECT id, title FROM tb_journey_chapters WHERE journey_id = $1 AND subject_user_id = $2 ORDER BY order_index")
-        .bind(revision.journey_id).bind(subject_user_id).fetch_all(pool).await.map_err(db_error)?;
+    let chapters = sqlx::query("SELECT id, title FROM tb_journey_chapters WHERE course_revision_id = $1 AND subject_user_id = $2 ORDER BY order_index")
+        .bind(revision.id).bind(subject_user_id).fetch_all(pool).await.map_err(db_error)?;
     if chapters.is_empty() {
         issues.push(issue(
             "missing_modules",
@@ -559,8 +604,8 @@ async fn validate_course(
     for chapter in &chapters {
         let chapter_id: Uuid = chapter.get("id");
         let title: String = chapter.get("title");
-        let counts = sqlx::query("SELECT COUNT(*) FILTER (WHERE kind = 'explanation') AS explanations, COUNT(*) FILTER (WHERE kind = 'example') AS examples FROM tb_activities WHERE chapter_id = $1 AND subject_user_id = $2")
-            .bind(chapter_id).bind(subject_user_id).fetch_one(pool).await.map_err(db_error)?;
+        let counts = sqlx::query("SELECT COUNT(*) FILTER (WHERE kind = 'explanation') AS explanations, COUNT(*) FILTER (WHERE kind = 'example') AS examples FROM tb_activities WHERE chapter_id = $1 AND course_revision_id = $2 AND subject_user_id = $3")
+            .bind(chapter_id).bind(revision.id).bind(subject_user_id).fetch_one(pool).await.map_err(db_error)?;
         if counts.get::<i64, _>("explanations") == 0 {
             issues.push(issue(
                 "module_missing_instruction",
@@ -577,8 +622,8 @@ async fn validate_course(
         }
     }
 
-    let activities = sqlx::query("SELECT id, kind, title, objective_ids, payload, rubric, publication_status FROM (SELECT a.id, a.kind, a.title, a.payload, a.rubric, a.publication_status, COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids FROM tb_activities a LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id WHERE a.journey_id = $1 AND a.subject_user_id = $2 GROUP BY a.id) activities")
-        .bind(revision.journey_id).bind(subject_user_id).fetch_all(pool).await.map_err(db_error)?;
+    let activities = sqlx::query("SELECT id, kind, title, objective_ids, payload, rubric, publication_status FROM (SELECT a.id, a.kind, a.title, a.payload, a.rubric, a.publication_status, COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids FROM tb_activities a LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id WHERE a.course_revision_id = $1 AND a.subject_user_id = $2 GROUP BY a.id) activities")
+        .bind(revision.id).bind(subject_user_id).fetch_all(pool).await.map_err(db_error)?;
     for activity in &activities {
         let activity_id: Uuid = activity.get("id");
         let kind: String = activity.get("kind");
@@ -625,9 +670,9 @@ async fn validate_course(
         }
     }
     for objective in sqlx::query(
-        "SELECT id FROM tb_journey_objectives WHERE journey_id = $1 AND subject_user_id = $2",
+        "SELECT id FROM tb_journey_objectives WHERE course_revision_id = $1 AND subject_user_id = $2",
     )
-    .bind(revision.journey_id)
+    .bind(revision.id)
     .bind(subject_user_id)
     .fetch_all(pool)
     .await

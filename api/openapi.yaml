@@ -2419,6 +2419,11 @@ components:
           format: uuid
         reviewStatus:
           type: string
+        revisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         sourceReferences:
           type: array
           items:
@@ -2436,6 +2441,11 @@ components:
           format: uuid
         reviewStatus:
           type: string
+        revisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         rubric:
           $ref: '#/components/schemas/TaskRubric'
         sourceReferences:
@@ -2591,6 +2601,11 @@ components:
             format: uuid
         payload:
           type: object
+        revisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         status:
           $ref: '#/components/schemas/ActivityStatus'
         title:
@@ -2611,6 +2626,11 @@ components:
             $ref: '#/components/schemas/AssessmentItemBody'
         mode:
           $ref: '#/components/schemas/AssessmentMode'
+        revisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         status:
           $ref: '#/components/schemas/AssessmentStatus'
     CreateChapterBody:
@@ -2620,6 +2640,11 @@ components:
       - title
       - summary
       properties:
+        revisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         summary:
           type: string
         title:
@@ -2793,6 +2818,11 @@ components:
       - statement
       - successCriteria
       properties:
+        revisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         statement:
           type: string
         successCriteria:
@@ -3245,6 +3275,11 @@ components:
         contentVersion:
           type: integer
           format: int32
+        courseRevisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         createdAt:
           type: string
           format: date-time
@@ -3305,6 +3340,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LearningActivityResponse'
+        courseRevisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         createdAt:
           type: string
           format: date-time
@@ -3475,6 +3515,11 @@ components:
       - status
       - createdAt
       properties:
+        courseRevisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
         createdAt:
           type: string
           format: date-time

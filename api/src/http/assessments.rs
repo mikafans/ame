@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -26,6 +27,7 @@ use crate::{
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAssessmentBody {
+    pub revision_id: Option<Uuid>,
     pub activity_id: Uuid,
     pub mode: AssessmentMode,
     pub items: Vec<AssessmentItemBody>,
@@ -138,10 +140,34 @@ pub async fn create_assessment(
     auth: AuthenticatedUser,
     Json(body): Json<CreateAssessmentBody>,
 ) -> Result<Json<AssessmentResponse>, ApiError> {
+    crate::http::learning::require_editable_activity_revision(
+        &state.pool,
+        auth.owner_id(),
+        body.activity_id,
+        body.revision_id,
+    )
+    .await?;
     let question_repository = PgQuestionRepository::new(state.pool.clone());
     let mut questions = Vec::with_capacity(body.items.len());
     let mut items = Vec::with_capacity(body.items.len());
     for item in body.items {
+        if let Some(revision_id) = body.revision_id {
+            let objective = sqlx::query(
+                "SELECT course_revision_id FROM tb_journey_objectives WHERE id = $1 AND subject_user_id = $2",
+            )
+            .bind(item.objective_id)
+            .bind(auth.owner_id())
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?
+            .ok_or(ApiError::NotFound { resource: "objective" })?;
+            if objective.get::<Option<Uuid>, _>("course_revision_id") != Some(revision_id) {
+                return Err(ApiError::Validation(vec![FieldError {
+                    field: "items.objectiveId".into(),
+                    message: "must belong to the assessment revision".into(),
+                }]));
+            }
+        }
         let question = question_repository
             .get_version(auth.owner_id(), item.question_id, item.question_version)
             .await

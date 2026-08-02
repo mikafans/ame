@@ -281,14 +281,15 @@ impl LearningRepository for PgLearningRepository {
         let row = sqlx::query(
             r#"
             INSERT INTO tb_journey_objectives (
-                journey_id, subject_user_id, verb, statement, success_criteria, order_index
+                journey_id, course_revision_id, subject_user_id, verb, statement, success_criteria, order_index
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id, journey_id, subject_user_id, verb, statement,
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, journey_id, course_revision_id, subject_user_id, verb, statement,
                       success_criteria, order_index, status, created_at
             "#,
         )
         .bind(journey.id)
+        .bind(input.course_revision_id)
         .bind(input.subject_user_id)
         .bind(&input.verb)
         .bind(&input.statement)
@@ -298,7 +299,11 @@ impl LearningRepository for PgLearningRepository {
         .await
         .map_err(|error| {
             if let sqlx::Error::Database(database) = &error
-                && database.constraint() == Some("tb_journey_objectives_journey_id_order_index_key")
+                && matches!(
+                    database.constraint(),
+                    Some("tb_journey_objectives_course_revision_order")
+                        | Some("tb_journey_objectives_legacy_journey_order")
+                )
             {
                 return LearningRepositoryError::OrderConflict {
                     resource: "objective",
@@ -320,13 +325,14 @@ impl LearningRepository for PgLearningRepository {
         let row = sqlx::query(
             r#"
             INSERT INTO tb_journey_chapters (
-                journey_id, subject_user_id, title, summary, order_index
+                journey_id, course_revision_id, subject_user_id, title, summary, order_index
             )
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, journey_id, subject_user_id, title, summary, order_index, created_at
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, journey_id, course_revision_id, subject_user_id, title, summary, order_index, created_at
             "#,
         )
         .bind(journey.id)
+        .bind(input.course_revision_id)
         .bind(input.subject_user_id)
         .bind(&input.title)
         .bind(&input.summary)
@@ -335,7 +341,11 @@ impl LearningRepository for PgLearningRepository {
         .await
         .map_err(|error| {
             if let sqlx::Error::Database(database) = &error
-                && database.constraint() == Some("tb_journey_chapters_journey_id_order_index_key")
+                && matches!(
+                    database.constraint(),
+                    Some("tb_journey_chapters_course_revision_order")
+                        | Some("tb_journey_chapters_legacy_journey_order")
+                )
             {
                 return LearningRepositoryError::OrderConflict {
                     resource: "chapter",
@@ -354,14 +364,37 @@ impl LearningRepository for PgLearningRepository {
         self.get_journey(subject_user_id, journey_id).await?;
         let rows = sqlx::query(
             r#"
-            SELECT id, journey_id, subject_user_id, title, summary, order_index, created_at
+            SELECT id, journey_id, course_revision_id, subject_user_id, title, summary, order_index, created_at
             FROM tb_journey_chapters
             WHERE journey_id = $1 AND subject_user_id = $2
+              AND (course_revision_id IS NULL OR EXISTS (
+                  SELECT 1 FROM tb_course_revisions revision
+                  WHERE revision.id = course_revision_id AND revision.status = 'published'
+              ))
             ORDER BY order_index ASC
             "#,
         )
         .bind(journey_id)
         .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows.into_iter().map(chapter_from_row).collect())
+    }
+
+    async fn list_chapters_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let rows = sqlx::query(
+            "SELECT id, journey_id, course_revision_id, subject_user_id, title, summary, order_index, created_at FROM tb_journey_chapters WHERE journey_id = $1 AND subject_user_id = $2 AND course_revision_id = $3 ORDER BY order_index ASC",
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .bind(course_revision_id)
         .fetch_all(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -376,15 +409,38 @@ impl LearningRepository for PgLearningRepository {
         self.get_journey(subject_user_id, journey_id).await?;
         let rows = sqlx::query(
             r#"
-            SELECT id, journey_id, subject_user_id, verb, statement,
+            SELECT id, journey_id, course_revision_id, subject_user_id, verb, statement,
                    success_criteria, order_index, status, created_at
             FROM tb_journey_objectives
             WHERE journey_id = $1 AND subject_user_id = $2
+              AND (course_revision_id IS NULL OR EXISTS (
+                  SELECT 1 FROM tb_course_revisions revision
+                  WHERE revision.id = course_revision_id AND revision.status = 'published'
+              ))
             ORDER BY order_index ASC
             "#,
         )
         .bind(journey_id)
         .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows.into_iter().map(objective_from_row).collect())
+    }
+
+    async fn list_objectives_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let rows = sqlx::query(
+            "SELECT id, journey_id, course_revision_id, subject_user_id, verb, statement, success_criteria, order_index, status, created_at FROM tb_journey_objectives WHERE journey_id = $1 AND subject_user_id = $2 AND course_revision_id = $3 ORDER BY order_index ASC",
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .bind(course_revision_id)
         .fetch_all(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -401,7 +457,7 @@ impl LearningRepository for PgLearningRepository {
             .await?;
         if let Some(chapter_id) = input.chapter_id {
             let chapter = sqlx::query(
-                "SELECT journey_id, subject_user_id FROM tb_journey_chapters WHERE id = $1",
+                "SELECT journey_id, course_revision_id, subject_user_id FROM tb_journey_chapters WHERE id = $1",
             )
             .bind(chapter_id)
             .fetch_optional(&self.pool)
@@ -412,17 +468,19 @@ impl LearningRepository for PgLearningRepository {
             })?;
             if chapter.get::<Uuid, _>("journey_id") != journey.id
                 || chapter.get::<Uuid, _>("subject_user_id") != input.subject_user_id
+                || chapter.get::<Option<Uuid>, _>("course_revision_id") != input.course_revision_id
             {
                 return Err(LearningRepositoryError::SubjectMismatch);
             }
         }
         for objective_id in &input.objective_ids {
             let row = sqlx::query(
-                "SELECT 1 FROM tb_journey_objectives WHERE id = $1 AND journey_id = $2 AND subject_user_id = $3",
+                "SELECT 1 FROM tb_journey_objectives WHERE id = $1 AND journey_id = $2 AND subject_user_id = $3 AND course_revision_id IS NOT DISTINCT FROM $4",
             )
             .bind(objective_id)
             .bind(journey.id)
             .bind(input.subject_user_id)
+            .bind(input.course_revision_id)
             .fetch_optional(&self.pool)
             .await
             .map_err(storage_error)?;
@@ -435,18 +493,19 @@ impl LearningRepository for PgLearningRepository {
         let row = sqlx::query(
             r#"
             INSERT INTO tb_activities (
-                journey_id, subject_user_id, source_actor_id,
+                journey_id, course_revision_id, subject_user_id, source_actor_id,
                 chapter_id, kind, title, order_index, payload_schema_version,
                 content_version, publication_status, payload, status, rubric
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            RETURNING id, journey_id, subject_user_id, source_actor_id,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id, journey_id, course_revision_id, subject_user_id, source_actor_id,
                       chapter_id, kind, title, order_index, payload_schema_version,
                       content_version, publication_status, payload,
                       status, rubric, created_at, updated_at
             "#,
         )
         .bind(journey.id)
+        .bind(input.course_revision_id)
         .bind(input.subject_user_id)
         .bind(input.source_actor_id)
         .bind(input.chapter_id)
@@ -465,8 +524,10 @@ impl LearningRepository for PgLearningRepository {
             if let sqlx::Error::Database(database) = &error
                 && matches!(
                     database.constraint(),
-                    Some("tb_activities_chapter_order")
-                        | Some("tb_activities_journey_order_ungrouped")
+                    Some("tb_activities_course_revision_chapter_order")
+                        | Some("tb_activities_course_revision_ungrouped_order")
+                        | Some("tb_activities_legacy_chapter_order")
+                        | Some("tb_activities_legacy_journey_order_ungrouped")
                 )
             {
                 return LearningRepositoryError::OrderConflict {
@@ -498,7 +559,7 @@ impl LearningRepository for PgLearningRepository {
         self.get_journey(subject_user_id, journey_id).await?;
         let rows = sqlx::query(
             r#"
-            SELECT a.id, a.journey_id, a.subject_user_id, a.source_actor_id,
+            SELECT a.id, a.journey_id, a.course_revision_id, a.subject_user_id, a.source_actor_id,
                    a.chapter_id, a.kind, a.title, a.order_index,
                    a.payload_schema_version, a.content_version,
                    a.publication_status, a.payload, a.status, a.rubric,
@@ -507,12 +568,53 @@ impl LearningRepository for PgLearningRepository {
             FROM tb_activities a
             LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id
             WHERE a.journey_id = $1 AND a.subject_user_id = $2
+              AND (a.course_revision_id IS NULL OR EXISTS (
+                  SELECT 1 FROM tb_course_revisions revision
+                  WHERE revision.id = a.course_revision_id AND revision.status = 'published'
+              ))
             GROUP BY a.id
             ORDER BY COALESCE((SELECT c.order_index FROM tb_journey_chapters c WHERE c.id = a.chapter_id), 2147483647), a.order_index ASC
             "#,
         )
         .bind(journey_id)
         .bind(subject_user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let objective_ids: Vec<Uuid> = row.get("objective_ids");
+                activity_from_row(row, objective_ids)
+            })
+            .collect())
+    }
+
+    async fn list_activities_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let rows = sqlx::query(
+            r#"
+            SELECT a.id, a.journey_id, a.course_revision_id, a.subject_user_id, a.source_actor_id,
+                   a.chapter_id, a.kind, a.title, a.order_index,
+                   a.payload_schema_version, a.content_version,
+                   a.publication_status, a.payload, a.status, a.rubric,
+                   a.created_at, a.updated_at,
+                   COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids
+            FROM tb_activities a
+            LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id
+            WHERE a.journey_id = $1 AND a.subject_user_id = $2 AND a.course_revision_id = $3
+            GROUP BY a.id
+            ORDER BY COALESCE((SELECT c.order_index FROM tb_journey_chapters c WHERE c.id = a.chapter_id), 2147483647), a.order_index ASC
+            "#,
+        )
+        .bind(journey_id)
+        .bind(subject_user_id)
+        .bind(course_revision_id)
         .fetch_all(&self.pool)
         .await
         .map_err(storage_error)?;
@@ -946,6 +1048,7 @@ fn chapter_from_row(row: sqlx::postgres::PgRow) -> LearningChapter {
     LearningChapter {
         id: row.get("id"),
         journey_id: row.get("journey_id"),
+        course_revision_id: row.get("course_revision_id"),
         subject_user_id: row.get("subject_user_id"),
         title: row.get("title"),
         summary: row.get("summary"),
@@ -1002,6 +1105,7 @@ fn objective_from_row(row: sqlx::postgres::PgRow) -> LearningObjective {
     LearningObjective {
         id: row.get("id"),
         journey_id: row.get("journey_id"),
+        course_revision_id: row.get("course_revision_id"),
         subject_user_id: row.get("subject_user_id"),
         verb: row.get("verb"),
         statement: row.get("statement"),
@@ -1016,6 +1120,7 @@ fn activity_from_row(row: sqlx::postgres::PgRow, objective_ids: Vec<Uuid>) -> Le
     LearningActivity {
         id: row.get("id"),
         journey_id: row.get("journey_id"),
+        course_revision_id: row.get("course_revision_id"),
         subject_user_id: row.get("subject_user_id"),
         source_actor_id: row.get("source_actor_id"),
         chapter_id: row.get("chapter_id"),

@@ -141,6 +141,9 @@ pub struct LearningJourney {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateChapter {
     pub journey_id: Uuid,
+    /// The draft course revision that owns this chapter. Legacy journeys leave
+    /// this empty and remain readable as their pre-course-revision content.
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub title: String,
     pub summary: String,
@@ -151,6 +154,7 @@ pub struct CreateChapter {
 pub struct LearningChapter {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub title: String,
     pub summary: String,
@@ -161,6 +165,8 @@ pub struct LearningChapter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateObjective {
     pub journey_id: Uuid,
+    /// The draft course revision that owns this objective.
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub verb: String,
     pub statement: String,
@@ -172,6 +178,7 @@ pub struct CreateObjective {
 pub struct LearningObjective {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub verb: String,
     pub statement: String,
@@ -184,6 +191,8 @@ pub struct LearningObjective {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreateActivity {
     pub journey_id: Uuid,
+    /// The draft course revision that owns this activity.
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub chapter_id: Option<Uuid>,
@@ -205,6 +214,7 @@ pub struct CreateActivity {
 pub struct LearningActivity {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub chapter_id: Option<Uuid>,
@@ -414,6 +424,14 @@ pub trait LearningRepository: Send + Sync {
         journey_id: Uuid,
     ) -> Result<Vec<LearningObjective>, LearningRepositoryError>;
 
+    /// Author-facing view of one draft/review/published course revision.
+    async fn list_objectives_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError>;
+
     async fn create_chapter(
         &self,
         input: CreateChapter,
@@ -425,6 +443,14 @@ pub trait LearningRepository: Send + Sync {
         journey_id: Uuid,
     ) -> Result<Vec<LearningChapter>, LearningRepositoryError>;
 
+    /// Author-facing view of one course revision.
+    async fn list_chapters_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError>;
+
     async fn create_activity(
         &self,
         input: CreateActivity,
@@ -434,6 +460,14 @@ pub trait LearningRepository: Send + Sync {
         &self,
         subject_user_id: Uuid,
         journey_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
+
+    /// Author-facing view of one course revision.
+    async fn list_activities_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
     ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
 
     async fn author_activity_content(

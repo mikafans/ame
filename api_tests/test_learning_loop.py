@@ -219,6 +219,62 @@ def test_agent_can_start_an_empty_course_without_generic_template_material(clien
     assert journey.json()["objectives"] == []
 
 
+def test_draft_course_graph_is_revision_owned_and_hidden_from_learners(client):
+    _, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
+    created = client.post(
+        "/api/v1/learning/courses",
+        headers=headers,
+        json={
+            "rawIntent": "Design a reliable Netty service.",
+            "idempotencyKey": f"revision-owned-{uuid.uuid4()}",
+            "brief": {
+                "title": "Netty service design",
+                "audience": "A Java maintainer",
+                "estimatedMinutes": 90,
+                "prerequisites": ["Basic Java concurrency"],
+                "outcomes": ["Explain an event-loop design"],
+                "modules": ["Event loops"],
+            },
+            "sourceReferences": references,
+        },
+    )
+    assert created.status_code == 201, created.text
+    journey_id = created.json()["journeyId"]
+    revision_id = created.json()["revision"]["id"]
+
+    missing_revision = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/objectives",
+        headers=headers,
+        json={
+            "verb": "Explain",
+            "statement": "Explain one event-loop responsibility.",
+            "successCriteria": "Names scheduling and I/O ownership.",
+        },
+    )
+    assert missing_revision.status_code == 422, missing_revision.text
+
+    objective = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/objectives",
+        headers=headers,
+        json={
+            "revisionId": revision_id,
+            "verb": "Explain",
+            "statement": "Explain one event-loop responsibility.",
+            "successCriteria": "Names scheduling and I/O ownership.",
+        },
+    )
+    assert objective.status_code == 200, objective.text
+    assert objective.json()["courseRevisionId"] == revision_id
+
+    learner_view = client.get(
+        f"/api/v1/learning/journeys/{journey_id}", headers=headers
+    )
+    assert learner_view.status_code == 200, learner_view.text
+    assert learner_view.json()["objectives"] == []
+    assert learner_view.json()["activities"] == []
+
+
 def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     started, headers = _start_learner(client, "I want to learn a useful subject")
     references = _certified_reference(client, headers)

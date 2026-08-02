@@ -9,7 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -57,6 +57,7 @@ pub struct LearningGoalResponse {
 pub struct LearningObjectiveResponse {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub verb: String,
     pub statement: String,
@@ -73,6 +74,7 @@ pub struct LearningObjectiveResponse {
 pub struct LearningActivityResponse {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub chapter_id: Option<Uuid>,
@@ -102,6 +104,7 @@ pub struct LearningActivityResponse {
 pub struct LearningChapterResponse {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub title: String,
     pub summary: String,
@@ -247,6 +250,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthorActivityContentBody {
+    pub revision_id: Option<Uuid>,
     pub generation_run_id: Uuid,
     #[schema(value_type = Object)]
     pub content: Value,
@@ -257,16 +261,24 @@ pub struct AuthorActivityContentBody {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthorActivityRubricBody {
+    pub revision_id: Option<Uuid>,
     pub generation_run_id: Uuid,
     pub rubric: TaskRubric,
     pub source_references: Vec<String>,
     pub review_status: String,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RevisionTargetBody {
+    pub revision_id: Option<Uuid>,
+}
+
 /// A new chapter is always appended after the journey's existing chapters.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateChapterBody {
+    pub revision_id: Option<Uuid>,
     pub title: String,
     pub summary: String,
 }
@@ -276,6 +288,7 @@ pub struct CreateChapterBody {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateObjectiveBody {
+    pub revision_id: Option<Uuid>,
     pub verb: String,
     pub statement: String,
     pub success_criteria: String,
@@ -286,6 +299,7 @@ pub struct CreateObjectiveBody {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateActivityBody {
+    pub revision_id: Option<Uuid>,
     pub chapter_id: Option<Uuid>,
     pub kind: ActivityKind,
     pub title: String,
@@ -367,16 +381,28 @@ pub async fn create_chapter(
     Path(journey_id): Path<Uuid>,
     Json(body): Json<CreateChapterBody>,
 ) -> Result<Json<LearningChapterResponse>, ApiError> {
+    let revision_id = crate::http::courses::require_editable_revision(
+        &state.pool,
+        auth.owner_id(),
+        journey_id,
+        body.revision_id,
+    )
+    .await?;
     let repository = PgLearningRepository::new(state.pool);
-    let order_index = repository
-        .list_chapters(auth.owner_id(), journey_id)
-        .await
-        .map_err(map_learning_error)?
-        .last()
-        .map_or(0, |chapter| chapter.order_index + 1);
+    let chapters = match revision_id {
+        Some(revision_id) => {
+            repository
+                .list_chapters_for_revision(auth.owner_id(), journey_id, revision_id)
+                .await
+        }
+        None => repository.list_chapters(auth.owner_id(), journey_id).await,
+    }
+    .map_err(map_learning_error)?;
+    let order_index = chapters.last().map_or(0, |chapter| chapter.order_index + 1);
     let chapter = repository
         .create_chapter(CreateChapter {
             journey_id,
+            course_revision_id: revision_id,
             subject_user_id: auth.owner_id(),
             title: body.title,
             summary: body.summary,
@@ -408,16 +434,34 @@ pub async fn create_objective(
     Path(journey_id): Path<Uuid>,
     Json(body): Json<CreateObjectiveBody>,
 ) -> Result<Json<LearningObjectiveResponse>, ApiError> {
+    let revision_id = crate::http::courses::require_editable_revision(
+        &state.pool,
+        auth.owner_id(),
+        journey_id,
+        body.revision_id,
+    )
+    .await?;
     let repository = PgLearningRepository::new(state.pool);
-    let order_index = repository
-        .list_objectives(auth.owner_id(), journey_id)
-        .await
-        .map_err(map_learning_error)?
+    let objectives = match revision_id {
+        Some(revision_id) => {
+            repository
+                .list_objectives_for_revision(auth.owner_id(), journey_id, revision_id)
+                .await
+        }
+        None => {
+            repository
+                .list_objectives(auth.owner_id(), journey_id)
+                .await
+        }
+    }
+    .map_err(map_learning_error)?;
+    let order_index = objectives
         .last()
         .map_or(0, |objective| objective.order_index + 1);
     let objective = repository
         .create_objective(CreateObjective {
             journey_id,
+            course_revision_id: revision_id,
             subject_user_id: auth.owner_id(),
             verb: body.verb,
             statement: body.statement,
@@ -466,11 +510,28 @@ pub async fn create_activity(
         }]));
     }
 
+    let revision_id = crate::http::courses::require_editable_revision(
+        &state.pool,
+        auth.owner_id(),
+        journey_id,
+        body.revision_id,
+    )
+    .await?;
     let repository = PgLearningRepository::new(state.pool);
-    let order_index = repository
-        .list_activities(auth.owner_id(), journey_id)
-        .await
-        .map_err(map_learning_error)?
+    let activities = match revision_id {
+        Some(revision_id) => {
+            repository
+                .list_activities_for_revision(auth.owner_id(), journey_id, revision_id)
+                .await
+        }
+        None => {
+            repository
+                .list_activities(auth.owner_id(), journey_id)
+                .await
+        }
+    }
+    .map_err(map_learning_error)?;
+    let order_index = activities
         .iter()
         .map(|activity| activity.order_index)
         .max()
@@ -478,6 +539,7 @@ pub async fn create_activity(
     let activity = repository
         .create_activity(CreateActivity {
             journey_id,
+            course_revision_id: revision_id,
             subject_user_id: auth.owner_id(),
             source_actor_id: auth.owner_id(),
             chapter_id: body.chapter_id,
@@ -515,7 +577,15 @@ pub async fn submit_activity_for_review(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
     Path(activity_id): Path<Uuid>,
+    body: Option<Json<RevisionTargetBody>>,
 ) -> Result<Json<LearningActivityResponse>, ApiError> {
+    require_editable_activity_revision(
+        &state.pool,
+        auth.owner_id(),
+        activity_id,
+        body.and_then(|Json(body)| body.revision_id),
+    )
+    .await?;
     let activity = PgLearningRepository::new(state.pool)
         .transition_activity_publication(TransitionActivityPublication {
             subject_user_id: auth.owner_id(),
@@ -612,6 +682,8 @@ pub async fn author_activity_content(
     Path(activity_id): Path<Uuid>,
     Json(body): Json<AuthorActivityContentBody>,
 ) -> Result<Json<LearningActivityResponse>, ApiError> {
+    require_editable_activity_revision(&state.pool, auth.owner_id(), activity_id, body.revision_id)
+        .await?;
     let generation = crate::generation_postgres::PgGenerationRepository::new(state.pool.clone())
         .get(auth.owner_id(), body.generation_run_id)
         .await
@@ -664,6 +736,8 @@ pub async fn author_activity_rubric(
     Path(activity_id): Path<Uuid>,
     Json(body): Json<AuthorActivityRubricBody>,
 ) -> Result<Json<LearningActivityResponse>, ApiError> {
+    require_editable_activity_revision(&state.pool, auth.owner_id(), activity_id, body.revision_id)
+        .await?;
     validate_task_rubric(&body.rubric).map_err(|error| {
         ApiError::Validation(vec![crate::domain::error::FieldError {
             field: "rubric".to_string(),
@@ -968,6 +1042,7 @@ fn objective_response(objective: LearningObjective) -> LearningObjectiveResponse
     LearningObjectiveResponse {
         id: objective.id,
         journey_id: objective.journey_id,
+        course_revision_id: objective.course_revision_id,
         subject_user_id: objective.subject_user_id,
         verb: objective.verb,
         statement: objective.statement,
@@ -982,6 +1057,7 @@ fn activity_response(activity: LearningActivity) -> LearningActivityResponse {
     LearningActivityResponse {
         id: activity.id,
         journey_id: activity.journey_id,
+        course_revision_id: activity.course_revision_id,
         subject_user_id: activity.subject_user_id,
         source_actor_id: activity.source_actor_id,
         chapter_id: activity.chapter_id,
@@ -1009,6 +1085,7 @@ fn chapter_response(
     LearningChapterResponse {
         id: chapter.id,
         journey_id: chapter.journey_id,
+        course_revision_id: chapter.course_revision_id,
         subject_user_id: chapter.subject_user_id,
         title: chapter.title,
         summary: chapter.summary,
@@ -1035,6 +1112,40 @@ fn session_response(session: LearningSession) -> LearningSessionResponse {
         started_at: session.started_at,
         finished_at: session.finished_at,
     }
+}
+
+pub(crate) async fn require_editable_activity_revision(
+    pool: &PgPool,
+    subject_user_id: Uuid,
+    activity_id: Uuid,
+    requested_revision_id: Option<Uuid>,
+) -> Result<(), ApiError> {
+    let activity = sqlx::query(
+        "SELECT journey_id, course_revision_id FROM tb_activities WHERE id = $1 AND subject_user_id = $2",
+    )
+    .bind(activity_id)
+    .bind(subject_user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?
+    .ok_or(ApiError::NotFound {
+        resource: "activity",
+    })?;
+    let revision_id: Option<Uuid> = activity.get("course_revision_id");
+    if revision_id != requested_revision_id {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "revisionId".into(),
+            message: "must match the activity's course revision".into(),
+        }]));
+    }
+    crate::http::courses::require_editable_revision(
+        pool,
+        subject_user_id,
+        activity.get("journey_id"),
+        requested_revision_id,
+    )
+    .await?;
+    Ok(())
 }
 
 fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -> ApiError {

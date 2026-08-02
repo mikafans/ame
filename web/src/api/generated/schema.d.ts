@@ -1348,12 +1348,16 @@ export interface components {
             /** Format: uuid */
             generationRunId: string;
             reviewStatus: string;
+            /** Format: uuid */
+            revisionId?: string | null;
             sourceReferences: string[];
         };
         AuthorActivityRubricBody: {
             /** Format: uuid */
             generationRunId: string;
             reviewStatus: string;
+            /** Format: uuid */
+            revisionId?: string | null;
             rubric: components["schemas"]["TaskRubric"];
             sourceReferences: string[];
         };
@@ -1413,6 +1417,8 @@ export interface components {
             kind: components["schemas"]["ActivityKind"];
             objectiveIds: string[];
             payload: Record<string, never>;
+            /** Format: uuid */
+            revisionId?: string | null;
             status: components["schemas"]["ActivityStatus"];
             title: string;
         };
@@ -1421,10 +1427,14 @@ export interface components {
             activityId: string;
             items: components["schemas"]["AssessmentItemBody"][];
             mode: components["schemas"]["AssessmentMode"];
+            /** Format: uuid */
+            revisionId?: string | null;
             status?: components["schemas"]["AssessmentStatus"];
         };
         /** @description A new chapter is always appended after the journey's existing chapters. */
         CreateChapterBody: {
+            /** Format: uuid */
+            revisionId?: string | null;
             summary: string;
             title: string;
         };
@@ -1498,6 +1508,8 @@ export interface components {
          *     formative checks, and mastery work to them.
          */
         CreateObjectiveBody: {
+            /** Format: uuid */
+            revisionId?: string | null;
             statement: string;
             successCriteria: string;
             verb: string;
@@ -1673,6 +1685,8 @@ export interface components {
             chapterId?: string | null;
             /** Format: int32 */
             contentVersion: number;
+            /** Format: uuid */
+            courseRevisionId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1699,6 +1713,8 @@ export interface components {
         };
         LearningChapterResponse: {
             activities: components["schemas"]["LearningActivityResponse"][];
+            /** Format: uuid */
+            courseRevisionId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1766,6 +1782,8 @@ export interface components {
             status: components["schemas"]["JourneyStatus"];
         };
         LearningObjectiveResponse: {
+            /** Format: uuid */
+            courseRevisionId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */

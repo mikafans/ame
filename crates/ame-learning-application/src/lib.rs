@@ -300,6 +300,7 @@ impl LearningRepository for InMemoryLearningRepository {
         let objective = LearningObjective {
             id: Uuid::now_v7(),
             journey_id: input.journey_id,
+            course_revision_id: input.course_revision_id,
             subject_user_id: input.subject_user_id,
             verb: input.verb,
             statement: input.statement,
@@ -333,7 +334,33 @@ impl LearningRepository for InMemoryLearningRepository {
         let mut objectives: Vec<_> = state
             .objectives
             .values()
-            .filter(|objective| objective.journey_id == journey_id)
+            .filter(|objective| {
+                objective.journey_id == journey_id && objective.course_revision_id.is_none()
+            })
+            .cloned()
+            .collect();
+        objectives.sort_by_key(|objective| objective.order_index);
+        Ok(objectives)
+    }
+
+    async fn list_objectives_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut objectives: Vec<_> = state
+            .objectives
+            .values()
+            .filter(|objective| {
+                objective.journey_id == journey_id
+                    && objective.course_revision_id == Some(course_revision_id)
+            })
             .cloned()
             .collect();
         objectives.sort_by_key(|objective| objective.order_index);
@@ -375,6 +402,7 @@ impl LearningRepository for InMemoryLearningRepository {
         }
         if state.activities.values().any(|activity| {
             activity.journey_id == input.journey_id
+                && activity.course_revision_id == input.course_revision_id
                 && activity.chapter_id == input.chapter_id
                 && activity.order_index == input.order_index
         }) {
@@ -392,6 +420,7 @@ impl LearningRepository for InMemoryLearningRepository {
                     })?;
             if objective.journey_id != input.journey_id
                 || objective.subject_user_id != input.subject_user_id
+                || objective.course_revision_id != input.course_revision_id
             {
                 return Err(LearningRepositoryError::SubjectMismatch);
             }
@@ -400,6 +429,7 @@ impl LearningRepository for InMemoryLearningRepository {
         let activity = LearningActivity {
             id: Uuid::now_v7(),
             journey_id: input.journey_id,
+            course_revision_id: input.course_revision_id,
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
             chapter_id: input.chapter_id,
@@ -440,7 +470,9 @@ impl LearningRepository for InMemoryLearningRepository {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
         if state.chapters.values().any(|chapter| {
-            chapter.journey_id == input.journey_id && chapter.order_index == input.order_index
+            chapter.journey_id == input.journey_id
+                && chapter.course_revision_id == input.course_revision_id
+                && chapter.order_index == input.order_index
         }) {
             return Err(LearningRepositoryError::OrderConflict {
                 resource: "chapter",
@@ -449,6 +481,7 @@ impl LearningRepository for InMemoryLearningRepository {
         let chapter = LearningChapter {
             id: Uuid::now_v7(),
             journey_id: input.journey_id,
+            course_revision_id: input.course_revision_id,
             subject_user_id: input.subject_user_id,
             title: input.title,
             summary: input.summary,
@@ -480,7 +513,33 @@ impl LearningRepository for InMemoryLearningRepository {
         let mut chapters: Vec<_> = state
             .chapters
             .values()
-            .filter(|chapter| chapter.journey_id == journey_id)
+            .filter(|chapter| {
+                chapter.journey_id == journey_id && chapter.course_revision_id.is_none()
+            })
+            .cloned()
+            .collect();
+        chapters.sort_by_key(|chapter| chapter.order_index);
+        Ok(chapters)
+    }
+
+    async fn list_chapters_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut chapters: Vec<_> = state
+            .chapters
+            .values()
+            .filter(|chapter| {
+                chapter.journey_id == journey_id
+                    && chapter.course_revision_id == Some(course_revision_id)
+            })
             .cloned()
             .collect();
         chapters.sort_by_key(|chapter| chapter.order_index);
@@ -508,10 +567,36 @@ impl LearningRepository for InMemoryLearningRepository {
         let mut activities: Vec<_> = state
             .activities
             .values()
-            .filter(|activity| activity.journey_id == journey_id)
+            .filter(|activity| {
+                activity.journey_id == journey_id && activity.course_revision_id.is_none()
+            })
             .cloned()
             .collect();
         activities.sort_by_key(|activity| activity.order_index);
+        Ok(activities)
+    }
+
+    async fn list_activities_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut activities: Vec<_> = state
+            .activities
+            .values()
+            .filter(|activity| {
+                activity.journey_id == journey_id
+                    && activity.course_revision_id == Some(course_revision_id)
+            })
+            .cloned()
+            .collect();
+        activities.sort_by_key(|activity| (activity.chapter_id, activity.order_index));
         Ok(activities)
     }
 
@@ -892,6 +977,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let objective = repository
         .create_objective(CreateObjective {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             verb: "identify".to_string(),
             statement: "Identify intervals by ear".to_string(),
@@ -911,6 +997,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let chapter = repository
         .create_chapter(CreateChapter {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             title: "Interval foundations".to_string(),
             summary: "Learn how intervals are represented and analyzed.".to_string(),
@@ -929,6 +1016,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let activity = repository
         .create_activity(CreateActivity {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             source_actor_id: actor,
             chapter_id: Some(chapter.id),
@@ -948,6 +1036,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let next_activity = repository
         .create_activity(CreateActivity {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             source_actor_id: actor,
             chapter_id: Some(chapter.id),

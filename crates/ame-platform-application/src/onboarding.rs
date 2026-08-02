@@ -323,6 +323,7 @@ where
             self.repository
                 .create_chapter(CreateChapter {
                     journey_id: journey.id,
+                    course_revision_id: None,
                     subject_user_id: journey.subject_user_id,
                     title: render_goal_text(&chapter.title, &plan.normalized_statement),
                     summary: render_goal_text(&chapter.summary, &plan.normalized_statement),
@@ -370,6 +371,7 @@ where
             self.repository
                 .create_activity(CreateActivity {
                     journey_id: journey.id,
+                    course_revision_id: None,
                     subject_user_id: journey.subject_user_id,
                     source_actor_id: plan.source_actor_id,
                     chapter_id: Some(chapter_id),
@@ -489,6 +491,7 @@ fn starter_blueprint(
         .map(
             |(order_index, (verb, statement, success_criteria))| CreateObjective {
                 journey_id,
+                course_revision_id: None,
                 subject_user_id: subject,
                 verb: verb.to_string(),
                 statement,
