@@ -151,12 +151,11 @@ make db-down
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the certifiable agent-first learning
-loop and its later milestones. Current: **v0.3.1** — one unified learner API,
-durable journeys, question-backed practice and exams, evidence-based progress,
-deep dives, and a self-hostable Postgres + Valkey + API + web + Caddy origin.
-The canonical design and user stories are in
-[`docs/plans/2026-07-19-agent-first-learning-rework.md`](docs/plans/2026-07-19-agent-first-learning-rework.md).
+[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the next release: **v0.5.0 —
+agent-authored courses**. The 0.3.1 foundation supplies the durable learner
+API, assessment, evidence, provenance, and self-hosted stack. 0.5.0 makes
+those primitives usable by agents to assemble, validate, publish, and adapt
+real source-grounded courses, proven with complete Flink and Netty references.
 
 ## Contributing
 
