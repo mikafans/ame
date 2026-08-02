@@ -82,6 +82,20 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["rawIntent","idempotencyKey","brief","sourceReferences"],"properties":{"rawIntent":{"type":"string","minLength":1},"idempotencyKey":{"type":"string","minLength":1},"brief":{"type":"object","required":["title","audience","estimatedMinutes","prerequisites","outcomes","modules"]},"sourceReferences":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1}}}),
         ),
         endpoint(
+            "learning.course.revision.create",
+            "Create a new empty draft revision for an owned journey after its prior revision is published or retired. Supply a complete, source-grounded brief, then author a new revision-scoped graph; AME never mutates a published course graph in place.",
+            "POST",
+            "/api/v1/learning/journeys/{journey_id}/course-revisions",
+            json!({"type":"object","required":["journeyId","brief","sourceReferences"],"properties":{"journeyId":{"type":"string","format":"uuid"},"brief":{"type":"object","required":["title","audience","estimatedMinutes","prerequisites","outcomes","modules"]},"sourceReferences":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1}}}),
+        ),
+        endpoint(
+            "learning.course.revision.get",
+            "Read an owned revision's lifecycle status, persisted brief, source certificates, server validation diagnostics, review record, and publication timestamp before editing or retrying a transition.",
+            "GET",
+            "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}",
+            json!({"type":"object","required":["journeyId","revisionId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.course.objective.create",
             "Append a measurable outcome to the active draft revision before linking instructional activities, formative checks, or mastery work to it.",
             "POST",

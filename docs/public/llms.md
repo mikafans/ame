@@ -146,6 +146,62 @@ activities `proposed` so ordinary completion unlocks them in sequence. Use a
 `practice` activity as the target for a published formative assessment and an
 `application` activity as the target for a reviewed task rubric.
 
+## Course authoring sequence
+
+Use this order for a new course and retain every returned UUID. Do not infer a
+course from a generic onboarding journey or skip the source/review boundary.
+
+1. Read the public contract and manifest, register or log in, and obtain the
+   learner bearer token.
+2. Import learner-provided text or an allowed public source, then certify the
+   exact quoted range with `POST /api/v1/citations`. If no usable material is
+   available, stop and report that the course is blocked on sources.
+3. Create the empty course with a bounded brief and the citation IDs. Preserve
+   `journeyId` and `revision.id` from the response.
+4. For every observable outcome, create an objective with `revisionId`. Create
+   its module/chapter, then an instruction and worked-example activity linked
+   to that objective. Draft activities are private.
+5. Start and publish a matching `learning.activity.content.compose` generation
+   run; use it to attach approved, source-backed explanation/example content.
+   Create an approved `question.compose` question with a rationale, feedback,
+   and source references, then attach it as a published `practice` assessment
+   to the instructional activity.
+6. Add a distinct `graded` assessment and/or an `application` activity for
+   every objective. An application activity needs a source-backed,
+   `learning.activity.rubric.compose` rubric with objective-specific criteria.
+7. Submit every activity with `POST /api/v1/learning/activities/{activity_id}/review`
+   and the same `revisionId`. Run the course `validate` command and resolve
+   every returned blocking diagnostic.
+8. Submit the valid revision for review with a review record, then publish it.
+   Publishing is atomic and is the only action that makes the whole graph
+   learner-visible.
+9. After a learner completes an assessment or receives a terminal task review,
+   read the objective evidence and server recommendation. Adapt only from that
+   durable evidence; an agent must never invent learner answers or mastery.
+
+To revise a published course, start a new source-grounded draft with
+`POST /api/v1/learning/journeys/{journeyId}/course-revisions`, inspect it with
+the revision `GET`, and repeat the revision-scoped workflow. Published course
+records stay immutable; never try to edit an old revision in place.
+
+Minimal course creation payload:
+
+```json
+{
+  "rawIntent": "Design a reliable late-event clickstream service in Apache Flink.",
+  "idempotencyKey": "flink-clickstream-v1",
+  "brief": {
+    "title": "Reliable clickstream aggregation with Apache Flink",
+    "audience": "Backend engineer",
+    "estimatedMinutes": 240,
+    "prerequisites": ["Java", "stream processing basics"],
+    "outcomes": ["Design an event-time and recovery policy"],
+    "modules": ["Event time", "State and checkpoints"]
+  },
+  "sourceReferences": ["citation-uuid"]
+}
+```
+
 Course publication is a server command, not an activity-row transition. Before
 publication, an agent must run `validate`, resolve every blocking diagnostic,
 then submit the revision to `review` with review metadata, and finally call
