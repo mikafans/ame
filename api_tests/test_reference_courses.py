@@ -705,3 +705,26 @@ def test_reference_courses_publish_and_adapt_after_weak_evidence(client, course)
     )
     assert recommendation["objectiveId"] == built["firstObjective"]["id"]
     assert evidence["id"] in recommendation["evidenceIds"]
+
+    fork = request(
+        client,
+        "post",
+        f"/api/v1/learning/journeys/{built['journeyId']}/course-revisions/{built['revisionId']}/fork",
+        built["headers"],
+    )
+    assert fork["status"] == "draft"
+    assert fork["version"] == 2
+    fork_validation = request(
+        client,
+        "post",
+        f"/api/v1/learning/journeys/{built['journeyId']}/course-revisions/{fork['id']}/validate",
+        built["headers"],
+    )
+    assert fork_validation["validation"] == []
+    learner_after_fork = request(
+        client,
+        "get",
+        f"/api/v1/learning/journeys/{built['journeyId']}",
+        built["headers"],
+    )
+    assert learner_after_fork["activities"][0]["id"] == built["first"]["id"]

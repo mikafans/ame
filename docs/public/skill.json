@@ -272,6 +272,29 @@
       "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}"
     },
     {
+      "description": "Clone a published revision into a new private draft with fresh objectives, modules, activities, assessments, and assessment-item links. It preserves the published learner graph until the fork separately validates, reviews, and publishes.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.fork",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork"
+    },
+    {
       "description": "Append a measurable outcome to the active draft revision before linking instructional activities, formative checks, or mastery work to it.",
       "input_schema": {
         "properties": {

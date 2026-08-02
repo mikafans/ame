@@ -12,6 +12,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::Row;
+use std::collections::HashMap;
 use time::OffsetDateTime;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -142,6 +143,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route(
             "/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}",
             get(get_course_revision),
+        )
+        .route(
+            "/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork",
+            post(fork_course_revision),
         )
         .route(
             "/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate",
@@ -299,6 +304,196 @@ pub async fn get_course_revision(
 ) -> Result<Json<CourseRevisionResponse>, ApiError> {
     Ok(Json(
         load_owned_revision(&state.pool, auth.owner_id(), journey_id, revision_id).await?,
+    ))
+}
+
+/// Fork a published revision into an editable draft without changing the
+/// learner-visible graph. Question versions remain immutable shared inputs;
+/// activities, objectives, chapters, assessments, and assessment items receive
+/// fresh IDs under the new revision.
+#[utoipa::path(
+    post,
+    path = "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork",
+    params(("journey_id" = Uuid, Path), ("revision_id" = Uuid, Path)),
+    responses((status = 201, body = CourseRevisionResponse), (status = 409, description = "A draft revision already exists or the source revision is not published")),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn fork_course_revision(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path((journey_id, revision_id)): Path<(Uuid, Uuid)>,
+) -> Result<(axum::http::StatusCode, Json<CourseRevisionResponse>), ApiError> {
+    let mut transaction = state.pool.begin().await.map_err(db_error)?;
+    let source = sqlx::query(
+        "SELECT brief, source_references FROM tb_course_revisions WHERE id = $1 AND journey_id = $2 AND subject_user_id = $3 AND status = 'published' FOR UPDATE",
+    )
+    .bind(revision_id)
+    .bind(journey_id)
+    .bind(auth.owner_id())
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(db_error)?
+    .ok_or(ApiError::NotFound {
+        resource: "published course revision",
+    })?;
+    let fork = sqlx::query(
+        "INSERT INTO tb_course_revisions (journey_id, subject_user_id, version, brief, source_references) SELECT $1, $2, COALESCE(MAX(version), 0) + 1, $3, $4 FROM tb_course_revisions WHERE journey_id = $1 RETURNING id, journey_id, version, status, brief, source_references, validation, review, published_at, created_at, updated_at",
+    )
+    .bind(journey_id)
+    .bind(auth.owner_id())
+    .bind(source.get::<Value, _>("brief"))
+    .bind(source.get::<Value, _>("source_references"))
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(map_insert_revision_error)?;
+    let fork_id: Uuid = fork.get("id");
+
+    let mut objectives = HashMap::new();
+    for source_objective in sqlx::query(
+        "SELECT id, verb, statement, success_criteria, order_index, status FROM tb_journey_objectives WHERE course_revision_id = $1 AND subject_user_id = $2 ORDER BY order_index",
+    )
+    .bind(revision_id)
+    .bind(auth.owner_id())
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(db_error)? {
+        let old_id: Uuid = source_objective.get("id");
+        let new_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO tb_journey_objectives (journey_id, course_revision_id, subject_user_id, verb, statement, success_criteria, order_index, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        )
+        .bind(journey_id).bind(fork_id).bind(auth.owner_id())
+        .bind(source_objective.get::<String, _>("verb"))
+        .bind(source_objective.get::<String, _>("statement"))
+        .bind(source_objective.get::<String, _>("success_criteria"))
+        .bind(source_objective.get::<i32, _>("order_index"))
+        .bind(source_objective.get::<String, _>("status"))
+        .fetch_one(&mut *transaction).await.map_err(db_error)?;
+        objectives.insert(old_id, new_id);
+    }
+    let mut chapters = HashMap::new();
+    for source_chapter in sqlx::query(
+        "SELECT id, title, summary, order_index FROM tb_journey_chapters WHERE course_revision_id = $1 AND subject_user_id = $2 ORDER BY order_index",
+    )
+    .bind(revision_id).bind(auth.owner_id()).fetch_all(&mut *transaction).await.map_err(db_error)? {
+        let old_id: Uuid = source_chapter.get("id");
+        let new_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO tb_journey_chapters (journey_id, course_revision_id, subject_user_id, title, summary, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        )
+        .bind(journey_id).bind(fork_id).bind(auth.owner_id())
+        .bind(source_chapter.get::<String, _>("title"))
+        .bind(source_chapter.get::<String, _>("summary"))
+        .bind(source_chapter.get::<i32, _>("order_index"))
+        .fetch_one(&mut *transaction).await.map_err(db_error)?;
+        chapters.insert(old_id, new_id);
+    }
+    let source_activities = sqlx::query(
+        "SELECT id, chapter_id, source_actor_id, kind, title, order_index, payload_schema_version, content_version, payload, status, rubric FROM tb_activities WHERE course_revision_id = $1 AND subject_user_id = $2 ORDER BY order_index",
+    )
+    .bind(revision_id).bind(auth.owner_id()).fetch_all(&mut *transaction).await.map_err(db_error)?;
+    let mut activities = HashMap::new();
+    for source_activity in &source_activities {
+        let old_id: Uuid = source_activity.get("id");
+        let old_chapter: Option<Uuid> = source_activity.get("chapter_id");
+        let new_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO tb_activities (journey_id, course_revision_id, subject_user_id, source_actor_id, chapter_id, kind, title, order_index, payload_schema_version, content_version, publication_status, payload, status, rubric) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'review', $11, $12, $13) RETURNING id",
+        )
+        .bind(journey_id).bind(fork_id).bind(auth.owner_id())
+        .bind(source_activity.get::<Uuid, _>("source_actor_id"))
+        .bind(old_chapter.and_then(|id| chapters.get(&id).copied()))
+        .bind(source_activity.get::<String, _>("kind"))
+        .bind(source_activity.get::<String, _>("title"))
+        .bind(source_activity.get::<i32, _>("order_index"))
+        .bind(source_activity.get::<i32, _>("payload_schema_version"))
+        .bind(source_activity.get::<i32, _>("content_version"))
+        .bind(source_activity.get::<Value, _>("payload"))
+        .bind(source_activity.get::<String, _>("status"))
+        .bind(source_activity.get::<Option<Value>, _>("rubric"))
+        .fetch_one(&mut *transaction).await.map_err(db_error)?;
+        activities.insert(old_id, new_id);
+        for old_objective in sqlx::query_scalar::<_, Uuid>(
+            "SELECT objective_id FROM tb_activity_objectives WHERE activity_id = $1",
+        )
+        .bind(old_id)
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(db_error)?
+        {
+            let new_objective = objectives.get(&old_objective).copied().ok_or_else(|| {
+                ApiError::Internal(anyhow::anyhow!(
+                    "published activity links an objective outside its revision"
+                ))
+            })?;
+            sqlx::query(
+                "INSERT INTO tb_activity_objectives (activity_id, objective_id) VALUES ($1, $2)",
+            )
+            .bind(new_id)
+            .bind(new_objective)
+            .execute(&mut *transaction)
+            .await
+            .map_err(db_error)?;
+        }
+    }
+    for source_assessment in sqlx::query(
+        "SELECT id, activity_id, source_actor_id, version, mode, status, time_limit_seconds, passing_score, result_visibility FROM tb_assessments WHERE activity_id = ANY($1)",
+    )
+    .bind(source_activities.iter().map(|row| row.get::<Uuid, _>("id")).collect::<Vec<_>>())
+    .fetch_all(&mut *transaction).await.map_err(db_error)? {
+        let old_id: Uuid = source_assessment.get("id");
+        let new_activity = activities.get(&source_assessment.get::<Uuid, _>("activity_id")).copied().ok_or_else(|| ApiError::Internal(anyhow::anyhow!("assessment activity missing from revision fork")))?;
+        let new_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO tb_assessments (activity_id, subject_user_id, source_actor_id, version, mode, status, time_limit_seconds, passing_score, result_visibility) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+        )
+        .bind(new_activity).bind(auth.owner_id()).bind(source_assessment.get::<Uuid, _>("source_actor_id"))
+        .bind(source_assessment.get::<i32, _>("version")).bind(source_assessment.get::<String, _>("mode"))
+        .bind(source_assessment.get::<String, _>("status")).bind(source_assessment.get::<Option<i32>, _>("time_limit_seconds"))
+        .bind(source_assessment.get::<Option<f64>, _>("passing_score"))
+        .bind(source_assessment.get::<String, _>("result_visibility"))
+        .fetch_one(&mut *transaction).await.map_err(db_error)?;
+        let mut sections = HashMap::new();
+        for source_section in sqlx::query(
+            "SELECT id, title, order_index FROM tb_assessment_sections WHERE assessment_id = $1 ORDER BY order_index",
+        )
+        .bind(old_id)
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(db_error)?
+        {
+            let old_section_id: Uuid = source_section.get("id");
+            let new_section_id: Uuid = sqlx::query_scalar(
+                "INSERT INTO tb_assessment_sections (assessment_id, title, order_index) VALUES ($1, $2, $3) RETURNING id",
+            )
+            .bind(new_id)
+            .bind(source_section.get::<String, _>("title"))
+            .bind(source_section.get::<i32, _>("order_index"))
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(db_error)?;
+            sections.insert(old_section_id, new_section_id);
+        }
+        for item in sqlx::query("SELECT section_id, objective_id, question_version_id, order_index, points_override FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index")
+            .bind(old_id).fetch_all(&mut *transaction).await.map_err(db_error)? {
+            let new_objective = objectives.get(&item.get::<Uuid, _>("objective_id")).copied().ok_or_else(|| ApiError::Internal(anyhow::anyhow!("assessment item links an objective outside its revision")))?;
+            let new_section = item
+                .get::<Option<Uuid>, _>("section_id")
+                .map(|old_id| {
+                    sections.get(&old_id).copied().ok_or_else(|| {
+                        ApiError::Internal(anyhow::anyhow!(
+                            "assessment item links a section outside its assessment"
+                        ))
+                    })
+                })
+                .transpose()?;
+            sqlx::query("INSERT INTO tb_assessment_items (assessment_id, section_id, objective_id, question_version_id, order_index, points_override) VALUES ($1, $2, $3, $4, $5, $6)")
+                .bind(new_id).bind(new_section).bind(new_objective)
+                .bind(item.get::<Uuid, _>("question_version_id")).bind(item.get::<i32, _>("order_index"))
+                .bind(item.get::<Option<i32>, _>("points_override")).execute(&mut *transaction).await.map_err(db_error)?;
+        }
+    }
+    transaction.commit().await.map_err(db_error)?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(revision_response(fork)?),
     ))
 }
 

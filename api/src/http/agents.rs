@@ -96,6 +96,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["journeyId","revisionId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.course.revision.fork",
+            "Clone a published revision into a new private draft with fresh objectives, modules, activities, assessments, and assessment-item links. It preserves the published learner graph until the fork separately validates, reviews, and publishes.",
+            "POST",
+            "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork",
+            json!({"type":"object","required":["journeyId","revisionId"],"properties":{"journeyId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
             "learning.course.objective.create",
             "Append a measurable outcome to the active draft revision before linking instructional activities, formative checks, or mastery work to it.",
             "POST",

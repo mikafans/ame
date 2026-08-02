@@ -87,6 +87,7 @@ POST   /api/v1/learning/courses
 POST   /api/v1/learning/journeys/{journey_id}/objectives
 POST   /api/v1/learning/journeys/{journey_id}/chapters
 POST   /api/v1/learning/journeys/{journey_id}/activities
+POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork
 POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate
 POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review
 POST   /api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish
@@ -179,10 +180,12 @@ course from a generic onboarding journey or skip the source/review boundary.
    read the objective evidence and server recommendation. Adapt only from that
    durable evidence; an agent must never invent learner answers or mastery.
 
-To revise a published course, start a new source-grounded draft with
-`POST /api/v1/learning/journeys/{journeyId}/course-revisions`, inspect it with
-the revision `GET`, and repeat the revision-scoped workflow. Published course
-records stay immutable; never try to edit an old revision in place.
+To revise a published course, use
+`POST /api/v1/learning/journeys/{journeyId}/course-revisions/{revisionId}/fork`.
+It clones the published course graph into a new private draft; inspect it with
+the revision `GET`, edit only the new revision, and repeat validation, review,
+and publication. Published course records stay immutable; never try to edit an
+old revision in place.
 
 Minimal course creation payload:
 
