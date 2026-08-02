@@ -64,6 +64,29 @@ The web service bind-mounts `web/` and runs Next.js in development mode with
 polling enabled, so edits on macOS/Podman trigger hot reload without rebuilding
 the image. API source changes use the same bind-mounted development workflow.
 
+### Learning desk, themes, and local simulations
+
+`/learning` is the signed-in learner's private course library. It shows the
+learner's own course plans, their recommended next activity, progress, and
+reviews. It never shows courses owned by another account — including disposable
+local mock journeys — so an empty desk is an invitation to create a course, not
+a missing shared catalog.
+
+Paper & Moss is the default theme for a new browser. Learners can select a
+different theme from the interface; their saved choice takes precedence over
+the default.
+
+To create a browser-visible, disposable three-round learner simulation, choose
+the password locally and run:
+
+```bash
+HARU_SIM_PASSWORD='choose-your-own-password' make local-haru-simulation
+```
+
+The command prints the journey URL and a non-secret login email. It never saves
+or prints the password, and its courses remain visible only when you sign in as
+that simulated learner.
+
 ## Common tasks
 
 ```bash

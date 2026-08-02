@@ -301,7 +301,10 @@ export default function LearningHomePage() {
         </p>
         <Button asChild className="mt-7 rounded-full" variant="outline">
           <Link href="/start">
-            Start another journey <ArrowRight className="size-4" />
+            {journeys.length === 0
+              ? "Create your first course"
+              : "Start another journey"}{" "}
+            <ArrowRight className="size-4" />
           </Link>
         </Button>
       </section>
@@ -474,11 +477,26 @@ export default function LearningHomePage() {
           <div className="rounded-2xl border border-dashed border-border p-8 text-center">
             <Compass className="mx-auto size-8 text-primary" />
             <h2 className="mt-4 text-xl font-bold">
-              Choose a reviewed starting journey.
+              No journeys in this account yet.
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Start from a maintained set below, or use a freeform intent when
-              your topic is not listed.
+              This is your private course library. Courses created in another
+              account, including local simulations, never appear here. Start
+              with a reviewed path below, describe a freeform goal, or have an
+              agent set up a course for you.
+            </p>
+            <Button asChild className="mt-5 rounded-full" variant="outline">
+              <Link href="/agent">How an agent sets up a course</Link>
+            </Button>
+          </div>
+          <div>
+            <h3 className="text-lg font-bold">
+              Choose a reviewed starting path
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Each path has a maintained outline, stated outcomes, and source
+              review. You can also use a freeform intent when your topic is not
+              listed.
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">

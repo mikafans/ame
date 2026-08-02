@@ -129,8 +129,8 @@ test("native catalog lists eight reviewed journeys and previews each determinist
   ]);
   expect(
     catalog.every(
-      (entry: { reviewStatus: string; outcomes: string[] }) =>
-        entry.reviewStatus === "reviewed" && entry.outcomes.length > 0,
+      (entry: { contentReview: { status: string }; outcomes: string[] }) =>
+        entry.contentReview.status === "reviewed" && entry.outcomes.length > 0,
     ),
   ).toBeTruthy();
 
@@ -168,6 +168,15 @@ test("new learner discovers a native journey card from the learning desk", async
   await page.goto("/learning");
   const catalog = page.getByTestId("native-journey-catalog");
   await expect(catalog).toBeVisible();
+  await expect(
+    catalog.getByRole("heading", { name: "No journeys in this account yet." }),
+  ).toBeVisible();
+  await expect(
+    catalog.getByText("This is your private course library."),
+  ).toBeVisible();
+  await expect(
+    catalog.getByRole("link", { name: "How an agent sets up a course" }),
+  ).toHaveAttribute("href", "/agent");
   await expect(
     catalog.getByRole("heading", { name: "SQL foundations" }),
   ).toBeVisible();
@@ -321,7 +330,11 @@ test("learner sees variant failure, retries, and uses reviewed source-backed con
   );
   expect(masteryAfter.status()).toBe(masteryBefore.status());
   if (masteryBefore.ok()) {
-    expect(await masteryAfter.json()).toEqual(await masteryBefore.json());
+    const { calculatedAt: _beforeCalculatedAt, ...before } =
+      await masteryBefore.json();
+    const { calculatedAt: _afterCalculatedAt, ...after } =
+      await masteryAfter.json();
+    expect(after).toEqual(before);
   }
 });
 

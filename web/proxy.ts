@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = new Set([
   "/",
   "/login",
+  "/register",
   "/start",
   "/agent",
   "/self-hosting",

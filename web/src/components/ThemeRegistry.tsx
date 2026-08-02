@@ -36,7 +36,7 @@ export const AME_THEMES = [
 
 export type AmeTheme = (typeof AME_THEMES)[number]["id"];
 
-const DEFAULT_THEME: AmeTheme = "study-atelier";
+const DEFAULT_THEME: AmeTheme = "paper-moss";
 
 function isAmeTheme(theme: string | null): theme is AmeTheme {
   return AME_THEMES.some((candidate) => candidate.id === theme);

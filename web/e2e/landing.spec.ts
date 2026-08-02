@@ -16,6 +16,15 @@ test("landing page sends a new learner to public agent setup, not signup", async
   await expect(page.getByRole("link", { name: "Sign up free" })).toHaveCount(0);
 });
 
+test("legacy registration address opens the signup flow", async ({ page }) => {
+  await page.goto("/register");
+
+  await expect(page).toHaveURL(/\/login\?tab=signup$/);
+  await expect(
+    page.getByRole("tab", { name: "Create account" }),
+  ).toHaveAttribute("aria-selected", "true");
+});
+
 test("saved color mode is applied before the first page render", async ({
   page,
 }) => {
@@ -31,4 +40,15 @@ test("saved color mode is applied before the first page render", async ({
   await expect(
     page.getByRole("button", { name: "Use light mode" }),
   ).toBeVisible();
+});
+
+test("Paper & Moss is the default theme for a new browser", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-ame-theme",
+    "paper-moss",
+  );
 });
