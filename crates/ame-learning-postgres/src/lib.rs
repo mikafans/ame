@@ -6,9 +6,9 @@ use ame_learning_domain::{
     CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyOrigin,
     JourneyStatus, LearningActivity, LearningChapter, LearningGoal, LearningJourney,
     LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
-    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_activity_content,
-    validate_activity_rubric, validate_chapter, validate_goal, validate_journey,
-    validate_objective,
+    LearningSessionStatus, ObjectiveStatus, TransitionActivityPublication, validate_activity,
+    validate_activity_content, validate_activity_publication_transition, validate_activity_rubric,
+    validate_chapter, validate_goal, validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -530,7 +530,7 @@ impl LearningRepository for PgLearningRepository {
         input: AuthorActivityContent,
     ) -> Result<LearningActivity, LearningRepositoryError> {
         let row = sqlx::query(
-            "SELECT journey_id, subject_user_id, kind, status FROM tb_activities WHERE id = $1",
+            "SELECT journey_id, subject_user_id, kind, status, publication_status FROM tb_activities WHERE id = $1",
         )
         .bind(input.activity_id)
         .fetch_optional(&self.pool)
@@ -594,7 +594,7 @@ impl LearningRepository for PgLearningRepository {
     ) -> Result<LearningActivity, LearningRepositoryError> {
         validate_activity_rubric(&input)?;
         let row = sqlx::query(
-            "SELECT subject_user_id, journey_id, status FROM tb_activities WHERE id = $1",
+            "SELECT subject_user_id, journey_id, status, publication_status FROM tb_activities WHERE id = $1",
         )
         .bind(input.activity_id)
         .fetch_optional(&self.pool)
@@ -628,6 +628,51 @@ impl LearningRepository for PgLearningRepository {
             })
     }
 
+    async fn transition_activity_publication(
+        &self,
+        input: TransitionActivityPublication,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_publication_transition(&input)?;
+        let row = sqlx::query(
+            "SELECT journey_id, subject_user_id, publication_status, status FROM tb_activities WHERE id = $1",
+        )
+        .bind(input.activity_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(LearningRepositoryError::NotFound {
+            resource: "activity",
+        })?;
+        if row.get::<Uuid, _>("subject_user_id") != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity_publication_status(row.get::<String, _>("publication_status").as_str())
+            != input.from
+        {
+            return Err(LearningRepositoryError::InvalidActivityPublicationTransition);
+        }
+        if activity_status(row.get::<String, _>("status").as_str()) == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        let journey_id: Uuid = row.get("journey_id");
+        sqlx::query(
+            "UPDATE tb_activities SET publication_status = $1, updated_at = now() WHERE id = $2 AND subject_user_id = $3",
+        )
+        .bind(publication_status_value(input.to))
+        .bind(input.activity_id)
+        .bind(input.subject_user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        self.list_activities(input.subject_user_id, journey_id)
+            .await?
+            .into_iter()
+            .find(|activity| activity.id == input.activity_id)
+            .ok_or(LearningRepositoryError::NotFound {
+                resource: "activity",
+            })
+    }
+
     async fn start_learning_session(
         &self,
         input: CreateLearningSession,
@@ -636,7 +681,7 @@ impl LearningRepository for PgLearningRepository {
             .get_journey(input.subject_user_id, input.journey_id)
             .await?;
         let activity = sqlx::query(
-            "SELECT journey_id, subject_user_id, status FROM tb_activities WHERE id = $1",
+            "SELECT journey_id, subject_user_id, status, publication_status FROM tb_activities WHERE id = $1",
         )
         .bind(input.activity_id)
         .fetch_optional(&self.pool)
@@ -652,6 +697,9 @@ impl LearningRepository for PgLearningRepository {
         }
         if activity.get::<String, _>("status") != "ready" {
             return Err(LearningRepositoryError::ActivityNotReady);
+        }
+        if activity.get::<String, _>("publication_status") != "published" {
+            return Err(LearningRepositoryError::ActivityNotPublished);
         }
         sqlx::query(
             "UPDATE tb_learning_journeys SET status = 'active', updated_at = now() WHERE id = $1 AND subject_user_id = $2",

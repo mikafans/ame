@@ -25,6 +25,7 @@ use crate::{
             FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyOrigin,
             JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
             LearningRepository, LearningSession, LearningSessionStatus, ObjectiveStatus,
+            TransitionActivityPublication,
         },
         task::{TaskRubric, validate_task_rubric},
     },
@@ -228,6 +229,14 @@ pub fn router(state: AppState) -> Router<AppState> {
             "/v1/learning/activities/{activity_id}/rubric",
             axum::routing::patch(author_activity_rubric),
         )
+        .route(
+            "/v1/learning/activities/{activity_id}/review",
+            post(submit_activity_for_review),
+        )
+        .route(
+            "/v1/learning/activities/{activity_id}/publish",
+            post(publish_activity),
+        )
         .with_state(state)
 }
 
@@ -307,7 +316,7 @@ pub async fn list_journeys(
                 matches!(
                     activity.status,
                     ActivityStatus::Ready | ActivityStatus::InProgress
-                )
+                ) && activity.publication_status == ActivityPublicationStatus::Published
             });
         response.push(LearningJourneySummaryResponse {
             id: journey.id,
@@ -421,11 +430,73 @@ pub async fn create_activity(
             order_index,
             payload_schema_version: 1,
             content_version: 1,
-            publication_status: ActivityPublicationStatus::Published,
+            publication_status: ActivityPublicationStatus::Draft,
             payload: body.payload,
             objective_ids: body.objective_ids,
             status: body.status,
             rubric: None,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(activity_response(activity)))
+}
+
+/// POST /api/v1/learning/activities/{activity_id}/review — submit a draft activity for review.
+#[utoipa::path(
+    post,
+    path = "/api/v1/learning/activities/{activity_id}/review",
+    params(("activity_id" = Uuid, Path, description = "Draft activity to submit")),
+    responses(
+        (status = 200, description = "Activity submitted for review", body = LearningActivityResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Activity does not exist for this learner"),
+        (status = 409, description = "Activity is not an editable draft")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn submit_activity_for_review(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(activity_id): Path<Uuid>,
+) -> Result<Json<LearningActivityResponse>, ApiError> {
+    let activity = PgLearningRepository::new(state.pool)
+        .transition_activity_publication(TransitionActivityPublication {
+            subject_user_id: auth.owner_id(),
+            activity_id,
+            from: ActivityPublicationStatus::Draft,
+            to: ActivityPublicationStatus::Review,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(activity_response(activity)))
+}
+
+/// POST /api/v1/learning/activities/{activity_id}/publish — expose a reviewed activity to its learner.
+#[utoipa::path(
+    post,
+    path = "/api/v1/learning/activities/{activity_id}/publish",
+    params(("activity_id" = Uuid, Path, description = "Reviewed activity to publish")),
+    responses(
+        (status = 200, description = "Published learner activity", body = LearningActivityResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Activity does not exist for this learner"),
+        (status = 409, description = "Activity is not in review")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn publish_activity(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(activity_id): Path<Uuid>,
+) -> Result<Json<LearningActivityResponse>, ApiError> {
+    let activity = PgLearningRepository::new(state.pool)
+        .transition_activity_publication(TransitionActivityPublication {
+            subject_user_id: auth.owner_id(),
+            activity_id,
+            from: ActivityPublicationStatus::Review,
+            to: ActivityPublicationStatus::Published,
         })
         .await
         .map_err(map_learning_error)?;
@@ -931,6 +1002,15 @@ fn map_learning_error(error: crate::domain::learning::LearningRepositoryError) -
                 field: "activityId".to_string(),
                 message: "activity is not ready to start".to_string(),
             }])
+        }
+        crate::domain::learning::LearningRepositoryError::ActivityNotPublished => {
+            ApiError::Validation(vec![crate::domain::error::FieldError {
+                field: "activityId".to_string(),
+                message: "activity must be published before a learner can start it".to_string(),
+            }])
+        }
+        crate::domain::learning::LearningRepositoryError::InvalidActivityPublicationTransition => {
+            ApiError::ActivityContentConflict
         }
         crate::domain::learning::LearningRepositoryError::EmptyField { field } => {
             ApiError::Validation(vec![crate::domain::error::FieldError {

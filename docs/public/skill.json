@@ -194,7 +194,7 @@
       "path": "/api/v1/learning/journeys/{journey_id}/chapters"
     },
     {
-      "description": "Append an objective-linked course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
+      "description": "Append an objective-linked draft course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. It remains private until learning.course.activity.review then learning.course.activity.publish succeed. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
       "input_schema": {
         "properties": {
           "chapterId": {
@@ -256,6 +256,42 @@
       "method": "POST",
       "name": "learning.course.activity.create",
       "path": "/api/v1/learning/journeys/{journey_id}/activities"
+    },
+    {
+      "description": "Move an owned draft activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.activity.review",
+      "path": "/api/v1/learning/activities/{activity_id}/review"
+    },
+    {
+      "description": "Publish an owned reviewed activity so a learner can start it. A draft cannot be started or published directly.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.activity.publish",
+      "path": "/api/v1/learning/activities/{activity_id}/publish"
     },
     {
       "description": "Start an activity in an owned journey.",

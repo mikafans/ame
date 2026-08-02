@@ -83,10 +83,24 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.course.activity.create",
-            "Append an objective-linked course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
+            "Append an objective-linked draft course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. It remains private until learning.course.activity.review then learning.course.activity.publish succeed. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
             "POST",
             "/api/v1/learning/journeys/{journey_id}/activities",
             json!({"type":"object","required":["journeyId","kind","title","payload","objectiveIds","status"],"properties":{"journeyId":{"type":"string","format":"uuid"},"chapterId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["explanation","example","diagnostic","practice","feedback","application","reflection","milestone","timed_practice","recommendation"]},"title":{"type":"string","minLength":1},"payload":{"type":"object"},"objectiveIds":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1},"status":{"type":"string","enum":["ready","proposed"]}}}),
+        ),
+        endpoint(
+            "learning.course.activity.review",
+            "Move an owned draft activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
+            "POST",
+            "/api/v1/learning/activities/{activity_id}/review",
+            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.course.activity.publish",
+            "Publish an owned reviewed activity so a learner can start it. A draft cannot be started or published directly.",
+            "POST",
+            "/api/v1/learning/activities/{activity_id}/publish",
+            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.activity.start",

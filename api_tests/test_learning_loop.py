@@ -91,6 +91,61 @@ def _recommendation_candidates(journey_body):
     ]
 
 
+def test_agent_authored_activity_stays_private_until_review_and_publish(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    journey_id = started["journeyId"]
+    journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
+    assert journey.status_code == 200, journey.text
+    objective_id = journey.json()["objectives"][0]["id"]
+
+    created = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities",
+        headers=headers,
+        json={
+            "chapterId": None,
+            "kind": "practice",
+            "title": "Draft-only agent activity",
+            "payload": {"prompt": "A draft activity must not reach the learner."},
+            "objectiveIds": [objective_id],
+            "status": "ready",
+        },
+    )
+    assert created.status_code == 200, created.text
+    activity = created.json()
+    assert activity["publicationStatus"] == "draft"
+
+    blocked = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{activity['id']}/start",
+        headers=headers,
+        json={"questionPlan": {}},
+    )
+    assert blocked.status_code == 422, blocked.text
+
+    invalid_publish = client.post(
+        f"/api/v1/learning/activities/{activity['id']}/publish", headers=headers
+    )
+    assert invalid_publish.status_code == 409, invalid_publish.text
+
+    review = client.post(
+        f"/api/v1/learning/activities/{activity['id']}/review", headers=headers
+    )
+    assert review.status_code == 200, review.text
+    assert review.json()["publicationStatus"] == "review"
+
+    published = client.post(
+        f"/api/v1/learning/activities/{activity['id']}/publish", headers=headers
+    )
+    assert published.status_code == 200, published.text
+    assert published.json()["publicationStatus"] == "published"
+
+    started_activity = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{activity['id']}/start",
+        headers=headers,
+        json={"questionPlan": {}},
+    )
+    assert started_activity.status_code == 200, started_activity.text
+
+
 def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     started, headers = _start_learner(client, "I want to learn a useful subject")
     references = _certified_reference(client, headers)

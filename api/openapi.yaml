@@ -698,6 +698,64 @@ paths:
           description: Content, provenance, or review status is invalid
       security:
       - bearer_auth: []
+  /api/v1/learning/activities/{activity_id}/publish:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/activities/{activity_id}/publish — expose a reviewed activity to its learner.
+      operationId: publish_activity
+      parameters:
+      - name: activity_id
+        in: path
+        description: Reviewed activity to publish
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Published learner activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity does not exist for this learner
+        '409':
+          description: Activity is not in review
+      security:
+      - bearer_auth: []
+  /api/v1/learning/activities/{activity_id}/review:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/activities/{activity_id}/review — submit a draft activity for review.
+      operationId: submit_activity_for_review
+      parameters:
+      - name: activity_id
+        in: path
+        description: Draft activity to submit
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Activity submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity does not exist for this learner
+        '409':
+          description: Activity is not an editable draft
+      security:
+      - bearer_auth: []
   /api/v1/learning/activities/{activity_id}/rubric:
     patch:
       tags:

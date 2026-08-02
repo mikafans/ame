@@ -246,6 +246,16 @@ pub struct AuthorActivityRubric {
     pub review_status: String,
 }
 
+/// A controlled authoring transition. Activities are created as drafts and may
+/// reach learners only by moving draft -> review -> published.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionActivityPublication {
+    pub subject_user_id: Uuid,
+    pub activity_id: Uuid,
+    pub from: ActivityPublicationStatus,
+    pub to: ActivityPublicationStatus,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ActivityCapability {
@@ -335,6 +345,10 @@ pub enum LearningRepositoryError {
     OrderConflict { resource: &'static str },
     #[error("activity is not ready to start")]
     ActivityNotReady,
+    #[error("activity is not published for learners")]
+    ActivityNotPublished,
+    #[error("activity publication transition is invalid")]
+    InvalidActivityPublicationTransition,
     #[error("activity content is invalid")]
     InvalidActivityContent,
     #[error("activity rubric is invalid")]
@@ -430,6 +444,11 @@ pub trait LearningRepository: Send + Sync {
     async fn author_activity_rubric(
         &self,
         input: AuthorActivityRubric,
+    ) -> Result<LearningActivity, LearningRepositoryError>;
+
+    async fn transition_activity_publication(
+        &self,
+        input: TransitionActivityPublication,
     ) -> Result<LearningActivity, LearningRepositoryError>;
 
     async fn start_learning_session(
@@ -538,6 +557,27 @@ pub fn validate_activity(input: &CreateActivity) -> Result<(), LearningRepositor
         return Err(LearningRepositoryError::EmptyField {
             field: "content_version",
         });
+    }
+    Ok(())
+}
+
+pub fn validate_activity_publication_transition(
+    input: &TransitionActivityPublication,
+) -> Result<(), LearningRepositoryError> {
+    if !matches!(
+        (input.from, input.to),
+        (
+            ActivityPublicationStatus::Draft,
+            ActivityPublicationStatus::Review
+        ) | (
+            ActivityPublicationStatus::Review,
+            ActivityPublicationStatus::Published
+        ) | (
+            ActivityPublicationStatus::Published,
+            ActivityPublicationStatus::Retired
+        )
+    ) {
+        return Err(LearningRepositoryError::InvalidActivityPublicationTransition);
     }
     Ok(())
 }

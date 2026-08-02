@@ -62,6 +62,8 @@ use crate::http::{
         crate::http::learning::list_journeys,
         crate::http::learning::create_chapter,
         crate::http::learning::create_activity,
+        crate::http::learning::submit_activity_for_review,
+        crate::http::learning::publish_activity,
         crate::http::learning::get_learning_session,
         crate::http::learning::finish_learning_session,
         crate::http::learning::start_activity,

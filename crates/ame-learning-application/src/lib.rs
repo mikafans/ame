@@ -6,9 +6,9 @@ use ame_learning_domain::{
     CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyOrigin,
     JourneyStatus, LearningActivity, LearningChapter, LearningGoal, LearningJourney,
     LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
-    LearningSessionStatus, ObjectiveStatus, validate_activity, validate_activity_content,
-    validate_activity_rubric, validate_chapter, validate_goal, validate_journey,
-    validate_objective,
+    LearningSessionStatus, ObjectiveStatus, TransitionActivityPublication, validate_activity,
+    validate_activity_content, validate_activity_publication_transition, validate_activity_rubric,
+    validate_chapter, validate_goal, validate_journey, validate_objective,
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -583,6 +583,34 @@ impl LearningRepository for InMemoryLearningRepository {
         Ok(activity.clone())
     }
 
+    async fn transition_activity_publication(
+        &self,
+        input: TransitionActivityPublication,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_publication_transition(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let activity = state.activities.get_mut(&input.activity_id).ok_or(
+            LearningRepositoryError::NotFound {
+                resource: "activity",
+            },
+        )?;
+        if activity.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity.publication_status != input.from {
+            return Err(LearningRepositoryError::InvalidActivityPublicationTransition);
+        }
+        if activity.status == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        activity.publication_status = input.to;
+        activity.updated_at = OffsetDateTime::now_utc();
+        Ok(activity.clone())
+    }
+
     async fn start_learning_session(
         &self,
         input: CreateLearningSession,
@@ -605,6 +633,9 @@ impl LearningRepository for InMemoryLearningRepository {
         }
         if activity.status != ActivityStatus::Ready {
             return Err(LearningRepositoryError::ActivityNotReady);
+        }
+        if activity.publication_status != ActivityPublicationStatus::Published {
+            return Err(LearningRepositoryError::ActivityNotPublished);
         }
         let goal_id = state
             .journeys
