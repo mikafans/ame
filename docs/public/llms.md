@@ -76,6 +76,20 @@ future capabilities. Content is versioned and approved before it is learner
 visible. Text fields may contain Markdown, but an activity is not limited to
 plain text.
 
+Use these exact `content` shapes with `PATCH /api/v1/learning/activities/{activity_id}/content` after the matching generation run is `published`. The content type must match the activity kind: `explanation` for an instruction activity, `worked_example` for an example activity, and `scenario` for a diagnostic or application activity.
+
+```json
+{"content":{"type":"explanation","heading":"Event time","body":"Use the timestamp carried by the event, not arrival delay.","key_points":["Event time is domain time.","Watermarks bound expected delay."]}}
+```
+
+```json
+{"content":{"type":"worked_example","heading":"Window a delayed click","prompt":"A click arrives 20 seconds late.","steps":["Assign its event timestamp.","Apply the watermark policy."],"reflection":"Which events are now late?"}}
+```
+
+```json
+{"content":{"type":"scenario","context":"A job restarts after a failure.","prompt":"What restores consistent state?","options":[{"id":"checkpoint","label":"Restore the completed checkpoint"},{"id":"restart","label":"Start without state"}],"correct_option_id":"checkpoint","feedback":{"correct":"Correct: recovery restores the completed checkpoint.","incorrect":"Use the completed checkpoint to restore consistent state."}}}
+```
+
 ## Learner loop
 
 Use these operations with the learner token:

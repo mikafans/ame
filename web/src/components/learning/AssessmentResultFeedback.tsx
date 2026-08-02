@@ -58,7 +58,9 @@ export function AssessmentResultFeedback({ attempt }: { attempt: Attempt }) {
                   <div className="mt-2 space-y-1 text-muted-foreground">
                     {item.explanation && <p>{item.explanation}</p>}
                     {item.rationale && (
-                      <p className="text-xs">Why this matters: {item.rationale}</p>
+                      <p className="text-xs">
+                        Why this matters: {item.rationale}
+                      </p>
                     )}
                   </div>
                 )}

@@ -15,7 +15,7 @@ COPY docs/public docs/public
 COPY db/migrations db/migrations
 COPY ame.dev.toml ame.dev.toml
 
-RUN cargo build --manifest-path api/Cargo.toml --bin ame-api
+RUN cargo build --jobs 1 --manifest-path api/Cargo.toml --bin ame-api
 
 ENV AME_CONFIG_PATH=/workspace/ame.dev.toml
 ENV AME_PORT=8080

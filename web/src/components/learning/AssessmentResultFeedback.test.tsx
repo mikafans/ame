@@ -68,7 +68,8 @@ describe("AssessmentResultFeedback", () => {
               awardedPoints: 0,
               evaluationStatus: "incorrect",
               explanation: "Event time is when the click occurred.",
-              rationale: "This distinguishes delayed records from processing delay.",
+              rationale:
+                "This distinguishes delayed records from processing delay.",
             },
           ],
         })}

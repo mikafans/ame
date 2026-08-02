@@ -117,7 +117,9 @@
                 "id": "guess",
                 "label": "Act immediately without checking the idea"
               }
-            ]
+            ],
+            "correct_option_id": "make_model",
+            "feedback": { "correct": "Yes. Make the model explicit so your next action is testable.", "incorrect": "Pause first: make the core idea explicit, then choose an action you can test." }
           }
         },
         "status": "proposed"
@@ -660,7 +662,9 @@
                 "id": "restart",
                 "label": "Restart from scratch and reprocess everything from the beginning"
               }
-            ]
+            ],
+            "correct_option_id": "checkpoint",
+            "feedback": { "correct": "Correct. A completed checkpoint restores keyed state and coordinates the source rewind.", "incorrect": "Not quite. Flink recovers from the last completed checkpoint, restoring keyed state while rewinding the source." }
           }
         },
         "status": "proposed"
@@ -726,7 +730,9 @@
                 "id": "manual",
                 "label": "SSH into a node and start the job manager by hand"
               }
-            ]
+            ],
+            "correct_option_id": "flinkdeployment",
+            "feedback": { "correct": "Correct. The operator reconciles a FlinkDeployment resource into the running job.", "incorrect": "Use a FlinkDeployment resource first; the operator manages the job lifecycle from that declaration." }
           }
         },
         "status": "proposed"
@@ -936,7 +942,9 @@
                 "id": "kinetic",
                 "label": "Total kinetic energy is conserved"
               }
-            ]
+            ],
+            "correct_option_id": "momentum",
+            "feedback": { "correct": "Correct. Total momentum is conserved for the isolated collision.", "incorrect": "For a sticking collision, total momentum—not total kinetic energy—is conserved." }
           }
         },
         "status": "proposed"
