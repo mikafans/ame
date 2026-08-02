@@ -118,6 +118,12 @@ It must provide:
   answer rationales explain the reasoning, mastery checks are distinct from
   practice, and open work has an explicit rubric;
 - source, licensing, review, provenance, ownership, retry, and fixture rules;
+- a tested fresh-account handoff: the returned registration token, authenticated
+  journey start/resume request, and error recovery must agree with the public
+  examples;
+- a source-acquisition contract: accept learner-provided material or an
+  agent-supplied allowed URL/document, import and cite it before authoring, and
+  report an actionable blocked state when no usable source is available;
 - failure handling: validation errors, incomplete generation, pending review,
   and retryable agent runs;
 - two complete reference transcripts: Flink and Netty, from learner brief to
@@ -170,13 +176,13 @@ behalf.
 
 ### Delivery order and release gates
 
-| Phase   | Deliverable                                                                                    | Gate                                                                                                                                        |
-| ------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.5.0-A | Rewrite canonical user stories, course schema, publication states, and agent playbook contract | Contract tests reject a generic shell as publishable.                                                                                       |
-| 0.5.0-B | Implement course draft/publish validation and agent-visible diagnostics                        | API tests cover incomplete outcomes, missing rationales, missing rubrics, provenance, ownership, retries, and immutable published versions. |
-| 0.5.0-C | Wire lesson checks, assessment feedback, and application rubrics into the learner flow         | Browser proves lesson → check → result/task → resume without false evidence.                                                                |
-| 0.5.0-D | Author Flink and Netty reference courses through the public agent workflow                     | API-only agent simulations create and inspect both courses without source-code access.                                                      |
-| 0.5.0-E | Certify the local stack and public agent assets                                                | Fresh local stack, browser learner simulation, agent contract simulation, and documentation/OpenAPI drift checks all pass.                  |
+| Phase   | Deliverable                                                                                    | Gate                                                                                                                                                                                            |
+| ------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.5.0-A | Rewrite canonical user stories, course schema, publication states, and agent playbook contract | Contract tests reject a generic shell as publishable.                                                                                                                                           |
+| 0.5.0-B | Implement course draft/publish validation and agent-visible diagnostics                        | API tests cover incomplete outcomes, missing rationales, missing rubrics, provenance, ownership, retries, immutable published versions, fresh account handoff, and source-acquisition failures. |
+| 0.5.0-C | Wire lesson checks, assessment feedback, and application rubrics into the learner flow         | Browser proves lesson → check → result/task → resume without false evidence.                                                                                                                    |
+| 0.5.0-D | Author Flink and Netty reference courses through the public agent workflow                     | API-only agent simulations create and inspect both courses without source-code access.                                                                                                          |
+| 0.5.0-E | Certify the local stack and public agent assets                                                | Fresh local stack, browser learner simulation, agent contract simulation, and documentation/OpenAPI drift checks all pass.                                                                      |
 
 ### 0.5.0 definition of done
 
@@ -186,6 +192,8 @@ It is complete only when:
 - a clean local stack can reproduce both published reference courses;
 - an API-only external agent follows the public instructions and builds or
   revises a course without reading repository source;
+- the Flink, Netty, and introductory physics author simulations honor their
+  learner briefs rather than expanding into generic template material;
 - a browser learner completes representative Flink and Netty module loops and
   receives correct feedback and truthful progress;
 - every published module passes the course validator;
@@ -205,6 +213,9 @@ See [Coursera on learning objectives and meaningful assessments](https://blog.co
 [Coursera on mastery learning](https://blog.coursera.org/how-to-integrate-mastery-learning-into-course-design/),
 [Open edX feedback and hints](https://edx.readthedocs.io/projects/edx-partner-course-staff/en/latest/exercises_tools/dropdown.html),
 and [Open edX open-response rubrics](https://edx.readthedocs.io/projects/open-edx-building-and-running-a-course/en/open-release-sumac.master/exercises_tools/open_response_assessments/OpenResponseAssessments.html).
+
+The API-only baseline across Flink, Netty, and physics is recorded in
+[`audits/2026-08-02-agent-course-author-simulations.md`](audits/2026-08-02-agent-course-author-simulations.md).
 
 ## Prior foundations
 
