@@ -75,6 +75,20 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
+            "learning.course.chapter.create",
+            "Append a named chapter to an owned journey. Create chapters before the activities they contain; AME assigns the next stable chapter order.",
+            "POST",
+            "/api/v1/learning/journeys/{journey_id}/chapters",
+            json!({"type":"object","required":["journeyId","title","summary"],"properties":{"journeyId":{"type":"string","format":"uuid"},"title":{"type":"string","minLength":1},"summary":{"type":"string","minLength":1}}}),
+        ),
+        endpoint(
+            "learning.course.activity.create",
+            "Append an objective-linked course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
+            "POST",
+            "/api/v1/learning/journeys/{journey_id}/activities",
+            json!({"type":"object","required":["journeyId","kind","title","payload","objectiveIds","status"],"properties":{"journeyId":{"type":"string","format":"uuid"},"chapterId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["explanation","example","diagnostic","practice","feedback","application","reflection","milestone","timed_practice","recommendation"]},"title":{"type":"string","minLength":1},"payload":{"type":"object"},"objectiveIds":{"type":"array","items":{"type":"string","format":"uuid"},"minItems":1},"status":{"type":"string","enum":["ready","proposed"]}}}),
+        ),
+        endpoint(
             "learning.activity.start",
             "Start an activity in an owned journey.",
             "POST",
@@ -202,7 +216,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.session.finish",
-            "Finish a learning session and persist the learner's evidence and responses.",
+            "Finish a learning session and persist completion responses. This is not mastery evidence: record mastery only from a graded assessment attempt or reviewed task submission.",
             "POST",
             "/api/v1/learning/sessions/{id}/finish",
             json!({"type":"object","required":["id","completed","responses"],"properties":{"id":{"type":"string","format":"uuid"},"completed":{"type":"boolean"},"responses":{"type":"array"}}}),
@@ -213,6 +227,13 @@ pub fn build_skill_manifest() -> Value {
             "GET",
             "/api/v1/learning/sessions/{id}",
             json!({"type":"object","required":["id"],"properties":{"id":{"type":"string","format":"uuid"}}}),
+        ),
+        endpoint(
+            "learning.activity.content.get",
+            "Read an owned activity's immutable published payload, version, rubric, and status without starting or reopening a learner session. Use this to review completed work.",
+            "GET",
+            "/api/v1/learning/activities/{activity_id}/content",
+            json!({"type":"object","required":["activityId"],"properties":{"activityId":{"type":"string","format":"uuid"}}}),
         ),
         endpoint(
             "learning.task.submission.start",

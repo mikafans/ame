@@ -166,6 +166,98 @@
       "path": "/api/v1/learning/journeys/{id}"
     },
     {
+      "description": "Append a named chapter to an owned journey. Create chapters before the activities they contain; AME assigns the next stable chapter order.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "summary": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "title",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.chapter.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/chapters"
+    },
+    {
+      "description": "Append an objective-linked course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
+      "input_schema": {
+        "properties": {
+          "chapterId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "explanation",
+              "example",
+              "diagnostic",
+              "practice",
+              "feedback",
+              "application",
+              "reflection",
+              "milestone",
+              "timed_practice",
+              "recommendation"
+            ],
+            "type": "string"
+          },
+          "objectiveIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "proposed"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "kind",
+          "title",
+          "payload",
+          "objectiveIds",
+          "status"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.activity.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/activities"
+    },
+    {
       "description": "Start an activity in an owned journey.",
       "input_schema": {
         "properties": {
@@ -645,7 +737,7 @@
       "path": "/api/v1/learning/journeys/{id}/analytics"
     },
     {
-      "description": "Finish a learning session and persist the learner's evidence and responses.",
+      "description": "Finish a learning session and persist completion responses. This is not mastery evidence: record mastery only from a graded assessment attempt or reviewed task submission.",
       "input_schema": {
         "properties": {
           "completed": {
@@ -687,6 +779,24 @@
       "method": "GET",
       "name": "learning.session.get",
       "path": "/api/v1/learning/sessions/{id}"
+    },
+    {
+      "description": "Read an owned activity's immutable published payload, version, rubric, and status without starting or reopening a learner session. Use this to review completed work.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.activity.content.get",
+      "path": "/api/v1/learning/activities/{activity_id}/content"
     },
     {
       "description": "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",

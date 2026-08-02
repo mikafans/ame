@@ -360,7 +360,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** GET /api/v1/learning/activities/{activity_id}/content — read immutable activity content without starting a session. */
+        get: operations["get_activity_content"];
         put?: never;
         post?: never;
         delete?: never;
@@ -469,6 +470,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning/journeys/{journey_id}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/journeys/{journey_id}/activities — append a course activity. */
+        post: operations["create_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start": {
         parameters: {
             query?: never;
@@ -496,6 +514,23 @@ export interface paths {
         get: operations["list_journey_attempts"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/chapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/journeys/{journey_id}/chapters — append a course chapter. */
+        post: operations["create_chapter"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1188,12 +1223,30 @@ export interface components {
         };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
+        /**
+         * @description A course author supplies the activity semantics and objective links; AME owns
+         *     ordering, versioning, publication, and the learner identity.
+         */
+        CreateActivityBody: {
+            /** Format: uuid */
+            chapterId?: string | null;
+            kind: components["schemas"]["ActivityKind"];
+            objectiveIds: string[];
+            payload: Record<string, never>;
+            status: components["schemas"]["ActivityStatus"];
+            title: string;
+        };
         CreateAssessmentBody: {
             /** Format: uuid */
             activityId: string;
             items: components["schemas"]["AssessmentItemBody"][];
             mode: components["schemas"]["AssessmentMode"];
             status?: components["schemas"]["AssessmentStatus"];
+        };
+        /** @description A new chapter is always appended after the journey's existing chapters. */
+        CreateChapterBody: {
+            summary: string;
+            title: string;
         };
         CreateCitationBody: {
             /** Format: int32 */
@@ -2789,6 +2842,43 @@ export interface operations {
             };
         };
     };
+    get_activity_content: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Activity to review */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owned activity content */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     author_activity_content: {
         parameters: {
             query?: never;
@@ -3030,6 +3120,54 @@ export interface operations {
             };
         };
     };
+    create_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Journey to extend */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateActivityBody"];
+            };
+        };
+        responses: {
+            /** @description Appended activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey, chapter, or objective does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity is invalid or cannot be learner-startable */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     start_activity: {
         parameters: {
             query?: never;
@@ -3103,6 +3241,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AttemptResponse"][];
                 };
+            };
+        };
+    };
+    create_chapter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Journey to extend */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChapterBody"];
+            };
+        };
+        responses: {
+            /** @description Appended chapter */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningChapterResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chapter is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

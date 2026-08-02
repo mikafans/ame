@@ -17,12 +17,13 @@ use uuid::Uuid;
 use crate::{
     auth::extractor::AuthenticatedUser,
     domain::{
-        error::ApiError,
+        error::{ApiError, FieldError},
         generation::{GenerationRepository, validate_content_run},
         learning::{
-            ActivityKind, ActivityStatus, AuthorActivityContent, AuthorActivityRubric,
-            CreateLearningSession, FinishLearningSession as FinishLearningSessionInput, GoalStatus,
-            JourneyOrigin, JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
+            ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
+            AuthorActivityRubric, CreateActivity, CreateChapter, CreateLearningSession,
+            FinishLearningSession as FinishLearningSessionInput, GoalStatus, JourneyOrigin,
+            JourneyStatus, LearningActivity, LearningChapter, LearningObjective,
             LearningRepository, LearningSession, LearningSessionStatus, ObjectiveStatus,
         },
         task::{TaskRubric, validate_task_rubric},
@@ -198,6 +199,14 @@ pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/v1/learning/journeys", get(list_journeys))
         .route("/v1/learning/journeys/{id}", get(get_journey))
+        .route(
+            "/v1/learning/journeys/{journey_id}/chapters",
+            post(create_chapter),
+        )
+        .route(
+            "/v1/learning/journeys/{journey_id}/activities",
+            post(create_activity),
+        )
         .route("/v1/learning/sessions/{id}", get(get_learning_session))
         .route(
             "/v1/learning/sessions/{id}/finish",
@@ -206,6 +215,10 @@ pub fn router(state: AppState) -> Router<AppState> {
         .route(
             "/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
             post(start_activity),
+        )
+        .route(
+            "/v1/learning/activities/{activity_id}/content",
+            get(get_activity_content),
         )
         .route(
             "/v1/learning/activities/{activity_id}/content",
@@ -235,6 +248,28 @@ pub struct AuthorActivityRubricBody {
     pub rubric: TaskRubric,
     pub source_references: Vec<String>,
     pub review_status: String,
+}
+
+/// A new chapter is always appended after the journey's existing chapters.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateChapterBody {
+    pub title: String,
+    pub summary: String,
+}
+
+/// A course author supplies the activity semantics and objective links; AME owns
+/// ordering, versioning, publication, and the learner identity.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateActivityBody {
+    pub chapter_id: Option<Uuid>,
+    pub kind: ActivityKind,
+    pub title: String,
+    #[schema(value_type = Object)]
+    pub payload: Value,
+    pub objective_ids: Vec<Uuid>,
+    pub status: ActivityStatus,
 }
 
 /// GET /api/v1/learning/journeys — list the caller's learner-owned journeys.
@@ -286,6 +321,154 @@ pub async fn list_journeys(
         });
     }
     Ok(Json(response))
+}
+
+/// POST /api/v1/learning/journeys/{journey_id}/chapters — append a course chapter.
+#[utoipa::path(
+    post,
+    path = "/api/v1/learning/journeys/{journey_id}/chapters",
+    params(("journey_id" = Uuid, Path, description = "Journey to extend")),
+    request_body = CreateChapterBody,
+    responses(
+        (status = 200, description = "Appended chapter", body = LearningChapterResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Journey does not exist for this learner"),
+        (status = 422, description = "Chapter is invalid")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn create_chapter(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+    Json(body): Json<CreateChapterBody>,
+) -> Result<Json<LearningChapterResponse>, ApiError> {
+    let repository = PgLearningRepository::new(state.pool);
+    let order_index = repository
+        .list_chapters(auth.owner_id(), journey_id)
+        .await
+        .map_err(map_learning_error)?
+        .last()
+        .map_or(0, |chapter| chapter.order_index + 1);
+    let chapter = repository
+        .create_chapter(CreateChapter {
+            journey_id,
+            subject_user_id: auth.owner_id(),
+            title: body.title,
+            summary: body.summary,
+            order_index,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(chapter_response(chapter, &[])))
+}
+
+/// POST /api/v1/learning/journeys/{journey_id}/activities — append a course activity.
+#[utoipa::path(
+    post,
+    path = "/api/v1/learning/journeys/{journey_id}/activities",
+    params(("journey_id" = Uuid, Path, description = "Journey to extend")),
+    request_body = CreateActivityBody,
+    responses(
+        (status = 200, description = "Appended activity", body = LearningActivityResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Journey, chapter, or objective does not exist for this learner"),
+        (status = 422, description = "Activity is invalid or cannot be learner-startable")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn create_activity(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+    Json(body): Json<CreateActivityBody>,
+) -> Result<Json<LearningActivityResponse>, ApiError> {
+    if body.objective_ids.is_empty() {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "objectiveIds".to_string(),
+            message: "must link at least one journey objective".to_string(),
+        }]));
+    }
+    if !matches!(
+        body.status,
+        ActivityStatus::Proposed | ActivityStatus::Ready
+    ) {
+        return Err(ApiError::Validation(vec![FieldError {
+            field: "status".to_string(),
+            message: "must be proposed or ready when authoring a course".to_string(),
+        }]));
+    }
+
+    let repository = PgLearningRepository::new(state.pool);
+    let order_index = repository
+        .list_activities(auth.owner_id(), journey_id)
+        .await
+        .map_err(map_learning_error)?
+        .iter()
+        .map(|activity| activity.order_index)
+        .max()
+        .map_or(0, |order_index| order_index + 1);
+    let activity = repository
+        .create_activity(CreateActivity {
+            journey_id,
+            subject_user_id: auth.owner_id(),
+            source_actor_id: auth.owner_id(),
+            chapter_id: body.chapter_id,
+            kind: body.kind,
+            title: body.title,
+            order_index,
+            payload_schema_version: 1,
+            content_version: 1,
+            publication_status: ActivityPublicationStatus::Published,
+            payload: body.payload,
+            objective_ids: body.objective_ids,
+            status: body.status,
+            rubric: None,
+        })
+        .await
+        .map_err(map_learning_error)?;
+    Ok(Json(activity_response(activity)))
+}
+
+/// GET /api/v1/learning/activities/{activity_id}/content — read immutable activity content without starting a session.
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/activities/{activity_id}/content",
+    params(("activity_id" = Uuid, Path, description = "Activity to review")),
+    responses(
+        (status = 200, description = "Owned activity content", body = LearningActivityResponse),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 404, description = "Activity does not exist for this learner")
+    ),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn get_activity_content(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(activity_id): Path<Uuid>,
+) -> Result<Json<LearningActivityResponse>, ApiError> {
+    let repository = PgLearningRepository::new(state.pool);
+    for journey in repository
+        .list_journeys(auth.owner_id())
+        .await
+        .map_err(map_learning_error)?
+    {
+        if let Some(activity) = repository
+            .list_activities(auth.owner_id(), journey.id)
+            .await
+            .map_err(map_learning_error)?
+            .into_iter()
+            .find(|activity| activity.id == activity_id)
+        {
+            return Ok(Json(activity_response(activity)));
+        }
+    }
+    Err(ApiError::NotFound {
+        resource: "activity",
+    })
 }
 
 /// PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content.

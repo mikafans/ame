@@ -70,11 +70,13 @@ function ActivityRow({
   startingActivity,
   activeActivityId,
   onStart,
+  onReview,
 }: {
   activity: Journey["activities"][number];
   startingActivity: string | null;
   activeActivityId: string | null;
   onStart: (activityId: string) => void;
+  onReview: (activityId: string) => void;
 }) {
   const isActive = activeActivityId === activity.id;
   const isReady = activity.status === "ready";
@@ -115,9 +117,20 @@ function ActivityRow({
         </Button>
       )}
       {isCompleted && (
-        <span className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-primary">
-          <Check className="size-4" /> Done
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+            <Check className="size-4" /> Done
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onReview(activity.id)}
+            className="rounded-full"
+          >
+            Review
+          </Button>
+        </div>
       )}
       {!isReady && !isCompleted && (
         <span className="shrink-0 text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
@@ -227,6 +240,7 @@ export default function LearningJourneyPage() {
   const [assessmentResponses, setAssessmentResponses] = useState<
     Record<string, string>
   >({});
+  const [reviewActivityId, setReviewActivityId] = useState<string | null>(null);
 
   async function loadDeepDive(activityId: string) {
     const result = await api.GET("/api/v1/deep-dives", {
@@ -357,6 +371,7 @@ export default function LearningJourneyPage() {
       setAssessment(null);
       setAttempt(null);
       setDeepDive(null);
+      setReviewActivityId(null);
       window.localStorage.setItem(`ame-learning-session:${params.id}`, data.id);
       await loadAssessment(activityId, data.id);
     } catch (startError) {
@@ -487,6 +502,11 @@ export default function LearningJourneyPage() {
   );
   const activeActivity = session
     ? journey.activities.find((activity) => activity.id === session.activityId)
+    : null;
+  const reviewActivity = reviewActivityId
+    ? (journey.activities.find(
+        (activity) => activity.id === reviewActivityId,
+      ) ?? null)
     : null;
   const activeActivityId =
     session?.status === "in_progress" ? session.activityId : null;
@@ -672,6 +692,7 @@ export default function LearningJourneyPage() {
                       startingActivity={startingActivity}
                       activeActivityId={activeActivityId}
                       onStart={startActivity}
+                      onReview={setReviewActivityId}
                     />
                   ))}
                 </ChapterSection>
@@ -694,6 +715,7 @@ export default function LearningJourneyPage() {
                     startingActivity={startingActivity}
                     activeActivityId={activeActivityId}
                     onStart={startActivity}
+                    onReview={setReviewActivityId}
                   />
                 ))}
               </section>
@@ -910,6 +932,50 @@ export default function LearningJourneyPage() {
               </p>
             )}
             {attempt && <AssessmentResultFeedback attempt={attempt} />}
+          </section>
+        )}
+        {reviewActivity && !session && (
+          <section className="border border-border bg-card p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
+                  Completed activity
+                </p>
+                <h2 className="mt-2 text-xl font-semibold">
+                  {reviewActivity.title}
+                </h2>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewActivityId(null)}
+                className="rounded-full"
+              >
+                Close review
+              </Button>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This is the published content you completed. Reviewing it does not
+              start another session or change your progress.
+            </p>
+            <ActivityContentRenderer
+              content={
+                (reviewActivity.payload as unknown as ActivityPayload)
+                  .content ?? null
+              }
+              contentVersion={reviewActivity.contentVersion}
+              rubric={reviewActivity.rubric}
+            />
+            {(reviewActivity.payload as unknown as ActivityPayload)
+              .contentProvenance?.sourceReferences && (
+              <ActivityProvenance
+                sourceReferences={
+                  (reviewActivity.payload as unknown as ActivityPayload)
+                    .contentProvenance?.sourceReferences ?? []
+                }
+              />
+            )}
           </section>
         )}
         {deepDive && (

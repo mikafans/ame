@@ -636,6 +636,32 @@ paths:
       security:
       - bearer: []
   /api/v1/learning/activities/{activity_id}/content:
+    get:
+      tags:
+      - learning
+      summary: GET /api/v1/learning/activities/{activity_id}/content — read immutable activity content without starting a session.
+      operationId: get_activity_content
+      parameters:
+      - name: activity_id
+        in: path
+        description: Activity to review
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Owned activity content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Activity does not exist for this learner
+      security:
+      - bearer_auth: []
     patch:
       tags:
       - learning
@@ -822,6 +848,41 @@ paths:
                 $ref: '#/components/schemas/JourneyExportManifest'
       security:
       - bearer: []
+  /api/v1/learning/journeys/{journey_id}/activities:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/journeys/{journey_id}/activities — append a course activity.
+      operationId: create_activity
+      parameters:
+      - name: journey_id
+        in: path
+        description: Journey to extend
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateActivityBody'
+        required: true
+      responses:
+        '200':
+          description: Appended activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningActivityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Journey, chapter, or objective does not exist for this learner
+        '422':
+          description: Activity is invalid or cannot be learner-startable
+      security:
+      - bearer_auth: []
   /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start:
     post:
       tags:
@@ -884,6 +945,41 @@ paths:
                   $ref: '#/components/schemas/AttemptResponse'
       security:
       - bearer: []
+  /api/v1/learning/journeys/{journey_id}/chapters:
+    post:
+      tags:
+      - learning
+      summary: POST /api/v1/learning/journeys/{journey_id}/chapters — append a course chapter.
+      operationId: create_chapter
+      parameters:
+      - name: journey_id
+        in: path
+        description: Journey to extend
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChapterBody'
+        required: true
+      responses:
+        '200':
+          description: Appended chapter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearningChapterResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Journey does not exist for this learner
+        '422':
+          description: Chapter is invalid
+      security:
+      - bearer_auth: []
   /api/v1/learning/sessions/{id}:
     get:
       tags:
@@ -2139,6 +2235,36 @@ components:
       - approved
       - rejected
       - retired
+    CreateActivityBody:
+      type: object
+      description: |-
+        A course author supplies the activity semantics and objective links; AME owns
+        ordering, versioning, publication, and the learner identity.
+      required:
+      - kind
+      - title
+      - payload
+      - objectiveIds
+      - status
+      properties:
+        chapterId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/ActivityKind'
+        objectiveIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        payload:
+          type: object
+        status:
+          $ref: '#/components/schemas/ActivityStatus'
+        title:
+          type: string
     CreateAssessmentBody:
       type: object
       required:
@@ -2157,6 +2283,17 @@ components:
           $ref: '#/components/schemas/AssessmentMode'
         status:
           $ref: '#/components/schemas/AssessmentStatus'
+    CreateChapterBody:
+      type: object
+      description: A new chapter is always appended after the journey's existing chapters.
+      required:
+      - title
+      - summary
+      properties:
+        summary:
+          type: string
+        title:
+          type: string
     CreateCitationBody:
       type: object
       required:

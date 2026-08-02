@@ -16,7 +16,10 @@ fn skill_manifest_contains_namespaced_unified_learning_tools() {
     assert!(paths.contains(&"/public/v1/auth/register"));
     assert!(paths.contains(&"/public/v1/auth/login"));
     assert!(paths.contains(&"/api/v1/learning/journeys"));
+    assert!(paths.contains(&"/api/v1/learning/journeys/{journey_id}/chapters"));
+    assert!(paths.contains(&"/api/v1/learning/journeys/{journey_id}/activities"));
     assert!(paths.contains(&"/api/v1/learning/sessions/{id}"));
+    assert!(paths.contains(&"/api/v1/learning/activities/{activity_id}/content"));
     assert!(paths.contains(&"/api/v1/assessments?activityId={activity_id}"));
     assert!(paths.contains(&"/api/v1/deep-dives?activityId={activity_id}"));
     assert!(paths.contains(&"/api/v1/attempts/{attempt_id}/finish"));
@@ -55,5 +58,7 @@ fn advertised_activity_authoring_is_present_in_openapi() {
     let openapi = ame_api::http::openapi::openapi_yaml();
     assert!(openapi.contains("/api/v1/learning/activities/{activity_id}/content:"));
     assert!(openapi.contains("/api/v1/learning/activities/{activity_id}/rubric:"));
+    assert!(openapi.contains("/api/v1/learning/journeys/{journey_id}/chapters:"));
+    assert!(openapi.contains("/api/v1/learning/journeys/{journey_id}/activities:"));
     assert!(openapi.contains("  patch:\n"));
 }
