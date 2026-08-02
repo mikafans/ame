@@ -4130,14 +4130,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Email already belongs to a learner */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
+            /** @description Validation failed; an existing learner must supply a valid bearer token */
             422: {
                 headers: {
                     [name: string]: unknown;

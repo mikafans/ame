@@ -55,7 +55,7 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.start",
-            "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
+            "Bootstrap the first owner-scoped journey. After register or login, send that learner's bearer token and the matching email; unauthenticated start is only for a previously unknown email.",
             "POST",
             "/public/v1/onboarding/start",
             json!({"type":"object","required":["email","displayName","prompt","idempotencyKey"],"properties":{"email":{"type":"string","format":"email"},"displayName":{"type":"string"},"prompt":{"type":"string"},"catalogId":{"type":"string"},"idempotencyKey":{"type":"string"}}}),
@@ -447,7 +447,7 @@ pub fn build_skill_manifest() -> Value {
         "auth": {
             "type": "bearer",
             "format": "ame_token",
-            "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required."
+            "registration": "POST /public/v1/auth/register returns the bearer token. Send it on POST /public/v1/onboarding/start with the same email; no separate integration identity is required."
         },
         "entrypoint": "/public/llms.md",
         "tools": tools,

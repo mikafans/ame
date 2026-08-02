@@ -1,7 +1,7 @@
 {
   "auth": {
     "format": "ame_token",
-    "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required.",
+    "registration": "POST /public/v1/auth/register returns the bearer token. Send it on POST /public/v1/onboarding/start with the same email; no separate integration identity is required.",
     "type": "bearer"
   },
   "description": "ame — study, sweetened. An agent-friendly learning API with one owner-scoped learner model.",
@@ -105,7 +105,7 @@
       "path": "/public/v1/onboarding/preview"
     },
     {
-      "description": "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
+      "description": "Bootstrap the first owner-scoped journey. After register or login, send that learner's bearer token and the matching email; unauthenticated start is only for a previously unknown email.",
       "input_schema": {
         "properties": {
           "catalogId": {

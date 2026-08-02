@@ -46,6 +46,34 @@ def test_public_registration_and_authenticated_api_namespace(client):
     assert client.get("/public/v1/skill.json").status_code == 404
 
 
+def test_registered_learner_uses_bearer_token_to_start_first_journey(client):
+    email = f"start-contract-{uuid.uuid4()}@example.test"
+    registration = client.post(
+        "/public/v1/auth/register",
+        json={"email": email, "name": "Starting Learner", "password": "password123"},
+    )
+    assert registration.status_code == 201, registration.text
+    token = registration.json()["token"]
+    body = {
+        "email": email,
+        "displayName": "Starting Learner",
+        "prompt": "I want to learn Apache Flink checkpointing",
+        "idempotencyKey": f"start-contract-{uuid.uuid4()}",
+    }
+
+    client.cookies.clear()
+    unauthenticated = client.post("/public/v1/onboarding/start", json=body)
+    assert unauthenticated.status_code == 422, unauthenticated.text
+
+    started = client.post(
+        "/public/v1/onboarding/start",
+        json=body,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert started.status_code == 201, started.text
+    assert started.json()["email"] == email
+
+
 def test_active_docs_do_not_keep_retired_agent_surface():
     retired_docs = [
         "docs/audits/2026-05-28-principal-swe-audit.md",

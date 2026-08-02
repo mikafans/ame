@@ -213,8 +213,7 @@ pub async fn preview_learning(
     responses(
         (status = 201, description = "Learner and first journey created", body = StartLearningResponse),
         (status = 401, description = "Existing learner requires authentication"),
-        (status = 409, description = "Email already belongs to a learner"),
-        (status = 422, description = "Validation failed")
+        (status = 422, description = "Validation failed; an existing learner must supply a valid bearer token")
     ),
     tag = "onboarding"
 )]

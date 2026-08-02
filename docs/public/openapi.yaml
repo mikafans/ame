@@ -1739,10 +1739,8 @@ paths:
                 $ref: '#/components/schemas/StartLearningResponse'
         '401':
           description: Existing learner requires authentication
-        '409':
-          description: Email already belongs to a learner
         '422':
-          description: Validation failed
+          description: Validation failed; an existing learner must supply a valid bearer token
 components:
   schemas:
     ActivityKind:

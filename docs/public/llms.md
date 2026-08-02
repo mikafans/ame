@@ -22,9 +22,10 @@ Content-Type: application/json
 ```
 
 Existing learners can use `POST /public/v1/auth/login`. Both operations return
-`token` and `user`. Send the token as `Authorization: Bearer <token>` on
-authenticated `/api/v1/*` requests. In self-host mode, email is an account
-identifier; AME does not send email.
+`token` and `user`. Send the token as `Authorization: Bearer <token>` on every
+authenticated `/api/v1/*` request and on `POST /public/v1/onboarding/start`
+after registration or login. In self-host mode, email is an account identifier;
+AME does not send email.
 
 Preview a prompt without creating state:
 
@@ -33,10 +34,12 @@ POST /public/v1/onboarding/preview
 {"prompt":"I want to learn Apache Flink checkpointing"}
 ```
 
-Create or resume the learner journey with a stable idempotency key:
+Create or resume the learner journey with the registration/login bearer token
+and a stable idempotency key:
 
 ```http
 POST /public/v1/onboarding/start
+Authorization: Bearer <registration-or-login-token>
 {
   "email":"learner@example.com",
   "displayName":"Learner",
