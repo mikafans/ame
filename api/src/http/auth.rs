@@ -359,25 +359,27 @@ pub async fn logout(
         .await;
     }
 
-    (
-        StatusCode::OK,
-        [(
-            "set-cookie".to_string(),
-            format!(
-                "ame_token=; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=0, ame_session=;{} SameSite=Lax; Path=/; Max-Age=0",
-                if state.config.server.production {
-                    "; Secure"
-                } else {
-                    ""
-                },
-                if state.config.server.production {
-                    " Secure;"
-                } else {
-                    ""
-                }
-            ),
-        )],
-    )
+    let secure_suffix = if state.config.server.production {
+        "; Secure"
+    } else {
+        ""
+    };
+    let mut headers = HeaderMap::new();
+    headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&format!(
+            "ame_token=; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=0"
+        ))
+        .expect("valid expired session cookie"),
+    );
+    headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&format!(
+            "ame_session=;{secure_suffix}; SameSite=Lax; Path=/; Max-Age=0"
+        ))
+        .expect("valid expired session marker cookie"),
+    );
+    (StatusCode::OK, headers)
 }
 
 // Routes are mounted (with rate limiting) in `http::mod::router`. The handlers

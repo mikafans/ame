@@ -56,7 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (document.cookie.split(";").some((cookie) => cookie.trim() === "ame_session=1")) {
+    if (
+      document.cookie
+        .split(";")
+        .some((cookie) => cookie.trim() === "ame_session=1")
+    ) {
       fetchUser();
     } else {
       setLoading(false);

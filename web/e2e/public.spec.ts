@@ -28,7 +28,9 @@ test.describe("public documentation", () => {
 
     await expect(page).toHaveURL(/\/agent$/);
     await expect(
-      page.getByRole("heading", { name: /Tell your agent what you want to learn/ }),
+      page.getByRole("heading", {
+        name: /Tell your agent what you want to learn/,
+      }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Agent manifest" }),
@@ -41,7 +43,9 @@ test.describe("public documentation", () => {
     await page.goto("/agent");
 
     await expect(
-      page.getByRole("heading", { name: /Tell your agent what you want to learn/ }),
+      page.getByRole("heading", {
+        name: /Tell your agent what you want to learn/,
+      }),
     ).toBeVisible();
     const dimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
