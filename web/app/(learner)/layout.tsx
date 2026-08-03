@@ -39,9 +39,10 @@ export default function LearnerLayout({
     const routeMap: Record<string, string> = {
       "admin-dashboard": "/admin",
       "admin-users": "/admin/users",
-      "admin-tokens": "/admin/tokens",
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
+      "admin-settings": "/admin/settings",
+      "admin-tasks": "/admin/tasks",
       learning: "/learning",
     };
     router.push(routeMap[route] || "/learning");

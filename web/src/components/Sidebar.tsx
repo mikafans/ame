@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -180,13 +181,13 @@ export function Sidebar({
         })}
         <div className="mb-5">
           <div className="space-y-0.5 px-2">
-            <a
+            <Link
               href="/about"
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Info className="size-4 shrink-0" />
               <span>About AME</span>
-            </a>
+            </Link>
           </div>
         </div>
       </nav>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { LogOut, Menu } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { Logo } from "@/components/Logo";
@@ -63,12 +64,12 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
                 {label}
               </button>
             ))}
-            <a
+            <Link
               href="/about"
               className="flex items-center border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground transition hover:border-border hover:text-foreground"
             >
               About
-            </a>
+            </Link>
           </nav>
           <div className="ml-auto hidden items-center gap-3 md:flex">
             <ThemeSelector />
