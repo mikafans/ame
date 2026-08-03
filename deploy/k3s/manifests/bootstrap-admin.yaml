@@ -1,0 +1,163 @@
+# One-shot bootstrap of the root admin — the cluster equivalent of `make db-admin`.
+#
+# The API cannot mint an admin: POST /v1/auth/register always creates role=user
+# (no self-escalation), so the first admin must be written to Postgres out of
+# band. This Job argon2-hashes ADMIN_PASSWORD and upserts a role=admin row,
+# exactly like the make target (same argon2 library → same PHC hash format the
+# Rust `argon2` verifier accepts; params are encoded in the hash string).
+#
+# Why a Job and NOT an initContainer on ame-api:
+#   the upsert re-promotes on every run (ON CONFLICT DO UPDATE SET role='admin').
+#   An initContainer reruns on every API pod restart/scale, which would silently
+#   re-promote this account after you demote it in-app — you could never keep it
+#   demoted. This runs once at bootstrap; role changes after that are the app's.
+#
+# Idempotent: re-running just re-asserts email→admin and (for an existing,
+# already-registered account) preserves that account's own password — only a
+# brand-new row gets ADMIN_PASSWORD. To re-run after editing:
+#   kubectl -n ame delete job ame-bootstrap-admin && kubectl apply -f bootstrap-admin.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ame-bootstrap-admin-script
+  namespace: harus-edge
+  labels:
+    app.kubernetes.io/component: bootstrap-admin
+    app.kubernetes.io/part-of: ame
+data:
+  bootstrap.py: |
+    # /// script
+    # requires-python = "==3.14.*"
+    # dependencies = ["argon2-cffi", "psycopg[binary]"]
+    # ///
+    import os, time, psycopg
+    from argon2 import PasswordHasher
+
+
+    def canonical_email(email: str) -> str:
+        # Mirrors crates/ame-platform-application/src/token.rs::canonical_email —
+        # trim, lowercase, and strip a '+suffix' from the local part.
+        email = email.strip()
+        local, sep, domain = email.partition("@")
+        if not sep:
+            return email.lower()
+        local = local.split("+", 1)[0]
+        return f"{local.lower()}@{domain.lower()}"
+
+
+    pw_hash = PasswordHasher().hash(os.environ["ADMIN_PASSWORD"])
+    email, name = os.environ["ADMIN_EMAIL"], os.environ["ADMIN_NAME"]
+    email_canonical = canonical_email(email)
+
+    # Wait for Postgres — mirrors the pg_isready loop in `make db-admin`.
+    conn = None
+    for attempt in range(60):
+        try:
+            conn = psycopg.connect()  # reads PG* env
+            break
+        except psycopg.OperationalError as exc:
+            print(f"postgres not ready ({attempt}): {exc}", flush=True)
+            time.sleep(2)
+    if conn is None:
+        raise SystemExit("postgres never became reachable")
+
+    # tb_users.id is a deferred FK onto tb_identities.id (1:1 identity/profile
+    # split) — a brand-new admin needs both rows inserted with the same id.
+    # There's no unique constraint on plain `email` (only on email_canonical),
+    # so this is a manual select-then-insert-or-update, matching
+    # scripts/local_stack.py's admin() function.
+    with conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM tb_users WHERE email_canonical = %s", (email_canonical,)
+        )
+        row = cur.fetchone()
+        if row is None:
+            cur.execute(
+                "INSERT INTO tb_identities (identity_type, label) VALUES ('human', %s) RETURNING id",
+                (name,),
+            )
+            (user_id,) = cur.fetchone()
+            cur.execute(
+                """
+                INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
+                VALUES (%s, %s, %s, %s, 'admin', %s)
+                """,
+                (user_id, email, email_canonical, name, pw_hash),
+            )
+        else:
+            (user_id,) = row
+            cur.execute("UPDATE tb_users SET role = 'admin' WHERE id = %s", (user_id,))
+    print(f"[bootstrap-admin] {email} is admin", flush=True)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ame-bootstrap-admin
+  namespace: harus-edge
+  labels:
+    app.kubernetes.io/component: bootstrap-admin
+    app.kubernetes.io/part-of: ame
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: bootstrap-admin
+        app.kubernetes.io/part-of: ame
+    spec:
+      restartPolicy: Never
+      # The job needs ame-postgres (ClusterIP) and internet for uv's package fetch.
+      containers:
+        - name: bootstrap-admin
+          # uv ships the 3.14 interpreter and resolves the PEP 723 inline deps in
+          # bootstrap.py — same pattern as 05-tools/k3s-sqlite-backup. Pinned in
+          # SERVICE_VERSIONS.yaml.
+          image: ghcr.io/astral-sh/uv:0.11.23-python3.14-trixie-slim
+          command: ["uv", "run", "--no-config", "/scripts/bootstrap.py"]
+          env:
+            # Keep all uv writes off the root fs and skip interpreter downloads.
+            - name: HOME
+              value: /tmp
+            - name: UV_CACHE_DIR
+              value: /tmp/.uv-cache
+            - name: UV_PYTHON_DOWNLOADS
+              value: never
+            # libpq-style vars so psycopg picks them up; password never on argv.
+            - name: PGHOST
+              value: ame-postgres
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: postgres
+            - name: PGDATABASE
+              value: ame
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ame-secrets
+                  key: POSTGRES_PASSWORD
+            # Not secret — the bootstrap identity. Matches make db-admin's ADMIN_*.
+            - name: ADMIN_EMAIL
+              value: azusachino@proton.me
+            - name: ADMIN_NAME
+              value: haru
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ame-secrets
+                  key: ADMIN_PASSWORD
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: script
+          configMap:
+            name: ame-bootstrap-admin-script

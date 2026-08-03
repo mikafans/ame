@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ame-api
+  namespace: harus-edge
+  labels:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: ame
+spec:
+  # ClusterIP — reached over Tailscale as ame-api.harus-edge.svc.cluster.local
+  # (the subnet router advertises the 10.43.0.0/16 service CIDR + split DNS).
+  selector:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: ame
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ame-api
+  namespace: harus-edge
+  labels:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: ame
+spec:
+  revisionHistoryLimit: 3
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: api
+      app.kubernetes.io/part-of: ame
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: ame
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: api
+          image: azusachino.icu/ame-api:0.4.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            # The API requires ame.toml (rate-limit tiers/quotas have no default);
+            # mounted from the ame-config ConfigMap. Server/ratelimit/quota values
+            # live there — only secrets and the DB url are injected here.
+            - name: AME_CONFIG_PATH
+              value: /etc/ame/ame.toml
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ame-secrets
+                  key: POSTGRES_PASSWORD
+            # config.rs reads AME_DATABASE_URL (the AME_ prefix is required);
+            # $(VAR) expands the earlier POSTGRES_PASSWORD env entry.
+            - name: AME_DATABASE_URL
+              value: postgres://postgres:$(POSTGRES_PASSWORD)@ame-postgres:5432/ame
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ame
+              readOnly: true
+          # /readyz pings Postgres/Valkey; /healthz is a dumb liveness check.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: ame-config

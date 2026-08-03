@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ame-config
+  namespace: harus-edge
+  labels:
+    app.kubernetes.io/part-of: ame
+data:
+  # Mounted at /etc/ame/ame.toml (AME_CONFIG_PATH). The API REQUIRES this file:
+  # the rate-limit tiers, quotas and batch sizes have no env override and no
+  # default — if Config::load() fails the binary falls back to baked defaults
+  # AND silently drops all env overrides (DB url, port, cors). So we ship the
+  # full config here; secrets (DB password, agent code) stay in env from the
+  # SealedSecret and override these at boot.
+  ame.toml: |
+    # AME runtime config (public via Cloudflare Tunnel, HTTPS edge).
+    [server]
+    port = 8080
+    # production=true: served publicly over the Cloudflare HTTPS edge, so auth
+    # cookies get the Secure flag and the per-account login brute-force limiter
+    # is active (auth.rs gates both on this). NOTE: Secure cookies will NOT ride
+    # plain-HTTP Tailscale access anymore — reach the app via the HTTPS hostname.
+    production = true
+    # Behind the ame-platform front door the browser is same-origin, so this is
+    # only a backstop for any non-proxied caller; point it at the public origin.
+    cors_origins = "https://ame.azusachino.icu"
+    log_format = "json"
+    valkey_url = "redis://ame-valkey:6379"
+
+    [ratelimit]
+    # Two trusted L7 hops when fronted by Cloudflare Tunnel:
+    #   client -> CF edge -> cloudflared pod -> ame-platform nginx -> api
+    # XFF reaching the API is "<client>, <cloudflared-pod>, <nginx>" (nginx
+    # appends $server_addr; CF appends the real client as the right-most real
+    # entry). Stripping two right-most hops resolves the real client; any
+    # client-supplied XFF stays left of the trusted hops and can't spoof it.
+    # (If you ever drop the tunnel and serve nginx-only again, set this back to 1.)
+    trusted_proxies = 2
+
+    [ratelimit.free]
+    burst = 60
+    rate = 1
+
+    [ratelimit.premium]
+    burst = 600
+    rate = 10
+
+    [ratelimit.public]
+    burst = 10
+    period_secs = 2
+
+    [ratelimit.export]
+    burst = 1
+    period_secs = 60
+
+    [ratelimit.cost]
+    read = 1
+    write = 5
+
+    [batch]
+    free = 50
+    premium = 500
+
+    [quota.agents]
+    free = 1
+    premium = 100
+
+    [quota.assessments]
+    free = 50
+    premium = 5000
+
+    [quota.questions]
+    free = 50
+    premium = 5000
