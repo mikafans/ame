@@ -38,7 +38,7 @@ export type AmeTheme = (typeof AME_THEMES)[number]["id"];
 
 const DEFAULT_THEME: AmeTheme = "paper-moss";
 
-function isAmeTheme(theme: string | null): theme is AmeTheme {
+function isAmeTheme(theme: string | null | undefined): theme is AmeTheme {
   return AME_THEMES.some((candidate) => candidate.id === theme);
 }
 
@@ -63,7 +63,11 @@ export default function ThemeRegistry({
 }: {
   children: React.ReactNode;
 }) {
-  const [theme, setStoredTheme] = useState<AmeTheme>(DEFAULT_THEME);
+  const [theme, setStoredTheme] = useState<AmeTheme>(() => {
+    if (typeof document === "undefined") return DEFAULT_THEME;
+    const initialTheme = document.documentElement.dataset.ameTheme;
+    return isAmeTheme(initialTheme) ? initialTheme : DEFAULT_THEME;
+  });
 
   const setTheme = useCallback((nextTheme: AmeTheme) => {
     setStoredTheme(nextTheme);

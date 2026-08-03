@@ -129,7 +129,7 @@ It must provide:
 - two complete reference transcripts: Flink and Netty, from learner brief to
   published course and learner adaptation.
 
-`/public/skill.json`, `/public/llms.md`, `/public/openapi.yaml`,
+`/public/skill.json`, `/public/llms.txt`, `/public/openapi.yaml`,
 `/public/learning-contract.json`, `/public/learning-principles.md`, and
 `/agent` are release-critical projections of this playbook. A drift test must
 fail if they advertise an operation or requirement that the live API does not

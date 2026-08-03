@@ -1,0 +1,42 @@
+AME agent course-authoring contract
+
+Start here for the public agent contract.
+OpenAPI: /public/openapi.yaml
+Machine manifest: /public/skill.json
+Human-readable guide: /agent/guide
+
+Purpose
+AME is the durable learning system an authorized agent uses to assemble,
+validate, publish, and adapt a source-grounded course for one learner.
+
+Required authoring sequence
+1. Register or log in and retain the learner bearer token.
+   POST /public/v1/auth/register
+   POST /public/v1/auth/login
+   POST /public/v1/onboarding/start
+2. Import bounded source text and certify exact citations.
+3. Create a private course revision, objectives, chapters, and activities.
+4. Create each content generation run and transition it:
+   requested -> running -> review_required -> published.
+5. Attach published content, create reviewed questions and assessments, then
+   run course validation.
+6. Record an approved review with reviewer, decision=approved, and notes.
+7. Publish the complete course revision. Draft activities are never learner
+   visible.
+
+Quality requirements
+- Each outcome needs instruction, a worked example, a formative check with
+  rationale and learner-facing explanation, and mastery or application work.
+- A scenario must declare an evaluable correct option plus feedback, or be
+  plainly ungraded reflection.
+- Use questionId and numeric version to create assessment items.
+- Assessment attempts return assessmentItemId and questionVersionId. A
+  finished attempt returns status, score, item result, rationale, and
+  explanation.
+
+Content payload example
+PATCH /api/v1/learning/activities/{activity_id}/content
+{"content":{"type":"explanation","heading":"Event time","body":"Use the event timestamp.","key_points":["Event time is domain time."]}}
+
+Do not infer undocumented state. Read this contract and /public/openapi.yaml
+before mutation.

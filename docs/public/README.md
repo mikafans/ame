@@ -6,7 +6,7 @@ users and external clients.
 - [`self-hosting.md`](self-hosting.md) — single-host Docker or Podman deployment.
 - [`deploy.md`](deploy.md) — supported deployment artifacts and production checklist.
 - [`k3s.md`](k3s.md) — k3s image build and release workflow.
-- [`llms.md`](llms.md) — agent discovery and API usage contract, served at `/public/llms.md`.
+- [`llms.txt`](llms.txt) — compact agent discovery entrypoint, served at `/public/llms.txt`.
 - [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/public/skill.json`.
 - [`learning-contract.json`](learning-contract.json) — versioned learning stories, evidence rules, and fixture-simulation boundary, served at `/public/learning-contract.json`.
 - [`learning-principles.md`](learning-principles.md) — learner-readable explanation of the learning contract, served at `/public/learning-principles.md`.

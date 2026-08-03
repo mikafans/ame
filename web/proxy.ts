@@ -19,7 +19,7 @@ const PUBLIC_PATHS = new Set([
   "/start",
   "/agent",
   "/self-hosting",
-  "/public/llms.md",
+  "/public/llms.txt",
   "/public/skill.json",
   "/public/openapi.yaml",
 ]);
@@ -43,5 +43,7 @@ export function proxy(req: NextRequest) {
 // Skip Next internals, static assets, and the API-proxied paths
 // (/public/*, /api/*) so only real app pages hit the gate.
 export const config = {
-  matcher: ["/((?!_next/|api/|public/|favicon.ico|.*\\.[\\w]+$).*)"],
+  matcher: [
+    "/((?!_next/|api/|public/|agent(?:/|$)|favicon.ico|.*\\.[\\w]+$).*)",
+  ],
 };

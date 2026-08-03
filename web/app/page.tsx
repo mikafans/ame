@@ -45,13 +45,13 @@ const faqs = [
 
 const agentResources = [
   { href: "/agent", label: "Agent guide" },
-  { href: "/public/llms.md", label: "Agent API guide" },
+  { href: "/agent/guide", label: "Agent authoring guide" },
   { href: "/public/skill.json", label: "Skill manifest" },
   { href: "/public/openapi.yaml", label: "OpenAPI" },
 ];
 
 export default function LandingPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { mode, toggle } = useColorMode();
 
   return (
@@ -87,13 +87,15 @@ export default function LandingPage() {
               <Button asChild className="rounded-full px-5">
                 <Link href="/learning">Open learning desk</Link>
               </Button>
-            ) : (
+            ) : !loading ? (
               <Link
                 href="/login"
                 className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
               >
                 Sign in
               </Link>
+            ) : (
+              <span aria-hidden className="h-9 w-28" />
             )}
           </div>
         </header>
@@ -115,18 +117,32 @@ export default function LandingPage() {
                   shape the course, and leave you a clear next move.
                 </p>
                 <div className="flex flex-wrap items-center gap-4">
-                  <Button
-                    asChild
-                    className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90"
-                  >
-                    <Link href="/agent">
-                      Set up your agent
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  </Button>
+                  {user ? (
+                    <Button
+                      asChild
+                      className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90"
+                    >
+                      <Link href="/learning">
+                        Open learning desk
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                  ) : !loading ? (
+                    <Button
+                      asChild
+                      className="rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground hover:bg-primary/90"
+                    >
+                      <Link href="/agent">
+                        Set up your agent
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <span aria-hidden className="h-11 w-44" />
+                  )}
                   <a
                     className="text-sm font-medium text-[var(--ame-sugar)]/75 underline-offset-4 transition hover:text-[var(--ame-sugar)] hover:underline"
-                    href="/public/llms.md"
+                    href="/agent/guide"
                   >
                     Read agent API guide
                   </a>

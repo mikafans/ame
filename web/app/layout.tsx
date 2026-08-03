@@ -36,10 +36,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { try { const theme = localStorage.getItem("ame.theme"); if (["study-atelier", "night-study", "paper-moss", "high-contrast"].includes(theme)) document.documentElement.dataset.ameTheme = theme; else document.documentElement.dataset.ameTheme = "paper-moss"; } catch { document.documentElement.dataset.ameTheme = "paper-moss"; } })();`,
+          }}
+        />
         <link
           rel="alternate"
           type="text/plain"
-          href="/public/llms.md"
+          href="/public/llms.txt"
           title="LLM/Agent Documentation"
         />
       </head>

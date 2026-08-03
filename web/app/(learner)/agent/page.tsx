@@ -12,7 +12,7 @@ const onboardingExample = `POST /public/v1/onboarding/start
 }`;
 
 const publicResources = [
-  ["Agent API guide", "/public/llms.md"],
+  ["Authoring guide", "/agent/guide"],
   ["Skill manifest", "/public/skill.json"],
   ["OpenAPI", "/public/openapi.yaml"],
   ["Learning contract", "/public/learning-contract.json"],
@@ -115,9 +115,9 @@ export default function AgentPage() {
             </p>
           </div>
           <Button asChild className="w-fit rounded-full">
-            <a href="/public/llms.md" target="_blank" rel="noreferrer">
+            <Link href="/agent/guide">
               Read the agent guide <ArrowRight className="size-4" />
-            </a>
+            </Link>
           </Button>
         </section>
       </main>

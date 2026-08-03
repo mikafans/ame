@@ -67,7 +67,7 @@ machine-readable public documents. It copies the same `docs/public` content
 packaged in the web image into a shared volume and serves:
 
 ```text
-GET /public/llms.md
+GET /public/llms.txt
 GET /public/skill.json
 GET /public/openapi.yaml
 ```

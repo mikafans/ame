@@ -13,7 +13,7 @@ export default function LearnerLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const isPublicAgentGuide = pathname === "/agent";
+  const isPublicAgentGuide = pathname.startsWith("/agent");
 
   useEffect(() => {
     if (!isPublicAgentGuide && !loading && !user) {

@@ -10,7 +10,7 @@ external course authors. This is a black-box product test, not a source review.
 Each simulation used only `http://localhost:28800` public discovery and API
 endpoints. Each agent used a newly registered learner, never read repository
 files, never accessed an existing learner, never used a browser, and never
-submitted or invented learner work. The agents read `/public/llms.md`,
+submitted or invented learner work. The agents read `/public/llms.txt`,
 `/public/learning-contract.json`, `/public/skill.json`, and
 `/public/openapi.yaml` before acting.
 
