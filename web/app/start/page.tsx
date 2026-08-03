@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 function StartLearningForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refresh, user } = useAuth();
+  const { refresh, user, loading: authLoading } = useAuth();
   const routePrompt = searchParams.get("prompt") ?? "";
   const routeCatalogId = searchParams.get("catalogId") ?? "";
   const [prompt, setPrompt] = useState("");
@@ -19,6 +19,7 @@ function StartLearningForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,6 +27,10 @@ function StartLearningForm() {
       setPrompt(routePrompt);
     }
   }, [routePrompt]);
+
+  useEffect(() => {
+    if (user && !onboardingComplete && !loading) router.replace("/agent");
+  }, [loading, onboardingComplete, router, user]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,6 +69,7 @@ function StartLearningForm() {
       if (!response.ok || !data) {
         throw new Error("Could not start your learning journey");
       }
+      setOnboardingComplete(true);
       await refresh();
       router.push(`/learning/journeys/${data.journeyId}`);
     } catch (submitError) {
@@ -75,6 +81,23 @@ function StartLearningForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (authLoading || user) {
+    return (
+      <main className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
+        <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+          Agent handoff
+        </p>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight">
+          Opening your agent handoff…
+        </h1>
+        <p className="mt-3 text-muted-foreground">
+          Your account is ready. AME will take you to the place where you can
+          create a limited, revocable course-authoring handoff for your agent.
+        </p>
+      </main>
+    );
   }
 
   return (

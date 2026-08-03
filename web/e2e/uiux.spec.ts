@@ -262,56 +262,43 @@ test("learner can turn an intent into an evidence-backed next step", async ({
   await expect(page.getByText(workedExampleContent.prompt)).toBeVisible();
   await expect(page.getByText("Source-backed activity")).toBeVisible();
   await page.goto("/learning");
-  await expect(page.getByText(/Recent:/)).toBeVisible();
-  const journeyDetailResponse = await page.request.get(
-    apiUrl(`/api/v1/learning/journeys/${journeyId}`),
-  );
-  expect(journeyDetailResponse.ok()).toBeTruthy();
-  const journeyDetail = await journeyDetailResponse.json();
-  await expect(
-    page.getByRole("heading", { name: "Objective progress" }),
-  ).toBeVisible();
-  for (const objective of journeyDetail.objectives) {
-    await expect(
-      page.getByTestId(`objective-progress-${objective.id}`),
-    ).toContainText(objective.statement);
-  }
+  await expect(page.getByTestId("active-learning-desk")).toBeVisible();
+  await expect(page.getByText("Your active course")).toBeVisible();
+  await expect(page.getByText("Objective progress")).toHaveCount(0);
 });
 
 test("a returning learner resumes from the learning desk", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("haru@example.com");
-  await page.getByLabel("Password").fill("password123");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  const email = `returning-learner-${Date.now()}@example.com`;
+  await page.goto("/start");
+  await page
+    .getByLabel("What would you like to learn?")
+    .fill("I would like to learn the foundations of stream processing");
+  await page.getByLabel("Your name").fill("Returning Learner");
+  await page.getByLabel("Email identifier").fill(email);
+  await page.getByLabel("Password").fill("returning-local-2026");
+  await page.getByRole("button", { name: "Create my journey" }).click();
+  await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
+  await page.goto("/learning");
 
-  await expect(page).toHaveURL(/\/learning$/);
-  await expect(
-    page.getByRole("heading", { name: "Your learning, with a next move." }),
-  ).toBeVisible();
+  await expect(page.getByText("Your active course")).toBeVisible();
   const recommendedNext = page.getByTestId("recommended-next");
-  await expect(recommendedNext).toContainText("Recommended next");
-  const currentJourneyCard = page.locator("article").first();
+  await expect(recommendedNext).toContainText("Next step");
+  const currentJourneyCard = page.getByTestId("active-learning-desk");
   await expect(
     currentJourneyCard.getByText("Course path", { exact: true }),
   ).toBeVisible();
   await expect(
-    currentJourneyCard.getByText("Course progress", { exact: true }),
+    currentJourneyCard.getByText("Your progress", { exact: true }),
   ).toBeVisible();
   await expect(
     currentJourneyCard.getByRole("progressbar", { name: "Course progress" }),
   ).toHaveAttribute("aria-valuenow", /\d+/);
-  const journeyLink = currentJourneyCard.getByRole("link").last();
+  const journeyLink = recommendedNext.getByRole("link", {
+    name: "Continue learning",
+  });
   await expect(journeyLink).toHaveAttribute(
     "href",
     /\/learning\/journeys\/[0-9a-f-]+/,
-  );
-  const firstDeskActivity = currentJourneyCard
-    .locator('[data-testid^="desk-activity-"]')
-    .first();
-  await expect(firstDeskActivity).toBeVisible();
-  await expect(firstDeskActivity).toHaveAttribute(
-    "href",
-    /\/learning\/journeys\/[0-9a-f-]+#activity-[0-9a-f-]+$/,
   );
   await journeyLink.click();
   await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+/);

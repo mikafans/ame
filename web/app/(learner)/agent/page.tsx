@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { AgentHandoff } from "@/components/agent/AgentHandoff";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const setupBrief = `Use AME to build my course.
 Goal: [what I want to be able to do]
@@ -14,6 +17,8 @@ Read /public/skill.json first. Ground the course in sources, validate it,
 review it, publish it, then give me the first activity in AME.`;
 
 export default function AgentPage() {
+  const { user, loading } = useAuth();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
@@ -26,12 +31,21 @@ export default function AgentPage() {
             >
               Home
             </Link>
-            <Link
-              href="/login"
-              className="font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              Sign in
-            </Link>
+            {loading ? null : user ? (
+              <Link
+                href="/learning"
+                className="font-medium text-muted-foreground transition hover:text-foreground"
+              >
+                Learning desk
+              </Link>
+            ) : (
+              <Link
+                href="/login?returnTo=/agent"
+                className="font-medium text-muted-foreground transition hover:text-foreground"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       </header>

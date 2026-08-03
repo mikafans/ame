@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const baseUrl = process.env.E2E_BASE_URL ?? "http://localhost:23000";
+
 test.describe("agent handoff", () => {
   test("asks an anonymous visitor to sign in before granting access", async ({
     page,
@@ -21,6 +23,9 @@ test.describe("agent handoff", () => {
     page,
   }) => {
     let delegationReads = 0;
+    await page
+      .context()
+      .addCookies([{ name: "ame_session", value: "1", url: baseUrl }]);
     await page.route("**/api/v1/me", (route) =>
       route.fulfill({
         contentType: "application/json",
@@ -68,5 +73,38 @@ test.describe("agent handoff", () => {
     );
     expect(page.url()).not.toContain("dlg_delegation-1_one-time-secret");
     expect(delegationReads).toBeGreaterThan(0);
+  });
+
+  test("sends a signed-in learner from the fallback form to agent handoff", async ({
+    page,
+  }) => {
+    await page
+      .context()
+      .addCookies([{ name: "ame_session", value: "1", url: baseUrl }]);
+    await page.route("**/api/v1/me", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "learner-1",
+          displayName: "Haru",
+          role: "user",
+        }),
+      }),
+    );
+    await page.route("**/api/v1/agent-delegations", (route) =>
+      route.fulfill({ contentType: "application/json", body: "[]" }),
+    );
+
+    await page.goto("/start");
+
+    await expect(page).toHaveURL(/\/agent$/);
+    await expect(
+      page.getByRole("heading", {
+        name: "Tell your agent what you want to learn. It sets up the course.",
+      }),
+    ).toBeVisible();
+    await expect(page.getByLabel("What would you like to learn?")).toHaveCount(
+      0,
+    );
   });
 });
