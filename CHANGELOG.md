@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-This project is pre-1.0; releases are not yet tagged.
+This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
 
 ## [0.4.0] - 2026-08-03
 
