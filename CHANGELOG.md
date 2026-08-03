@@ -10,8 +10,11 @@ This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
 ### Added
 
 - Runtime-served agent contracts at `/public/llms.txt`, `/public/skill.json`,
-  `/public/openapi.yaml`, and `/public/learning-contract.json`, with root
-  aliases for discovery clients.
+  `/public/openapi.yaml`, and `/public/learning-contract.json` through one
+  unified `/public/*` runtime route.
+- A downloadable, self-contained Python SDK at
+  `/public/sdk/python/ame.py` for discovery, authentication, onboarding,
+  generic typed-contract requests, and rate-limit status.
 - Visible authenticated rate-limit status at `/api/v1/me/rate-limit`, standard
   `X-RateLimit-*` response headers, and dynamic `Retry-After` guidance.
 - Free and VIP/Premium user plans, with admin-panel plan changes and separate

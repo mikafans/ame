@@ -51,40 +51,6 @@ data:
         proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
       }
 
-      # Root-level public discovery docs — the API serves these at `/`, not under
-      # /api/ and /public/, so route them to ame-api explicitly. Otherwise they fall through to
-      # ame-web, whose Next.js rewrite self-references when the image is built
-      # with NEXT_PUBLIC_API_URL="" → 404. (/llms.txt is the llmstxt.org
-      # convention; /skill.json and /openapi.yaml sit alongside it as well-known
-      # public files.)
-      location = /llms.txt {
-        proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
-      }
-
-      location = /skill.json {
-        proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
-      }
-
-      location = /openapi.yaml {
-        proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
-      }
-
-      location = /learning-contract.json {
-        proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
-      }
-
       location / {
         proxy_pass http://ame-web.harus-edge.svc.cluster.local:80;
         proxy_set_header Host $host;

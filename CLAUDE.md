@@ -46,7 +46,7 @@ After making code changes, **always restart the dev server** via `make dev` to p
 ## Stack
 
 - **API**: Rust (axum) — containerized by `make dev`, reachable through Caddy at `:28800` (not a separate host port; the bare `ame-api` binary defaults to `AME_PORT` 8080 if run directly, which `make dev` no longer does)
-- **Frontend**: Next.js (bun) — containerized by `make dev`, also served through Caddy at `:28800` (same origin as the API and the static `/public/*` agent docs)
+- **Frontend**: Next.js (bun) — containerized by `make dev`, also served through Caddy at `:28800` (same origin as the API and the API-backed `/public/*` agent contract/SDK routes)
 - Access remotely via Tailscale: the container's Caddy binds all interfaces, so a host running `make dev` is reachable at `http://harus-mini:28800` (no `API_HOST` override needed)
 - **DB**: Postgres 18, containerized alongside the API/web/Caddy in `docker-compose.local.yml` for `make dev`; a separate bare Postgres via `db/docker-compose.yml` backs `make test-db`/`make ci` only
 - **Schema**: OpenAPI at `api/openapi.yaml`; regenerate with `make openapi`

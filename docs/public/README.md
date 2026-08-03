@@ -9,6 +9,7 @@ users and external clients.
 - [`llms.txt`](llms.txt) — compact agent discovery entrypoint, served at `/public/llms.txt`.
 - [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/public/skill.json`.
 - [`learning-contract.json`](learning-contract.json) — versioned learning stories, evidence rules, and fixture-simulation boundary, served at `/public/learning-contract.json`.
+- [`../sdk/python/ame.py`](../sdk/python/ame.py) — reusable Python SDK, served at `/public/sdk/python/ame.py`.
 - [`learning-principles.md`](learning-principles.md) — learner-readable explanation of the learning contract, served at `/public/learning-principles.md`.
 
 For a local, browser-visible three-round learner journey, run
@@ -18,8 +19,8 @@ URL plus a non-secret login email; it never stores or prints the password.
 
 Build and runtime projections must consume these files; do not create parallel
 copies under `api/`, `deploy/`, or `web/`. The API image embeds these documents
-and serves them at runtime; a front proxy may serve the same checked-in files
-directly, but must preserve the `/public/` paths and keep `/api/` and
-`/public/v1/` routed to the API.
+and serves them at runtime. A front proxy should use one `/public/*` rule to
+route both the documents and SDK to the API, with `/api/` and `/public/v1/`
+also routed to the API.
 
 Regenerate generated public documents with `make public-docs`.

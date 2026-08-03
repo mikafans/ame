@@ -16,11 +16,10 @@ Internet -> containerized Caddy :80/:443
 ```
 
 Use one public origin for the browser and API. The API image embeds the
-canonical documents `/public/llms.txt`, `/public/skill.json`,
-`/public/openapi.yaml`, and `/public/learning-contract.json`; Caddy may serve
-the same files directly, but it must proxy `/api/*` and `/public/v1/*` to the
-API and keep `/healthz`, `/readyz`, and `/metrics` as root operational
-endpoints. All other paths go to Next.js.
+canonical documents and Python SDK. Caddy should use one `/public/*` handler
+for all public API, contract, and SDK paths, plus `/api/*` for authenticated
+routes. Keep `/healthz`, `/readyz`, and `/metrics` as root operational
+endpoints; all other paths go to Next.js.
 
 ## Requirements
 

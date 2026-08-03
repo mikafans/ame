@@ -26,6 +26,7 @@ COPY crates ./crates
 COPY db/migrations ./db/migrations
 # Public agent documents are compile-time assets for the API handlers.
 COPY docs/public ./docs/public
+COPY sdk/python ./sdk/python
 
 RUN cargo build --release -p ame-api --bin ame-api \
   && cp target/release/ame-api /build/ame-api

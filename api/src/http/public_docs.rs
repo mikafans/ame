@@ -20,6 +20,8 @@ const LLMS: &str = include_str!("../../../docs/public/llms.txt");
 const SKILL: &str = include_str!("../../../docs/public/skill.json");
 const OPENAPI: &str = include_str!("../../../docs/public/openapi.yaml");
 const LEARNING_CONTRACT: &str = include_str!("../../../docs/public/learning-contract.json");
+const LEARNING_PRINCIPLES: &str = include_str!("../../../docs/public/learning-principles.md");
+const PYTHON_SDK: &str = include_str!("../../../sdk/python/ame.py");
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -27,11 +29,8 @@ pub fn router() -> Router<AppState> {
         .route("/public/skill.json", get(skill))
         .route("/public/openapi.yaml", get(openapi))
         .route("/public/learning-contract.json", get(learning_contract))
-        // Keep the llmstxt.org-style aliases working for the k3s front door.
-        .route("/llms.txt", get(llms))
-        .route("/skill.json", get(skill))
-        .route("/openapi.yaml", get(openapi))
-        .route("/learning-contract.json", get(learning_contract))
+        .route("/public/learning-principles.md", get(learning_principles))
+        .route("/public/sdk/python/ame.py", get(python_sdk))
 }
 
 async fn llms() -> Response {
@@ -48,6 +47,14 @@ async fn openapi() -> Response {
 
 async fn learning_contract() -> Response {
     document("application/json", LEARNING_CONTRACT)
+}
+
+async fn learning_principles() -> Response {
+    document("text/markdown; charset=utf-8", LEARNING_PRINCIPLES)
+}
+
+async fn python_sdk() -> Response {
+    document("text/x-python; charset=utf-8", PYTHON_SDK)
 }
 
 fn document(content_type: &'static str, body: &'static str) -> Response {

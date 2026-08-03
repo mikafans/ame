@@ -111,8 +111,8 @@ needed.
 
 For a single-host self-hosted installation, follow
 [`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
-`/public/llms.txt` file is the agent discovery contract, served statically by
-the recommended proxy rather than by the API.
+`/public/llms.txt` file is the agent discovery contract, served by the API
+through the unified `/public/*` proxy route.
 
 ```bash
 cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)

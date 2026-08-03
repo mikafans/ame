@@ -27,6 +27,7 @@ COPY db/migrations ./db/migrations
 # Public agent contracts are embedded into the API so the runtime image serves
 # the exact documents it was built and tested with.
 COPY docs/public ./docs/public
+COPY sdk/python ./sdk/python
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release -p ame-api --bin ame-api
 

@@ -62,14 +62,16 @@ The [`k3s/`](k3s/) and [`k8s/`](k8s/) directories contain the reference image
 build and Kustomize manifests. They are intentionally environment-specific;
 review the overlays and secrets before applying them to another cluster.
 
-The API image embeds and serves the machine-readable public documents, so the
-front door must route these paths to `ame-api`:
+The API image embeds and serves the machine-readable public documents and SDK,
+so the front door should use one `/public/*` rule to route these paths to
+`ame-api`:
 
 ```text
 GET /public/llms.txt
 GET /public/skill.json
 GET /public/openapi.yaml
 GET /public/learning-contract.json
+GET /public/sdk/python/ame.py
 ```
 
 The `/api/v1/*` prefix is authenticated and `/public/v1/*` is unauthenticated;

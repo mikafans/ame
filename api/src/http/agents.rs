@@ -40,6 +40,13 @@ pub fn build_skill_manifest() -> Value {
             empty.clone(),
         ),
         endpoint(
+            "learning.sdk.python",
+            "Download the reusable Python SDK. It can be saved and imported, or executed directly with built-in discovery, contract, rate-limit, and generic request commands.",
+            "GET",
+            "/public/sdk/python/ame.py",
+            empty.clone(),
+        ),
+        endpoint(
             "learning.catalog.list",
             "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt. Each entry includes structured source links, licenses, optional locators or source versions, and an explicit content-review record.",
             "GET",
