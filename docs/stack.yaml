@@ -45,7 +45,7 @@ verification:
   unit_and_contract: make check
   api_black_box: uv run pytest api_tests -v
   browser: make local-uiux
-  full_stack: make local-up
+  full_stack: make dev
   public_contract_source: docs/public/
 
 documentation:

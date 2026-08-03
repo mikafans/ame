@@ -3,8 +3,11 @@
 Usage:
     uv run scripts/local_stack.py up
     uv run scripts/local_stack.py down
+    uv run scripts/local_stack.py reset
     uv run scripts/local_stack.py logs
     uv run scripts/local_stack.py seed
+    uv run scripts/local_stack.py admin
+    uv run scripts/local_stack.py shell
     uv run scripts/local_stack.py uiux
     uv run scripts/local_stack.py api-contracts
 """
@@ -66,6 +69,9 @@ def wait_for_web(timeout: int = 120) -> None:
 
 
 def promote_admin() -> None:
+    email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
+    name = os.environ.get("ADMIN_NAME", "Carol Admin")
+    password = os.environ.get("ADMIN_PASSWORD", "password123")
     password_hash = subprocess.check_output(
         [
             "uvx",
@@ -74,7 +80,7 @@ def promote_admin() -> None:
             "argon2-cffi",
             "python",
             "-c",
-            "from argon2 import PasswordHasher; print(PasswordHasher().hash('password123'))",
+            f"from argon2 import PasswordHasher; print(PasswordHasher().hash({password!r}))",
         ],
         cwd=ROOT,
         text=True,
@@ -87,14 +93,14 @@ DECLARE
 BEGIN
   SELECT id INTO existing_user_id
   FROM tb_users
-  WHERE email_canonical = 'admin@example.com';
+  WHERE email_canonical = {email!r};
 
   IF existing_user_id IS NULL THEN
     new_user_id := uuid_generate_v7();
     INSERT INTO tb_identities (id, identity_type, label)
-    VALUES (new_user_id, 'human', 'Carol Admin');
+    VALUES (new_user_id, 'human', {name!r});
     INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
-    VALUES (new_user_id, 'admin@example.com', 'admin@example.com', 'Carol Admin', 'admin', '{password_hash}');
+    VALUES (new_user_id, {email!r}, {email!r}, {name!r}, 'admin', '{password_hash}');
   ELSE
     UPDATE tb_users SET role = 'admin' WHERE id = existing_user_id;
   END IF;
@@ -313,6 +319,17 @@ def seed_stack(*, force: bool = False) -> None:
     fixture_account()
 
 
+def bring_up() -> None:
+    # The web source and its node_modules live in separate mounts. Recreate
+    # the web container on each start so a changed package manifest cannot
+    # leave a stale dependency volume behind.
+    compose("up", "-d", "--build", "--force-recreate", "api", "web", "caddy")
+    wait_for_api()
+    wait_for_web()
+    seed_stack()
+    print("local stack ready → http://localhost:28800")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -320,8 +337,11 @@ def main() -> int:
         choices=(
             "up",
             "down",
+            "reset",
             "logs",
             "seed",
+            "admin",
+            "shell",
             "uiux",
             "api-contracts",
             "learner-workspace",
@@ -330,21 +350,21 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "up":
-        # The web source and its node_modules live in separate mounts. Recreate
-        # the web container on each start so a changed package manifest cannot
-        # leave a stale dependency volume behind.
-        compose("up", "-d", "--build", "--force-recreate", "api", "web", "caddy")
-        wait_for_api()
-        wait_for_web()
-        seed_stack()
-        print("local stack ready → http://localhost:28800")
+        bring_up()
     elif args.command == "down":
         compose("down")
+    elif args.command == "reset":
+        compose("down", "-v")
+        bring_up()
     elif args.command == "logs":
         compose("logs", "-f")
     elif args.command == "seed":
         wait_for_api()
         seed_stack(force=True)
+    elif args.command == "admin":
+        promote_admin()
+    elif args.command == "shell":
+        compose("exec", "postgres", "psql", "-U", "postgres", "-d", "ame")
     elif args.command == "api-contracts":
         wait_for_api()
         run_api_contracts()

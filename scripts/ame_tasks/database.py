@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import time
-from urllib.parse import urlparse
 from pathlib import Path
 
-from .common import API_PORT, DB_URL, ROOT, compose, run
+from .common import DB_URL, ROOT, compose, run
 
 
 def up() -> int:
@@ -44,53 +42,3 @@ def reset() -> int:
     raise SystemExit("Postgres did not become ready")
 
 
-def admin() -> int:
-    email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-    name = os.environ.get("ADMIN_NAME", "Carol Admin")
-    password = os.environ.get("ADMIN_PASSWORD", "password123")
-    hashed = subprocess.check_output(["uvx", "--quiet", "--from", "argon2-cffi", "python", "-c", f"from argon2 import PasswordHasher; print(PasswordHasher().hash({password!r}))"], text=True).strip()
-    sql = f"""
-BEGIN;
-SET CONSTRAINTS ALL DEFERRED;
-DO $$
-DECLARE
-  existing_user_id uuid;
-  new_user_id uuid;
-BEGIN
-  SELECT id INTO existing_user_id FROM tb_users WHERE email_canonical = {email!r};
-  IF existing_user_id IS NULL THEN
-    new_user_id := uuid_generate_v7();
-    INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
-    VALUES (new_user_id, {email!r}, {email!r}, {name!r}, 'admin', {hashed!r});
-    INSERT INTO tb_identities (id, identity_type, owner_user_id, label)
-    VALUES (new_user_id, 'human', new_user_id, {name!r});
-  ELSE
-    UPDATE tb_users
-    SET display_name = {name!r}, role = 'admin', password_hash = {hashed!r}
-    WHERE id = existing_user_id;
-  END IF;
-END
-$$;
-COMMIT;
-"""
-    database = urlparse(DB_URL).path.removeprefix("/")
-    if not database:
-        raise SystemExit("AME_DATABASE_URL must include a database name")
-    return compose(
-        "exec",
-        "-T",
-        "postgres",
-        "psql",
-        "-U",
-        "postgres",
-        "-d",
-        database,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-c",
-        sql,
-    )
-
-
-def seed() -> int:
-    return run("uv", "run", "scripts/seed_current.py", "--api", f"http://localhost:{API_PORT}")

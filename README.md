@@ -25,44 +25,39 @@ via `mise x -- <command>` in non-interactive shells), then:
 
 ```bash
 make init-env       # web deps + Playwright browsers (toolchain comes from mise)
-make db-up          # start Postgres in Docker or Podman
-make dev            # API on :28080, frontend on :23000
-make db-seed        # seed the current learner journey fixture (requires API running)
+make dev            # Postgres, Valkey, API, and web, all behind Caddy at :28800
 ```
 
-Demo credentials after seeding: `haru@example.com / password123` (learner),
-`admin@example.com / password123` (admin).
-
-### Admin users
-
-Registration only ever grants the `user` role — there is no API path to self-register
-as an admin (`POST /public/v1/auth/register` rejects `role: admin`). Admins are granted
-**directly in the database**:
+`make dev` is the one local stack — there's no separate host-process mode. It
+auto-seeds demo accounts the first time it starts. Demo credentials:
+`haru@example.com / password123` (learner), `admin@example.com / password123` (admin).
 
 ```bash
-make db-admin                                  # create/grant admin@example.com (default)
-make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
-```
-
-`db-seed` depends on `db-admin`, so the local admin exists before the current
-learner fixture runs. After being promoted, log
-out and back in to refresh the session.
-
-Copy `.env.example` to `.env` if you need to override defaults.
-
-### Containerized local stack
-
-Use the debug stack when you want the complete local topology behind Caddy:
-
-```bash
-make local-up       # Caddy + web + API + Postgres + Valkey at :28800
 make local-uiux     # run the focused browser smoke test through Caddy
-make local-down     # stop services; keep the named Postgres volume
+make stop           # stop services; keeps the named Postgres volume
+make dev-reset      # wipe the volume and start clean (e.g. a migration checksum mismatch)
 ```
 
 The web service bind-mounts `web/` and runs Next.js in development mode with
 polling enabled, so edits on macOS/Podman trigger hot reload without rebuilding
-the image. API source changes use the same bind-mounted development workflow.
+the image. The API container recompiles in place on source changes (cached via
+a persistent cargo target volume); re-run `make dev` if a change doesn't pick
+up on its own.
+
+### Admin users
+
+Registration only ever grants the `user` role — there is no API path to self-register
+as an admin (`POST /public/v1/auth/register` rejects `role: admin`). The seeded
+`admin@example.com` account above is already an admin. To promote a different,
+already-registered account **directly in the database**:
+
+```bash
+make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
+```
+
+After being promoted, log out and back in to refresh the session.
+
+Copy `.env.example` to `.env` if you need to override defaults.
 
 ### Learning desk, themes, and local simulations
 
