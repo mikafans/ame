@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -26,20 +25,12 @@ function courseHref(course: Course) {
 }
 
 export default function LearningHomePage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [courses, setCourses] = useState<Course[]>([]);
   const [nativeJourneys, setNativeJourneys] = useState<NativeJourney[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const showCourses = searchParams.get("tab") === "courses";
-  const activeCourse = useMemo(
-    () =>
-      courses.find(
-        (course) => course.status !== "completed" && course.next !== null,
-      ) ?? null,
-    [courses],
-  );
+  const [selectedCollection, setSelectedCollection] = useState<
+    "in-progress" | "completed"
+  >("in-progress");
 
   useEffect(() => {
     let cancelled = false;
@@ -61,13 +52,7 @@ export default function LearningHomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!loading && !showCourses && activeCourse) {
-      router.replace(courseHref(activeCourse));
-    }
-  }, [activeCourse, loading, router, showCourses]);
-
-  if (loading || (!showCourses && activeCourse)) {
+  if (loading) {
     return (
       <section className="mx-auto max-w-4xl py-12" aria-live="polite">
         <p className="text-sm text-muted-foreground">Opening your learning…</p>
@@ -76,35 +61,107 @@ export default function LearningHomePage() {
   }
 
   if (courses.length > 0) {
-    return <CourseLibrary courses={courses} />;
+    return (
+      <CourseLibrary
+        courses={courses}
+        selectedCollection={selectedCollection}
+        setSelectedCollection={setSelectedCollection}
+      />
+    );
   }
 
   return <EmptyCourseLibrary nativeJourneys={nativeJourneys} />;
 }
 
-function CourseLibrary({ courses }: { courses: Course[] }) {
+function CourseLibrary({
+  courses,
+  selectedCollection,
+  setSelectedCollection,
+}: {
+  courses: Course[];
+  selectedCollection: "in-progress" | "completed";
+  setSelectedCollection: (collection: "in-progress" | "completed") => void;
+}) {
   const active = courses.filter((course) => course.status !== "completed");
   const completed = courses.filter((course) => course.status === "completed");
+  const visibleCourses =
+    selectedCollection === "in-progress" ? active : completed;
   return (
     <main
       className="mx-auto max-w-5xl space-y-10 py-4"
       data-testid="course-library"
     >
-      <header className="max-w-2xl">
+      <header className="max-w-3xl">
         <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
           My learning
         </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">Your courses</h1>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight">
+          Continue where you left off.
+        </h1>
         <p className="mt-3 leading-7 text-muted-foreground">
-          Choose a course to resume. Each course keeps its own next step,
-          progress, and reviewed sources.
+          Each course has its own next step, progress, and reviewed sources.
         </p>
       </header>
-      <CourseGroup title="Active" courses={active} empty="No active courses." />
-      {completed.length > 0 && (
-        <CourseGroup title="Completed" courses={completed} empty="" />
-      )}
+      <div
+        className="border-b border-border"
+        role="tablist"
+        aria-label="Course collections"
+      >
+        <CollectionTab
+          active={selectedCollection === "in-progress"}
+          count={active.length}
+          id="in-progress"
+          label="In progress"
+          onSelect={() => setSelectedCollection("in-progress")}
+        />
+        <CollectionTab
+          active={selectedCollection === "completed"}
+          count={completed.length}
+          id="completed"
+          label="Completed"
+          onSelect={() => setSelectedCollection("completed")}
+        />
+      </div>
+      <CourseGroup
+        title={
+          selectedCollection === "in-progress" ? "In progress" : "Completed"
+        }
+        courses={visibleCourses}
+        empty={
+          selectedCollection === "in-progress"
+            ? "No courses are in progress."
+            : "No completed courses yet."
+        }
+      />
     </main>
+  );
+}
+
+function CollectionTab({
+  active,
+  count,
+  id,
+  label,
+  onSelect,
+}: {
+  active: boolean;
+  count: number;
+  id: string;
+  label: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      aria-controls={`course-group-${id}`}
+      aria-selected={active}
+      className={`border-b-2 px-4 py-3 text-sm font-medium transition ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"}`}
+      id={`course-tab-${id}`}
+      onClick={onSelect}
+      role="tab"
+      type="button"
+    >
+      {label} <span className="ml-1 text-xs">{count}</span>
+    </button>
   );
 }
 
@@ -120,7 +177,7 @@ function CourseGroup({
   return (
     <section aria-labelledby={`course-group-${title.toLowerCase()}`}>
       <h2
-        id={`course-group-${title.toLowerCase()}`}
+        id={`course-group-${title === "In progress" ? "in-progress" : "completed"}`}
         className="text-lg font-semibold"
       >
         {title}
@@ -163,9 +220,9 @@ function CourseGroup({
                   </p>
                 )}
               </div>
-              <Button asChild className="mt-auto w-fit rounded-full" size="sm">
+              <Button asChild className="mt-auto w-fit" size="sm">
                 <Link href={courseHref(course)}>
-                  {course.next ? "Resume course" : "Open course"}
+                  {course.next ? "Continue" : "View course"}
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>

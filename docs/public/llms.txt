@@ -26,6 +26,21 @@ Required authoring sequence
 8. Publish the complete course revision, then return the learner's
    `/learning/journeys/{journeyId}` URL. Draft activities are never learner visible.
 
+Generation operation identifiers
+`POST /api/v1/generation-runs` accepts only these literal `operation` values.
+Start the matching run, transition it to `published`, then use its ID in the
+corresponding authoring request. Do not invent an operation name.
+
+| Literal operation | Use it for | Follow with |
+| --- | --- | --- |
+| `learning.activity.content.compose` | reviewed explanation or worked-example content | `PATCH /api/v1/learning/activities/{activity_id}/content` |
+| `learning.activity.rubric.compose` | reviewed application-task rubric | `PATCH /api/v1/learning/activities/{activity_id}/rubric` |
+| `question.compose` | a versioned formative or graded question | `POST /api/v1/questions` or `POST /api/v1/questions/{question_id}/versions` |
+| `deep_dive.create` | a source-backed follow-up explanation | `POST /api/v1/deep-dives` |
+
+For an explanation, example, or difficulty variant, use
+`POST /api/v1/learning-variants`; it creates its matching generation operation.
+
 Quality requirements
 - Each outcome needs instruction, a worked example, a formative check with
   rationale and learner-facing explanation, and mastery or application work.

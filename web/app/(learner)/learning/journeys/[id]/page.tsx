@@ -889,7 +889,7 @@ export default function LearningJourneyPage() {
       <header className="border-b border-border pb-5">
         <Link
           className="text-sm font-medium text-muted-foreground hover:text-foreground"
-          href="/learning?tab=courses"
+          href="/learning"
         >
           My learning
         </Link>
@@ -928,12 +928,6 @@ export default function LearningJourneyPage() {
                 </Link>
               );
             })}
-          <Link
-            className="inline-flex shrink-0 items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition hover:border-border hover:text-foreground"
-            href="/learning?tab=courses"
-          >
-            <LibraryBig className="size-4" /> Courses
-          </Link>
         </nav>
       </header>
 

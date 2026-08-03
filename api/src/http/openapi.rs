@@ -24,7 +24,10 @@ use crate::http::{
     },
     deep_dives::{CreateDeepDiveBody, DeepDiveActivityQuery, DeepDiveResponse},
     delegations::{CreateDelegationBody, CreateDelegationResponse, DelegationResponse},
-    generation::{GenerationRunResponse, StartGenerationRunBody, TransitionGenerationRunBody},
+    generation::{
+        GenerationOperation, GenerationRunResponse, StartGenerationRunBody,
+        TransitionGenerationRunBody,
+    },
     learning::{
         CreateObjectiveBody, FinishLearningSessionBody, LearnerAttemptSummaryResponse,
         LearnerCompletionResponse, LearnerCourseResponse, LearnerCourseSummaryResponse,
@@ -256,6 +259,7 @@ use crate::http::{
         DeepDiveResponse,
         DeepDiveActivityQuery,
         GenerationRunResponse,
+        GenerationOperation,
         StartGenerationRunBody,
         TransitionGenerationRunBody,
         ListUsersResponse,

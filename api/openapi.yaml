@@ -3337,6 +3337,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LearningResponseBody'
+    GenerationOperation:
+      type: string
+      enum:
+      - learning.activity.content.compose
+      - learning.activity.rubric.compose
+      - question.compose
+      - deep_dive.create
     GenerationRunResponse:
       type: object
       required:
@@ -5065,7 +5072,8 @@ components:
           format: int32
           minimum: 0
         operation:
-          type: string
+          $ref: '#/components/schemas/GenerationOperation'
+          description: Literal operation required by the later content-authoring endpoint.
         provider:
           type:
           - string

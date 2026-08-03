@@ -10,27 +10,28 @@ Status: approved direction — implementation follows the course-scoped model be
 
 ## Executive conclusion
 
-AME should have one global learner destination, **Learning**, with a
-course-scoped tab bar inside it. It should not have one overloaded dashboard,
-and it should not add another global sidebar item for every learner concern.
+AME should have one global learner destination, **Learning**, whose default is
+a multi-course **My learning** home modeled on Coursera's enrolled-course
+organization: an explicit In progress / Completed switcher and course cards
+that lead into a selected course. It should not redirect a returning learner to
+an arbitrary first course.
 
 The proposed tabs are:
 
-| Tab | Primary learner question | Scope |
-| --- | --- | --- |
-| Learn | What should I do now? | selected course |
-| Course | What did my agent create, and how is it structured? | selected course |
-| Progress | What have I actually demonstrated and what needs review? | selected course |
-| Sources | Why should I trust this course and activity? | selected course |
-| Courses | Which course do I want to resume or revisit? | learner-owned library |
+| Tab      | Primary learner question                                 | Scope                 |
+| -------- | -------------------------------------------------------- | --------------------- |
+| Learn    | What should I do now?                                    | selected course       |
+| Course   | What did my agent create, and how is it structured?      | selected course       |
+| Progress | What have I actually demonstrated and what needs review? | selected course       |
+| Sources  | Why should I trust this course and activity?             | selected course       |
+| Courses  | Which course do I want to resume or revisit?             | learner-owned library |
 
 `/agent` remains outside Learning. It is the setup and authorization surface
 for an external agent, not a learner-workspace tab.
 
-This is not a recommendation to copy Coursera or edX. It is a candidate
-definition that uses their useful separation of: current work, course
-structure, progress, and discovery. AME adds two product-specific
-requirements: agent-authored course provenance and evidence-based progress.
+This adopts Coursera's interaction and information-architecture pattern, not
+its code, branding, copy, assets, marketplace, or credential model. AME adds
+agent-authored course provenance and evidence-based progress.
 
 ## Research question
 
@@ -139,7 +140,8 @@ Source: <https://www.edx.org/learn/how-to-learn/edx-how-to-learn-online?index=pr
    missed calendar target is failed learning.
 
 3. A generic catalog-first landing screen for a learner who already has work.
-   The agent-first handoff must lead to the prepared course.
+   The agent-first handoff must lead to **My learning**, where the prepared
+   course is the visible In progress card.
 
 4. A broad analytics dashboard as the first returning-learner screen.
 
@@ -156,8 +158,9 @@ Source: <https://www.edx.org/learn/how-to-learn/edx-how-to-learn-online?index=pr
 
 ### Existing gaps
 
-1. The Learning Desk selects the first active journey and does not provide a
-   learner-facing way to switch to another owned course.
+1. The Learning Desk selected the first active journey and did not provide a
+   learner-facing way to switch to another owned course. This is replaced by a
+   persistent multi-course home.
 2. The old desk mixed five distinct concerns: current work, all courses,
    sources/citations, export, and analytics. The latest revision removed the
    extra content but did not establish its destinations.
@@ -179,15 +182,15 @@ model. The owner-scoped journey API is the correct base. The gaps are in
 learner-oriented projections and associations, not in creating a new global
 dashboard API.
 
-| UX need | Current evidence | Contract verdict | Required change before UI |
-| --- | --- | --- | --- |
-| Courses list | `GET /api/v1/learning/journeys` returns owner-scoped title/goal, status, next activity, and creation date | Partial | Add deterministic recency or last-learning timestamp, completion summary, current module, and review-due summary. Never choose `journeys[0]` as product policy. |
-| Learn | Journey detail returns chapters, published activities, recommendation, and learner-owned status | Mostly present | Define a stable selected-course rule and a learner-ready next-activity projection with expected effort and purpose. |
-| Course | Detail returns goal, objectives, chapters, and activities | Partial | Publish and return a learner-facing course brief: prerequisites, time budget, module rationale, expected effort, and reviewed/publication summary. |
-| Progress | Journey analytics and attempts exist; due reviews are owner-scoped | Partial | Define objective/evidence projection that suppresses empty metrics, carries feedback/rationale, and scopes due review to the selected course. |
-| Sources | Source snapshots and citations are owner-scoped but globally listed | Missing for learner UX | Add course/activity association and a learner-readable source projection. Do not use the raw snapshot response as tab data. |
-| Agent authorship | Course revisions, review/publish commands, and scoped delegations exist | Partial | Expose a published-course provenance summary to the learner without exposing delegation secrets, author drafts, or raw internal logs. |
-| Course isolation | Journey, analytics, review, citation, and source endpoints all perform owner checks | Present at endpoint level | Add multi-course browser tests proving that switching and deep links cannot cross owner/course state. |
+| UX need          | Current evidence                                                                                          | Contract verdict          | Required change before UI                                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Courses list     | `GET /api/v1/learning/journeys` returns owner-scoped title/goal, status, next activity, and creation date | Partial                   | Add deterministic recency or last-learning timestamp, completion summary, current module, and review-due summary. Never choose `journeys[0]` as product policy. |
+| Learn            | Journey detail returns chapters, published activities, recommendation, and learner-owned status           | Mostly present            | Define a stable selected-course rule and a learner-ready next-activity projection with expected effort and purpose.                                             |
+| Course           | Detail returns goal, objectives, chapters, and activities                                                 | Partial                   | Publish and return a learner-facing course brief: prerequisites, time budget, module rationale, expected effort, and reviewed/publication summary.              |
+| Progress         | Journey analytics and attempts exist; due reviews are owner-scoped                                        | Partial                   | Define objective/evidence projection that suppresses empty metrics, carries feedback/rationale, and scopes due review to the selected course.                   |
+| Sources          | Source snapshots and citations are owner-scoped but globally listed                                       | Missing for learner UX    | Add course/activity association and a learner-readable source projection. Do not use the raw snapshot response as tab data.                                     |
+| Agent authorship | Course revisions, review/publish commands, and scoped delegations exist                                   | Partial                   | Expose a published-course provenance summary to the learner without exposing delegation secrets, author drafts, or raw internal logs.                           |
+| Course isolation | Journey, analytics, review, citation, and source endpoints all perform owner checks                       | Present at endpoint level | Add multi-course browser tests proving that switching and deep links cannot cross owner/course state.                                                           |
 
 ### Consequences
 
@@ -230,8 +233,16 @@ Learning** and course selection.
     "status": "active",
     "lastLearningAt": "2026-08-03T12:00:00Z",
     "progress": { "completed": 3, "total": 16 },
-    "currentModule": { "id": "uuid", "title": "Checkpoint recovery", "position": 2 },
-    "next": { "activityId": "uuid", "title": "Trace a failed checkpoint", "estimatedMinutes": 15 },
+    "currentModule": {
+      "id": "uuid",
+      "title": "Checkpoint recovery",
+      "position": 2
+    },
+    "next": {
+      "activityId": "uuid",
+      "title": "Trace a failed checkpoint",
+      "estimatedMinutes": 15
+    },
     "review": { "dueCount": 1 }
   }
 ]
@@ -261,7 +272,11 @@ selected revision, publication state, and tab availability.
   "status": "active",
   "publishedRevisionId": "uuid",
   "tabs": ["learn", "modules", "progress", "resources"],
-  "next": { "activityId": "uuid", "title": "Trace a failed checkpoint", "estimatedMinutes": 15 },
+  "next": {
+    "activityId": "uuid",
+    "title": "Trace a failed checkpoint",
+    "estimatedMinutes": 15
+  },
   "courseUrl": "/learning/journeys/uuid"
 }
 ```
@@ -448,14 +463,14 @@ and it must never show another learner's courses.
 
 ## Roles and boundaries
 
-| Surface | Learner | External agent | AME |
-| --- | --- | --- | --- |
-| `/agent` | creates/revokes a scoped handoff | receives explicit contract and capability | limits authority and records provenance |
-| Learn | completes work | cannot complete work | recommends deterministic next action |
-| Course | reads published brief/syllabus | authors draft and responds to validation | publishes only reviewed/valid material |
-| Progress | reads feedback/evidence, accepts adaptation | reads allowed durable evidence | computes and preserves evidence |
-| Sources | audits course trust | imports/cites allowed sources | records review and provenance |
-| Courses | chooses a course | no cross-course access by default | owner-scopes list and detail |
+| Surface  | Learner                                     | External agent                            | AME                                     |
+| -------- | ------------------------------------------- | ----------------------------------------- | --------------------------------------- |
+| `/agent` | creates/revokes a scoped handoff            | receives explicit contract and capability | limits authority and records provenance |
+| Learn    | completes work                              | cannot complete work                      | recommends deterministic next action    |
+| Course   | reads published brief/syllabus              | authors draft and responds to validation  | publishes only reviewed/valid material  |
+| Progress | reads feedback/evidence, accepts adaptation | reads allowed durable evidence            | computes and preserves evidence         |
+| Sources  | audits course trust                         | imports/cites allowed sources             | records review and provenance           |
+| Courses  | chooses a course                            | no cross-course access by default         | owner-scopes list and detail            |
 
 ## Acceptance stories required before UI implementation
 

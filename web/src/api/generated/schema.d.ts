@@ -1772,6 +1772,8 @@ export interface components {
             completed: boolean;
             responses: components["schemas"]["LearningResponseBody"][];
         };
+        /** @enum {string} */
+        GenerationOperation: "learning.activity.content.compose" | "learning.activity.rubric.compose" | "question.compose" | "deep_dive.create";
         GenerationRunResponse: {
             /** Format: int32 */
             contentVersion: number;
@@ -2459,7 +2461,8 @@ export interface components {
         StartGenerationRunBody: {
             /** Format: int32 */
             contentVersion?: number;
-            operation: string;
+            /** @description Literal operation required by the later content-authoring endpoint. */
+            operation: components["schemas"]["GenerationOperation"];
             provider?: string | null;
             retryKey?: string | null;
         };

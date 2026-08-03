@@ -475,10 +475,10 @@ pub fn build_skill_manifest() -> Value {
         ),
         endpoint(
             "learning.generation.start",
-            "Start or resume an owner-scoped provider generation run with an idempotent retry key.",
+            "Start or resume an owner-scoped provider generation run with an idempotent retry key. operation is one of the published literal operation identifiers; do not infer a string from an endpoint name.",
             "POST",
             "/api/v1/generation-runs",
-            json!({"type":"object","required":["operation"],"properties":{"operation":{"type":"string"},"provider":{"type":"string"},"retryKey":{"type":"string"},"contentVersion":{"type":"integer","minimum":1}}}),
+            json!({"type":"object","required":["operation"],"properties":{"operation":{"type":"string","enum":["learning.activity.content.compose","learning.activity.rubric.compose","question.compose","deep_dive.create"]},"provider":{"type":"string"},"retryKey":{"type":"string"},"contentVersion":{"type":"integer","minimum":1}}}),
         ),
         endpoint(
             "learning.generation.get",

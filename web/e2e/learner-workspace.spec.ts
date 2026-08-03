@@ -17,6 +17,27 @@ test("learner separates active work, completed courses, progress, and sources", 
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 
+  await expect(page).toHaveURL(/\/learning$/);
+  const library = page.getByTestId("course-library");
+  await expect(library).toBeVisible();
+  await expect(
+    library.getByRole("heading", {
+      name: "Asynchronous TCP service design with Netty",
+    }),
+  ).toBeVisible();
+  await expect(
+    library.getByRole("heading", {
+      name: "Reliable clickstream aggregation with Apache Flink",
+    }),
+  ).toHaveCount(0);
+  await page.getByRole("tab", { name: /Completed 1/ }).click();
+  await expect(
+    library.getByRole("heading", {
+      name: "Reliable clickstream aggregation with Apache Flink",
+    }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: /In progress 1/ }).click();
+  await library.getByRole("link", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/learning\/journeys\/[0-9a-f-]+$/);
   await expect(
     page.getByRole("heading", {
@@ -47,18 +68,14 @@ test("learner separates active work, completed courses, progress, and sources", 
   await expect(page.getByText(/netty-tcp-service/)).toBeVisible();
   await expect(page.getByText(/flink-clickstream/)).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Courses", exact: true }).click();
-  const library = page.getByTestId("course-library");
+  await page.getByRole("link", { name: "My learning", exact: true }).click();
   await expect(library).toBeVisible();
-  await expect(library.getByRole("heading", { name: "Active" })).toBeVisible();
-  await expect(
-    library.getByRole("heading", { name: "Completed" }),
-  ).toBeVisible();
   await expect(
     library.getByRole("heading", {
       name: "Asynchronous TCP service design with Netty",
     }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: /Completed 1/ }).click();
   await expect(
     library.getByRole("heading", {
       name: "Reliable clickstream aggregation with Apache Flink",
