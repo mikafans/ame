@@ -2,7 +2,11 @@ use axum::{Json, extract::State, response::IntoResponse};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::{auth::admin::RequireAdmin, domain::error::ApiError, http::AppState};
+use crate::{
+    auth::admin::RequireAdmin,
+    domain::error::{ApiError, FieldError},
+    http::AppState,
+};
 
 /// Partial update for platform settings — any omitted field is left unchanged.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -54,6 +58,17 @@ pub async fn put_settings(
     Json(body): Json<UpdateSettingsBody>,
 ) -> Result<impl IntoResponse, ApiError> {
     let actor = admin.0.user.id;
+
+    if let Some(ratelimit) = &body.ratelimit {
+        for (tier, limits) in [("free", &ratelimit.free), ("premium", &ratelimit.premium)] {
+            if limits.burst == 0 || limits.rate == 0 {
+                return Err(ApiError::Validation(vec![FieldError {
+                    field: format!("ratelimit.{tier}"),
+                    message: "burst and rate must both be greater than zero".into(),
+                }]));
+            }
+        }
+    }
 
     let mut changed: Vec<(&'static str, serde_json::Value)> = Vec::new();
     if let Some(m) = body.maintenance_mode {

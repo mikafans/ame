@@ -138,6 +138,16 @@
       "path": "/public/v1/onboarding/start"
     },
     {
+      "description": "Read the authenticated learner's effective rate-limit tier, remaining bucket budget, request cost, and reset delay. Rate-limit response headers are also returned on API requests.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.rate_limit.status",
+      "path": "/api/v1/me/rate-limit"
+    },
+    {
       "description": "List the authenticated learner's journeys and the next activity for each.",
       "input_schema": {
         "properties": {},
@@ -1185,7 +1195,7 @@
             "type": "string"
           },
           "content": {
-            "description": "The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings.",
+            "description": "Content JSON uses lower camelCase keys. The content type must match the activity kind: explanation uses heading, body, keyPoints; worked_example uses heading, prompt, steps, reflection; diagram uses title, source, altText. Text and list items must be non-empty strings.",
             "required": [
               "type"
             ],
@@ -1358,6 +1368,26 @@
             "type": "string"
           },
           "options": {
+            "description": "For multiple-choice questions, each option requires id, text, and isCorrect.",
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "isCorrect": {
+                  "type": "boolean"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "text",
+                "isCorrect"
+              ],
+              "type": "object"
+            },
             "type": "array"
           },
           "points": {

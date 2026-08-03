@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LogOut, Menu } from "lucide-react";
+import { api } from "@/api/client";
+import type { components } from "@/api/generated/schema.d.ts";
 import { Sidebar } from "@/components/Sidebar";
 import { Logo } from "@/components/Logo";
 import { ThemeSelector } from "@/components/ThemeSelector";
@@ -16,6 +18,19 @@ interface AppShellProps {
 export function AppShell({ route, setRoute, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
+  const [rateLimit, setRateLimit] = useState<
+    components["schemas"]["RateLimitStatusResponse"] | null
+  >(null);
+
+  useEffect(() => {
+    if (!user) {
+      setRateLimit(null);
+      return;
+    }
+    void api.GET("/api/v1/me/rate-limit").then((result) => {
+      if (result.response.ok && result.data) setRateLimit(result.data);
+    });
+  }, [user]);
 
   const handleRouteChange = (r: string) => {
     setMobileOpen(false);
@@ -67,9 +82,24 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
           </nav>
           <div className="ml-auto hidden items-center gap-3 md:flex">
             <ThemeSelector />
+            {rateLimit && (
+              <span
+                className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground"
+                title={`Rate budget resets in ${rateLimit.resetAfterSeconds} seconds`}
+              >
+                {rateLimit.tier === "premium" ? "VIP" : "Free"} ·{" "}
+                {rateLimit.remaining.toLocaleString()}/
+                {rateLimit.limit.toLocaleString()}
+              </span>
+            )}
             <span className="max-w-32 truncate text-sm font-medium">
               {user?.displayName}
             </span>
+            {user && (
+              <span className="rounded-full border border-primary/30 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                {user.plan === "premium" ? "VIP" : "Free"}
+              </span>
+            )}
             <button
               type="button"
               title="Sign out"

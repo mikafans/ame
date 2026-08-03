@@ -1,6 +1,6 @@
 # One-shot bootstrap of the root admin — the cluster equivalent of `make db-admin`.
 #
-# The API cannot mint an admin: POST /v1/auth/register always creates role=user
+# The API cannot mint an admin: POST /public/v1/auth/register always creates role=learner
 # (no self-escalation), so the first admin must be written to Postgres out of
 # band. This Job argon2-hashes ADMIN_PASSWORD and upserts a role=admin row,
 # exactly like the make target (same argon2 library → same PHC hash format the

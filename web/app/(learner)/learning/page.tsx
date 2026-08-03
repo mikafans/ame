@@ -11,6 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import { api, publicApi } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
 import type { components } from "@/api/generated/schema.d.ts";
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +30,8 @@ export default function LearningHomePage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [nativeJourneys, setNativeJourneys] = useState<NativeJourney[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedCollection, setSelectedCollection] = useState<
     "in-progress" | "completed"
   >("in-progress");
@@ -38,20 +41,62 @@ export default function LearningHomePage() {
     void Promise.all([
       api.GET("/api/v1/learning/courses"),
       publicApi.GET("/public/v1/catalog/journeys"),
-    ]).then(([courseResult, catalogResult]) => {
-      if (cancelled) return;
-      if (courseResult.response.ok && courseResult.data) {
+    ])
+      .then(([courseResult, catalogResult]) => {
+        if (cancelled) return;
+        if (!courseResult.response.ok || !courseResult.data) {
+          setError(
+            responseErrorMessage(
+              courseResult.response,
+              courseResult.error,
+              "Could not load your courses.",
+            ),
+          );
+          setLoading(false);
+          return;
+        }
         setCourses(courseResult.data);
-      }
-      if (catalogResult.response.ok && catalogResult.data) {
-        setNativeJourneys(catalogResult.data);
-      }
-      setLoading(false);
-    });
+        if (catalogResult.response.ok && catalogResult.data) {
+          setNativeJourneys(catalogResult.data);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(
+            "AME could not be reached. Check your connection and try again.",
+          );
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
+
+  if (error) {
+    return (
+      <section
+        className="mx-auto max-w-xl rounded-2xl border border-destructive/30 bg-destructive/5 p-8"
+        role="alert"
+      >
+        <h1 className="text-lg font-semibold">
+          We could not open your learning desk
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+        <Button
+          className="mt-5"
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            setReloadKey((key) => key + 1);
+          }}
+        >
+          Try again
+        </Button>
+      </section>
+    );
+  }
 
   if (loading) {
     return (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
 import type { components } from "@/api/generated/schema.d.ts";
 
 type Submission = components["schemas"]["TaskSubmissionResponse"];
@@ -19,7 +20,13 @@ export default function AdminTasksPage() {
   async function load() {
     const result = await api.GET("/api/v1/admin/task-submissions");
     if (!result.response.ok || !result.data) {
-      setError("Could not load pending task submissions.");
+      setError(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not load pending task submissions.",
+        ),
+      );
     } else {
       setSubmissions(result.data);
     }
@@ -71,7 +78,13 @@ export default function AdminTasksPage() {
       },
     );
     if (!result.response.ok) {
-      setError("Could not review this submission.");
+      setError(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not review this submission.",
+        ),
+      );
       return;
     }
     setSubmissions((current) =>

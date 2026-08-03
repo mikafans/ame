@@ -21,7 +21,7 @@ pub async fn list(
     let total = count.build_query_as::<(i64,)>().fetch_one(pool).await?.0;
 
     let mut users = QueryBuilder::new(
-        "SELECT u.id, u.email_canonical AS email, u.display_name, u.role, u.status, u.created_at FROM tb_users u",
+        "SELECT u.id, u.email_canonical AS email, u.display_name, u.role, u.plan, u.status, u.created_at FROM tb_users u",
     );
     if let Some(search) = &search {
         users
@@ -47,6 +47,7 @@ pub async fn list(
             } else {
                 Role::User
             },
+            plan: row.get("plan"),
             status: if row.get::<String, _>("status") == "deactivated" {
                 UserStatus::Deactivated
             } else {
@@ -86,6 +87,15 @@ pub async fn update_status(pool: &PgPool, user_id: Uuid, status: &str) -> Result
 pub async fn update_role(pool: &PgPool, user_id: Uuid, role: &str) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE tb_users SET role = $1 WHERE id = $2")
         .bind(role)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map(|_| ())
+}
+
+pub async fn update_plan(pool: &PgPool, user_id: Uuid, plan: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE tb_users SET plan = $1 WHERE id = $2")
+        .bind(plan)
         .bind(user_id)
         .execute(pool)
         .await

@@ -12,6 +12,7 @@ async fn main() -> anyhow::Result<()> {
                 production: false,
                 cors_origins: "http://localhost:23000".to_string(),
                 log_format: "compact".to_string(),
+                public_base_url: None,
                 database_url: None,
                 valkey_url: None,
             },

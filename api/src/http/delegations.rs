@@ -3,7 +3,7 @@
 use axum::{
     Json, Router,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
     routing::{delete, post},
 };
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,7 @@ pub fn router(state: AppState) -> Router<AppState> {
 pub async fn create(
     State(state): State<AppState>,
     auth: AuthenticatedUser,
+    headers: HeaderMap,
     Json(body): Json<CreateDelegationBody>,
 ) -> Result<(StatusCode, Json<CreateDelegationResponse>), ApiError> {
     require_learner(&auth)?;
@@ -96,8 +97,9 @@ pub async fn create(
         .fetch_one(&mut *tx).await.map_err(db_error)?;
     tx.commit().await.map_err(db_error)?;
     let token = format_token(TokenKind::Delegation, id, &secret);
+    let origin = public_origin(&headers, state.config.server.public_base_url.as_deref())?;
     let handoff = format!(
-        "Use AME to create one source-grounded course for this learner. Read http://localhost:28800/public/llms.txt first.\nAuthorization: Bearer {token}\nScope: course authoring only; expires {}. Goal: {goal}. Import and certify sources, create a complete course, validate, review, publish, then return /learning/journeys/{{journeyId}}. Do not ask for or use a learner login token.",
+        "Use AME to create one source-grounded course for this learner. Read {origin}/public/llms.txt first.\nAuthorization: Bearer {token}\nScope: course authoring only; expires {}. Goal: {goal}. Import and certify sources, create a complete course, validate, review, publish, then return /learning/journeys/{{journeyId}}. Do not ask for or use a learner login token.",
         expires_at
             .format(&time::format_description::well_known::Rfc3339)
             .unwrap_or_default(),
@@ -109,6 +111,77 @@ pub async fn create(
             handoff,
         }),
     ))
+}
+
+fn public_origin(
+    headers: &HeaderMap,
+    configured_base_url: Option<&str>,
+) -> Result<String, ApiError> {
+    let configured = configured_base_url
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let origin = configured
+        .or_else(|| {
+            let host = headers
+                .get(header::HOST)
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())?;
+            let proto = headers
+                .get("x-forwarded-proto")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.split(',').next())
+                .map(str::trim)
+                .filter(|value| matches!(*value, "http" | "https"))
+                .unwrap_or("http");
+            Some(format!("{proto}://{host}"))
+        })
+        .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("request has no public origin")))?;
+
+    let origin = origin.trim_end_matches('/');
+    let authority = origin
+        .split_once("://")
+        .map(|(_, authority)| authority)
+        .unwrap_or_default();
+    if !(origin.starts_with("http://") || origin.starts_with("https://"))
+        || origin.contains('\n')
+        || origin.contains('\r')
+        || authority.is_empty()
+        || authority.contains('/')
+    {
+        return Err(ApiError::Internal(anyhow::anyhow!(
+            "configured public base URL must be an HTTP origin"
+        )));
+    }
+    Ok(origin.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::public_origin;
+    use axum::http::HeaderMap;
+
+    #[test]
+    fn configured_origin_takes_precedence() {
+        let mut headers = HeaderMap::new();
+        headers.insert("host", "internal:8080".parse().unwrap());
+        assert_eq!(
+            public_origin(&headers, Some("https://ame.example.com/")).unwrap(),
+            "https://ame.example.com"
+        );
+    }
+
+    #[test]
+    fn forwarded_request_uses_public_host_and_protocol() {
+        let mut headers = HeaderMap::new();
+        headers.insert("host", "ame.example.com".parse().unwrap());
+        headers.insert("x-forwarded-proto", "https, http".parse().unwrap());
+        assert_eq!(
+            public_origin(&headers, None).unwrap(),
+            "https://ame.example.com"
+        );
+    }
 }
 
 #[utoipa::path(get, path = "/api/v1/agent-delegations", responses((status = 200, body = [DelegationResponse])), security(("bearer_auth" = [])), tag = "agent delegation")]

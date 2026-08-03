@@ -47,6 +47,7 @@ pub struct UserInfo {
     pub name: String,
     pub email: String,
     pub role: String,
+    pub plan: String,
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────
@@ -154,6 +155,7 @@ pub async fn register(
     let email = registered.email;
     let display_name = registered.display_name;
     let role = registered.role;
+    let plan = registered.plan;
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
     let cookie_headers = auth_cookie_headers(&token_str, state.config.server.production);
 
@@ -169,6 +171,7 @@ pub async fn register(
                 name: display_name,
                 email,
                 role,
+                plan,
             },
         }),
     ))
@@ -250,6 +253,7 @@ pub async fn login(
     let email = user.email;
     let display_name = user.display_name;
     let role = user.role;
+    let plan = user.plan;
 
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
     let cookie_headers = auth_cookie_headers(&token_str, state.config.server.production);
@@ -266,6 +270,7 @@ pub async fn login(
                 name: display_name,
                 email,
                 role,
+                plan,
             },
         }),
     ))

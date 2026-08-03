@@ -62,18 +62,19 @@ The [`k3s/`](k3s/) and [`k8s/`](k8s/) directories contain the reference image
 build and Kustomize manifests. They are intentionally environment-specific;
 review the overlays and secrets before applying them to another cluster.
 
-The reference Kubernetes web pod includes a small Caddy sidecar for the
-machine-readable public documents. It copies the same `docs/public` content
-packaged in the web image into a shared volume and serves:
+The API image embeds and serves the machine-readable public documents, so the
+front door must route these paths to `ame-api`:
 
 ```text
 GET /public/llms.txt
 GET /public/skill.json
 GET /public/openapi.yaml
+GET /public/learning-contract.json
 ```
 
-The `/public/v1/*` prefix remains API-backed and is routed to `ame-api`.
-There is no API or Next.js runtime handler for the static documents.
+The `/api/v1/*` prefix is authenticated and `/public/v1/*` is unauthenticated;
+both remain API-backed and must be routed to `ame-api`. The old `/v1/*` surface
+is not supported.
 
 ## CI image publishing
 

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { publicApi } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,34 +45,39 @@ function StartLearningForm() {
         });
         if (!registration.response.ok || !registration.data) {
           throw new Error(
-            registration.response.status === 422
-              ? "This email is already registered, or the password is invalid"
-              : "Could not create your learner account",
+            responseErrorMessage(
+              registration.response,
+              registration.error,
+              "Could not create your learner account",
+            ),
           );
         }
         onboardingToken = registration.data.token;
       }
-      const { data, response } = await publicApi.POST(
-        "/public/v1/onboarding/start",
-        {
-          headers: onboardingToken
-            ? { Authorization: `Bearer ${onboardingToken}` }
-            : undefined,
-          body: {
-            displayName,
-            email,
-            idempotencyKey: crypto.randomUUID(),
-            prompt,
-            ...(routeCatalogId ? { catalogId: routeCatalogId } : {}),
-          },
+      const startResult = await publicApi.POST("/public/v1/onboarding/start", {
+        headers: onboardingToken
+          ? { Authorization: `Bearer ${onboardingToken}` }
+          : undefined,
+        body: {
+          displayName,
+          email,
+          idempotencyKey: crypto.randomUUID(),
+          prompt,
+          ...(routeCatalogId ? { catalogId: routeCatalogId } : {}),
         },
-      );
-      if (!response.ok || !data) {
-        throw new Error("Could not start your learning journey");
+      });
+      if (!startResult.response.ok || !startResult.data) {
+        throw new Error(
+          responseErrorMessage(
+            startResult.response,
+            startResult.error,
+            "Could not start your learning journey",
+          ),
+        );
       }
       setOnboardingComplete(true);
       await refresh();
-      router.push(`/learning/journeys/${data.journeyId}`);
+      router.push(`/learning/journeys/${startResult.data.journeyId}`);
     } catch (submitError) {
       setError(
         submitError instanceof Error

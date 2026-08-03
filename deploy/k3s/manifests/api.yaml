@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: azusachino.icu/ame-api:0.4.0
+          image: azusachino.icu/ame-api:0.4.1
           imagePullPolicy: Never
           ports:
             - containerPort: 8080

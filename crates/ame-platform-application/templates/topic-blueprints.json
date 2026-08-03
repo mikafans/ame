@@ -67,7 +67,7 @@
             "type": "explanation",
             "heading": "A clear model for {{goal}}",
             "body": "Begin by putting {{goal}} into your own words. A useful first model has three parts: what it is, why it matters, and one situation where you would use it.",
-            "key_points": [
+            "keyPoints": [
               "Name what {{goal}} is for.",
               "Connect one core idea to the outcome you want.",
               "State one question your first example should answer."
@@ -118,7 +118,7 @@
                 "label": "Act immediately without checking the idea"
               }
             ],
-            "correct_option_id": "make_model",
+            "correctOptionId": "make_model",
             "feedback": { "correct": "Yes. Make the model explicit so your next action is testable.", "incorrect": "Pause first: make the core idea explicit, then choose an action you can test." }
           }
         },
@@ -201,7 +201,7 @@
             "type": "explanation",
             "heading": "A clear model for {{goal}}",
             "body": "Begin by putting {{goal}} into your own words. A useful target model has three parts: what it covers, how it is evaluated, and one question you must be able to solve.",
-            "key_points": [
+            "keyPoints": [
               "Name the domains covered by {{goal}}.",
               "Connect one domain to the outcome you want.",
               "State one question your first practice should answer."
@@ -318,7 +318,7 @@
             "type": "explanation",
             "heading": "A clear model for {{goal}}",
             "body": "Begin by putting {{goal}} into your own words. A useful project model has three parts: what you will make, who it helps, and how you will know it works.",
-            "key_points": [
+            "keyPoints": [
               "Name the smallest useful result for {{goal}}.",
               "Connect one core idea to the result.",
               "State one risk your first milestone should expose."
@@ -384,7 +384,7 @@
     ],
     "first_activity": { "kind": "explanation", "title": "Set a useful learning signal", "purpose": "orientation", "estimated_minutes": 5, "context": "Choose one small idea you want to remember and describe what you can recall without looking.", "instructions": "Name the idea and your current recall confidence.", "questions": [{ "id": "confidence", "kind": "single_choice", "prompt": "How confidently can you recall the idea now?", "options": ["not_yet", "partly", "clearly"] }, { "id": "target", "kind": "short_text", "prompt": "What small idea will you practice recalling?" }], "objective_orders": [0], "status": "ready" },
     "follow_up_activities": [
-      { "kind": "explanation", "title": "Use retrieval as the first check", "objective_orders": [0, 1], "payload": { "purpose": "first_explanation", "estimated_minutes": 8, "content": { "type": "explanation", "heading": "Recall first, then inspect", "body": "Attempting to retrieve an answer makes the gap visible. Check the source after the attempt, then record the one cue that would help you retrieve it next time.", "key_points": ["Start with a cue, not the answer.", "Treat an incomplete recall as useful feedback.", "Schedule a later attempt instead of cramming repetitions."] } }, "status": "proposed" },
+      { "kind": "explanation", "title": "Use retrieval as the first check", "objective_orders": [0, 1], "payload": { "purpose": "first_explanation", "estimated_minutes": 8, "content": { "type": "explanation", "heading": "Recall first, then inspect", "body": "Attempting to retrieve an answer makes the gap visible. Check the source after the attempt, then record the one cue that would help you retrieve it next time.", "keyPoints": ["Start with a cue, not the answer.", "Treat an incomplete recall as useful feedback.", "Schedule a later attempt instead of cramming repetitions."] } }, "status": "proposed" },
       { "kind": "recommendation", "title": "Choose your next spaced recall", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
     ]
   },
@@ -592,7 +592,7 @@
             "type": "explanation",
             "heading": "Sources, operators, sinks, and event time",
             "body": "A Flink job is a dataflow of sources, transformations, and sinks over unbounded streams. Event time (when an event happened) differs from processing time (when Flink observes it); most correct pipelines reason in event time.",
-            "key_points": [
+            "keyPoints": [
               "A job is a directed dataflow of operators.",
               "Event time is carried by the records, not the wall clock.",
               "Processing time is simpler but non-deterministic under delay."
@@ -633,7 +633,7 @@
             "type": "explanation",
             "heading": "How Flink recovers",
             "body": "Operators keep keyed state; periodic checkpoints snapshot that state consistently, so a failed job can restart from the last checkpoint without losing or double-counting data.",
-            "key_points": [
+            "keyPoints": [
               "State is scoped per key.",
               "Checkpoints are consistent snapshots.",
               "Recovery restores state and rewinds the source."
@@ -663,7 +663,7 @@
                 "label": "Restart from scratch and reprocess everything from the beginning"
               }
             ],
-            "correct_option_id": "checkpoint",
+            "correctOptionId": "checkpoint",
             "feedback": { "correct": "Correct. A completed checkpoint restores keyed state and coordinates the source rewind.", "incorrect": "Not quite. Flink recovers from the last completed checkpoint, restoring keyed state while rewinding the source." }
           }
         },
@@ -680,7 +680,7 @@
             "type": "explanation",
             "heading": "Grouping unbounded streams",
             "body": "Windows slice an unbounded stream into finite chunks (tumbling, sliding, session). Watermarks signal that event time has advanced, so a window can close even though a few late records may still trickle in.",
-            "key_points": [
+            "keyPoints": [
               "Windows bound an infinite stream.",
               "Watermarks estimate event-time progress.",
               "A lateness policy decides what to do with stragglers."
@@ -731,7 +731,7 @@
                 "label": "SSH into a node and start the job manager by hand"
               }
             ],
-            "correct_option_id": "flinkdeployment",
+            "correctOptionId": "flinkdeployment",
             "feedback": { "correct": "Correct. The operator reconciles a FlinkDeployment resource into the running job.", "incorrect": "Use a FlinkDeployment resource first; the operator manages the job lifecycle from that declaration." }
           }
         },
@@ -831,7 +831,7 @@
             "type": "explanation",
             "heading": "Describing motion",
             "body": "Kinematics describes how objects move without asking why. Position tells you where an object is; velocity is how fast position changes; acceleration is how fast velocity changes. For constant acceleration, v = v0 + a*t.",
-            "key_points": [
+            "keyPoints": [
               "Velocity is the rate of change of position.",
               "Acceleration is the rate of change of velocity.",
               "Constant acceleration gives linear velocity in time."
@@ -851,7 +851,7 @@
             "type": "explanation",
             "heading": "Force and motion",
             "body": "Newton's laws connect force to motion: an object keeps its velocity unless a net force acts (1st); net force equals mass times acceleration, F = m*a (2nd); forces come in equal and opposite pairs (3rd).",
-            "key_points": [
+            "keyPoints": [
               "No net force means constant velocity.",
               "F = m*a relates net force to acceleration.",
               "Forces act in pairs between two bodies."
@@ -892,7 +892,7 @@
             "type": "explanation",
             "heading": "Conservation of energy",
             "body": "Work transfers energy; kinetic energy is energy of motion (1/2 m v^2) and potential energy is stored (e.g. m*g*h). In an isolated system without friction, total mechanical energy is conserved.",
-            "key_points": [
+            "keyPoints": [
               "Work is force applied over a distance.",
               "Kinetic energy grows with the square of speed.",
               "Total mechanical energy is conserved without losses."
@@ -943,7 +943,7 @@
                 "label": "Total kinetic energy is conserved"
               }
             ],
-            "correct_option_id": "momentum",
+            "correctOptionId": "momentum",
             "feedback": { "correct": "Correct. Total momentum is conserved for the isolated collision.", "incorrect": "For a sticking collision, total momentum—not total kinetic energy—is conserved." }
           }
         },

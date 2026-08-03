@@ -8,6 +8,7 @@ pub struct RegisteredUser {
     pub email: String,
     pub display_name: String,
     pub role: String,
+    pub plan: String,
 }
 
 #[derive(Debug, Clone)]
@@ -16,6 +17,7 @@ pub struct LoginUser {
     pub email: String,
     pub display_name: String,
     pub role: String,
+    pub plan: String,
     pub password_hash: Option<String>,
     pub status: String,
     pub identity_status: String,
@@ -35,7 +37,7 @@ pub async fn register_user(
     let row = sqlx::query(
         "INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
          VALUES ($1, $2, $2, $3, 'learner', $4)
-         RETURNING id, email_canonical, display_name, role",
+         RETURNING id, email_canonical, display_name, role, plan",
     )
     .bind(user_id)
     .bind(email)
@@ -57,12 +59,13 @@ pub async fn register_user(
         email: row.get("email_canonical"),
         display_name: row.get("display_name"),
         role: row.get("role"),
+        plan: row.get("plan"),
     })
 }
 
 pub async fn find_login_user(pool: &PgPool, email: &str) -> Result<Option<LoginUser>, sqlx::Error> {
     sqlx::query(
-        "SELECT u.id, u.email_canonical, u.display_name, u.role, u.password_hash, u.status,
+        "SELECT u.id, u.email_canonical, u.display_name, u.role, u.plan, u.password_hash, u.status,
                 i.status AS identity_status
          FROM tb_users u JOIN tb_identities i ON i.id = u.id
          WHERE u.email_canonical = $1",
@@ -76,6 +79,7 @@ pub async fn find_login_user(pool: &PgPool, email: &str) -> Result<Option<LoginU
             email: row.get("email_canonical"),
             display_name: row.get("display_name"),
             role: row.get("role"),
+            plan: row.get("plan"),
             password_hash: row.get("password_hash"),
             status: row.get("status"),
             identity_status: row.get("identity_status"),

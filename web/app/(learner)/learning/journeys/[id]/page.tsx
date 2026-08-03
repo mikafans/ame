@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { api } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
 import type { components } from "@/api/generated/schema.d.ts";
 import { Button } from "@/components/ui/button";
 import { ActivityContentRenderer } from "@/components/learning/ActivityContentRenderer";
@@ -523,7 +524,13 @@ export default function LearningJourneyPage() {
       return;
     }
     if (!result.response.ok || !result.data) {
-      throw new Error("Could not load the activity explanation");
+      throw new Error(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not load the activity explanation",
+        ),
+      );
     }
     setDeepDive(result.data);
   }
@@ -540,7 +547,13 @@ export default function LearningJourneyPage() {
         return;
       }
       if (!result.response.ok || !result.data) {
-        throw new Error("Could not load the activity assessment");
+        throw new Error(
+          responseErrorMessage(
+            result.response,
+            result.error,
+            "Could not load the activity assessment",
+          ),
+        );
       }
       setAssessment(result.data);
       const attemptResult = await api.POST(
@@ -551,7 +564,13 @@ export default function LearningJourneyPage() {
         },
       );
       if (!attemptResult.response.ok || !attemptResult.data) {
-        throw new Error("Could not start the activity assessment");
+        throw new Error(
+          responseErrorMessage(
+            attemptResult.response,
+            attemptResult.error,
+            "Could not start the activity assessment",
+          ),
+        );
       }
       setAttempt(attemptResult.data);
     } finally {
@@ -565,7 +584,13 @@ export default function LearningJourneyPage() {
       { params: { path: { journey_id: params.id } } },
     );
     if (!result.response.ok || !result.data) {
-      throw new Error("Could not load assessment history");
+      throw new Error(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not load assessment history",
+        ),
+      );
     }
     setAttemptHistory(result.data);
   }, [params.id]);
@@ -578,7 +603,13 @@ export default function LearningJourneyPage() {
           params: { path: { id: params.id } },
         });
         if (!journeyResult.response.ok || !journeyResult.data) {
-          throw new Error("Could not load this learning journey");
+          throw new Error(
+            responseErrorMessage(
+              journeyResult.response,
+              journeyResult.error,
+              "Could not load this learning journey",
+            ),
+          );
         }
         if (cancelled) return;
         setJourney(journeyResult.data);
@@ -641,7 +672,16 @@ export default function LearningJourneyPage() {
       );
       if (cancelled) return;
       setLearnerViewLoaded(true);
-      if (!viewResult.response.ok || !viewResult.data) return;
+      if (!viewResult.response.ok || !viewResult.data) {
+        setError(
+          responseErrorMessage(
+            viewResult.response,
+            viewResult.error,
+            "Could not load the learner view",
+          ),
+        );
+        return;
+      }
       setLearnerView(viewResult.data);
       if (selectedTab === "course") {
         const result = await api.GET("/api/v1/learning/journeys/{id}/course", {
@@ -679,23 +719,32 @@ export default function LearningJourneyPage() {
     setStartingActivity(activityId);
     setError(null);
     try {
-      const { data, response } = await api.POST(
+      const result = await api.POST(
         "/api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start",
         {
           params: { path: { journey_id: params.id, activity_id: activityId } },
         },
       );
-      if (!response.ok || !data)
-        throw new Error("Could not start this activity");
-      setSession(data);
+      if (!result.response.ok || !result.data)
+        throw new Error(
+          responseErrorMessage(
+            result.response,
+            result.error,
+            "Could not start this activity",
+          ),
+        );
+      setSession(result.data);
       setResponses({});
       setAssessmentResponses({});
       setAssessment(null);
       setAttempt(null);
       setDeepDive(null);
       setReviewActivityId(null);
-      window.localStorage.setItem(`ame-learning-session:${params.id}`, data.id);
-      await loadAssessment(activityId, data.id);
+      window.localStorage.setItem(
+        `ame-learning-session:${params.id}`,
+        result.data.id,
+      );
+      await loadAssessment(activityId, result.data.id);
     } catch (startError) {
       setError(
         startError instanceof Error
@@ -736,7 +785,13 @@ export default function LearningJourneyPage() {
         },
       });
       if (!result.response.ok || !result.data) {
-        throw new Error("Could not save the assessment answer");
+        throw new Error(
+          responseErrorMessage(
+            result.response,
+            result.error,
+            "Could not save the assessment answer",
+          ),
+        );
       }
     }
     const finishedAttempt = await api.POST(
@@ -744,7 +799,13 @@ export default function LearningJourneyPage() {
       { params: { path: { attempt_id: attempt.id } } },
     );
     if (!finishedAttempt.response.ok || !finishedAttempt.data) {
-      throw new Error("Could not grade the assessment");
+      throw new Error(
+        responseErrorMessage(
+          finishedAttempt.response,
+          finishedAttempt.error,
+          "Could not grade the assessment",
+        ),
+      );
     }
     setAttempt(finishedAttempt.data);
     if (finishedAttempt.data.status === "graded") {
@@ -763,7 +824,13 @@ export default function LearningJourneyPage() {
         },
       });
       if (!evidence.response.ok) {
-        throw new Error("Could not record assessment evidence");
+        throw new Error(
+          responseErrorMessage(
+            evidence.response,
+            evidence.error,
+            "Could not record assessment evidence",
+          ),
+        );
       }
     }
   }
@@ -776,22 +843,25 @@ export default function LearningJourneyPage() {
       if (assessment && attempt?.status === "in_progress") {
         await finishAssessment();
       }
-      const { data, response } = await api.POST(
-        "/api/v1/learning/sessions/{id}/finish",
-        {
-          params: { path: { id: session.id } },
-          body: {
-            completed: true,
-            responses: Object.entries(responses).map(([id, value]) => ({
-              id,
-              value,
-            })),
-          },
+      const result = await api.POST("/api/v1/learning/sessions/{id}/finish", {
+        params: { path: { id: session.id } },
+        body: {
+          completed: true,
+          responses: Object.entries(responses).map(([id, value]) => ({
+            id,
+            value,
+          })),
         },
-      );
-      if (!response.ok || !data)
-        throw new Error("Could not finish this activity");
-      setSession(data);
+      });
+      if (!result.response.ok || !result.data)
+        throw new Error(
+          responseErrorMessage(
+            result.response,
+            result.error,
+            "Could not finish this activity",
+          ),
+        );
+      setSession(result.data);
       window.localStorage.removeItem(`ame-learning-session:${params.id}`);
       const refreshed = await api.GET("/api/v1/learning/journeys/{id}", {
         params: { path: { id: params.id } },

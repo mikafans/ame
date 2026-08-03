@@ -9,7 +9,7 @@
 # NEXT_PUBLIC_API_URL="" so all API calls are relative to whatever host serves
 # the page — i.e. this front door.
 #
-#   browser ──▶ ame-platform ──┬─ /v1/* ─▶ ame-api
+#   browser ──▶ ame-platform ──┬─ /api/* + /public/* ─▶ ame-api
 #                              └─ /*    ─▶ ame-web
 apiVersion: v1
 kind: ConfigMap
@@ -34,11 +34,12 @@ data:
         proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        # AME's get_client_ip strips `trusted_proxies` (=1, see ame.toml)
-        # right-most hops from X-Forwarded-For. $proxy_add_x_forwarded_for
+        # AME's get_client_ip strips `trusted_proxies` (=2, see ame.toml)
+        # right-most hops from X-Forwarded-For. The Cloudflare and nginx hops
+        # are the trusted right-most entries; $proxy_add_x_forwarded_for
         # already ends with the real client ($remote_addr); appending
-        # $server_addr makes the chain "client, nginx", so stripping one hop
-        # yields the real client and any client-supplied XFF stays harmlessly
+        # $server_addr makes the chain "client, cloudflared, nginx", so
+        # stripping two hops yields the real client and any client-supplied XFF stays harmlessly
         # to the left (can't spoof past the trusted hop).
         proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
       }
@@ -51,7 +52,7 @@ data:
       }
 
       # Root-level public discovery docs — the API serves these at `/`, not under
-      # /v1/, so route them to ame-api explicitly. Otherwise they fall through to
+      # /api/ and /public/, so route them to ame-api explicitly. Otherwise they fall through to
       # ame-web, whose Next.js rewrite self-references when the image is built
       # with NEXT_PUBLIC_API_URL="" → 404. (/llms.txt is the llmstxt.org
       # convention; /skill.json and /openapi.yaml sit alongside it as well-known
@@ -71,6 +72,13 @@ data:
       }
 
       location = /openapi.yaml {
+        proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For "$proxy_add_x_forwarded_for, $server_addr";
+      }
+
+      location = /learning-contract.json {
         proxy_pass http://ame-api.harus-edge.svc.cluster.local:80;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;

@@ -21,6 +21,7 @@ pub struct AuthenticatedPrincipal {
     /// The authenticated learner and the owner of every learner resource.
     pub user_id: Uuid,
     pub role: PrincipalRole,
+    pub plan: String,
     pub email: Option<String>,
     pub display_name: String,
     pub created_at: OffsetDateTime,

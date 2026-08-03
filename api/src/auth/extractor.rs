@@ -29,6 +29,7 @@ pub struct AuthenticatedUserView {
     pub email: Option<String>,
     pub display_name: String,
     pub role: crate::domain::user::Role,
+    pub plan: String,
     pub created_at: time::OffsetDateTime,
 }
 
@@ -57,6 +58,7 @@ impl AuthenticatedUser {
                 email: principal.email,
                 display_name: principal.display_name,
                 role,
+                plan: principal.plan,
                 created_at: principal.created_at,
             },
             owner_id: principal.user_id,

@@ -61,6 +61,13 @@ pub fn build_skill_manifest() -> Value {
             json!({"type":"object","required":["email","displayName","prompt","idempotencyKey"],"properties":{"email":{"type":"string","format":"email"},"displayName":{"type":"string"},"prompt":{"type":"string"},"catalogId":{"type":"string"},"idempotencyKey":{"type":"string"}}}),
         ),
         endpoint(
+            "learning.rate_limit.status",
+            "Read the authenticated learner's effective rate-limit tier, remaining bucket budget, request cost, and reset delay. Rate-limit response headers are also returned on API requests.",
+            "GET",
+            "/api/v1/me/rate-limit",
+            empty.clone(),
+        ),
+        endpoint(
             "learning.journey.list",
             "List the authenticated learner's journeys and the next activity for each.",
             "GET",
@@ -324,7 +331,7 @@ pub fn build_skill_manifest() -> Value {
             "Replace an uncompleted explanation or worked example with reviewed, source-backed content from a published learning.activity.content.compose generation run.",
             "PATCH",
             "/api/v1/learning/activities/{activity_id}/content",
-            json!({"type":"object","required":["activityId","revisionId","generationRunId","content","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"content":{"type":"object","required":["type"],"description":"The content type must match the activity kind: explanation uses heading, body, key_points; worked_example uses heading, prompt, steps, reflection. Text and list items must be non-empty strings."},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved content is learner-visible."}}}),
+            json!({"type":"object","required":["activityId","revisionId","generationRunId","content","sourceReferences","reviewStatus"],"properties":{"activityId":{"type":"string","format":"uuid"},"revisionId":{"type":"string","format":"uuid"},"generationRunId":{"type":"string","format":"uuid"},"content":{"type":"object","required":["type"],"description":"Content JSON uses lower camelCase keys. The content type must match the activity kind: explanation uses heading, body, keyPoints; worked_example uses heading, prompt, steps, reflection; diagram uses title, source, altText. Text and list items must be non-empty strings."},"sourceReferences":{"type":"array","items":{"type":"string"},"minItems":1},"reviewStatus":{"type":"string","enum":["approved"],"description":"Only approved content is learner-visible."}}}),
         ),
         endpoint(
             "learning.activity.rubric.author",
@@ -338,7 +345,7 @@ pub fn build_skill_manifest() -> Value {
             "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory. For a course formative check, set both rationale and explanation: explanation is the learner-facing correct-answer feedback (there is no feedback field).",
             "POST",
             "/api/v1/questions",
-            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","numeric","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array"},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string","description":"Learner-facing correct-answer feedback; required alongside rationale for a publishable formative check."},"rationale":{"type":"string","description":"Why this question assesses the linked objective; required alongside explanation for a publishable formative check."},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
+            json!({"type":"object","required":["generationRunId","kind","prompt","points"],"properties":{"generationRunId":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["multiple_choice","true_false","short_answer","numeric","essay","code"]},"prompt":{"type":"string"},"options":{"type":"array","description":"For multiple-choice questions, each option requires id, text, and isCorrect.","items":{"type":"object","required":["id","text","isCorrect"],"properties":{"id":{"type":"string"},"text":{"type":"string"},"isCorrect":{"type":"boolean"}}}},"acceptedAnswers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string","description":"Learner-facing correct-answer feedback; required alongside rationale for a publishable formative check."},"rationale":{"type":"string","description":"Why this question assesses the linked objective; required alongside explanation for a publishable formative check."},"difficulty":{"type":"string"},"points":{"type":"integer","minimum":1},"reviewStatus":{"type":"string"},"sourceReferences":{"type":"array","items":{"type":"string"}}}}),
         ),
         endpoint(
             "learning.question.get",

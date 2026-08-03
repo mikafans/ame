@@ -60,7 +60,7 @@ Updating a running deployment → [Operations](#operations).
 | ---------------- | ----------- | ---------------------------------------------- |
 | **ame-platform** | Deployment  | **<http://ame-platform.harus-edge.svc.cluster.local>**  |
 | ame-web          | Deployment  | internal — behind ame-platform (`/`)           |
-| ame-api          | Deployment  | internal — behind ame-platform (`/v1`)         |
+| ame-api          | Deployment  | internal — behind ame-platform (`/api/`, `/public/`) |
 | ame-postgres     | StatefulSet | in-namespace `ame-postgres:5432` (2Gi PVC)     |
 | ame-valkey       | Deployment  | in-namespace `ame-valkey:6379`                 |
 
@@ -72,8 +72,12 @@ CIDR and split DNS resolves `cluster.local`), but with `production = true` the
 Secure session cookie only rides the HTTPS hostname — log in via `https://ame.azusachino.icu`.
 No NodePort.
 
-**Everything is one origin.** `ame-platform` (nginx, `front.yaml`) proxies `/v1/*`
-to ame-api and everything else to ame-web. This is required, not cosmetic: the API
+**Everything is one origin.** `ame-platform` (nginx, `front.yaml`) proxies
+`/api/*` and `/public/*` to ame-api and everything else to ame-web. Authenticated
+endpoints are `/api/v1/*`; unauthenticated endpoints are `/public/v1/*`; the old
+`/v1/*` surface is not supported. Discovery documents are served from
+`/public/llms.txt`, `/public/skill.json`, `/public/openapi.yaml`, and
+`/public/learning-contract.json`. This is required, not cosmetic: the API
 sets its session cookie `SameSite=Lax` over plain HTTP, so if the browser talked to
 ame-web and ame-api as *different* hosts the cookie wouldn't ride the API calls and
 login wouldn't stick. Behind the front door the browser is same-origin, so the
@@ -91,10 +95,11 @@ Secrets and the DB URL are injected as env on top (env overrides only apply when
 the TOML loads successfully). Note the DB url env var is `AME_DATABASE_URL` (the
 `AME_` prefix is required by `config.rs`).
 
-`trusted_proxies = 1` — exactly one trusted L7 hop, the ame-platform front door.
-nginx rewrites `X-Forwarded-For` to `"<client>, <nginx>"` (see `front.yaml`), so the
-API strips one right-most hop to get the real client for per-IP rate limiting; any
-client-supplied XFF stays left of the trusted hop and can't spoof it.
+`trusted_proxies = 2` — the Cloudflare Tunnel and ame-platform front door are
+trusted L7 hops. nginx preserves the forwarding chain (see `front.yaml`), so the
+API strips the two right-most hops to get the real client for per-IP rate
+limiting; any client-supplied XFF stays left of the trusted hops and can't spoof
+it.
 
 ## One-time setup
 

@@ -15,11 +15,12 @@ Internet -> containerized Caddy :80/:443
                                   \-> valkey:6379
 ```
 
-Use one public origin for the browser and API. Containerized Caddy serves the
-canonical documents `/public/llms.txt`, `/public/skill.json`, and
-`/public/openapi.yaml` directly from `docs/public`; it proxies `/api/*` and
-`/public/v1/*` to the API, and keeps `/healthz`, `/readyz`, and `/metrics` as
-root operational endpoints. All other paths go to Next.js.
+Use one public origin for the browser and API. The API image embeds the
+canonical documents `/public/llms.txt`, `/public/skill.json`,
+`/public/openapi.yaml`, and `/public/learning-contract.json`; Caddy may serve
+the same files directly, but it must proxy `/api/*` and `/public/v1/*` to the
+API and keep `/healthz`, `/readyz`, and `/metrics` as root operational
+endpoints. All other paths go to Next.js.
 
 ## Requirements
 

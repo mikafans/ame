@@ -42,7 +42,7 @@ spec:
           # NEXT_PUBLIC_API_URL is baked EMPTY at build (build-images.sh) so API
           # calls are relative — the web is served same-origin behind ame-platform
           # (front.yaml). Tag tracks the ame source built by build-images.sh.
-          image: azusachino.icu/ame-web:0.4.0
+          image: azusachino.icu/ame-web:0.4.1
           imagePullPolicy: Never
           ports:
             - containerPort: 3000

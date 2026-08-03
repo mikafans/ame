@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.0.0",
+  "contractVersion": "1.1.0",
   "title": "AME learning contract",
   "purpose": "The public rules that keep learner state, source-backed material, and agent actions trustworthy.",
   "audiences": [
@@ -74,6 +74,10 @@
     {
       "id": "catalog-is-not-a-progress-claim",
       "requirement": "Selecting a reviewed catalog journey may create a learner-owned starting point, but it does not claim that the learner completed, understood, or retained its material."
+    },
+    {
+      "id": "content-wire-convention",
+      "requirement": "Agent-authored content JSON object keys use lower camelCase, including nested fields. Content fields include keyPoints, altText, and correctOptionId; snake_case aliases are not accepted."
     }
   ],
   "verificationScenarios": [

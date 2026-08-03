@@ -14,6 +14,7 @@ export interface AuthUser {
   displayName: string;
   email?: string;
   role: string;
+  plan: "free" | "premium";
 }
 
 interface AuthContextType {

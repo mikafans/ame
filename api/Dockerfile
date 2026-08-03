@@ -24,6 +24,9 @@ COPY crates ./crates
 # Migrations are embedded into the binary via sqlx::migrate!, so they must be
 # present at compile time (resolved as ../db/migrations relative to the crate).
 COPY db/migrations ./db/migrations
+# Public agent contracts are embedded into the API so the runtime image serves
+# the exact documents it was built and tested with.
+COPY docs/public ./docs/public
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release -p ame-api --bin ame-api
 

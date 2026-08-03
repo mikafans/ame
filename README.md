@@ -46,7 +46,7 @@ up on its own.
 
 ### Admin users
 
-Registration only ever grants the `user` role — there is no API path to self-register
+Registration only ever grants the `learner` role — there is no API path to self-register
 as an admin (`POST /public/v1/auth/register` rejects `role: admin`). The seeded
 `admin@example.com` account above is already an admin. To promote a different,
 already-registered account **directly in the database**:
@@ -146,8 +146,8 @@ make db-down
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the next release: **v0.4.0 —
-agent-authored courses**. The 0.3.0 foundation supplies the durable learner
+[`CHANGELOG.md`](CHANGELOG.md) records the current release: **v0.4.1**.
+The 0.4.0 agent-authored course release supplies the durable learner
 API, assessment, evidence, provenance, and self-hosted stack. 0.4.0 makes
 those primitives usable by agents to assemble, validate, publish, and adapt
 real source-grounded courses, proven with complete Flink and Netty

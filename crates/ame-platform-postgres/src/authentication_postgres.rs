@@ -50,7 +50,7 @@ impl PgAuthenticationRepository {
         let row = sqlx::query(
             r#"
             SELECT d.id, d.token_hash, d.revoked_at, d.expires_at,
-                   u.id AS user_id, u.email, u.display_name, u.role, u.status,
+                   u.id AS user_id, u.email, u.display_name, u.role, u.plan, u.status,
                    human.status AS identity_status, human.created_at,
                    d.actor_identity_id, agent.status AS agent_status
             FROM tb_agent_delegations d
@@ -87,6 +87,7 @@ impl PgAuthenticationRepository {
         Ok(AuthenticatedPrincipal {
             user_id: row.get("user_id"),
             role: parse_role(row.get("role"))?,
+            plan: row.get("plan"),
             email: row.get("email"),
             display_name: row.get("display_name"),
             created_at: row.get("created_at"),
@@ -110,7 +111,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
             r#"
             SELECT s.id, s.token_hash, s.revoked_at, s.expires_at,
                    u.id AS user_id, u.email, u.display_name,
-                   u.role, u.status, i.status AS identity_status, i.created_at
+                   u.role, u.plan, u.status, i.status AS identity_status, i.created_at
             FROM tb_login_sessions s
             JOIN tb_users u ON u.id = s.user_id
             JOIN tb_identities i ON i.id = u.id
@@ -135,6 +136,7 @@ impl AuthenticationRepository for PgAuthenticationRepository {
         Ok(AuthenticatedPrincipal {
             user_id: row.get("user_id"),
             role: parse_role(row.get("role"))?,
+            plan: row.get("plan"),
             email: row.get("email"),
             display_name: row.get("display_name"),
             created_at: row.get("created_at"),

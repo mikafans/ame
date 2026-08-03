@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
 import { Button } from "@/components/ui/button";
 
 type Note = {
@@ -24,12 +25,23 @@ export function ActivityNotes({
   const [body, setBody] = useState("");
   const [editing, setEditing] = useState<Note | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const result = await api.GET("/api/v1/notes", {
       params: { query: { journeyId, activityId } },
     });
-    if (result.response.ok && result.data) setNotes(result.data as Note[]);
+    if (result.response.ok && result.data) {
+      setNotes(result.data as Note[]);
+    } else {
+      setError(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not load your notes.",
+        ),
+      );
+    }
   }, [activityId, journeyId]);
 
   useEffect(() => {
@@ -39,6 +51,7 @@ export function ActivityNotes({
   async function save() {
     if (!body.trim()) return;
     setSaving(true);
+    setError(null);
     const result = editing
       ? await api.PATCH("/api/v1/notes/{id}", {
           params: { path: { id: editing.id } },
@@ -57,6 +70,14 @@ export function ActivityNotes({
       setBody("");
       setEditing(null);
       await reload();
+    } else {
+      setError(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not save this note.",
+        ),
+      );
     }
     setSaving(false);
   }
@@ -66,6 +87,14 @@ export function ActivityNotes({
       params: { path: { id } },
     });
     if (result.response.ok) await reload();
+    else
+      setError(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not delete this note.",
+        ),
+      );
   }
 
   return (
@@ -74,6 +103,11 @@ export function ActivityNotes({
       data-testid="activity-notes"
     >
       <h3 className="font-semibold">Private notes</h3>
+      {error && (
+        <p className="mt-2 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
       <p className="mt-1 text-xs text-muted-foreground">
         Anchored to content version {contentVersion}. Only you can read these.
       </p>

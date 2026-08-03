@@ -5,6 +5,36 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
 
+## [0.4.1] - 2026-08-03
+
+### Added
+
+- Runtime-served agent contracts at `/public/llms.txt`, `/public/skill.json`,
+  `/public/openapi.yaml`, and `/public/learning-contract.json`, with root
+  aliases for discovery clients.
+- Visible authenticated rate-limit status at `/api/v1/me/rate-limit`, standard
+  `X-RateLimit-*` response headers, and dynamic `Retry-After` guidance.
+- Free and VIP/Premium user plans, with admin-panel plan changes and separate
+  owner-scoped rate-limit tiers. Free defaults are 600 burst / 10 tokens per
+  second; Premium is 10x at 6000 / 100.
+
+### Fixed
+
+- Delegation handoff URLs now use the configured public origin or trusted
+  request forwarding headers instead of hardcoded `localhost:28800`.
+- `QuestionOption` and agent-authored content use the canonical lower camelCase
+  wire convention, including `isCorrect`, `keyPoints`, `altText`, and
+  `correctOptionId`; unknown content keys are rejected.
+- Public unauthenticated traffic remains a strict per-IP limiter, while
+  authenticated journey authoring uses the free/VIP owner bucket.
+
+### Breaking route documentation
+
+The 0.4 route split is explicit: authenticated endpoints are under
+`/api/v1/*`, unauthenticated endpoints are under `/public/v1/*`, and the old
+`/v1/*` surface is not supported. Reverse proxies must send both `/api/` and
+`/public/` to the API; discovery documents are served under `/public/`.
+
 ## [0.4.0] - 2026-08-03
 
 ### Added

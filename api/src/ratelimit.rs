@@ -1,6 +1,6 @@
 use crate::auth::extractor::AuthenticatedUser;
 use crate::http::AppState;
-use axum::extract::State;
+use axum::{extract::State, response::IntoResponse};
 use deadpool_redis::Pool;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -17,6 +17,11 @@ fn get_lua_script() -> &'static redis::Script {
             local rate = tonumber(ARGV[2])
             local cost = tonumber(ARGV[3])
             local now = tonumber(ARGV[4])
+
+            -- Fail closed if an invalid operator setting reaches Valkey.
+            if burst < 1 or rate <= 0 or cost < 0 then
+                return {0, 0, 60}
+            end
 
             local state = redis.call('HMGET', key, 'tokens', 'last_updated', 'burst')
             local tokens = tonumber(state[1])
@@ -40,12 +45,11 @@ fn get_lua_script() -> &'static redis::Script {
                 tokens = tokens - cost
                 redis.call('HMSET', key, 'tokens', tokens, 'last_updated', now, 'burst', burst)
                 redis.call('EXPIRE', key, 86400)
-                return 1
+                return {1, math.floor(tokens), math.ceil(math.max(0, 1 - tokens) / rate)}
             else
-                if old_burst and old_burst ~= burst then
-                    redis.call('HMSET', key, 'tokens', tokens, 'last_updated', now, 'burst', burst)
-                end
-                return 0
+                redis.call('HMSET', key, 'tokens', tokens, 'last_updated', now, 'burst', burst)
+                redis.call('EXPIRE', key, 86400)
+                return {0, math.floor(tokens), math.ceil((cost - tokens) / rate)}
             end
         "#,
         )
@@ -63,6 +67,27 @@ fn get_now_secs() -> f64 {
 pub struct RateLimiter {
     pool: Pool,
     fallback: Mutex<HashMap<String, FallbackBucket>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RateLimitSnapshot {
+    pub limit: u32,
+    pub remaining: u32,
+    pub reset_after_seconds: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConsumeResult {
+    pub allowed: bool,
+    pub snapshot: RateLimitSnapshot,
+}
+
+#[derive(Debug, Clone)]
+pub struct RequestLimit {
+    pub key: String,
+    pub burst: u32,
+    pub refill_rate: f64,
+    pub cost: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -90,12 +115,22 @@ impl RateLimiter {
         refill_rate: f64, // tokens per second
         cost: u32,
     ) -> bool {
+        self.consume(key, burst, refill_rate, cost).await.allowed
+    }
+
+    pub async fn consume(
+        &self,
+        key: &str,
+        burst: u32,
+        refill_rate: f64,
+        cost: u32,
+    ) -> ConsumeResult {
         let now = get_now_secs();
 
         match self.pool.get().await {
             Ok(mut conn) => {
                 let script = get_lua_script();
-                let res: Result<i32, redis::RedisError> = script
+                let res: Result<(i32, i64, i64), redis::RedisError> = script
                     .key(key)
                     .arg(burst)
                     .arg(refill_rate)
@@ -105,14 +140,20 @@ impl RateLimiter {
                     .await;
 
                 match res {
-                    Ok(1) => true,
-                    Ok(_) => false,
+                    Ok((allowed, remaining, reset_after_seconds)) => ConsumeResult {
+                        allowed: allowed == 1,
+                        snapshot: RateLimitSnapshot {
+                            limit: burst,
+                            remaining: remaining.max(0) as u32,
+                            reset_after_seconds: reset_after_seconds.max(0) as u64,
+                        },
+                    },
                     Err(e) => {
                         tracing::error!(
                             "Valkey Lua script execution failed: {:?}. Falling back to in-memory.",
                             e
                         );
-                        self.try_consume_fallback(key, burst, refill_rate, cost)
+                        self.consume_fallback(key, burst, refill_rate, cost)
                     }
                 }
             }
@@ -121,12 +162,22 @@ impl RateLimiter {
                     "Failed to get connection from Valkey pool: {:?}. Falling back to in-memory.",
                     e
                 );
-                self.try_consume_fallback(key, burst, refill_rate, cost)
+                self.consume_fallback(key, burst, refill_rate, cost)
             }
         }
     }
 
-    fn try_consume_fallback(&self, key: &str, burst: u32, refill_rate: f64, cost: u32) -> bool {
+    pub async fn inspect(&self, key: &str, burst: u32, refill_rate: f64) -> RateLimitSnapshot {
+        self.consume(key, burst, refill_rate, 0).await.snapshot
+    }
+
+    fn consume_fallback(
+        &self,
+        key: &str,
+        burst: u32,
+        refill_rate: f64,
+        cost: u32,
+    ) -> ConsumeResult {
         let mut fallback = self
             .fallback
             .lock()
@@ -146,12 +197,100 @@ impl RateLimiter {
         bucket.tokens = (burst_f).min(bucket.tokens + elapsed * refill_rate);
         bucket.last_updated = now;
 
-        if bucket.tokens >= cost_f {
+        let allowed = bucket.tokens >= cost_f;
+        if allowed {
             bucket.tokens -= cost_f;
-            true
-        } else {
-            false
         }
+
+        let remaining = bucket.tokens.floor().max(0.0) as u32;
+        let reset_after_seconds = if bucket.tokens >= cost_f {
+            if bucket.tokens >= 1.0 || refill_rate <= 0.0 {
+                0
+            } else {
+                ((1.0 - bucket.tokens) / refill_rate).ceil() as u64
+            }
+        } else if refill_rate <= 0.0 {
+            u64::MAX
+        } else {
+            ((cost_f - bucket.tokens) / refill_rate).ceil() as u64
+        };
+        ConsumeResult {
+            allowed,
+            snapshot: RateLimitSnapshot {
+                limit: burst,
+                remaining,
+                reset_after_seconds,
+            },
+        }
+    }
+}
+
+pub fn authenticated_request_limit(
+    state: &AppState,
+    auth: &AuthenticatedUser,
+    method: &axum::http::Method,
+    path: &str,
+) -> RequestLimit {
+    let tier = if auth.user.plan == "premium" {
+        &state.config.ratelimit.premium
+    } else {
+        &state.config.ratelimit.free
+    };
+    let is_read = matches!(
+        method,
+        &axum::http::Method::GET | &axum::http::Method::HEAD | &axum::http::Method::OPTIONS
+    );
+    let base_cost = if is_read {
+        state.config.ratelimit.cost.read
+    } else {
+        state.config.ratelimit.cost.write
+    };
+    let cost = authenticated_request_cost(path, base_cost);
+    RequestLimit {
+        key: format!("ame:limiter:owner:{}", auth.owner_id),
+        burst: tier.burst,
+        refill_rate: tier.rate as f64,
+        cost,
+    }
+}
+
+fn apply_headers(response: &mut axum::response::Response, snapshot: RateLimitSnapshot) {
+    let too_many_requests = response.status() == axum::http::StatusCode::TOO_MANY_REQUESTS;
+    let headers = response.headers_mut();
+    headers.insert(
+        "x-ratelimit-limit",
+        snapshot
+            .limit
+            .to_string()
+            .parse()
+            .expect("valid rate limit"),
+    );
+    headers.insert(
+        "x-ratelimit-remaining",
+        snapshot
+            .remaining
+            .to_string()
+            .parse()
+            .expect("valid rate limit"),
+    );
+    headers.insert(
+        "x-ratelimit-reset",
+        snapshot
+            .reset_after_seconds
+            .to_string()
+            .parse()
+            .expect("valid rate limit"),
+    );
+    if too_many_requests {
+        headers.insert(
+            "retry-after",
+            snapshot
+                .reset_after_seconds
+                .max(1)
+                .to_string()
+                .parse()
+                .expect("valid retry-after"),
+        );
     }
 }
 
@@ -169,49 +308,49 @@ pub async fn rate_limit_middleware(
     let method = req.method().clone();
     let trusted_proxies = state.config.ratelimit.trusted_proxies.unwrap_or(1);
 
-    let (key, burst, refill_rate, cost) = if let Some(auth) = auth {
-        let key = format!("ame:limiter:owner:{}", auth.owner_id);
+    let request_limit = if let Some(auth) = auth {
         // Prefer the operator-tunable tiers resolved by the maintenance
         // middleware (stashed in extensions); fall back to config if absent.
-        let free = req
-            .extensions()
-            .get::<crate::settings::EffectiveSettings>()
-            .map(|s| (s.ratelimit.free.burst, s.ratelimit.free.rate))
-            .unwrap_or((
-                state.config.ratelimit.free.burst,
-                state.config.ratelimit.free.rate,
-            ));
-        // The clean baseline has no account-plan column. Local policy is the
-        // single rate-limit authority for every actor.
-        let (burst, rate) = (free.0, free.1 as f64);
-        let is_read = matches!(
-            method,
-            axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS
-        );
-        let base_cost = if is_read {
-            state.config.ratelimit.cost.read
-        } else {
-            state.config.ratelimit.cost.write
-        };
-        let cost = authenticated_request_cost(path, base_cost);
-        (key, burst, rate, cost)
+        let mut request_limit = authenticated_request_limit(&state, auth, &method, path);
+        if let Some(settings) = req.extensions().get::<crate::settings::EffectiveSettings>() {
+            let tier = if auth.user.plan == "premium" {
+                &settings.ratelimit.premium
+            } else {
+                &settings.ratelimit.free
+            };
+            request_limit.burst = tier.burst;
+            request_limit.refill_rate = tier.rate as f64;
+        }
+        request_limit
     } else {
         let ip = get_client_ip(&req, trusted_proxies);
-        let key = public_rate_limit_key(path, &ip);
-        let burst = state.config.ratelimit.public.burst;
-        let refill_rate = 1.0 / (state.config.ratelimit.public.period_secs as f64);
-        (key, burst, refill_rate, 1)
+        let public_period_secs = state.config.ratelimit.public.period_secs.max(1);
+        RequestLimit {
+            key: public_rate_limit_key(path, &ip),
+            burst: state.config.ratelimit.public.burst,
+            refill_rate: 1.0 / (public_period_secs as f64),
+            cost: 1,
+        }
     };
 
-    if state
+    let result = state
         .limiter
-        .try_consume(&key, burst, refill_rate, cost)
-        .await
-    {
-        Ok(next.run(req).await)
+        .consume(
+            &request_limit.key,
+            request_limit.burst,
+            request_limit.refill_rate,
+            request_limit.cost,
+        )
+        .await;
+    if result.allowed {
+        let mut response = next.run(req).await;
+        apply_headers(&mut response, result.snapshot);
+        Ok(response)
     } else {
         metrics::counter!("ratelimit_rejection_total").increment(1);
-        Err(crate::domain::error::ApiError::TooManyRequests)
+        let mut response = crate::domain::error::ApiError::TooManyRequests.into_response();
+        apply_headers(&mut response, result.snapshot);
+        Ok(response)
     }
 }
 

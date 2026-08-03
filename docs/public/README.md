@@ -17,9 +17,9 @@ The command creates only disposable learner-origin data and prints the journey
 URL plus a non-secret login email; it never stores or prints the password.
 
 Build and runtime projections must consume these files; do not create parallel
-copies under `api/`, `deploy/`, or `web/`. The Compose Caddy container and the
-reference Kubernetes Caddy sidecar serve the three machine-readable documents
-directly from `docs/public`; the API has no runtime handlers for these
-documents.
+copies under `api/`, `deploy/`, or `web/`. The API image embeds these documents
+and serves them at runtime; a front proxy may serve the same checked-in files
+directly, but must preserve the `/public/` paths and keep `/api/` and
+`/public/v1/` routed to the API.
 
 Regenerate generated public documents with `make public-docs`.

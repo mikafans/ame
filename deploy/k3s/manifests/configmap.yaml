@@ -21,6 +21,7 @@ data:
     # is active (auth.rs gates both on this). NOTE: Secure cookies will NOT ride
     # plain-HTTP Tailscale access anymore — reach the app via the HTTPS hostname.
     production = true
+    public_base_url = "https://ame.azusachino.icu"
     # Behind the ame-platform front door the browser is same-origin, so this is
     # only a backstop for any non-proxied caller; point it at the public origin.
     cors_origins = "https://ame.azusachino.icu"
@@ -38,12 +39,15 @@ data:
     trusted_proxies = 2
 
     [ratelimit.free]
-    burst = 60
-    rate = 1
-
-    [ratelimit.premium]
+    # A journey authoring flow can span dozens of writes. Keep the free
+    # account practical while retaining a finite owner-scoped bucket.
     burst = 600
     rate = 10
+
+    [ratelimit.premium]
+    # Premium is exactly 10x the free tier for both burst and refill.
+    burst = 6000
+    rate = 100
 
     [ratelimit.public]
     burst = 10

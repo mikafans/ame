@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
 import { Button } from "@/components/ui/button";
 
 export function PortabilityPanel({
@@ -18,7 +19,13 @@ export function PortabilityPanel({
       params: { path: { id: journeyId } },
     });
     if (!result.response.ok || !result.data) {
-      setMessage("Could not export this journey.");
+      setMessage(
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Could not export this journey.",
+        ),
+      );
       return;
     }
     const serialized = JSON.stringify(result.data, null, 2);
@@ -45,7 +52,11 @@ export function PortabilityPanel({
     });
     if (!result.response.ok || !result.data) {
       setMessage(
-        "Import rejected: check owner, checksum, schema, and conflicts.",
+        responseErrorMessage(
+          result.response,
+          result.error,
+          "Import rejected: check owner, checksum, schema, and conflicts.",
+        ),
       );
       return;
     }

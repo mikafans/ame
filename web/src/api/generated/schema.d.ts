@@ -872,6 +872,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/rate-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the current authenticated learner rate-limit bucket without consuming
+         *     an additional request from it.
+         */
+        get: operations["get_rate_limit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notes": {
         parameters: {
             query?: never;
@@ -2173,6 +2193,7 @@ export interface components {
             email?: string | null;
             /** Format: uuid */
             id: string;
+            plan: string;
             role: components["schemas"]["Role"];
         };
         NativeJourneyCatalogResponse: {
@@ -2228,6 +2249,7 @@ export interface components {
         /** @enum {string} */
         ObjectiveStatus: "active" | "paused" | "completed";
         PatchUserAdminBody: {
+            plan?: string | null;
             role?: string | null;
             status?: string | null;
         };
@@ -2267,7 +2289,7 @@ export interface components {
         QuestionKind: "multiple_choice" | "true_false" | "short_answer" | "numeric" | "essay" | "code";
         QuestionOption: {
             id: string;
-            is_correct: boolean;
+            isCorrect: boolean;
             text: string;
         };
         QuestionResponse: {
@@ -2294,6 +2316,17 @@ export interface components {
         RateLimitSettings: {
             free: components["schemas"]["TierLimit"];
             premium: components["schemas"]["TierLimit"];
+        };
+        RateLimitStatusResponse: {
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            remaining: number;
+            /** Format: int32 */
+            requestCost: number;
+            /** Format: int64 */
+            resetAfterSeconds: number;
+            tier: string;
         };
         RateReviewBody: {
             rating: components["schemas"]["ReviewRating"];
@@ -2623,6 +2656,7 @@ export interface components {
             email?: string | null;
             /** Format: uuid */
             id: string;
+            plan: string;
             role: components["schemas"]["Role"];
             status: components["schemas"]["UserStatus"];
         };
@@ -2631,6 +2665,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
+            plan: string;
             role: string;
         };
         /** @enum {string} */
@@ -4460,6 +4495,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_rate_limit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current learner rate-limit bucket */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateLimitStatusResponse"];
                 };
             };
             /** @description Unauthorized */
