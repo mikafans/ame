@@ -64,6 +64,7 @@ export default function LearningHomePage() {
     return (
       <CourseLibrary
         courses={courses}
+        nativeJourneys={nativeJourneys}
         selectedCollection={selectedCollection}
         setSelectedCollection={setSelectedCollection}
       />
@@ -75,10 +76,12 @@ export default function LearningHomePage() {
 
 function CourseLibrary({
   courses,
+  nativeJourneys,
   selectedCollection,
   setSelectedCollection,
 }: {
   courses: Course[];
+  nativeJourneys: NativeJourney[];
   selectedCollection: "in-progress" | "completed";
   setSelectedCollection: (collection: "in-progress" | "completed") => void;
 }) {
@@ -92,12 +95,19 @@ function CourseLibrary({
       data-testid="course-library"
     >
       <header className="max-w-3xl">
-        <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
-          My learning
-        </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">
-          Continue where you left off.
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+              My learning
+            </p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">
+              Continue where you left off.
+            </h1>
+          </div>
+          <Button asChild className="rounded-full" variant="outline">
+            <Link href="/agent">Start a new course</Link>
+          </Button>
+        </div>
         <p className="mt-3 leading-7 text-muted-foreground">
           Each course has its own next step, progress, and reviewed sources.
         </p>
@@ -133,6 +143,9 @@ function CourseLibrary({
             : "No completed courses yet."
         }
       />
+      {nativeJourneys.length > 0 && (
+        <ReviewedStartingPaths nativeJourneys={nativeJourneys} />
+      )}
     </main>
   );
 }
@@ -260,49 +273,59 @@ function EmptyCourseLibrary({
           <Link href="/agent">How an agent sets up a course</Link>
         </Button>
       </section>
-      <section>
-        <div className="flex items-center gap-3">
-          <LibraryBig className="size-5 text-primary" />
-          <div>
-            <h2 className="text-xl font-semibold">Reviewed starting paths</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              These are optional starting points, not another learner's course.
-            </p>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {nativeJourneys.map((journey) => (
-            <article
-              className="border border-border bg-card p-5"
-              key={journey.id}
-            >
-              <p className="font-mono text-xs uppercase tracking-[0.12em] text-primary">
-                {journey.id}
-              </p>
-              <h3 className="mt-2 text-lg font-semibold">{journey.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {journey.description}
-              </p>
-              <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <Clock3 className="size-3.5" /> About {journey.estimatedMinutes}{" "}
-                minutes
-              </p>
-              <Button
-                asChild
-                className="mt-5 rounded-full"
-                size="sm"
-                variant="outline"
-              >
-                <Link
-                  href={`/start?catalogId=${encodeURIComponent(journey.id)}`}
-                >
-                  Start this path <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            </article>
-          ))}
-        </div>
-      </section>
+      {nativeJourneys.length > 0 && (
+        <ReviewedStartingPaths nativeJourneys={nativeJourneys} />
+      )}
     </main>
+  );
+}
+
+function ReviewedStartingPaths({
+  nativeJourneys,
+}: {
+  nativeJourneys: NativeJourney[];
+}) {
+  return (
+    <section>
+      <div className="flex items-center gap-3">
+        <LibraryBig className="size-5 text-primary" />
+        <div>
+          <h2 className="text-xl font-semibold">Reviewed starting paths</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            These are optional starting points, not another learner's course.
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {nativeJourneys.map((journey) => (
+          <article
+            className="border border-border bg-card p-5"
+            key={journey.id}
+          >
+            <p className="font-mono text-xs uppercase tracking-[0.12em] text-primary">
+              {journey.id}
+            </p>
+            <h3 className="mt-2 text-lg font-semibold">{journey.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {journey.description}
+            </p>
+            <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock3 className="size-3.5" /> About {journey.estimatedMinutes}{" "}
+              minutes
+            </p>
+            <Button
+              asChild
+              className="mt-5 rounded-full"
+              size="sm"
+              variant="outline"
+            >
+              <Link href={`/start?catalogId=${encodeURIComponent(journey.id)}`}>
+                Start this path <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
