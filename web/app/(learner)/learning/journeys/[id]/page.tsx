@@ -673,13 +673,19 @@ export default function LearningJourneyPage() {
       if (cancelled) return;
       setLearnerViewLoaded(true);
       if (!viewResult.response.ok || !viewResult.data) {
-        setError(
-          responseErrorMessage(
-            viewResult.response,
-            viewResult.error,
-            "Could not load the learner view",
-          ),
-        );
+        // 404 here just means this journey has no published course revision
+        // (e.g. a catalog/prompt-bootstrapped journey, not the agent-authored
+        // course workflow) — that's the expected legacy-outline path below,
+        // not an error worth showing the learner.
+        if (viewResult.response.status !== 404) {
+          setError(
+            responseErrorMessage(
+              viewResult.response,
+              viewResult.error,
+              "Could not load the learner view",
+            ),
+          );
+        }
         return;
       }
       setLearnerView(viewResult.data);

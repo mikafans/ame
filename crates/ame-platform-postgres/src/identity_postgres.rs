@@ -23,11 +23,17 @@ impl PgIdentityRepository {
 #[async_trait]
 impl IdentityRepository for PgIdentityRepository {
     async fn get_learner(&self, user_id: Uuid) -> Result<LearnerAccount, IdentityRepositoryError> {
+        // Looks up by id only (not role = 'learner'): this is also the lookup
+        // behind resuming an existing authenticated user's onboarding/start
+        // call and issuing their session, and an admin account is still a
+        // valid owner of learner data (e.g. a self-host operator using their
+        // own instance). Excluding admins here previously made
+        // "Start this path" 500 for any admin account.
         sqlx::query(
             r#"
             SELECT id, email_canonical, display_name, status, created_at
             FROM tb_users
-            WHERE id = $1 AND role = 'learner'
+            WHERE id = $1
             "#,
         )
         .bind(user_id)
