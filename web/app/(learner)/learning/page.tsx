@@ -8,6 +8,7 @@ import {
   Clock3,
   Compass,
   LibraryBig,
+  Plus,
 } from "lucide-react";
 import { api, publicApi } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
@@ -94,23 +95,27 @@ function CourseLibrary({
       className="mx-auto max-w-5xl space-y-10 py-4"
       data-testid="course-library"
     >
-      <header className="max-w-3xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
-              My learning
-            </p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight">
-              Continue where you left off.
-            </h1>
-          </div>
-          <Button asChild className="rounded-full" variant="outline">
-            <Link href="/agent">Start a new course</Link>
-          </Button>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            My learning
+          </p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">
+            Continue where you left off.
+          </h1>
+          <p className="mt-3 leading-7 text-muted-foreground">
+            Each course has its own next step, progress, and reviewed sources.
+          </p>
         </div>
-        <p className="mt-3 leading-7 text-muted-foreground">
-          Each course has its own next step, progress, and reviewed sources.
-        </p>
+        <Button
+          asChild
+          className="shrink-0 gap-1.5 rounded-full px-5 py-3 font-bold shadow-[4px_4px_0_hsl(var(--primary)/0.3)]"
+        >
+          <Link href="/agent">
+            <Plus className="size-4" />
+            Start a new course
+          </Link>
+        </Button>
       </header>
       <div
         className="border-b border-border"
