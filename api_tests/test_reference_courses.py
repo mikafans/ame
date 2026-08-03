@@ -740,3 +740,93 @@ def test_reference_courses_publish_and_adapt_after_weak_evidence(client, course)
         built["headers"],
     )
     assert learner_after_fork["activities"][0]["id"] == built["first"]["id"]
+
+
+def test_learner_views_are_published_course_scoped_and_owner_scoped(client):
+    headers = register_author(client, COURSES[0])
+    flink = build_reference_course(client, COURSES[0], headers)
+    netty = build_reference_course(client, COURSES[1], headers)
+    draft_reference = source_reference(client, headers, COURSES[0])
+    draft = request(
+        client,
+        "post",
+        "/api/v1/learning/courses",
+        headers,
+        json={
+            "rawIntent": "Draft course must not enter a learner library.",
+            "idempotencyKey": f"draft-learner-view-{uuid.uuid4()}",
+            "brief": {
+                "title": "Unpublished draft course",
+                "audience": "Test learner",
+                "estimatedMinutes": 30,
+                "prerequisites": [],
+                "outcomes": ["Inspect publication boundaries"],
+                "modules": ["Draft module"],
+            },
+            "sourceReferences": [draft_reference],
+        },
+    )
+
+    library = request(client, "get", "/api/v1/learning/courses", headers)
+    assert [course["journeyId"] for course in library] == [
+        netty["journeyId"],
+        flink["journeyId"],
+    ]
+    assert library[0]["title"] == COURSES[1]["title"]
+    assert library[0]["progress"] == {"completed": 0, "total": 10}
+    assert library[0]["next"]["activityId"] == netty["first"]["id"]
+
+    shell = request(
+        client,
+        "get",
+        f"/api/v1/learning/journeys/{netty['journeyId']}/learner-view",
+        headers,
+    )
+    assert shell["publishedRevisionId"] == netty["revisionId"]
+    assert shell["tabs"] == ["learn", "course", "progress", "resources"]
+    assert shell["next"]["activityId"] == netty["first"]["id"]
+
+    course = request(
+        client,
+        "get",
+        f"/api/v1/learning/journeys/{netty['journeyId']}/course",
+        headers,
+    )
+    assert course["title"] == COURSES[1]["title"]
+    assert [module["title"] for module in course["modules"]] == [
+        module["title"] for module in COURSES[1]["modules"]
+    ]
+    assert all(module["completion"] == {"completed": 0, "total": 2} for module in course["modules"])
+
+    progress = request(
+        client,
+        "get",
+        f"/api/v1/learning/journeys/{netty['journeyId']}/progress-view",
+        headers,
+    )
+    assert progress["attempts"] == []
+    assert all(outcome["evidenceStatus"] == "not_assessed_yet" for outcome in progress["outcomes"])
+
+    resources = request(
+        client,
+        "get",
+        f"/api/v1/learning/journeys/{netty['journeyId']}/resources",
+        headers,
+    )
+    assert len(resources["sources"]) == 1
+    assert resources["sources"][0]["locator"] == f"reference://{COURSES[1]['slug']}/course-notes.txt"
+    assert "content" not in resources["sources"][0]
+    assert "contentSha256" not in resources["sources"][0]
+
+    draft_view = client.get(
+        f"/api/v1/learning/journeys/{draft['journeyId']}/learner-view",
+        headers=headers,
+    )
+    assert draft_view.status_code == 404, draft_view.text
+
+    other_headers = register_author(client, COURSES[0])
+    forbidden = client.get(
+        f"/api/v1/learning/journeys/{netty['journeyId']}/learner-view",
+        headers=other_headers,
+    )
+    assert forbidden.status_code == 404, forbidden.text

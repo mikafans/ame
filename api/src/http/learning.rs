@@ -200,9 +200,189 @@ pub struct LearningJourneySummaryResponse {
     pub created_at: OffsetDateTime,
 }
 
+/// A published course available to the signed-in learner. This deliberately
+/// excludes draft and review revisions: authors can inspect those through the
+/// authoring API, but they are never learner material.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerCourseSummaryResponse {
+    pub journey_id: Uuid,
+    pub title: String,
+    pub goal: String,
+    pub status: String,
+    #[serde(with = "time::serde::rfc3339::option")]
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub last_learning_at: Option<OffsetDateTime>,
+    pub progress: LearnerCompletionResponse,
+    pub current_module: Option<LearnerModuleReferenceResponse>,
+    pub next: Option<LearnerNextActivityResponse>,
+    pub review: LearnerReviewSummaryResponse,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerCompletionResponse {
+    pub completed: u32,
+    pub total: u32,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerModuleReferenceResponse {
+    pub id: Uuid,
+    pub title: String,
+    pub position: i32,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerNextActivityResponse {
+    pub activity_id: Uuid,
+    pub title: String,
+    pub estimated_minutes: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerReviewSummaryResponse {
+    pub due_count: u32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerViewResponse {
+    pub journey_id: Uuid,
+    pub title: String,
+    pub status: String,
+    pub published_revision_id: Uuid,
+    pub tabs: Vec<String>,
+    pub next: Option<LearnerNextActivityResponse>,
+    pub course_url: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerCourseResponse {
+    pub journey_id: Uuid,
+    pub title: String,
+    pub goal: String,
+    pub promise: String,
+    pub audience: Option<String>,
+    pub estimated_minutes: Option<u32>,
+    pub prerequisites: Vec<String>,
+    pub outcomes: Vec<LearnerOutcomeResponse>,
+    pub modules: Vec<LearnerModuleResponse>,
+    pub publication: LearnerPublicationResponse,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerOutcomeResponse {
+    pub id: Uuid,
+    pub statement: String,
+    pub success_criteria: String,
+    pub position: i32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerModuleResponse {
+    pub id: Uuid,
+    pub title: String,
+    pub summary: String,
+    pub position: i32,
+    pub activity_kinds: Vec<ActivityKind>,
+    pub completion: LearnerCompletionResponse,
+    pub state: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerPublicationResponse {
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub published_at: OffsetDateTime,
+    pub reviewed: bool,
+    pub source_reviewed: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerProgressViewResponse {
+    pub journey_id: Uuid,
+    pub outcomes: Vec<LearnerProgressOutcomeResponse>,
+    pub attempts: Vec<LearnerAttemptSummaryResponse>,
+    pub due_reviews: Vec<LearnerDueReviewResponse>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerProgressOutcomeResponse {
+    pub objective_id: Uuid,
+    pub statement: String,
+    pub evidence_count: u32,
+    pub evidence_status: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerAttemptSummaryResponse {
+    pub id: Uuid,
+    pub activity_id: Uuid,
+    pub activity_title: String,
+    pub status: String,
+    pub score: Option<f32>,
+    pub max_score: Option<f32>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerDueReviewResponse {
+    pub id: Uuid,
+    pub activity_id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
+    #[schema(value_type = String, format = DateTime)]
+    pub due_at: OffsetDateTime,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerResourcesResponse {
+    pub journey_id: Uuid,
+    pub sources: Vec<LearnerResourceResponse>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerResourceResponse {
+    pub title: String,
+    pub locator: String,
+    pub quote: String,
+    pub relevance: String,
+    pub grounding_status: String,
+    pub license_status: String,
+    pub license_name: Option<String>,
+    pub license_url: Option<String>,
+    pub activity_ids: Vec<Uuid>,
+}
+
 pub fn router(state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/v1/learning/courses", get(list_learner_courses))
         .route("/v1/learning/journeys", get(list_journeys))
+        .route(
+            "/v1/learning/journeys/{id}/learner-view",
+            get(get_learner_view),
+        )
+        .route("/v1/learning/journeys/{id}/course", get(get_learner_course))
+        .route(
+            "/v1/learning/journeys/{id}/progress-view",
+            get(get_learner_progress_view),
+        )
+        .route(
+            "/v1/learning/journeys/{id}/resources",
+            get(get_learner_resources),
+        )
         .route("/v1/learning/journeys/{id}", get(get_journey))
         .route(
             "/v1/learning/journeys/{journey_id}/objectives",
@@ -246,6 +426,484 @@ pub fn router(state: AppState) -> Router<AppState> {
             post(publish_activity),
         )
         .with_state(state)
+}
+
+#[derive(Debug)]
+struct PublishedLearnerCourse {
+    journey_id: Uuid,
+    revision_id: Uuid,
+    title: String,
+    goal: String,
+    promise: String,
+    status: String,
+    brief: Value,
+    source_references: Vec<Uuid>,
+    published_at: OffsetDateTime,
+    last_learning_at: Option<OffsetDateTime>,
+}
+
+/// GET /api/v1/learning/courses — the learner's published course library.
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/courses",
+    responses((status = 200, body = [LearnerCourseSummaryResponse])),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn list_learner_courses(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<Vec<LearnerCourseSummaryResponse>>, ApiError> {
+    let courses = load_published_learner_courses(&state.pool, auth.owner_id()).await?;
+    let mut response = Vec::with_capacity(courses.len());
+    for course in courses {
+        response.push(course_summary(&state.pool, auth.owner_id(), &course).await?);
+    }
+    Ok(Json(response))
+}
+
+/// GET /api/v1/learning/journeys/{id}/learner-view — stable selected-course shell.
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/journeys/{id}/learner-view",
+    params(("id" = Uuid, Path)),
+    responses((status = 200, body = LearnerViewResponse), (status = 404, description = "No published owned course")),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn get_learner_view(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<LearnerViewResponse>, ApiError> {
+    let course = load_published_learner_course(&state.pool, auth.owner_id(), journey_id).await?;
+    let summary = course_summary(&state.pool, auth.owner_id(), &course).await?;
+    Ok(Json(LearnerViewResponse {
+        journey_id,
+        title: course.title,
+        status: course.status,
+        published_revision_id: course.revision_id,
+        tabs: vec![
+            "learn".into(),
+            "course".into(),
+            "progress".into(),
+            "resources".into(),
+        ],
+        next: summary.next,
+        course_url: format!("/learning/journeys/{journey_id}"),
+    }))
+}
+
+/// GET /api/v1/learning/journeys/{id}/course — published learner syllabus.
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/journeys/{id}/course",
+    params(("id" = Uuid, Path)),
+    responses((status = 200, body = LearnerCourseResponse), (status = 404, description = "No published owned course")),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn get_learner_course(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<LearnerCourseResponse>, ApiError> {
+    let course = load_published_learner_course(&state.pool, auth.owner_id(), journey_id).await?;
+    let objectives = sqlx::query(
+        "SELECT id, statement, success_criteria, order_index FROM tb_journey_objectives WHERE course_revision_id = $1 AND subject_user_id = $2 ORDER BY order_index",
+    )
+    .bind(course.revision_id)
+    .bind(auth.owner_id())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?
+    .into_iter()
+    .map(|row| LearnerOutcomeResponse {
+        id: row.get("id"),
+        statement: row.get("statement"),
+        success_criteria: row.get("success_criteria"),
+        position: row.get("order_index"),
+    })
+    .collect();
+    let chapters = sqlx::query(
+        "SELECT id, title, summary, order_index FROM tb_journey_chapters WHERE course_revision_id = $1 AND subject_user_id = $2 ORDER BY order_index",
+    )
+    .bind(course.revision_id)
+    .bind(auth.owner_id())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?;
+    let mut modules = Vec::with_capacity(chapters.len());
+    let mut current_set = false;
+    for chapter in chapters {
+        let chapter_id: Uuid = chapter.get("id");
+        let activities = sqlx::query(
+            "SELECT kind, status FROM tb_activities WHERE chapter_id = $1 AND course_revision_id = $2 AND subject_user_id = $3 AND publication_status = 'published' ORDER BY order_index",
+        )
+        .bind(chapter_id)
+        .bind(course.revision_id)
+        .bind(auth.owner_id())
+        .fetch_all(&state.pool)
+        .await
+        .map_err(database_error)?;
+        let total = activities.len() as u32;
+        let completed = activities
+            .iter()
+            .filter(|activity| activity.get::<String, _>("status") == "completed")
+            .count() as u32;
+        let has_ready = activities.iter().any(|activity| {
+            matches!(
+                activity.get::<String, _>("status").as_str(),
+                "ready" | "in_progress"
+            )
+        });
+        let state = if total > 0 && completed == total {
+            "completed"
+        } else if !current_set && (has_ready || completed < total) {
+            current_set = true;
+            "current"
+        } else if has_ready {
+            "ready"
+        } else {
+            "planned"
+        };
+        modules.push(LearnerModuleResponse {
+            id: chapter_id,
+            title: chapter.get("title"),
+            summary: chapter.get("summary"),
+            position: chapter.get("order_index"),
+            activity_kinds: activities
+                .iter()
+                .filter_map(|activity| {
+                    serde_json::from_value(Value::String(activity.get("kind"))).ok()
+                })
+                .collect(),
+            completion: LearnerCompletionResponse { completed, total },
+            state: state.into(),
+        });
+    }
+    Ok(Json(LearnerCourseResponse {
+        journey_id,
+        title: course.title,
+        goal: course.goal,
+        promise: course.promise,
+        audience: course
+            .brief
+            .get("audience")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        estimated_minutes: course
+            .brief
+            .get("estimatedMinutes")
+            .and_then(Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok()),
+        prerequisites: string_array(&course.brief, "prerequisites"),
+        outcomes: objectives,
+        modules,
+        publication: LearnerPublicationResponse {
+            published_at: course.published_at,
+            reviewed: true,
+            source_reviewed: !course.source_references.is_empty(),
+        },
+    }))
+}
+
+/// GET /api/v1/learning/journeys/{id}/progress-view — evidence first; no
+/// synthetic mastery value appears before recorded evidence exists.
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/journeys/{id}/progress-view",
+    params(("id" = Uuid, Path)),
+    responses((status = 200, body = LearnerProgressViewResponse), (status = 404, description = "No published owned course")),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn get_learner_progress_view(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<LearnerProgressViewResponse>, ApiError> {
+    let course = load_published_learner_course(&state.pool, auth.owner_id(), journey_id).await?;
+    let outcomes = sqlx::query(
+        "SELECT objective.id, objective.statement, COUNT(evidence.id)::bigint AS evidence_count FROM tb_journey_objectives objective LEFT JOIN tb_mastery_evidence evidence ON evidence.objective_id = objective.id AND evidence.subject_user_id = $2 AND evidence.journey_id = $3 WHERE objective.course_revision_id = $1 AND objective.subject_user_id = $2 GROUP BY objective.id, objective.statement, objective.order_index ORDER BY objective.order_index",
+    )
+    .bind(course.revision_id)
+    .bind(auth.owner_id())
+    .bind(journey_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?
+    .into_iter()
+    .map(|row| {
+        let evidence_count = row.get::<i64, _>("evidence_count") as u32;
+        LearnerProgressOutcomeResponse {
+            objective_id: row.get("id"),
+            statement: row.get("statement"),
+            evidence_count,
+            evidence_status: if evidence_count == 0 { "not_assessed_yet" } else { "evidence_recorded" }.into(),
+        }
+    })
+    .collect();
+    let attempts = sqlx::query(
+        "SELECT attempt.id, attempt.activity_id, activity.title AS activity_title, attempt.status, attempt.score::float4 AS score, attempt.max_score::float4 AS max_score FROM tb_attempts attempt JOIN tb_activities activity ON activity.id = attempt.activity_id WHERE attempt.subject_user_id = $1 AND activity.journey_id = $2 AND activity.course_revision_id = $3 ORDER BY attempt.created_at DESC",
+    )
+    .bind(auth.owner_id())
+    .bind(journey_id)
+    .bind(course.revision_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?
+    .into_iter()
+    .map(|row| LearnerAttemptSummaryResponse {
+        id: row.get("id"), activity_id: row.get("activity_id"), activity_title: row.get("activity_title"), status: row.get("status"), score: row.get("score"), max_score: row.get("max_score"),
+    })
+    .collect();
+    let due_reviews = sqlx::query(
+        "SELECT id, activity_id, due_at FROM tb_review_items WHERE subject_user_id = $1 AND journey_id = $2 AND due_at <= now() ORDER BY due_at",
+    )
+    .bind(auth.owner_id())
+    .bind(journey_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?
+    .into_iter()
+    .map(|row| LearnerDueReviewResponse { id: row.get("id"), activity_id: row.get("activity_id"), due_at: row.get("due_at") })
+    .collect();
+    Ok(Json(LearnerProgressViewResponse {
+        journey_id,
+        outcomes,
+        attempts,
+        due_reviews,
+    }))
+}
+
+/// GET /api/v1/learning/journeys/{id}/resources — course citation metadata,
+/// never imported document bytes or storage hashes.
+#[utoipa::path(
+    get,
+    path = "/api/v1/learning/journeys/{id}/resources",
+    params(("id" = Uuid, Path)),
+    responses((status = 200, body = LearnerResourcesResponse), (status = 404, description = "No published owned course")),
+    security(("bearer_auth" = [])),
+    tag = "learning"
+)]
+pub async fn get_learner_resources(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Path(journey_id): Path<Uuid>,
+) -> Result<Json<LearnerResourcesResponse>, ApiError> {
+    let course = load_published_learner_course(&state.pool, auth.owner_id(), journey_id).await?;
+    let rows = sqlx::query(
+        "SELECT citation.id, source.locator, citation.quote, citation.grounding_note, citation.grounding_status, citation.license_status, citation.license_name, citation.license_url FROM tb_citations citation JOIN tb_source_snapshots snapshot ON snapshot.id = citation.snapshot_id JOIN tb_sources source ON source.id = snapshot.source_id WHERE citation.subject_user_id = $1 AND citation.id = ANY($2)",
+    )
+    .bind(auth.owner_id())
+    .bind(&course.source_references)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?;
+    let activity_rows = sqlx::query(
+        "SELECT id, payload FROM tb_activities WHERE journey_id = $1 AND course_revision_id = $2 AND subject_user_id = $3 AND publication_status = 'published'",
+    )
+    .bind(journey_id)
+    .bind(course.revision_id)
+    .bind(auth.owner_id())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(database_error)?;
+    let sources = rows
+        .into_iter()
+        .map(|row| {
+            let citation_id: Uuid = row.get("id");
+            let citation_id = citation_id.to_string();
+            let activity_ids = activity_rows
+                .iter()
+                .filter_map(|activity| {
+                    let payload: Value = activity.get("payload");
+                    let references = payload
+                        .get("contentProvenance")?
+                        .get("sourceReferences")?
+                        .as_array()?;
+                    references
+                        .iter()
+                        .any(|reference| reference.as_str() == Some(&citation_id))
+                        .then(|| activity.get("id"))
+                })
+                .collect();
+            let locator: String = row.get("locator");
+            LearnerResourceResponse {
+                title: resource_title(&locator),
+                locator,
+                quote: row.get("quote"),
+                relevance: row.get("grounding_note"),
+                grounding_status: row.get("grounding_status"),
+                license_status: row.get("license_status"),
+                license_name: row.get("license_name"),
+                license_url: row.get("license_url"),
+                activity_ids,
+            }
+        })
+        .collect();
+    Ok(Json(LearnerResourcesResponse {
+        journey_id,
+        sources,
+    }))
+}
+
+async fn load_published_learner_courses(
+    pool: &PgPool,
+    subject_user_id: Uuid,
+) -> Result<Vec<PublishedLearnerCourse>, ApiError> {
+    let rows = sqlx::query(
+        "SELECT journey.id AS journey_id, revision.id AS revision_id, revision.brief, revision.source_references, revision.published_at, journey.promise, journey.status, goal.normalized_statement AS goal, latest.last_learning_at FROM tb_course_revisions revision JOIN tb_learning_journeys journey ON journey.id = revision.journey_id JOIN tb_learning_goals goal ON goal.id = journey.goal_id LEFT JOIN LATERAL (SELECT MAX(COALESCE(session.finished_at, session.started_at)) AS last_learning_at FROM tb_learning_sessions session WHERE session.subject_user_id = journey.subject_user_id AND session.journey_id = journey.id) latest ON TRUE WHERE revision.subject_user_id = $1 AND revision.status = 'published' ORDER BY latest.last_learning_at DESC NULLS LAST, journey.created_at DESC",
+    )
+    .bind(subject_user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(database_error)?;
+    rows.into_iter().map(published_course_row).collect()
+}
+
+async fn load_published_learner_course(
+    pool: &PgPool,
+    subject_user_id: Uuid,
+    journey_id: Uuid,
+) -> Result<PublishedLearnerCourse, ApiError> {
+    let row = sqlx::query(
+        "SELECT journey.id AS journey_id, revision.id AS revision_id, revision.brief, revision.source_references, revision.published_at, journey.promise, journey.status, goal.normalized_statement AS goal, latest.last_learning_at FROM tb_course_revisions revision JOIN tb_learning_journeys journey ON journey.id = revision.journey_id JOIN tb_learning_goals goal ON goal.id = journey.goal_id LEFT JOIN LATERAL (SELECT MAX(COALESCE(session.finished_at, session.started_at)) AS last_learning_at FROM tb_learning_sessions session WHERE session.subject_user_id = journey.subject_user_id AND session.journey_id = journey.id) latest ON TRUE WHERE revision.subject_user_id = $1 AND revision.journey_id = $2 AND revision.status = 'published'",
+    )
+    .bind(subject_user_id)
+    .bind(journey_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(database_error)?
+    .ok_or(ApiError::NotFound {
+        resource: "published learning course",
+    })?;
+    published_course_row(row)
+}
+
+fn published_course_row(row: sqlx::postgres::PgRow) -> Result<PublishedLearnerCourse, ApiError> {
+    let brief: Value = row.get("brief");
+    let title = brief
+        .get("title")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("published course lacks a title")))?
+        .to_owned();
+    let source_references: Vec<String> = serde_json::from_value(row.get("source_references"))
+        .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?;
+    let source_references = source_references
+        .into_iter()
+        .map(|reference| Uuid::parse_str(&reference))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?;
+    Ok(PublishedLearnerCourse {
+        journey_id: row.get("journey_id"),
+        revision_id: row.get("revision_id"),
+        title,
+        goal: row.get("goal"),
+        promise: row.get("promise"),
+        status: row.get("status"),
+        brief,
+        source_references,
+        published_at: row.get("published_at"),
+        last_learning_at: row.get("last_learning_at"),
+    })
+}
+
+async fn course_summary(
+    pool: &PgPool,
+    subject_user_id: Uuid,
+    course: &PublishedLearnerCourse,
+) -> Result<LearnerCourseSummaryResponse, ApiError> {
+    let counts = sqlx::query(
+        "SELECT COUNT(*)::bigint AS total, COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed FROM tb_activities WHERE course_revision_id = $1 AND subject_user_id = $2 AND publication_status = 'published'",
+    )
+    .bind(course.revision_id)
+    .bind(subject_user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(database_error)?;
+    let next_row = sqlx::query(
+        "SELECT id, title, payload FROM tb_activities WHERE course_revision_id = $1 AND subject_user_id = $2 AND publication_status = 'published' AND status IN ('ready', 'in_progress') ORDER BY order_index LIMIT 1",
+    )
+    .bind(course.revision_id)
+    .bind(subject_user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(database_error)?;
+    let next = next_row.map(|row| {
+        let payload: Value = row.get("payload");
+        LearnerNextActivityResponse {
+            activity_id: row.get("id"),
+            title: row.get("title"),
+            estimated_minutes: payload
+                .get("estimatedMinutes")
+                .or_else(|| payload.get("estimated_minutes"))
+                .and_then(Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok()),
+        }
+    });
+    let current_module = sqlx::query(
+        "SELECT chapter.id, chapter.title, chapter.order_index FROM tb_journey_chapters chapter WHERE chapter.course_revision_id = $1 AND chapter.subject_user_id = $2 AND EXISTS (SELECT 1 FROM tb_activities activity WHERE activity.chapter_id = chapter.id AND activity.course_revision_id = $1 AND activity.subject_user_id = $2 AND activity.publication_status = 'published' AND activity.status <> 'completed') ORDER BY chapter.order_index LIMIT 1",
+    )
+    .bind(course.revision_id)
+    .bind(subject_user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(database_error)?
+    .map(|row| LearnerModuleReferenceResponse {
+        id: row.get("id"), title: row.get("title"), position: row.get("order_index"),
+    });
+    let due_count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM tb_review_items WHERE subject_user_id = $1 AND journey_id = $2 AND due_at <= now()",
+    )
+    .bind(subject_user_id)
+    .bind(course.journey_id)
+    .fetch_one(pool)
+    .await
+    .map_err(database_error)? as u32;
+    Ok(LearnerCourseSummaryResponse {
+        journey_id: course.journey_id,
+        title: course.title.clone(),
+        goal: course.goal.clone(),
+        status: course.status.clone(),
+        last_learning_at: course.last_learning_at,
+        progress: LearnerCompletionResponse {
+            completed: counts.get::<i64, _>("completed") as u32,
+            total: counts.get::<i64, _>("total") as u32,
+        },
+        current_module,
+        next,
+        review: LearnerReviewSummaryResponse { due_count },
+    })
+}
+
+fn string_array(value: &Value, field: &str) -> Vec<String> {
+    value
+        .get(field)
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn resource_title(locator: &str) -> String {
+    locator
+        .rsplit('/')
+        .next()
+        .filter(|segment| !segment.is_empty())
+        .unwrap_or(locator)
+        .to_owned()
+}
+
+fn database_error(error: sqlx::Error) -> ApiError {
+    ApiError::Internal(anyhow::Error::new(error))
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
