@@ -3,6 +3,7 @@
 use crate::auth::token::verify_token_secret;
 use crate::domain::auth::{
     AuthenticatedPrincipal, AuthenticationRepository, AuthenticationRepositoryError, PrincipalRole,
+    PrincipalScope,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
@@ -36,6 +37,64 @@ impl PgAuthenticationRepository {
         .await
         .map_err(storage_error)?;
         Ok(())
+    }
+
+    /// Authenticate a bounded agent capability. Unlike login sessions this is
+    /// absolute-expiry only: use never renews its lifetime.
+    pub async fn authenticate_agent_delegation(
+        &self,
+        delegation_id: Uuid,
+        secret: &str,
+        now: OffsetDateTime,
+    ) -> Result<AuthenticatedPrincipal, AuthenticationRepositoryError> {
+        let row = sqlx::query(
+            r#"
+            SELECT d.id, d.token_hash, d.revoked_at, d.expires_at,
+                   u.id AS user_id, u.email, u.display_name, u.role, u.status,
+                   human.status AS identity_status, human.created_at,
+                   d.actor_identity_id, agent.status AS agent_status
+            FROM tb_agent_delegations d
+            JOIN tb_users u ON u.id = d.subject_user_id
+            JOIN tb_identities human ON human.id = u.id
+            JOIN tb_identities agent ON agent.id = d.actor_identity_id
+            WHERE d.id = $1 AND d.scope = 'course_author'
+            "#,
+        )
+        .bind(delegation_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?
+        .ok_or(AuthenticationRepositoryError::NotFound)?;
+
+        validate_credential(
+            row.get("token_hash"),
+            row.get("revoked_at"),
+            row.get("expires_at"),
+            secret,
+            now,
+        )?;
+        validate_owner_status(row.get("status"), row.get("identity_status"))?;
+        if row.get::<String, _>("agent_status") != "active" {
+            return Err(AuthenticationRepositoryError::OwnerInactive);
+        }
+        sqlx::query("UPDATE tb_agent_delegations SET last_used_at = $2 WHERE id = $1")
+            .bind(delegation_id)
+            .bind(now)
+            .execute(&self.pool)
+            .await
+            .map_err(storage_error)?;
+
+        Ok(AuthenticatedPrincipal {
+            user_id: row.get("user_id"),
+            role: parse_role(row.get("role"))?,
+            email: row.get("email"),
+            display_name: row.get("display_name"),
+            created_at: row.get("created_at"),
+            credential_id: delegation_id,
+            expires_at: row.get("expires_at"),
+            actor_identity_id: row.get("actor_identity_id"),
+            scope: PrincipalScope::CourseAuthor,
+        })
     }
 }
 
@@ -81,6 +140,8 @@ impl AuthenticationRepository for PgAuthenticationRepository {
             created_at: row.get("created_at"),
             credential_id: row.get("id"),
             expires_at: row.get("expires_at"),
+            actor_identity_id: row.get("user_id"),
+            scope: PrincipalScope::Learner,
         })
     }
 }

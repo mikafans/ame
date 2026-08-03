@@ -192,6 +192,7 @@ pub struct LearningJourneySummaryResponse {
     pub origin: JourneyOrigin,
     pub status: JourneyStatus,
     pub raw_intent: String,
+    pub goal: LearningGoalResponse,
     pub next_activity_id: Option<Uuid>,
     pub next_activity_title: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
@@ -351,7 +352,8 @@ pub async fn list_journeys(
             promise: journey.promise,
             origin: journey.origin,
             status: journey.status,
-            raw_intent: goal.raw_intent,
+            raw_intent: goal.raw_intent.clone(),
+            goal: goal_response(goal),
             next_activity_id: next_activity.as_ref().map(|activity| activity.id),
             next_activity_title: next_activity.map(|activity| activity.title),
             created_at: journey.created_at,
@@ -541,7 +543,7 @@ pub async fn create_activity(
             journey_id,
             course_revision_id: revision_id,
             subject_user_id: auth.owner_id(),
-            source_actor_id: auth.owner_id(),
+            source_actor_id: auth.actor_identity_id(),
             chapter_id: body.chapter_id,
             kind: body.kind,
             title: body.title,
@@ -836,18 +838,7 @@ pub async fn get_journey(
         origin: journey.origin,
         status: journey.status,
         created_at: journey.created_at,
-        goal: LearningGoalResponse {
-            id: goal.id,
-            subject_user_id: goal.subject_user_id,
-            source_actor_id: goal.source_actor_id,
-            template_version_id: goal.template_version_id,
-            catalog_entry_id: goal.catalog_entry_id,
-            catalog_entry_version: goal.catalog_entry_version,
-            raw_intent: goal.raw_intent,
-            normalized_statement: goal.normalized_statement,
-            status: goal.status,
-            created_at: goal.created_at,
-        },
+        goal: goal_response(goal),
         objectives: objectives.into_iter().map(objective_response).collect(),
         chapters: chapter_responses,
         ungrouped_activities: ungrouped_activities
@@ -857,6 +848,21 @@ pub async fn get_journey(
         activities: activity_responses,
         recommendation,
     }))
+}
+
+fn goal_response(goal: crate::domain::learning::LearningGoal) -> LearningGoalResponse {
+    LearningGoalResponse {
+        id: goal.id,
+        subject_user_id: goal.subject_user_id,
+        source_actor_id: goal.source_actor_id,
+        template_version_id: goal.template_version_id,
+        catalog_entry_id: goal.catalog_entry_id,
+        catalog_entry_version: goal.catalog_entry_version,
+        raw_intent: goal.raw_intent,
+        normalized_statement: goal.normalized_statement,
+        status: goal.status,
+        created_at: goal.created_at,
+    }
 }
 
 /// POST /api/v1/learning/journeys/{journey_id}/activities/{activity_id}/start — start or resume an activity session.

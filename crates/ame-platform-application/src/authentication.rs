@@ -78,6 +78,8 @@ impl AuthenticationRepository for InMemoryAuthenticationRepository {
             created_at: fixture.created_at,
             credential_id: fixture.credential_id,
             expires_at: fixture.expires_at,
+            actor_identity_id: fixture.user_id,
+            scope: ame_platform_domain::auth::PrincipalScope::Learner,
         })
     }
 }

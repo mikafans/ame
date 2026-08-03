@@ -14,16 +14,8 @@ test.describe("public documentation", () => {
       page.getByRole("link", { name: "Agent guide", exact: true }),
     ).toHaveAttribute("href", "/agent");
     await expect(
-      page.getByRole("link", { name: "Agent authoring guide", exact: true }),
-    ).toHaveAttribute("href", "/agent/guide");
-  });
-
-  test("rendered authoring guide is public", async ({ page }) => {
-    await page.goto("/agent/guide");
-    await expect(page).toHaveURL(/\/agent\/guide$/);
-    await expect(
-      page.getByRole("heading", { name: /Create a real course/ }),
-    ).toBeVisible();
+      page.getByRole("link", { name: "How agent setup works", exact: true }),
+    ).toHaveAttribute("href", "/agent");
   });
 
   test("agent guide is public and does not redirect to login", async ({

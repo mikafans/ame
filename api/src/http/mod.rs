@@ -41,6 +41,51 @@ pub async fn auth_extract_middleware(
     next.run(req).await
 }
 
+/// A `dlg_*` capability is intentionally useful for building a course, not for
+/// acting as the learner. New routes default to denied until explicitly added.
+pub async fn delegated_author_scope_middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use crate::{auth::extractor::AuthenticatedUser, domain::error::ApiError};
+    use axum::response::IntoResponse;
+    let delegated = req
+        .extensions()
+        .get::<AuthenticatedUser>()
+        .map(AuthenticatedUser::is_delegated_course_author)
+        .unwrap_or(false);
+    if delegated && !delegated_author_route(req.method(), req.uri().path()) {
+        return ApiError::Forbidden("this delegation is limited to course authoring".into())
+            .into_response();
+    }
+    next.run(req).await
+}
+
+fn delegated_author_route(method: &axum::http::Method, path: &str) -> bool {
+    use axum::http::Method;
+    matches!(
+        (method, path),
+        (&Method::POST, "/api/v1/sources/imports")
+            | (&Method::GET, "/api/v1/source-imports")
+            | (&Method::GET, "/api/v1/source-snapshots")
+            | (&Method::POST, "/api/v1/citations")
+            | (&Method::GET, "/api/v1/citations")
+            | (&Method::POST, "/api/v1/generation-runs")
+            | (&Method::POST, "/api/v1/questions")
+            | (&Method::POST, "/api/v1/assessments")
+            | (&Method::POST, "/api/v1/learning/courses")
+            | (&Method::GET, "/api/v1/learning/journeys")
+    ) || path.starts_with("/api/v1/source-snapshots/")
+        || path.starts_with("/api/v1/citations/")
+        || path.starts_with("/api/v1/generation-runs/")
+        || path.starts_with("/api/v1/questions/")
+        || (path.starts_with("/api/v1/learning/journeys/") && !path.contains("/activities/")
+            || path.contains("/course-revisions/")
+            || path.ends_with("/objectives")
+            || path.ends_with("/chapters")
+            || path.ends_with("/activities"))
+}
+
 /// Resolves the effective platform settings once per request, stashes them in
 /// request extensions (so `rate_limit_middleware` reuses the same blob), and
 /// returns 503 for non-admins while maintenance mode is on. Runs AFTER
@@ -87,6 +132,7 @@ pub mod citations;
 pub mod courses;
 pub mod db;
 pub mod deep_dives;
+pub mod delegations;
 pub mod fixture;
 pub mod generation;
 pub mod health;
@@ -197,6 +243,7 @@ pub fn router(pool: PgPool) -> Router {
         .merge(portability::router(state.clone()))
         .merge(analytics::router(state.clone()))
         .merge(deep_dives::router(state.clone()))
+        .merge(delegations::router(state.clone()))
         .merge(generation::router(state.clone()))
         .route(
             "/v1/tasks/{task_id}/submissions",
@@ -232,6 +279,7 @@ pub fn router(pool: PgPool) -> Router {
             state.clone(),
             maintenance_mode_middleware,
         ))
+        .layer(middleware::from_fn(delegated_author_scope_middleware))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_extract_middleware,

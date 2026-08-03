@@ -98,7 +98,7 @@ pub async fn create_question(
     let (_, version) = repository
         .create_question(CreateQuestion {
             subject_user_id: auth.owner_id(),
-            source_actor_id: auth.owner_id(),
+            source_actor_id: auth.actor_identity_id(),
             generation_run_id: body.generation_run_id,
             kind: body.kind,
             prompt: body.prompt,
@@ -146,7 +146,7 @@ pub async fn create_question_version(
             question_id,
             CreateQuestion {
                 subject_user_id: auth.owner_id(),
-                source_actor_id: auth.owner_id(),
+                source_actor_id: auth.actor_identity_id(),
                 generation_run_id: body.generation_run_id,
                 kind: body.kind,
                 prompt: body.prompt,

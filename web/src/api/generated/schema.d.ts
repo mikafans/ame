@@ -112,6 +112,38 @@ export interface paths {
         patch: operations["patch_user_admin"];
         trace?: never;
     };
+    "/api/v1/agent-delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-delegations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assessments": {
         parameters: {
             query?: never;
@@ -1522,6 +1554,16 @@ export interface components {
             /** Format: uuid */
             triggeringEvidenceId: string;
         };
+        CreateDelegationBody: {
+            /** Format: int64 */
+            expiresInMinutes: number;
+            goal: string;
+        };
+        CreateDelegationResponse: {
+            delegation: components["schemas"]["DelegationResponse"];
+            /** @description Returned once only. This is a scoped capability, never a login token. */
+            handoff: string;
+        };
         CreateNoteBody: {
             /** Format: uuid */
             activityId?: string | null;
@@ -1584,6 +1626,20 @@ export interface components {
             title: string;
             /** Format: uuid */
             triggeringEvidenceId: string;
+        };
+        DelegationResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            goal: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            /** Format: date-time */
+            revokedAt?: string | null;
+            scope: string;
         };
         DueReviewQuery: {
             /** Format: date-time */
@@ -1800,6 +1856,7 @@ export interface components {
         LearningJourneySummaryResponse: {
             /** Format: date-time */
             createdAt: string;
+            goal: components["schemas"]["LearningGoalResponse"];
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -2627,6 +2684,67 @@ export interface operations {
             };
             /** @description User not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationResponse"][];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDelegationBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateDelegationResponse"];
+                };
+            };
+        };
+    };
+    revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

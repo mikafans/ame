@@ -3,26 +3,28 @@ AME agent course-authoring contract
 Start here for the public agent contract.
 OpenAPI: /public/openapi.yaml
 Machine manifest: /public/skill.json
-Human-readable guide: /agent/guide
+Learning safety contract: /public/learning-contract.json
+Human handoff page: /agent
 
 Purpose
 AME is the durable learning system an authorized agent uses to assemble,
 validate, publish, and adapt a source-grounded course for one learner.
 
 Required authoring sequence
-1. Register or log in and retain the learner bearer token.
-   POST /public/v1/auth/register
-   POST /public/v1/auth/login
-   POST /public/v1/onboarding/start
-2. Import bounded source text and certify exact citations.
-3. Create a private course revision, objectives, chapters, and activities.
-4. Create each content generation run and transition it:
+1. The learner signs in at /agent and deliberately creates a temporary agent
+   handoff for the stated goal. It contains a `dlg_*` bearer capability.
+2. Use only that `dlg_*` capability in the Authorization header. It is scoped
+   to course authoring, has a hard expiry, and can be revoked by the learner.
+   Never request, accept, store, or use the learner's `lgn_*` login token.
+3. Import bounded source text and certify exact citations.
+4. Create a private course revision, objectives, chapters, and activities.
+5. Create each content generation run and transition it:
    requested -> running -> review_required -> published.
-5. Attach published content, create reviewed questions and assessments, then
+6. Attach published content, create reviewed questions and assessments, then
    run course validation.
-6. Record an approved review with reviewer, decision=approved, and notes.
-7. Publish the complete course revision. Draft activities are never learner
-   visible.
+7. Record an approved review with reviewer, decision=approved, and notes.
+8. Publish the complete course revision, then return the learner's
+   `/learning/journeys/{journeyId}` URL. Draft activities are never learner visible.
 
 Quality requirements
 - Each outcome needs instruction, a worked example, a formative check with
@@ -33,10 +35,14 @@ Quality requirements
 - Assessment attempts return assessmentItemId and questionVersionId. A
   finished attempt returns status, score, item result, rationale, and
   explanation.
+- Set exactly one course activity to `ready`; it is the learner's startable
+  first step. All other activities remain `proposed`.
 
 Content payload example
 PATCH /api/v1/learning/activities/{activity_id}/content
 {"content":{"type":"explanation","heading":"Event time","body":"Use the event timestamp.","key_points":["Event time is domain time."]}}
 
-Do not infer undocumented state. Read this contract and /public/openapi.yaml
-before mutation.
+Use only operations advertised by /public/skill.json. /public/openapi.yaml is
+the endpoint and type reference; it includes privileged operations outside the
+agent workflow. Read /public/learning-contract.json before mutation. Do not
+infer undocumented state.

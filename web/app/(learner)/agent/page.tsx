@@ -1,22 +1,17 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { AgentHandoff } from "@/components/agent/AgentHandoff";
 import { Button } from "@/components/ui/button";
 
-const onboardingExample = `POST /public/v1/onboarding/start
-{
-  "email": "learner@example.com",
-  "displayName": "Learner",
-  "prompt": "Help me learn distributed systems",
-  "idempotencyKey": "first-journey"
-}`;
+const setupBrief = `Use AME to build my course.
+Goal: [what I want to be able to do]
+Current level: [what I already know]
+Time: [time available each week]
+Constraints or sources: [optional]
 
-const publicResources = [
-  ["Authoring guide", "/agent/guide"],
-  ["Skill manifest", "/public/skill.json"],
-  ["OpenAPI", "/public/openapi.yaml"],
-  ["Learning contract", "/public/learning-contract.json"],
-] as const;
+Read /public/skill.json first. Ground the course in sources, validate it,
+review it, publish it, then give me the first activity in AME.`;
 
 export default function AgentPage() {
   return (
@@ -45,60 +40,75 @@ export default function AgentPage() {
         <section className="grid gap-10 border-b border-border pb-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-end">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
-              Public agent setup · OpenAPI 3.1
+              AME / agent handoff
             </p>
             <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-[-0.045em] sm:text-5xl">
-              Give your agent AME. Keep the learner out of setup.
+              Tell your agent what you want to learn. It sets up the course.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-              Your agent discovers the public contract, creates the durable
-              journey, and shapes the course. The learner opens AME when there
-              is something useful to learn.
+              You do not configure AME or assemble lessons. Give an authorized
+              agent your learning goal; it creates a reviewed, source-grounded
+              course and hands you the first useful activity.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              {publicResources.map(([label, href]) => (
-                <Button key={href} asChild variant="outline" size="sm">
-                  <a href={href} target="_blank" rel="noreferrer">
-                    {label} <ExternalLink className="size-3.5" />
-                  </a>
-                </Button>
-              ))}
+              <Button asChild className="rounded-full">
+                <a href="#agent-handoff">Create agent handoff</a>
+              </Button>
+              <Button asChild variant="outline" className="rounded-full">
+                <a href="/public/skill.json" target="_blank" rel="noreferrer">
+                  Agent manifest <ExternalLink className="size-4" />
+                </a>
+              </Button>
             </div>
           </div>
-
           <section className="min-w-0 border border-border bg-card p-5 sm:p-6">
             <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              The first durable action
+              Give this to your agent
             </p>
             <pre className="mt-4 overflow-x-auto border border-border bg-muted p-4 text-xs leading-6 text-foreground sm:text-sm">
-              <code>{onboardingExample}</code>
+              <code>{setupBrief}</code>
             </pre>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
-              An email identifier establishes the learner-owned journey. It is
-              not a separate agent identity or another browser signup step.
+              The agent reads the machine contract. You only need to state the
+              outcome you want.
             </p>
           </section>
         </section>
 
         <section className="py-12">
+          <div id="agent-handoff">
+            <AgentHandoff />
+          </div>
+        </section>
+
+        <section className="border-t border-border py-12">
           <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
-            Three moves
+            The correct handoff
           </p>
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
-            <GuideStep
+          <div className="mt-5 grid gap-4 md:grid-cols-4">
+            <Step
               number="01"
-              title="Read the boundary"
-              body="Read the public learning contract before changing state. It keeps generated material separate from learner evidence."
+              owner="You"
+              title="State the outcome"
+              body="Give your agent a domain, goal, current level, time budget, and any useful sources or constraints."
             />
-            <GuideStep
+            <Step
               number="02"
-              title="Shape the beginning"
-              body="Preview a goal or select a reviewed native journey. The agent can make the first lesson useful before the learner arrives."
+              owner="Your agent"
+              title="Create and check"
+              body="It uses the temporary course-authoring handoff you created, then grounds the course in sources, creates lessons and checks, and validates the full course."
             />
-            <GuideStep
+            <Step
               number="03"
-              title="Hand off a course"
-              body="Use the same owner-scoped API to continue, assess, and recommend. The browser sees the exact durable state the agent created."
+              owner="AME"
+              title="Publish durable work"
+              body="Only the reviewed course becomes visible. AME preserves the course, evidence, assessment feedback, and next action."
+            />
+            <Step
+              number="04"
+              owner="You"
+              title="Learn the first step"
+              body="Open the learning desk when the agent hands off a course. Answer checks honestly; AME and your agent adapt the next step."
             />
           </div>
         </section>
@@ -106,38 +116,52 @@ export default function AgentPage() {
         <section className="grid gap-6 border-t border-border pt-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">
-              The browser is the course workspace.
+              For an agent: one source of truth.
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              AME does not make the learner repeat the agent&apos;s setup. Once
-              a journey exists, the learner can inspect, practise, and continue
-              it in the learning desk.
+              <code>/public/skill.json</code> points to the compact{" "}
+              <code>/public/llms.txt</code> entry contract and typed{" "}
+              <code>/public/openapi.yaml</code>. Read those before mutation; do
+              not infer undocumented state.
             </p>
           </div>
-          <Button asChild className="w-fit rounded-full">
-            <Link href="/agent/guide">
-              Read the agent guide <ArrowRight className="size-4" />
-            </Link>
+          <Button asChild variant="outline" className="w-fit rounded-full">
+            <a href="/public/llms.txt" target="_blank" rel="noreferrer">
+              Read agent contract <ExternalLink className="size-4" />
+            </a>
           </Button>
         </section>
+        <p className="mt-8 text-sm leading-6 text-muted-foreground">
+          No agent available?{" "}
+          <Link
+            href="/start"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Set up AME yourself
+          </Link>
+          . This fallback asks you for the details an agent would otherwise
+          provide.
+        </p>
       </main>
     </div>
   );
 }
 
-function GuideStep({
+function Step({
   number,
+  owner,
   title,
   body,
 }: {
   number: string;
+  owner: string;
   title: string;
   body: string;
 }) {
   return (
     <article className="border border-border bg-card p-5">
       <p className="font-mono text-xs tracking-[0.14em] text-primary">
-        {number}
+        {number} / {owner}
       </p>
       <h2 className="mt-5 text-lg font-semibold">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>

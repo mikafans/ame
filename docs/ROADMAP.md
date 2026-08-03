@@ -189,6 +189,9 @@ behalf.
 0.5.0 is not complete because a journey, activities, or a catalog card exists.
 It is complete only when:
 
+- a real signed-in learner can deliberately grant an agent scoped, revocable
+  course-authoring authority for that learner and journey, and the agent can
+  return a learning-desk URL without exposing a full bearer credential;
 - a clean local stack can reproduce both published reference courses;
 - an API-only external agent follows the public instructions and builds or
   revises a course without reading repository source;

@@ -45,7 +45,7 @@ const faqs = [
 
 const agentResources = [
   { href: "/agent", label: "Agent guide" },
-  { href: "/agent/guide", label: "Agent authoring guide" },
+  { href: "/agent", label: "How agent setup works" },
   { href: "/public/skill.json", label: "Skill manifest" },
   { href: "/public/openapi.yaml", label: "OpenAPI" },
 ];

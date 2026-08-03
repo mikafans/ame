@@ -185,7 +185,7 @@ pub async fn create_assessment(
         .create_assessment(
             CreateAssessment {
                 subject_user_id: auth.owner_id(),
-                source_actor_id: auth.owner_id(),
+                source_actor_id: auth.actor_identity_id(),
                 activity_id: body.activity_id,
                 mode: body.mode,
                 items,

@@ -74,7 +74,7 @@ pub async fn start(
     let value = PgGenerationRepository::new(state.pool)
         .start(StartGenerationRun {
             subject_user_id: auth.owner_id(),
-            source_actor_id: auth.owner_id(),
+            source_actor_id: auth.actor_identity_id(),
             operation: body.operation,
             provider: body.provider,
             retry_key: body.retry_key,

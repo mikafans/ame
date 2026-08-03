@@ -192,7 +192,7 @@ pub async fn create_course(
     let goal = repository
         .create_goal(CreateGoal {
             subject_user_id: auth.owner_id(),
-            source_actor_id: auth.owner_id(),
+            source_actor_id: auth.actor_identity_id(),
             template_version_id: None,
             catalog_entry_id: None,
             catalog_entry_version: None,
@@ -206,7 +206,7 @@ pub async fn create_course(
         .ensure_journey(CreateJourney {
             goal_id: goal.id,
             subject_user_id: auth.owner_id(),
-            source_actor_id: auth.owner_id(),
+            source_actor_id: auth.actor_identity_id(),
             promise: body
                 .brief
                 .get("title")
@@ -602,6 +602,20 @@ pub async fn publish_course_revision(
     .execute(&mut *transaction)
     .await
     .map_err(db_error)?;
+    sqlx::query(
+        "UPDATE tb_learning_journeys SET status = 'active' WHERE id = $1 AND subject_user_id = $2",
+    )
+    .bind(journey_id)
+    .bind(auth.owner_id())
+    .execute(&mut *transaction)
+    .await
+    .map_err(db_error)?;
+    sqlx::query("UPDATE tb_learning_goals SET status = 'active' WHERE id = (SELECT goal_id FROM tb_learning_journeys WHERE id = $1) AND subject_user_id = $2")
+        .bind(journey_id)
+        .bind(auth.owner_id())
+        .execute(&mut *transaction)
+        .await
+        .map_err(db_error)?;
     transaction.commit().await.map_err(db_error)?;
     Ok(Json(
         load_owned_revision(&state.pool, auth.owner_id(), journey_id, revision_id).await?,
@@ -840,6 +854,19 @@ async fn validate_course(
         }
     }
 
+    let ready_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tb_activities WHERE course_revision_id = $1 AND subject_user_id = $2 AND status = 'ready'")
+        .bind(revision.id)
+        .bind(subject_user_id)
+        .fetch_one(pool)
+        .await
+        .map_err(db_error)?;
+    if ready_count != 1 {
+        issues.push(issue(
+            "missing_startable_activity",
+            "activities",
+            "a course needs exactly one ready first activity",
+        ));
+    }
     let activities = sqlx::query("SELECT id, kind, title, objective_ids, payload, rubric, publication_status FROM (SELECT a.id, a.kind, a.title, a.payload, a.rubric, a.publication_status, COALESCE(array_agg(ao.objective_id) FILTER (WHERE ao.objective_id IS NOT NULL), ARRAY[]::uuid[]) AS objective_ids FROM tb_activities a LEFT JOIN tb_activity_objectives ao ON ao.activity_id = a.id WHERE a.course_revision_id = $1 AND a.subject_user_id = $2 GROUP BY a.id) activities")
         .bind(revision.id).bind(subject_user_id).fetch_all(pool).await.map_err(db_error)?;
     for activity in &activities {

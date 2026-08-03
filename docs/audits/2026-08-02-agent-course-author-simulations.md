@@ -122,3 +122,53 @@ account and source set, then proves a learner can complete it.
 
 This audit is the acceptance baseline for 0.5.0-A through 0.5.0-E in
 [`../ROADMAP.md`](../ROADMAP.md).
+
+## Real-user agent handoff smoke — 2026-08-03
+
+The API-only simulations above prove authoring primitives, but not the product
+handoff between a human and their agent. A separate browser-only learner smoke
+started at `/agent`, while an API-only agent followed the exact displayed Flink
+setup brief.
+
+Result: **blocked**. The public page could explain the intent, but it could not
+bind the agent to the signed-in learner. The agent can register or log in as a
+different learner and publish there; the human browser has no deliberate,
+scoped delegation, journey context, or returned course URL. Linking raw
+`llms.txt` is not an authorization handoff, and copying a full bearer token is
+not an acceptable replacement.
+
+The next implementation gate is therefore a learner-initiated, revocable
+delegation or one-time capability. Its handoff payload must contain the AME
+origin, learner/journey context, approved scope and expiry, the learner goal,
+and a return learning-desk URL. The agent must use that capability to author
+only in the delegated learner scope. The learner smoke passes only after it
+uses the resulting browser course, completes a check, and sees feedback and
+progress.
+
+### Agent-side control result
+
+An independent API-only agent did complete the displayed Flink prompt through
+the public surface: register, authenticated onboarding, official-source import,
+exact citation, private revision, objectives/chapters/activities, reviewed
+source-backed lessons, question and rubric generation chains, validation,
+review, and publish. The published revision was
+`019fc54a-00fb-7b34-8c6c-7209c09aa192`; validation returned `[]`.
+
+This is proof that the public authoring workflow can publish a structural
+course. It is not a real-user handoff pass because that course belongs to the
+agent-created test learner. The run also found two follow-up contract gaps:
+
+- the validator requires formative assessments to attach to an explanation
+  activity, but the compact contract did not say that; and
+- draft recovery reads do not return activity IDs, so a restarted agent must
+  retain every creation response ID.
+
+Post-publish summary is also not a valid learner handoff: the published
+journey's list-summary reported `status: onboarding`, `goal: null`, and
+`nextActivity: null`, although the detailed journey read contained the reviewed
+chapters, objectives, activities, and raw intent. The list/dashboard contract
+must derive a published course's goal and next learner activity before the
+agent can truthfully return the learner to the desk.
+
+The feature gate remains blocked until delegation binds this successful
+authoring flow to the human learner's scope and browser return path.

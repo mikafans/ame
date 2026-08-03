@@ -205,6 +205,58 @@ paths:
           description: User not found
       security:
       - bearer: []
+  /api/v1/agent-delegations:
+    get:
+      tags:
+      - agent delegation
+      operationId: list
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DelegationResponse'
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - agent delegation
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDelegationBody'
+        required: true
+      responses:
+        '201':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDelegationResponse'
+      security:
+      - bearer_auth: []
+  /api/v1/agent-delegations/{id}:
+    delete:
+      tags:
+      - agent delegation
+      operationId: revoke
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: ''
+      security:
+      - bearer_auth: []
   /api/v1/assessments:
     get:
       tags:
@@ -2830,6 +2882,28 @@ components:
         triggeringEvidenceId:
           type: string
           format: uuid
+    CreateDelegationBody:
+      type: object
+      required:
+      - goal
+      - expiresInMinutes
+      properties:
+        expiresInMinutes:
+          type: integer
+          format: int64
+        goal:
+          type: string
+    CreateDelegationResponse:
+      type: object
+      required:
+      - delegation
+      - handoff
+      properties:
+        delegation:
+          $ref: '#/components/schemas/DelegationResponse'
+        handoff:
+          type: string
+          description: Returned once only. This is a scoped capability, never a login token.
     CreateNoteBody:
       type: object
       required:
@@ -2986,6 +3060,38 @@ components:
         triggeringEvidenceId:
           type: string
           format: uuid
+    DelegationResponse:
+      type: object
+      required:
+      - id
+      - goal
+      - scope
+      - createdAt
+      - expiresAt
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        goal:
+          type: string
+        id:
+          type: string
+          format: uuid
+        lastUsedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        revokedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        scope:
+          type: string
     DueReviewQuery:
       type: object
       properties:
@@ -3523,11 +3629,14 @@ components:
       - origin
       - status
       - rawIntent
+      - goal
       - createdAt
       properties:
         createdAt:
           type: string
           format: date-time
+        goal:
+          $ref: '#/components/schemas/LearningGoalResponse'
         id:
           type: string
           format: uuid
