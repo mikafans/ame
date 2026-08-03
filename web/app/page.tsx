@@ -44,7 +44,6 @@ const faqs = [
 ];
 
 const agentResources = [
-  { href: "/agent", label: "Agent guide" },
   { href: "/agent", label: "How agent setup works" },
   { href: "/public/skill.json", label: "Skill manifest" },
   { href: "/public/openapi.yaml", label: "OpenAPI" },
@@ -142,7 +141,7 @@ export default function LandingPage() {
                   )}
                   <a
                     className="text-sm font-medium text-[var(--ame-sugar)]/75 underline-offset-4 transition hover:text-[var(--ame-sugar)] hover:underline"
-                    href="/agent/guide"
+                    href="/public/llms.txt"
                   >
                     Read agent API guide
                   </a>

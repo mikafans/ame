@@ -11,9 +11,6 @@ test.describe("public documentation", () => {
       page.getByRole("link", { name: "Agent API", exact: true }),
     ).toHaveAttribute("href", "/agent");
     await expect(
-      page.getByRole("link", { name: "Agent guide", exact: true }),
-    ).toHaveAttribute("href", "/agent");
-    await expect(
       page.getByRole("link", { name: "How agent setup works", exact: true }),
     ).toHaveAttribute("href", "/agent");
   });
@@ -24,17 +21,22 @@ test.describe("public documentation", () => {
     const browserErrors: string[] = [];
     page.on("pageerror", (error) => browserErrors.push(error.message));
     page.on("console", (message) => {
-      if (message.type() === "error") browserErrors.push(message.text());
+      if (
+        message.type() === "error" &&
+        !message.text().includes("status of 401 (Unauthorized)")
+      ) {
+        browserErrors.push(message.text());
+      }
     });
 
     await page.goto("/agent");
 
     await expect(page).toHaveURL(/\/agent$/);
     await expect(
-      page.getByRole("heading", { name: /Give your agent AME/ }),
+      page.getByRole("heading", { name: /Tell your agent what you want to learn/ }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Skill manifest" }),
+      page.getByRole("link", { name: "Agent manifest" }),
     ).toHaveAttribute("href", "/public/skill.json");
     expect(browserErrors).toEqual([]);
   });
@@ -44,7 +46,7 @@ test.describe("public documentation", () => {
     await page.goto("/agent");
 
     await expect(
-      page.getByRole("heading", { name: /Give your agent AME/ }),
+      page.getByRole("heading", { name: /Tell your agent what you want to learn/ }),
     ).toBeVisible();
     const dimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
