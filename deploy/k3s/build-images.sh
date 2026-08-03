@@ -1,52 +1,44 @@
 #!/usr/bin/env bash
-# Build the ame-api / ame-web images and push them to the Docker Hub repos the
-# k3s deployments pull from (docker.io/azusachino/ame-*).
+# Build the ame-api / ame-web images and import them straight into the k3s
+# node's containerd — bypasses any registry, same as daphne/suzuran's
+# `image-local` Makefile target.
 #
-# This lives in the ame repo (the build context is the ame source). The k3s repo
-# (harus-k3s/06-edge/ame/) only carries the k8s manifests and patches the image
-# TAG to match what this script pushed.
+# This lives in the ame repo (the build context is the ame source). The k3s
+# repo (harus-k3s/06-edge/ame/) only carries the k8s manifests and patches the
+# image TAG to match what this script imported.
 #
-# Uses BUILDPLATFORM-split Dockerfiles (Dockerfile.api / Dockerfile.web): the
-# heavy compile runs natively on this amd64 box and only COPY-only runtime
-# stages are the target arch, so NO qemu/binfmt is needed. Run from harus-mini.
-#
-# PLATFORM defaults to linux/amd64 (x64). The arm64 harus-pi edge image is one
-# env var away — Dockerfile.api derives its Rust musl target from TARGETARCH.
-#
-# Requires: podman logged in to docker.io as azusachino.
-#   ./build-images.sh                       # x64; TAG defaults to api/Cargo.toml version
-#   PLATFORM=linux/arm64 ./build-images.sh  # arm64 (harus-pi edge)
-#   TAG=0.2.1 ./build-images.sh             # pin the tag explicitly
+# Run on harus-mini (single-node amd64 cluster — no cross-arch build needed).
+#   ./build-images.sh             # TAG defaults to api/Cargo.toml version
+#   TAG=0.4.1 ./build-images.sh   # pin the tag explicitly
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AME_REPO="${AME_REPO:-$(cd "$HERE/../.." && pwd)}"
 # Tracks the ame package version (api/Cargo.toml) by default — AGENTS.md forbids
-# floating tags. Override with TAG=... only to re-push an existing version.
+# floating tags. Override with TAG=... only to re-import an existing version.
 TAG="${TAG:-$(grep -m1 '^version' "$AME_REPO/api/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
-PLATFORM="${PLATFORM:-linux/amd64}"
-REGISTRY=docker.io/azusachino
+LOCAL_IMAGE=azusachino.icu
 # Empty = relative API calls, so the web is served same-origin behind the
 # ame-platform front door (front.yaml) and the session cookie stays first-party.
 # Use `-` (not `:-`) so an explicitly empty NEXT_PUBLIC_API_URL is honored.
 API_URL="${NEXT_PUBLIC_API_URL-}"
 
-echo ">> Building $REGISTRY/ame-api:$TAG ($PLATFORM, cross via zigbuild)"
-podman build --platform="$PLATFORM" \
+echo ">> Building $LOCAL_IMAGE/ame-api:$TAG"
+podman build \
 	-f "$HERE/Dockerfile.api" \
-	-t "$REGISTRY/ame-api:$TAG" \
+	-t "$LOCAL_IMAGE/ame-api:$TAG" \
 	"$AME_REPO"
 
-echo ">> Building $REGISTRY/ame-web:$TAG ($PLATFORM) NEXT_PUBLIC_API_URL=$API_URL"
-podman build --platform="$PLATFORM" \
+echo ">> Building $LOCAL_IMAGE/ame-web:$TAG (NEXT_PUBLIC_API_URL=$API_URL)"
+podman build \
 	-f "$HERE/Dockerfile.web" \
 	--build-arg NEXT_PUBLIC_API_URL="$API_URL" \
-	-t "$REGISTRY/ame-web:$TAG" \
+	-t "$LOCAL_IMAGE/ame-web:$TAG" \
 	"$AME_REPO"
 
-echo ">> Pushing"
-podman push "$REGISTRY/ame-api:$TAG"
-podman push "$REGISTRY/ame-web:$TAG"
+echo ">> Importing into k3s containerd"
+podman save "$LOCAL_IMAGE/ame-api:$TAG" | sudo k3s ctr images import -
+podman save "$LOCAL_IMAGE/ame-web:$TAG" | sudo k3s ctr images import -
 
 echo ">> Done. Next: in harus-k3s, bump image: tags to $TAG in 06-edge/ame/{api,web}.yaml,"
-echo ">>       then: make apply-edge ; kubectl -n ame rollout status deploy/ame-api deploy/ame-web"
+echo ">>       then: make apply-edge ; kubectl -n harus-edge rollout status deploy/ame-api deploy/ame-web"

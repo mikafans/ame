@@ -1,24 +1,20 @@
 # syntax=docker/dockerfile:1
-# Cross-build the ame web (Next.js standalone) for the target arch WITHOUT
-# emulation:
-#   - deps/builder run natively on $BUILDPLATFORM (amd64); `bun run build`
-#     produces portable standalone JS (SWC/native bits are build-time only).
-#   - runtime is COPY-only on the multi-arch node base, which just runs
-#     server.js, so no target-arch code executes at build time → no qemu/binfmt.
+# Build the ame web (Next.js standalone) for the single-node amd64 k3s host
+# (harus-mini): `bun run build` produces standalone JS, runtime is COPY-only.
 #
 # Build context MUST be the ame repo root (needs web/ and api/openapi.yaml):
-#   podman build --platform=linux/amd64 -f deploy/k3s/Dockerfile.web \
+#   podman build -f deploy/k3s/Dockerfile.web \
 #     --build-arg NEXT_PUBLIC_API_URL=http://ame-api.ame.svc.cluster.local \
-#     -t ame-web:arm64 .
+#     -t ame-web:local .
 ARG BUN_VERSION=1.2
 ARG NODE_VERSION=22
 
-FROM --platform=$BUILDPLATFORM oven/bun:${BUN_VERSION} AS deps
+FROM oven/bun:${BUN_VERSION} AS deps
 WORKDIR /build
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 
-FROM --platform=$BUILDPLATFORM oven/bun:${BUN_VERSION} AS builder
+FROM oven/bun:${BUN_VERSION} AS builder
 WORKDIR /build
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /build/node_modules ./node_modules
@@ -33,7 +29,7 @@ ARG NEXT_PUBLIC_API_URL=http://ame-api.ame.svc.cluster.local
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN bun run build
 
-# ── runtime (arm64, COPY-only — assembled, never executed here) ───────────────
+# ── runtime (COPY-only — assembled, never executed here) ──────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
