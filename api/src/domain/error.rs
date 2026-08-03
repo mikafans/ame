@@ -28,6 +28,8 @@ pub enum ApiError {
     IdempotencyConflict,
     #[error("generation state transition conflicts with the current state")]
     GenerationStateConflict,
+    #[error("course publication validation is required")]
+    CoursePublicationRequired,
     #[error("too many requests")]
     TooManyRequests,
     #[error("service in maintenance mode")]
@@ -57,7 +59,8 @@ impl ApiError {
             | ApiError::LearningSessionResultConflict
             | ApiError::ActivityContentConflict
             | ApiError::IdempotencyConflict
-            | ApiError::GenerationStateConflict => StatusCode::CONFLICT,
+            | ApiError::GenerationStateConflict
+            | ApiError::CoursePublicationRequired => StatusCode::CONFLICT,
             ApiError::Maintenance => StatusCode::SERVICE_UNAVAILABLE,
             ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -115,6 +118,12 @@ impl IntoResponse for ApiError {
                 StatusCode::CONFLICT,
                 "generation_state_conflict",
                 "the generation run cannot make that state transition".to_string(),
+                None,
+            ),
+            ApiError::CoursePublicationRequired => (
+                StatusCode::CONFLICT,
+                "course_publication_required",
+                "publish the reviewed course revision after server-side validation; activities cannot publish independently".to_string(),
                 None,
             ),
             ApiError::TooManyRequests => (

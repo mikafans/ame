@@ -1,25 +1,25 @@
-"use client";
-/* eslint-disable @next/next/no-img-element -- brand SVG variants are selected by color mode. */
-
-import { useColorMode } from "@/components/ThemeRegistry";
+/* eslint-disable @next/next/no-img-element -- brand SVG variants are selected by CSS. */
 
 interface BrandMarkProps {
   size?: number;
 }
 
 export function BrandMark({ size = 32 }: BrandMarkProps) {
-  const { mode } = useColorMode();
-  const mascotSrc =
-    mode === "dark" ? "/ame-icon-dark.svg" : "/ame-icon-light.svg";
-
   return (
     <div data-testid="brand-mark" className="flex items-center gap-3">
       <img
-        src={mascotSrc}
+        src="/ame-icon-light.svg"
         alt=""
         aria-hidden="true"
         data-testid="brand-mascot"
-        className="block shrink-0 rounded-lg"
+        className="brand-mark-light block shrink-0 rounded-lg"
+        style={{ width: size, height: size }}
+      />
+      <img
+        src="/ame-icon-dark.svg"
+        alt=""
+        aria-hidden="true"
+        className="brand-mark-dark hidden shrink-0 rounded-lg"
         style={{ width: size, height: size }}
       />
       <span

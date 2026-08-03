@@ -13,21 +13,28 @@ export default function LearnerLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicAgentGuide = pathname.startsWith("/agent");
+  const isPublicPage = isPublicAgentGuide || pathname.startsWith("/about");
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isPublicPage && !loading && !user) {
       window.location.href = "/login";
     }
-  }, [loading, user]);
+  }, [isPublicPage, loading, user]);
+
+  if (isPublicAgentGuide) {
+    return children;
+  }
 
   const getRouteId = () => {
     if (pathname.startsWith("/admin/users")) return "admin-users";
-    if (pathname.startsWith("/admin/tokens")) return "admin-tokens";
     if (pathname.startsWith("/admin/audit")) return "admin-audit";
     if (pathname.startsWith("/admin/health")) return "admin-health";
+    if (pathname.startsWith("/admin/settings")) return "admin-settings";
+    if (pathname.startsWith("/admin/tasks")) return "admin-tasks";
     if (pathname.startsWith("/admin")) return "admin-dashboard";
+    if (pathname.startsWith("/about")) return "about";
     if (pathname.startsWith("/learning")) return "learning";
-    if (pathname.startsWith("/agent")) return "agent";
     return "explore";
   };
 
@@ -35,11 +42,12 @@ export default function LearnerLayout({
     const routeMap: Record<string, string> = {
       "admin-dashboard": "/admin",
       "admin-users": "/admin/users",
-      "admin-tokens": "/admin/tokens",
       "admin-audit": "/admin/audit",
       "admin-health": "/admin/health",
+      "admin-settings": "/admin/settings",
+      "admin-tasks": "/admin/tasks",
+      about: "/about",
       learning: "/learning",
-      agent: "/agent",
     };
     router.push(routeMap[route] || "/learning");
   };

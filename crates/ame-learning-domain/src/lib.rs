@@ -27,6 +27,15 @@ pub enum JourneyStatus {
     Failed,
 }
 
+/// Immutable reason the journey exists. Catalog selection is separate metadata:
+/// it never changes a learner journey into a fixture.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum JourneyOrigin {
+    Learner,
+    Fixture,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectiveStatus {
@@ -82,6 +91,8 @@ pub struct CreateGoal {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
     pub raw_intent: String,
     pub normalized_statement: String,
     pub idempotency_key: Option<String>,
@@ -93,6 +104,8 @@ pub struct LearningGoal {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
     pub raw_intent: String,
     pub normalized_statement: String,
     pub status: GoalStatus,
@@ -106,6 +119,9 @@ pub struct CreateJourney {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub promise: String,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
+    pub origin: JourneyOrigin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +131,9 @@ pub struct LearningJourney {
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub promise: String,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
+    pub origin: JourneyOrigin,
     pub status: JourneyStatus,
     pub created_at: OffsetDateTime,
 }
@@ -122,6 +141,9 @@ pub struct LearningJourney {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateChapter {
     pub journey_id: Uuid,
+    /// The draft course revision that owns this chapter. Legacy journeys leave
+    /// this empty and remain readable as their pre-course-revision content.
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub title: String,
     pub summary: String,
@@ -132,6 +154,7 @@ pub struct CreateChapter {
 pub struct LearningChapter {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub title: String,
     pub summary: String,
@@ -142,6 +165,8 @@ pub struct LearningChapter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreateObjective {
     pub journey_id: Uuid,
+    /// The draft course revision that owns this objective.
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub verb: String,
     pub statement: String,
@@ -153,6 +178,7 @@ pub struct CreateObjective {
 pub struct LearningObjective {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub verb: String,
     pub statement: String,
@@ -165,6 +191,8 @@ pub struct LearningObjective {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreateActivity {
     pub journey_id: Uuid,
+    /// The draft course revision that owns this activity.
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub chapter_id: Option<Uuid>,
@@ -186,6 +214,7 @@ pub struct CreateActivity {
 pub struct LearningActivity {
     pub id: Uuid,
     pub journey_id: Uuid,
+    pub course_revision_id: Option<Uuid>,
     pub subject_user_id: Uuid,
     pub source_actor_id: Uuid,
     pub chapter_id: Option<Uuid>,
@@ -225,6 +254,16 @@ pub struct AuthorActivityRubric {
     pub rubric: serde_json::Value,
     pub source_references: Vec<String>,
     pub review_status: String,
+}
+
+/// A controlled authoring transition. Activities are created as drafts and may
+/// reach learners only by moving draft -> review -> published.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionActivityPublication {
+    pub subject_user_id: Uuid,
+    pub activity_id: Uuid,
+    pub from: ActivityPublicationStatus,
+    pub to: ActivityPublicationStatus,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -316,6 +355,10 @@ pub enum LearningRepositoryError {
     OrderConflict { resource: &'static str },
     #[error("activity is not ready to start")]
     ActivityNotReady,
+    #[error("activity is not published for learners")]
+    ActivityNotPublished,
+    #[error("activity publication transition is invalid")]
+    InvalidActivityPublicationTransition,
     #[error("activity content is invalid")]
     InvalidActivityContent,
     #[error("activity rubric is invalid")]
@@ -381,6 +424,14 @@ pub trait LearningRepository: Send + Sync {
         journey_id: Uuid,
     ) -> Result<Vec<LearningObjective>, LearningRepositoryError>;
 
+    /// Author-facing view of one draft/review/published course revision.
+    async fn list_objectives_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError>;
+
     async fn create_chapter(
         &self,
         input: CreateChapter,
@@ -390,6 +441,14 @@ pub trait LearningRepository: Send + Sync {
         &self,
         subject_user_id: Uuid,
         journey_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError>;
+
+    /// Author-facing view of one course revision.
+    async fn list_chapters_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
     ) -> Result<Vec<LearningChapter>, LearningRepositoryError>;
 
     async fn create_activity(
@@ -403,6 +462,14 @@ pub trait LearningRepository: Send + Sync {
         journey_id: Uuid,
     ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
 
+    /// Author-facing view of one course revision.
+    async fn list_activities_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError>;
+
     async fn author_activity_content(
         &self,
         input: AuthorActivityContent,
@@ -411,6 +478,11 @@ pub trait LearningRepository: Send + Sync {
     async fn author_activity_rubric(
         &self,
         input: AuthorActivityRubric,
+    ) -> Result<LearningActivity, LearningRepositoryError>;
+
+    async fn transition_activity_publication(
+        &self,
+        input: TransitionActivityPublication,
     ) -> Result<LearningActivity, LearningRepositoryError>;
 
     async fn start_learning_session(
@@ -519,6 +591,27 @@ pub fn validate_activity(input: &CreateActivity) -> Result<(), LearningRepositor
         return Err(LearningRepositoryError::EmptyField {
             field: "content_version",
         });
+    }
+    Ok(())
+}
+
+pub fn validate_activity_publication_transition(
+    input: &TransitionActivityPublication,
+) -> Result<(), LearningRepositoryError> {
+    if !matches!(
+        (input.from, input.to),
+        (
+            ActivityPublicationStatus::Draft,
+            ActivityPublicationStatus::Review
+        ) | (
+            ActivityPublicationStatus::Review,
+            ActivityPublicationStatus::Published
+        ) | (
+            ActivityPublicationStatus::Published,
+            ActivityPublicationStatus::Retired
+        )
+    ) {
+        return Err(LearningRepositoryError::InvalidActivityPublicationTransition);
     }
     Ok(())
 }

@@ -9,11 +9,11 @@ Agent-friendly learning platform with one owner-scoped journey API. Rust (Axum) 
 ![Landing page](docs/assets/screenshots/landing.png)
 
 <details>
-<summary>More screenshots — active session, learner analytics</summary>
+<summary>More screenshots — active session, course progress</summary>
 
-![Active learning session with private notes and alternate-angle variants](docs/assets/screenshots/learning-desk.png)
+![Active learning session with a practice assessment, private notes, and alternate-angle variants](docs/assets/screenshots/learning-desk.png)
 
-![Learning desk with course progress and retention analytics](docs/assets/screenshots/analytics.png)
+![Course progress tab with evidence-backed outcomes, attempts, and due reviews](docs/assets/screenshots/analytics.png)
 
 </details>
 
@@ -25,44 +25,62 @@ via `mise x -- <command>` in non-interactive shells), then:
 
 ```bash
 make init-env       # web deps + Playwright browsers (toolchain comes from mise)
-make db-up          # start Postgres in Docker or Podman
-make dev            # API on :28080, frontend on :23000
-make db-seed        # seed the current learner journey fixture (requires API running)
+make dev            # Postgres, Valkey, API, and web, all behind Caddy at :28800
 ```
 
-Demo credentials after seeding: `haru@example.com / password123` (learner),
-`admin@example.com / password123` (admin).
-
-### Admin users
-
-Registration only ever grants the `user` role — there is no API path to self-register
-as an admin (`POST /public/v1/auth/register` rejects `role: admin`). Admins are granted
-**directly in the database**:
+`make dev` is the one local stack — there's no separate host-process mode. It
+auto-seeds demo accounts the first time it starts. Demo credentials:
+`haru@example.com / password123` (learner), `admin@example.com / password123` (admin).
 
 ```bash
-make db-admin                                  # create/grant admin@example.com (default)
-make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
-```
-
-`db-seed` depends on `db-admin`, so the local admin exists before the current
-learner fixture runs. After being promoted, log
-out and back in to refresh the session.
-
-Copy `.env.example` to `.env` if you need to override defaults.
-
-### Containerized local stack
-
-Use the debug stack when you want the complete local topology behind Caddy:
-
-```bash
-make local-up       # Caddy + web + API + Postgres + Valkey at :28800
 make local-uiux     # run the focused browser smoke test through Caddy
-make local-down     # stop services; keep the named Postgres volume
+make stop           # stop services; keeps the named Postgres volume
+make dev-reset      # wipe the volume and start clean (e.g. a migration checksum mismatch)
 ```
 
 The web service bind-mounts `web/` and runs Next.js in development mode with
 polling enabled, so edits on macOS/Podman trigger hot reload without rebuilding
-the image. API source changes use the same bind-mounted development workflow.
+the image. The API container recompiles in place on source changes (cached via
+a persistent cargo target volume); re-run `make dev` if a change doesn't pick
+up on its own.
+
+### Admin users
+
+Registration only ever grants the `user` role — there is no API path to self-register
+as an admin (`POST /public/v1/auth/register` rejects `role: admin`). The seeded
+`admin@example.com` account above is already an admin. To promote a different,
+already-registered account **directly in the database**:
+
+```bash
+make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (password untouched)
+```
+
+After being promoted, log out and back in to refresh the session.
+
+Copy `.env.example` to `.env` if you need to override defaults.
+
+### Learning desk, themes, and local simulations
+
+`/learning` is the signed-in learner's private course library. It shows the
+learner's own course plans, their recommended next activity, progress, and
+reviews. It never shows courses owned by another account — including disposable
+local mock journeys — so an empty desk is an invitation to create a course, not
+a missing shared catalog.
+
+Paper & Moss is the default theme for a new browser. Learners can select a
+different theme from the interface; their saved choice takes precedence over
+the default.
+
+To create a browser-visible, disposable three-round learner simulation, choose
+the password locally and run:
+
+```bash
+HARU_SIM_PASSWORD='choose-your-own-password' make local-haru-simulation
+```
+
+The command prints the journey URL and a non-secret login email. It never saves
+or prints the password, and its courses remain visible only when you sign in as
+that simulated learner.
 
 ## Common tasks
 
@@ -128,12 +146,13 @@ make db-down
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the certifiable agent-first learning
-loop and its later milestones. Current: **v0.3.0** — one unified learner API,
-durable journeys, question-backed practice and exams, evidence-based progress,
-deep dives, and a self-hostable Postgres + Valkey + API + web + Caddy origin.
-The canonical design and user stories are in
-[`docs/plans/2026-07-19-agent-first-learning-rework.md`](docs/plans/2026-07-19-agent-first-learning-rework.md).
+[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the next release: **v0.4.0 —
+agent-authored courses**. The 0.3.0 foundation supplies the durable learner
+API, assessment, evidence, provenance, and self-hosted stack. 0.4.0 makes
+those primitives usable by agents to assemble, validate, publish, and adapt
+real source-grounded courses, proven with complete Flink and Netty
+references, plus the Study Atelier native catalog and a course-scoped
+learner workspace.
 
 ## Contributing
 

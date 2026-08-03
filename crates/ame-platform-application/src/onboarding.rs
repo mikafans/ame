@@ -6,9 +6,12 @@ use crate::domain::identity::{
 };
 use crate::domain::learning::{
     ActivityKind, ActivityStatus, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
-    CreateObjective, LearningGoal, LearningJourney, LearningRepository, LearningRepositoryError,
+    CreateObjective, JourneyOrigin, LearningGoal, LearningJourney, LearningRepository,
+    LearningRepositoryError,
 };
-use crate::templates::{builtin_catalog, find_template_blueprint, find_topic_blueprint};
+use crate::templates::{
+    builtin_catalog, find_native_journey_blueprint, find_template_blueprint, find_topic_blueprint,
+};
 use async_trait::async_trait;
 use thiserror::Error;
 use uuid::Uuid;
@@ -23,6 +26,9 @@ pub struct BootstrapPlan {
     pub template_id: String,
     pub template_version: u32,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
+    pub origin: JourneyOrigin,
     pub idempotency_key: String,
 }
 
@@ -59,6 +65,8 @@ pub struct StartLearningRequest {
     pub template_id: String,
     pub template_version: u32,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
     pub idempotency_key: String,
     pub registration_mode: RegistrationMode,
 }
@@ -86,6 +94,8 @@ pub struct PromptInterpretation {
     pub template_id: String,
     pub template_version: u32,
     pub template_version_id: Option<Uuid>,
+    pub catalog_entry_id: Option<String>,
+    pub catalog_entry_version: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,6 +126,8 @@ pub enum PromptInterpretationError {
     EmptyPrompt,
     #[error("built-in learning template catalog is invalid: {0}")]
     InvalidTemplateCatalog(String),
+    #[error("native journey catalog entry is unavailable: {0}")]
+    UnknownCatalogEntry(String),
 }
 
 #[async_trait]
@@ -185,6 +197,41 @@ impl LearningPromptInterpreter for CatalogPromptInterpreter {
             template_id: template.id.clone(),
             template_version: template.version,
             template_version_id: None,
+            catalog_entry_id: None,
+            catalog_entry_version: None,
+        })
+    }
+}
+
+impl CatalogPromptInterpreter {
+    pub fn interpret_catalog_entry(
+        id: &str,
+    ) -> Result<PromptInterpretation, PromptInterpretationError> {
+        let topic = find_native_journey_blueprint(id)
+            .map_err(PromptInterpretationError::InvalidTemplateCatalog)?
+            .ok_or_else(|| PromptInterpretationError::UnknownCatalogEntry(id.to_string()))?;
+        let catalog = topic
+            .catalog
+            .ok_or_else(|| PromptInterpretationError::UnknownCatalogEntry(id.to_string()))?;
+        let template = builtin_catalog()
+            .map_err(PromptInterpretationError::InvalidTemplateCatalog)?
+            .templates
+            .into_iter()
+            .find(|template| template.id == topic.template_id)
+            .ok_or_else(|| {
+                PromptInterpretationError::InvalidTemplateCatalog(format!(
+                    "native catalog entry {id} references missing template {}",
+                    topic.template_id
+                ))
+            })?;
+        Ok(PromptInterpretation {
+            normalized_statement: catalog.title,
+            promise: template.promise,
+            template_id: template.id,
+            template_version: template.version,
+            template_version_id: None,
+            catalog_entry_id: Some(topic.id),
+            catalog_entry_version: Some(catalog.version),
         })
     }
 }
@@ -224,6 +271,8 @@ where
                 subject_user_id: plan.subject_user_id,
                 source_actor_id: plan.source_actor_id,
                 template_version_id: plan.template_version_id,
+                catalog_entry_id: plan.catalog_entry_id.clone(),
+                catalog_entry_version: plan.catalog_entry_version,
                 raw_intent: plan.raw_intent.clone(),
                 normalized_statement: plan.normalized_statement.clone(),
                 idempotency_key: Some(plan.idempotency_key.clone()),
@@ -236,6 +285,9 @@ where
                 subject_user_id: goal.subject_user_id,
                 source_actor_id: goal.source_actor_id,
                 promise: plan.promise.clone(),
+                catalog_entry_id: plan.catalog_entry_id.clone(),
+                catalog_entry_version: plan.catalog_entry_version,
+                origin: plan.origin,
             })
             .await?;
 
@@ -271,6 +323,7 @@ where
             self.repository
                 .create_chapter(CreateChapter {
                     journey_id: journey.id,
+                    course_revision_id: None,
                     subject_user_id: journey.subject_user_id,
                     title: render_goal_text(&chapter.title, &plan.normalized_statement),
                     summary: render_goal_text(&chapter.summary, &plan.normalized_statement),
@@ -318,6 +371,7 @@ where
             self.repository
                 .create_activity(CreateActivity {
                     journey_id: journey.id,
+                    course_revision_id: None,
                     subject_user_id: journey.subject_user_id,
                     source_actor_id: plan.source_actor_id,
                     chapter_id: Some(chapter_id),
@@ -403,8 +457,15 @@ fn starter_blueprint(
     journey_id: Uuid,
 ) -> Result<StarterBlueprint, BootstrapError> {
     let subject = plan.subject_user_id;
-    let topic = find_topic_blueprint(&plan.normalized_statement)
+    let topic = plan
+        .catalog_entry_id
+        .as_deref()
+        .map(find_native_journey_blueprint)
+        .transpose()
         .map_err(BootstrapError::InvalidTopicBlueprint)?
+        .flatten()
+        .or(find_topic_blueprint(&plan.normalized_statement)
+            .map_err(BootstrapError::InvalidTopicBlueprint)?)
         .or(find_template_blueprint(&plan.template_id)
             .map_err(BootstrapError::InvalidTopicBlueprint)?);
     let topic = topic.ok_or_else(|| {
@@ -430,6 +491,7 @@ fn starter_blueprint(
         .map(
             |(order_index, (verb, statement, success_criteria))| CreateObjective {
                 journey_id,
+                course_revision_id: None,
                 subject_user_id: subject,
                 verb: verb.to_string(),
                 statement,
@@ -538,6 +600,22 @@ where
         interpreter: &P,
     ) -> Result<LearningPreview, PromptInterpretationError> {
         let interpretation = interpreter.interpret(raw_prompt).await?;
+        self.preview_from_interpretation(interpretation)
+    }
+
+    pub async fn preview_from_catalog_entry(
+        &self,
+        catalog_entry_id: &str,
+    ) -> Result<LearningPreview, PromptInterpretationError> {
+        self.preview_from_interpretation(CatalogPromptInterpreter::interpret_catalog_entry(
+            catalog_entry_id,
+        )?)
+    }
+
+    fn preview_from_interpretation(
+        &self,
+        interpretation: PromptInterpretation,
+    ) -> Result<LearningPreview, PromptInterpretationError> {
         let blueprint = starter_blueprint(
             &BootstrapPlan {
                 subject_user_id: Uuid::nil(),
@@ -548,6 +626,9 @@ where
                 template_id: interpretation.template_id.clone(),
                 template_version: interpretation.template_version,
                 template_version_id: interpretation.template_version_id,
+                catalog_entry_id: interpretation.catalog_entry_id.clone(),
+                catalog_entry_version: interpretation.catalog_entry_version,
+                origin: JourneyOrigin::Learner,
                 idempotency_key: "preview".to_string(),
             },
             Uuid::nil(),
@@ -629,6 +710,9 @@ where
                 template_id: request.template_id,
                 template_version: request.template_version,
                 template_version_id: request.template_version_id,
+                catalog_entry_id: request.catalog_entry_id,
+                catalog_entry_version: request.catalog_entry_version,
+                origin: JourneyOrigin::Learner,
                 idempotency_key: request.idempotency_key,
             })
             .await?;
@@ -652,6 +736,36 @@ where
             template_id: interpretation.template_id,
             template_version: interpretation.template_version,
             template_version_id: interpretation.template_version_id,
+            catalog_entry_id: interpretation.catalog_entry_id,
+            catalog_entry_version: interpretation.catalog_entry_version,
+            idempotency_key: request.idempotency_key,
+            registration_mode: request.registration_mode,
+        })
+        .await
+    }
+
+    pub async fn start_from_catalog_entry(
+        &self,
+        request: StartLearningPromptRequest,
+        catalog_entry_id: &str,
+    ) -> Result<StartLearningResult, StartLearningError> {
+        let interpretation = CatalogPromptInterpreter::interpret_catalog_entry(catalog_entry_id)?;
+        self.start_learning(StartLearningRequest {
+            authenticated_user_id: request.authenticated_user_id,
+            email: request.email,
+            display_name: request.display_name,
+            raw_intent: if !request.raw_prompt.trim().is_empty() {
+                request.raw_prompt
+            } else {
+                format!("Selected native journey: {catalog_entry_id}")
+            },
+            normalized_statement: interpretation.normalized_statement,
+            promise: interpretation.promise,
+            template_id: interpretation.template_id,
+            template_version: interpretation.template_version,
+            template_version_id: interpretation.template_version_id,
+            catalog_entry_id: interpretation.catalog_entry_id,
+            catalog_entry_version: interpretation.catalog_entry_version,
             idempotency_key: request.idempotency_key,
             registration_mode: request.registration_mode,
         })
@@ -696,7 +810,9 @@ mod tests {
         StartLearningRequest,
     };
     use crate::domain::identity::RegistrationMode;
-    use crate::domain::learning::{ActivityKind, LearningRepository, LearningRepositoryError};
+    use crate::domain::learning::{
+        ActivityKind, JourneyOrigin, LearningRepository, LearningRepositoryError,
+    };
     use crate::identity::InMemoryIdentityRepository;
     use crate::learning::InMemoryLearningRepository;
     use uuid::Uuid;
@@ -711,6 +827,9 @@ mod tests {
             template_id: "understand-a-subject".to_string(),
             template_version: 1,
             template_version_id: None,
+            catalog_entry_id: None,
+            catalog_entry_version: None,
+            origin: JourneyOrigin::Learner,
             idempotency_key: "onboarding/learner-selected-topic".to_string(),
         }
     }
@@ -726,6 +845,8 @@ mod tests {
             template_id: "understand-a-subject".to_string(),
             template_version: 1,
             template_version_id: None,
+            catalog_entry_id: None,
+            catalog_entry_version: None,
             idempotency_key: "onboarding/learner-selected-topic".to_string(),
             registration_mode: RegistrationMode::Open,
         }
@@ -757,6 +878,35 @@ mod tests {
         assert_eq!(
             result.bootstrap.goal.raw_intent,
             "I would like to learn a learner-selected topic"
+        );
+    }
+
+    #[tokio::test]
+    async fn catalog_selection_persists_the_reviewed_entry_on_goal_and_journey() {
+        let repository = InMemoryLearningRepository::default();
+        let service =
+            SelfHostOnboardingService::new(InMemoryIdentityRepository::default(), repository);
+        let result = service
+            .start_from_catalog_entry(start_learning_prompt_request(), "flink-cs-starter")
+            .await
+            .expect("catalog onboarding succeeds");
+
+        assert_eq!(
+            result.bootstrap.goal.catalog_entry_id.as_deref(),
+            Some("flink-cs-starter")
+        );
+        assert_eq!(result.bootstrap.goal.catalog_entry_version, Some(1));
+        assert_eq!(
+            result.bootstrap.journey.catalog_entry_id.as_deref(),
+            Some("flink-cs-starter")
+        );
+        assert_eq!(result.bootstrap.journey.catalog_entry_version, Some(1));
+        assert!(
+            result
+                .bootstrap
+                .goal
+                .normalized_statement
+                .contains("Apache Flink")
         );
     }
 

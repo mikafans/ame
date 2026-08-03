@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs local-api-contracts
+.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev dev-reset hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-seed local-logs local-api-contracts local-haru-simulation local-reference-courses local-learner-workspace
 
 API_HOST ?= localhost
 API_PORT ?= 28080
@@ -60,22 +60,24 @@ db-reset: ## Recreate the local database and cache
 	uv run scripts/tasks.py db-reset
 db-migrate: ## Run pending SQL migrations
 	uv run scripts/tasks.py db-migrate
-db-shell: ## Open an interactive local PostgreSQL shell
-	uvx pgcli postgres://postgres:postgres@localhost:5432/ame
-db-backup: db-up ## Back up local PostgreSQL
+db-shell: ## Open an interactive psql shell in the running make dev stack
+	uv run scripts/local_stack.py shell
+db-backup: db-up ## Back up the bare test Postgres (make test-db's database; not make dev's)
 	uv run scripts/db.py backup
-db-restore: db-up ## Restore local PostgreSQL
+db-restore: db-up ## Restore the bare test Postgres (make test-db's database; not make dev's)
 	uv run scripts/db.py restore
-db-admin: db-up ## Promote the configured admin account
-	uv run scripts/tasks.py db-admin
-db-seed: db-admin ## Seed demo data through the host API
-	uv run scripts/tasks.py db-seed
+db-admin: ## Promote the configured admin account in the running make dev stack
+	uv run scripts/local_stack.py admin
+db-seed: ## Seed demo data in the running make dev stack (make dev already does this on first boot)
+	uv run scripts/local_stack.py seed
 init-env: ## Install project toolchains, dependencies, and browsers
 	uv run scripts/tasks.py init-env
-dev: ## Start the host development stack
-	uv run scripts/tasks.py dev
-stop: ## Stop the host development stack
-	uv run scripts/tasks.py stop
+dev: ## Start the one local stack: Postgres, Valkey, API, and web behind Caddy at :28800
+	uv run scripts/local_stack.py up
+stop: ## Stop the local stack; keeps the named Postgres volume
+	uv run scripts/local_stack.py down
+dev-reset: ## Wipe the local stack's Postgres volume and restart clean
+	uv run scripts/local_stack.py reset
 
 # Container workflows
 docker-build: ## Build production-shaped images
@@ -86,16 +88,18 @@ docker-down: ## Stop the production-shaped stack
 	uv run scripts/tasks.py docker-down
 docker-logs: ## Tail production-shaped stack logs
 	uv run scripts/tasks.py docker-logs
-local-up: ## Start the debug stack behind Caddy at :28800
-	uv run scripts/local_stack.py up
-local-down: ## Stop the debug stack and keep named volumes
-	uv run scripts/local_stack.py down
 local-seed: ## Seed the containerized stack through Caddy
 	uv run scripts/local_stack.py seed
 local-logs: ## Tail containerized stack logs
 	uv run scripts/local_stack.py logs
 local-api-contracts: ## Run the api_tests black-box contract suite through Caddy
 	uv run scripts/local_stack.py api-contracts
+local-haru-simulation: ## Create a disposable three-round Haru journey; requires HARU_SIM_PASSWORD
+	uv run scripts/haru_simulation.py
+local-reference-courses: ## Create delegated Flink and Netty courses for one learner; requires HARU_REFERENCE_PASSWORD
+	uv run scripts/seed_reference_courses.py
+local-learner-workspace: ## Seed active/completed delegated courses and smoke the learner workspace through Caddy
+	uv run scripts/local_stack.py learner-workspace
 
 hooks-install: ## Configure the repository git hooks
 	git config core.hooksPath .githooks

@@ -21,18 +21,21 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Login,
+    Delegation,
 }
 
 impl TokenKind {
     pub fn prefix(&self) -> &'static str {
         match self {
             Self::Login => "lgn",
+            Self::Delegation => "dlg",
         }
     }
 
     pub fn parse(prefix: &str) -> Option<Self> {
         match prefix {
             "lgn" => Some(Self::Login),
+            "dlg" => Some(Self::Delegation),
             _ => None,
         }
     }
@@ -151,6 +154,14 @@ mod tests {
         assert_eq!(parsed.kind, TokenKind::Login);
         assert_eq!(parsed.id, token_id);
         assert_eq!(parsed.secret, "my_secret_token");
+    }
+
+    #[test]
+    fn parses_delegated_course_author_token() {
+        let token_id = uuid::Uuid::now_v7();
+        let parsed = parse_bearer_token(&format!("Bearer dlg_{token_id}_capability")).unwrap();
+        assert_eq!(parsed.kind, TokenKind::Delegation);
+        assert_eq!(parsed.id, token_id);
     }
 
     #[test]

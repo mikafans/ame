@@ -49,11 +49,42 @@ pub struct TopicBlueprint {
     pub template_id: String,
     #[serde(default)]
     pub field: String,
+    #[serde(default)]
+    pub catalog: Option<NativeJourneyCatalog>,
     pub aliases: Vec<String>,
     pub objectives: Vec<TopicObjective>,
     pub chapters: Vec<TopicChapter>,
     pub first_activity: TopicFirstActivity,
     pub follow_up_activities: Vec<TopicActivity>,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct NativeJourneyCatalog {
+    pub version: u32,
+    pub title: String,
+    pub description: String,
+    pub level: String,
+    pub estimated_minutes: i64,
+    pub outcomes: Vec<String>,
+    pub source_summary: String,
+    pub sources: Vec<NativeJourneySource>,
+    pub content_review: NativeJourneyContentReview,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct NativeJourneySource {
+    pub title: String,
+    pub url: String,
+    pub locator: Option<String>,
+    pub license: String,
+    pub source_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct NativeJourneyContentReview {
+    pub status: String,
+    pub reviewed_at: String,
+    pub reviewer: String,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
@@ -102,7 +133,12 @@ pub fn builtin_catalog() -> Result<TemplateCatalog, String> {
 pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
     let topics: Vec<TopicBlueprint> = serde_json::from_str(TOPIC_BLUEPRINTS)
         .map_err(|error| format!("invalid topic blueprints: {error}"))?;
-    for topic in &topics {
+    validate_topic_blueprints(&topics)?;
+    Ok(topics)
+}
+
+fn validate_topic_blueprints(topics: &[TopicBlueprint]) -> Result<(), String> {
+    for topic in topics {
         if topic.id.trim().is_empty()
             || topic.template_id.trim().is_empty()
             || topic.objectives.is_empty()
@@ -114,6 +150,34 @@ pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
                 "topic blueprints must contain identity, objectives, chapters, and questions"
                     .into(),
             );
+        }
+
+        if let Some(catalog) = &topic.catalog
+            && (catalog.version == 0
+                || catalog.title.trim().is_empty()
+                || catalog.description.trim().is_empty()
+                || catalog.level.trim().is_empty()
+                || catalog.estimated_minutes <= 0
+                || catalog.outcomes.is_empty()
+                || catalog
+                    .outcomes
+                    .iter()
+                    .any(|outcome| outcome.trim().is_empty())
+                || catalog.source_summary.trim().is_empty()
+                || catalog.sources.is_empty()
+                || catalog.sources.iter().any(|source| {
+                    source.title.trim().is_empty()
+                        || !source.url.starts_with("https://")
+                        || source.license.trim().is_empty()
+                })
+                || catalog.content_review.status != "reviewed"
+                || catalog.content_review.reviewed_at.trim().is_empty()
+                || catalog.content_review.reviewer.trim().is_empty())
+        {
+            return Err(format!(
+                "native catalog entry {} must have reviewed learner metadata",
+                topic.id
+            ));
         }
 
         let mut activity_orders: Vec<i32> = topic
@@ -135,7 +199,7 @@ pub fn topic_blueprints() -> Result<Vec<TopicBlueprint>, String> {
             ));
         }
     }
-    Ok(topics)
+    Ok(())
 }
 
 pub fn find_topic_blueprint(prompt: &str) -> Result<Option<TopicBlueprint>, String> {
@@ -148,6 +212,19 @@ pub fn find_topic_blueprint(prompt: &str) -> Result<Option<TopicBlueprint>, Stri
                 .any(|alias| normalized.contains(&alias.to_lowercase()))
         })
     })
+}
+
+pub fn native_journey_blueprints() -> Result<Vec<TopicBlueprint>, String> {
+    topic_blueprints().map(|topics| {
+        topics
+            .into_iter()
+            .filter(|topic| topic.catalog.is_some())
+            .collect()
+    })
+}
+
+pub fn find_native_journey_blueprint(id: &str) -> Result<Option<TopicBlueprint>, String> {
+    native_journey_blueprints().map(|topics| topics.into_iter().find(|topic| topic.id == id))
 }
 
 pub fn find_template_blueprint(template_id: &str) -> Result<Option<TopicBlueprint>, String> {
@@ -253,7 +330,8 @@ fn validate_catalog(catalog: &TemplateCatalog) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        TemplateRecommendation, builtin_catalog, find_topic_blueprint, recommend_builtin_template,
+        TemplateRecommendation, builtin_catalog, find_native_journey_blueprint,
+        find_topic_blueprint, native_journey_blueprints, recommend_builtin_template,
     };
 
     #[test]
@@ -322,6 +400,51 @@ mod tests {
                 .expect("topic blueprint catalog must parse")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn native_journeys_expose_only_reviewed_metadata() {
+        let journeys = native_journey_blueprints().expect("native journey catalog must parse");
+
+        assert_eq!(journeys.len(), 8);
+        let ids: Vec<_> = journeys.iter().map(|journey| journey.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "learning-science-starter",
+                "rust-ownership-starter",
+                "python-foundations-starter",
+                "sql-foundations-starter",
+                "linear-algebra-starter",
+                "technical-writing-starter",
+                "flink-cs-starter",
+                "physics-mechanics-starter"
+            ]
+        );
+        let flink = find_native_journey_blueprint("flink-cs-starter")
+            .expect("native journey catalog must parse")
+            .expect("Flink is catalog-ready");
+        let metadata = flink.catalog.expect("Flink metadata is present");
+        assert_eq!(metadata.version, 1);
+        assert_eq!(metadata.content_review.status, "reviewed");
+        assert!(!metadata.sources.is_empty());
+        assert!(!metadata.outcomes.is_empty());
+        assert!(
+            find_native_journey_blueprint("subject-starter")
+                .expect("native journey catalog must parse")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn native_catalog_rejects_missing_structured_provenance() {
+        let mut topics = super::topic_blueprints().expect("topic blueprint catalog must parse");
+        let catalog = topics
+            .iter_mut()
+            .find_map(|topic| topic.catalog.as_mut())
+            .expect("catalog metadata");
+        catalog.sources.clear();
+        assert!(super::validate_topic_blueprints(&topics).is_err());
     }
 
     #[test]

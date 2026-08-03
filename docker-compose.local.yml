@@ -31,6 +31,10 @@ services:
       AME_CORS_ORIGINS: http://localhost:28800
     volumes:
       - ./api:/workspace/api
+      # The API is a workspace crate: mount its shared crates as well so a
+      # local source restart never compiles new handlers against stale image
+      # copies of domain/application/Postgres contracts.
+      - ./crates:/workspace/crates
       - ./db/migrations:/workspace/db/migrations:ro
       - ./ame.dev.toml:/workspace/ame.dev.toml:ro
       - cargo-registry:/usr/local/cargo/registry

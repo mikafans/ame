@@ -1,7 +1,7 @@
 {
   "auth": {
     "format": "ame_token",
-    "registration": "POST /public/v1/auth/register followed by POST /public/v1/onboarding/start returns a learner bearer token; no separate integration identity is required.",
+    "registration": "POST /public/v1/auth/register returns the bearer token. Send it on POST /public/v1/onboarding/start with the same email; no separate integration identity is required.",
     "type": "bearer"
   },
   "description": "ame — study, sweetened. An agent-friendly learning API with one owner-scoped learner model.",
@@ -65,9 +65,32 @@
       "path": "/public/v1/auth/login"
     },
     {
+      "description": "Read AME's public learning rules, user stories, evidence boundary, and fixture-simulation policy before mutating learner state.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.contract.get",
+      "path": "/public/learning-contract.json"
+    },
+    {
+      "description": "List reviewed native journeys that may be selected through the same onboarding contract as a freeform prompt. Each entry includes structured source links, licenses, optional locators or source versions, and an explicit content-review record.",
+      "input_schema": {
+        "properties": {},
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.catalog.list",
+      "path": "/public/v1/catalog/journeys"
+    },
+    {
       "description": "Preview the promise, objectives, and first activity for a learner's prompt without creating state.",
       "input_schema": {
         "properties": {
+          "catalogId": {
+            "type": "string"
+          },
           "prompt": {
             "type": "string"
           }
@@ -82,9 +105,12 @@
       "path": "/public/v1/onboarding/preview"
     },
     {
-      "description": "Create or resume a learner account and bootstrap the first owner-scoped journey from one prompt.",
+      "description": "Bootstrap the first owner-scoped journey. After register or login, send that learner's bearer token and the matching email; unauthenticated start is only for a previously unknown email.",
       "input_schema": {
         "properties": {
+          "catalogId": {
+            "type": "string"
+          },
           "displayName": {
             "type": "string"
           },
@@ -138,6 +164,392 @@
       "method": "GET",
       "name": "learning.journey.get",
       "path": "/api/v1/learning/journeys/{id}"
+    },
+    {
+      "description": "Create an empty, owner-scoped draft course from the learner brief and approved citation certificates. This never inserts generic starter material; author outcomes, modules, instruction, checks, assessment/task work, validate, then publish.",
+      "input_schema": {
+        "properties": {
+          "brief": {
+            "required": [
+              "title",
+              "audience",
+              "estimatedMinutes",
+              "prerequisites",
+              "outcomes",
+              "modules"
+            ],
+            "type": "object"
+          },
+          "idempotencyKey": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rawIntent": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sourceReferences": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "rawIntent",
+          "idempotencyKey",
+          "brief",
+          "sourceReferences"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.create",
+      "path": "/api/v1/learning/courses"
+    },
+    {
+      "description": "Create a new empty draft revision for an owned journey after its prior revision is published or retired. Supply a complete, source-grounded brief, then author a new revision-scoped graph; AME never mutates a published course graph in place.",
+      "input_schema": {
+        "properties": {
+          "brief": {
+            "required": [
+              "title",
+              "audience",
+              "estimatedMinutes",
+              "prerequisites",
+              "outcomes",
+              "modules"
+            ],
+            "type": "object"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceReferences": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "journeyId",
+          "brief",
+          "sourceReferences"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions"
+    },
+    {
+      "description": "Read an owned revision's lifecycle status, persisted brief, source certificates, server validation diagnostics, review record, and publication timestamp before editing or retrying a transition.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.course.revision.get",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}"
+    },
+    {
+      "description": "Clone a published revision into a new private draft with fresh objectives, modules, activities, assessments, and assessment-item links. It preserves the published learner graph until the fork separately validates, reviews, and publishes.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.fork",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork"
+    },
+    {
+      "description": "Append a measurable outcome to the active draft revision before linking instructional activities, formative checks, or mastery work to it.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "statement": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "successCriteria": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "verb": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId",
+          "verb",
+          "statement",
+          "successCriteria"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.objective.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/objectives"
+    },
+    {
+      "description": "Run the server-side course validator. It reports stable blocking diagnostics for missing source grounding, module instruction/example coverage, formative rationale and learner explanation feedback, assessment/task mastery coverage, rubrics, and review state.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.validate",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate"
+    },
+    {
+      "description": "Move a valid owned draft course revision to review, recording the approval metadata after the server-side validator passes. Review must include non-empty reviewer, decision=approved, and notes.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "review": {
+            "properties": {
+              "decision": {
+                "enum": [
+                  "approved"
+                ],
+                "type": "string"
+              },
+              "notes": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "reviewer": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "reviewer",
+              "decision",
+              "notes"
+            ],
+            "type": "object"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId",
+          "review"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.review",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review"
+    },
+    {
+      "description": "Publish a reviewed course revision. This is the only agent-facing publication command for a course; it revalidates atomically and exposes reviewed activities only if no blocking diagnostic remains.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.revision.publish",
+      "path": "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish"
+    },
+    {
+      "description": "Append a named chapter to the active draft revision. Create chapters before the activities they contain; AME assigns the next stable chapter order within that revision.",
+      "input_schema": {
+        "properties": {
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "summary": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId",
+          "title",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.chapter.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/chapters"
+    },
+    {
+      "description": "Append an objective-linked draft course activity. Use ready only for the learner's next startable activity and proposed for later ordered activities. It remains private until course-level validation, review, and publication succeed. A practice activity can receive a published assessment; an application activity can receive a reviewed rubric and task submission.",
+      "input_schema": {
+        "properties": {
+          "chapterId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "journeyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "explanation",
+              "example",
+              "diagnostic",
+              "practice",
+              "feedback",
+              "application",
+              "reflection",
+              "milestone",
+              "timed_practice",
+              "recommendation"
+            ],
+            "type": "string"
+          },
+          "objectiveIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "proposed"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "journeyId",
+          "revisionId",
+          "kind",
+          "title",
+          "payload",
+          "objectiveIds",
+          "status"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.activity.create",
+      "path": "/api/v1/learning/journeys/{journey_id}/activities"
+    },
+    {
+      "description": "Move an owned draft-revision activity into review. This is required before publication; callers cannot create learner-visible activities directly.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "method": "POST",
+      "name": "learning.course.activity.review",
+      "path": "/api/v1/learning/activities/{activity_id}/review"
     },
     {
       "description": "Start an activity in an owned journey.",
@@ -538,7 +950,7 @@
       "path": "/api/v1/learning-variants/{id}"
     },
     {
-      "description": "Export an owned journey and learner history as a versioned, checksummed application manifest.",
+      "description": "Export an owned journey and learner history as a versioned, checksummed application manifest that preserves its immutable learner or fixture origin.",
       "input_schema": {
         "properties": {
           "id": {
@@ -619,7 +1031,7 @@
       "path": "/api/v1/learning/journeys/{id}/analytics"
     },
     {
-      "description": "Finish a learning session and persist the learner's evidence and responses.",
+      "description": "Finish a learning session and persist completion responses. This is not mastery evidence: record mastery only from a graded assessment attempt or reviewed task submission.",
       "input_schema": {
         "properties": {
           "completed": {
@@ -661,6 +1073,24 @@
       "method": "GET",
       "name": "learning.session.get",
       "path": "/api/v1/learning/sessions/{id}"
+    },
+    {
+      "description": "Read an owned activity's immutable published payload, version, rubric, and status without starting or reopening a learner session. Use this to review completed work.",
+      "input_schema": {
+        "properties": {
+          "activityId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activityId"
+        ],
+        "type": "object"
+      },
+      "method": "GET",
+      "name": "learning.activity.content.get",
+      "path": "/api/v1/learning/activities/{activity_id}/content"
     },
     {
       "description": "Start a submission for an application task at its immutable content version. The response is not evidence until evaluation reaches a reviewed state.",
@@ -772,6 +1202,10 @@
             ],
             "type": "string"
           },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "sourceReferences": {
             "items": {
               "type": "string"
@@ -782,6 +1216,7 @@
         },
         "required": [
           "activityId",
+          "revisionId",
           "generationRunId",
           "content",
           "sourceReferences",
@@ -810,6 +1245,10 @@
             "enum": [
               "approved"
             ],
+            "type": "string"
+          },
+          "revisionId": {
+            "format": "uuid",
             "type": "string"
           },
           "rubric": {
@@ -874,6 +1313,7 @@
         },
         "required": [
           "activityId",
+          "revisionId",
           "generationRunId",
           "rubric",
           "sourceReferences",
@@ -886,7 +1326,7 @@
       "path": "/api/v1/learning/activities/{activity_id}/rubric"
     },
     {
-      "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory.",
+      "description": "Create a learner-owned versioned question from a published question.compose generation run; provenance is mandatory. For a course formative check, set both rationale and explanation: explanation is the learner-facing correct-answer feedback (there is no feedback field).",
       "input_schema": {
         "properties": {
           "acceptedAnswers": {
@@ -899,6 +1339,7 @@
             "type": "string"
           },
           "explanation": {
+            "description": "Learner-facing correct-answer feedback; required alongside rationale for a publishable formative check.",
             "type": "string"
           },
           "generationRunId": {
@@ -927,6 +1368,7 @@
             "type": "string"
           },
           "rationale": {
+            "description": "Why this question assesses the linked objective; required alongside explanation for a publishable formative check.",
             "type": "string"
           },
           "reviewStatus": {
@@ -1009,7 +1451,7 @@
       "path": "/api/v1/questions/{question_id}/versions"
     },
     {
-      "description": "Compose approved question versions into a learner-owned practice or graded assessment.",
+      "description": "Compose approved immutable question versions into a practice or graded assessment attached to the active draft revision. From a question response, use questionId (logical ID) and version (integer) for each item; do not use id, which is the immutable version UUID.",
       "input_schema": {
         "properties": {
           "activityId": {
@@ -1056,11 +1498,16 @@
             ],
             "type": "string"
           },
+          "revisionId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "status": {
             "type": "string"
           }
         },
         "required": [
+          "revisionId",
           "activityId",
           "mode",
           "items"
@@ -1131,7 +1578,7 @@
       "path": "/api/v1/assessments/{assessment_id}/attempts"
     },
     {
-      "description": "Save one answer while preserving assessment item and question version identity.",
+      "description": "Save one answer while preserving assessment item and question version identity. Response envelopes are question-kind specific: multiple choice uses {option_id: option-id}; true/false, short answer, and numeric use {value: boolean|string|number}. Numeric accepts a JSON number or numeric string; do not use {answer: ...}.",
       "input_schema": {
         "properties": {
           "assessmentItemId": {
@@ -1147,6 +1594,7 @@
             "type": "string"
           },
           "response": {
+            "description": "multiple_choice: {option_id: string}; true_false, short_answer, numeric: {value: boolean|string|number}; numeric accepts a JSON number or numeric string.",
             "type": "object"
           }
         },
@@ -1482,7 +1930,7 @@
       "path": "/api/v1/deep-dives/{id}"
     },
     {
-      "description": "Start or resume an owner-scoped provider generation run with an idempotent retry key.",
+      "description": "Start or resume an owner-scoped provider generation run with an idempotent retry key. operation is one of the published literal operation identifiers; do not infer a string from an endpoint name.",
       "input_schema": {
         "properties": {
           "contentVersion": {
@@ -1490,6 +1938,12 @@
             "type": "integer"
           },
           "operation": {
+            "enum": [
+              "learning.activity.content.compose",
+              "learning.activity.rubric.compose",
+              "question.compose",
+              "deep_dive.create"
+            ],
             "type": "string"
           },
           "provider": {
@@ -1527,7 +1981,7 @@
       "path": "/api/v1/generation-runs/{id}"
     },
     {
-      "description": "Advance an owned generation run or record a provider failure; failed runs cannot be published.",
+      "description": "Advance an owned generation run or record a provider failure; failed runs cannot be published. The successful path is requested -> running -> review_required -> published; do not skip states. A failure may be recorded from a nonterminal state.",
       "input_schema": {
         "properties": {
           "error": {

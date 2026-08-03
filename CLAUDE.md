@@ -23,14 +23,15 @@ specs were fine. It was *validate the need* and *test-first the refactor*.
 **Always use `make` — never raw commands.**
 
 - `make init-env` — one-time setup on a fresh checkout: web deps + Playwright browsers (language runtimes and `sqlx-cli` come from mise, not this target)
-- `make dev` — start the full stack (kills stale procs, migrates, starts API + frontend)
-- `make stop` — stop everything
+- `make dev` — start the one local stack: Postgres, Valkey, API, and web, all containerized behind Caddy at `:28800`. Auto-seeds demo accounts (`haru@example.com`, `admin@example.com`, both `password123`) on first boot. Hot-reloads on source edits (web instantly; the API container recompiles in place, cached).
+- `make stop` — stop the local stack; keeps the named Postgres volume
+- `make dev-reset` — wipe the local stack's Postgres volume and restart clean (use this for a migration-checksum mismatch, not `make db-reset`)
 - `make check` — pre-commit gate (fmt-check + lint + test)
 - `make ci` — full gate: `make check` + DB tests + e2e (resets the DB between them)
-- `make test-db` — DB-backed API integration tests (requires `make db-up`; `make check` skips these unless `AME_RUN_DB_TESTS=1`)
-- `make e2e` — Playwright tests
-- `make db-up` / `make db-down` — start / stop Postgres
-- `make db-seed` — seed demo data (requires API running)
+- `make test-db` — DB-backed API integration tests against a separate, bare Postgres (`make db-up`) used only by this target and `make ci` — unrelated to the `make dev` stack/database. `make check` skips these unless `AME_RUN_DB_TESTS=1`
+- `make e2e` — Playwright tests (self-contained; spins up its own temporary API/web processes, independent of `make dev`)
+- `make db-up` / `make db-down` — start / stop the bare Postgres used only by `make test-db`/`make ci`
+- `make local-seed` / `make local-reference-courses` / `make local-haru-simulation` / `make local-learner-workspace` — extra fixtures against the running `make dev` stack (Flink/Netty reference courses, disposable simulations); `make dev` already seeds the base demo accounts on its own
 
 Never run `npm run dev`, `bun run dev`, `cargo run`, etc. directly. Always go through Make.
 
@@ -44,10 +45,10 @@ After making code changes, **always restart the dev server** via `make dev` to p
 
 ## Stack
 
-- **API**: Rust (axum) — `make dev` serves on `:28080` (override with `API_PORT`; the bare `ame-api` binary defaults to `AME_PORT` 8080)
-- **Frontend**: Next.js (bun) — `make dev` serves on `:23000` (override with `WEB_PORT`)
-- Access remotely via Tailscale: `make dev API_HOST=harus-mini` → http://harus-mini:23000
-- **DB**: Postgres 18 via docker/podman compose (`db/docker-compose.yml`)
+- **API**: Rust (axum) — containerized by `make dev`, reachable through Caddy at `:28800` (not a separate host port; the bare `ame-api` binary defaults to `AME_PORT` 8080 if run directly, which `make dev` no longer does)
+- **Frontend**: Next.js (bun) — containerized by `make dev`, also served through Caddy at `:28800` (same origin as the API and the static `/public/*` agent docs)
+- Access remotely via Tailscale: the container's Caddy binds all interfaces, so a host running `make dev` is reachable at `http://harus-mini:28800` (no `API_HOST` override needed)
+- **DB**: Postgres 18, containerized alongside the API/web/Caddy in `docker-compose.local.yml` for `make dev`; a separate bare Postgres via `db/docker-compose.yml` backs `make test-db`/`make ci` only
 - **Schema**: OpenAPI at `api/openapi.yaml`; regenerate with `make openapi`
 - **Toolchain**: Rust edition 2024, Axum 0.8, Tokio, sqlx; Next.js 16 / React 19 / Tailwind CSS 4 + shadcn/ui. `mise.toml` provides the toolchain — rust (+ rustfmt/clippy), bun, uv, python 3.14, sqlx-cli, podman-compose. Run `mise install` once; tools then activate automatically on `cd` into the repo (mise's shell hook), or explicitly via `mise x -- <command>` in non-interactive shells (e.g. `mise x -- make <target>`). `rust-analyzer` is not mise-managed — install it via your editor's Rust extension or `rustup component add rust-analyzer`. Migrations: `sqlx migrate run`; SQL lint: `uvx sqlfluff`; SQL client: `uvx pgcli postgres://postgres:postgres@localhost:5432/ame`.
 - **Canonical spec**: `docs/plans/2026-07-19-agent-first-learning-rework.md` (design, user stories, contracts, and TDD matrix for the current 0.3 agent-first rework; see `docs/ROADMAP.md`). The earlier `docs/specs/2026-05-20-harus-platform-design.md` was retired once its content landed in code. Implementation plans in `docs/plans/`.
@@ -85,16 +86,16 @@ After making code changes, **always restart the dev server** via `make dev` to p
 - **Search with `rg`, find with `fd`** — never `grep -r` or `find`.
 - **Read files directly** — if `rg` gives you a path, use the Read tool. Never pipe into `xargs rg`.
 - **Long `make` output** — redirect to a file (`make check > .tmp/check.log 2>&1`) then Read it. `grep` on terminal-truncated output silently misses content.
-- **Migration checksum mismatch** (sqlfluff reformatted a migration after it was applied) — fix with `make db-reset` then `make dev`, not manual DB surgery.
+- **Migration checksum mismatch** (sqlfluff reformatted a migration after it was applied) — fix with `make dev-reset` (wipes the `make dev` stack's own Postgres volume) for the local stack, or `make db-reset` then `make test-db` for the separate bare test Postgres. Not manual DB surgery.
 - **JS runtime** — use `bun`, never `node`. Playwright: `bunx @playwright/cli`.
 - **Verifier scripts** — write to `.claude/scripts/` for reuse, run with `bun .claude/scripts/<name>.js`.
 
 ## E2E & Visual Audit
 
-- Full suite: `E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:23000 bunx @playwright/test test --project=chromium`.
+- Full suite (against a running `make dev`): `E2E_API_TOKEN=<learner-token> E2E_BASE_URL=http://localhost:28800 bunx @playwright/test test --project=chromium`.
 - Interactive audit uses `@playwright/cli` (**not** `playwright-cli` — that 404s). Run from `.tmp/` (gitignored) so snapshots land there.
 - **Auth pattern**: cookies don't survive `goto` — re-set on each new page: `bunx @playwright/cli cookie-set ame_token "<token>" --domain=localhost` → `reload` → `sleep 3` (async `useAuth`; screenshotting too early catches the Loading state).
-- Mint a learner token: `curl -s -X POST http://localhost:28080/public/v1/auth/login -H "Content-Type: application/json" -d '{"email":"ada@example.com","password":"password123"}' | jq -r .token`.
+- Mint a learner token: `curl -s -X POST http://localhost:28800/public/v1/auth/login -H "Content-Type: application/json" -d '{"email":"ada@example.com","password":"password123"}' | jq -r .token`.
 - **fish + jq**: a multi-line variable piped into `jq` breaks — write to a temp file first (`curl -s <url> -o /tmp/out.json && jq '.field' /tmp/out.json`).
 
 ## Agent Surface

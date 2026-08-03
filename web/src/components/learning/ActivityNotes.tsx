@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 
@@ -25,16 +25,16 @@ export function ActivityNotes({
   const [editing, setEditing] = useState<Note | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function reload() {
+  const reload = useCallback(async () => {
     const result = await api.GET("/api/v1/notes", {
       params: { query: { journeyId, activityId } },
     });
     if (result.response.ok && result.data) setNotes(result.data as Note[]);
-  }
+  }, [activityId, journeyId]);
 
   useEffect(() => {
     void reload();
-  }, [journeyId, activityId]);
+  }, [reload]);
 
   async function save() {
     if (!body.trim()) return;

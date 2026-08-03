@@ -83,9 +83,12 @@ async function onboardIntoJourney(
   name: string,
   email: string,
   password: string,
+  catalogId?: string,
 ) {
-  await page.goto("/start");
-  await page.getByLabel("What would you like to learn?").fill(prompt);
+  await page.goto(catalogId ? `/start?catalogId=${catalogId}` : "/start");
+  if (!catalogId) {
+    await page.getByLabel("What would you like to learn?").fill(prompt);
+  }
   await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email identifier").fill(email);
   await page.getByLabel("Password").fill(password);
@@ -104,6 +107,85 @@ async function onboardIntoJourney(
   const journey = await journeyResponse.json();
   return { journeyId: journeyId as string, journey };
 }
+
+test("native catalog lists eight reviewed journeys and previews each deterministically", async ({
+  page,
+}) => {
+  const catalogResponse = await page.request.get(
+    apiUrl("/public/v1/catalog/journeys"),
+  );
+  expect(catalogResponse.ok()).toBeTruthy();
+  const catalog = await catalogResponse.json();
+  const ids = catalog.map((entry: { id: string }) => entry.id);
+  expect(ids).toEqual([
+    "learning-science-starter",
+    "rust-ownership-starter",
+    "python-foundations-starter",
+    "sql-foundations-starter",
+    "linear-algebra-starter",
+    "technical-writing-starter",
+    "flink-cs-starter",
+    "physics-mechanics-starter",
+  ]);
+  expect(
+    catalog.every(
+      (entry: { contentReview: { status: string }; outcomes: string[] }) =>
+        entry.contentReview.status === "reviewed" && entry.outcomes.length > 0,
+    ),
+  ).toBeTruthy();
+
+  for (const id of ids) {
+    const preview = await page.request.post(
+      apiUrl("/public/v1/onboarding/preview"),
+      { data: { prompt: "", catalogId: id } },
+    );
+    expect(preview.ok(), id).toBeTruthy();
+    const body = await preview.json();
+    expect(body.catalogId).toBe(id);
+    expect(body.catalogVersion).toBe(1);
+    expect(body.objectives.length).toBeGreaterThan(0);
+  }
+});
+
+test("new learner discovers a native journey card from the learning desk", async ({
+  page,
+}) => {
+  const email = `native-catalog-${Date.now()}@example.com`;
+  const registration = await page.request.post(
+    apiUrl("/public/v1/auth/register"),
+    { data: { email, name: "Catalog Learner", password: "catalog-2026" } },
+  );
+  expect(registration.ok()).toBeTruthy();
+  const { token } = await registration.json();
+  await page.context().addCookies([
+    {
+      name: "ame_token",
+      value: token,
+      url: process.env.E2E_BASE_URL ?? "http://localhost:23000",
+    },
+  ]);
+
+  await page.goto("/learning");
+  const catalog = page.getByTestId("native-journey-catalog");
+  await expect(catalog).toBeVisible();
+  await expect(
+    catalog.getByRole("heading", { name: "No journeys in this account yet." }),
+  ).toBeVisible();
+  await expect(
+    catalog.getByText("This is your private course library."),
+  ).toBeVisible();
+  await expect(
+    catalog.getByRole("link", { name: "How an agent sets up a course" }),
+  ).toHaveAttribute("href", "/agent");
+  await expect(
+    catalog.getByRole("heading", { name: "SQL foundations" }),
+  ).toBeVisible();
+  await expect(catalog.getByText("sql-foundations-starter")).toBeVisible();
+  await catalog
+    .locator('a[href="/start?catalogId=learning-science-starter"]')
+    .click();
+  await expect(page).toHaveURL(/\/start\?catalogId=learning-science-starter$/);
+});
 
 test("learner writes, resumes, edits, and deletes a version-anchored private note", async ({
   page,
@@ -144,10 +226,9 @@ test("owner inspects an export and repeated import does not duplicate learner st
     "portable-golden-2026",
   );
   await page.goto("/learning");
-  const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON" }).click();
-  await download;
   const artifact = page.getByLabel("Journey portability artifact");
+  await expect(artifact).toBeVisible();
   await expect(artifact).toHaveValue(/ame\.journey-history\.v1/);
   await expect(artifact).toHaveValue(/"checksum"/);
   await page.getByRole("button", { name: "Import JSON" }).click();
@@ -249,7 +330,11 @@ test("learner sees variant failure, retries, and uses reviewed source-backed con
   );
   expect(masteryAfter.status()).toBe(masteryBefore.status());
   if (masteryBefore.ok()) {
-    expect(await masteryAfter.json()).toEqual(await masteryBefore.json());
+    const before = await masteryBefore.json();
+    const after = await masteryAfter.json();
+    delete before.calculatedAt;
+    delete after.calculatedAt;
+    expect(after).toEqual(before);
   }
 });
 
@@ -263,7 +348,11 @@ test("physics golden journey seeds deterministically and grades numeric answers 
     "Physics Learner",
     email,
     "physics-golden-2026",
+    "physics-mechanics-starter",
   );
+
+  expect(journey.goal.catalogEntryId).toBe("physics-mechanics-starter");
+  expect(journey.goal.catalogEntryVersion).toBe(1);
 
   expect(
     journey.chapters.map((chapter: { title: string }) => chapter.title),
@@ -499,7 +588,11 @@ test("flink golden journey seeds deterministically and routes a code submission 
     "Flink Learner",
     email,
     "flink-golden-2026",
+    "flink-cs-starter",
   );
+
+  expect(journey.goal.catalogEntryId).toBe("flink-cs-starter");
+  expect(journey.goal.catalogEntryVersion).toBe(1);
 
   expect(
     journey.chapters.map((chapter: { title: string }) => chapter.title),

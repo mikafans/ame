@@ -38,6 +38,7 @@ impl ReviewRepository for PgReviewRepository {
                        a.content_version, e.id, now()
                   FROM tb_mastery_evidence e
                   JOIN tb_activities a ON a.id = e.activity_id
+                  JOIN tb_learning_journeys j ON j.id = e.journey_id AND j.origin = 'learner'
                  WHERE e.id = $1 AND e.subject_user_id = $2
                 ON CONFLICT (subject_user_id, source_evidence_id)
                 DO UPDATE SET source_evidence_id = EXCLUDED.source_evidence_id
@@ -62,9 +63,10 @@ impl ReviewRepository for PgReviewRepository {
         // rather than the API process's clock — otherwise clock skew between hosts can hide
         // a review item that was just seeded moments ago.
         sqlx::query(
-            "SELECT * FROM tb_review_items
-             WHERE subject_user_id = $1 AND due_at <= COALESCE($2, now())
-             ORDER BY due_at, created_at",
+            "SELECT r.* FROM tb_review_items r
+             JOIN tb_learning_journeys j ON j.id = r.journey_id AND j.origin = 'learner'
+             WHERE r.subject_user_id = $1 AND r.due_at <= COALESCE($2, now())
+             ORDER BY r.due_at, r.created_at",
         )
         .bind(subject_user_id)
         .bind(due_before)
@@ -77,7 +79,9 @@ impl ReviewRepository for PgReviewRepository {
     async fn rate(&self, input: RateReview) -> Result<ReviewItem, ReviewScheduleError> {
         let mut transaction = self.pool.begin().await.map_err(storage)?;
         let row = sqlx::query(
-            "SELECT * FROM tb_review_items WHERE id = $1 AND subject_user_id = $2 FOR UPDATE",
+            "SELECT r.* FROM tb_review_items r
+             JOIN tb_learning_journeys j ON j.id = r.journey_id AND j.origin = 'learner'
+             WHERE r.id = $1 AND r.subject_user_id = $2 FOR UPDATE",
         )
         .bind(input.review_item_id)
         .bind(input.subject_user_id)

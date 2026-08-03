@@ -3,10 +3,11 @@
 use ame_learning_domain::{
     ActivityKind, ActivityPublicationStatus, ActivityStatus, AuthorActivityContent,
     AuthorActivityRubric, CreateActivity, CreateChapter, CreateGoal, CreateJourney,
-    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyStatus,
-    LearningActivity, LearningChapter, LearningGoal, LearningJourney, LearningObjective,
-    LearningRepository, LearningRepositoryError, LearningSession, LearningSessionStatus,
-    ObjectiveStatus, validate_activity, validate_activity_content, validate_activity_rubric,
+    CreateLearningSession, CreateObjective, FinishLearningSession, GoalStatus, JourneyOrigin,
+    JourneyStatus, LearningActivity, LearningChapter, LearningGoal, LearningJourney,
+    LearningObjective, LearningRepository, LearningRepositoryError, LearningSession,
+    LearningSessionStatus, ObjectiveStatus, TransitionActivityPublication, validate_activity,
+    validate_activity_content, validate_activity_publication_transition, validate_activity_rubric,
     validate_chapter, validate_goal, validate_journey, validate_objective,
 };
 use async_trait::async_trait;
@@ -130,6 +131,8 @@ impl LearningRepository for InMemoryLearningRepository {
                 && existing.normalized_statement == input.normalized_statement
                 && existing.source_actor_id == input.source_actor_id
                 && existing.template_version_id == input.template_version_id
+                && existing.catalog_entry_id == input.catalog_entry_id
+                && existing.catalog_entry_version == input.catalog_entry_version
             {
                 return Ok(existing.clone());
             }
@@ -141,6 +144,8 @@ impl LearningRepository for InMemoryLearningRepository {
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
             template_version_id: input.template_version_id,
+            catalog_entry_id: input.catalog_entry_id,
+            catalog_entry_version: input.catalog_entry_version,
             raw_intent: input.raw_intent,
             normalized_statement: input.normalized_statement,
             status: GoalStatus::Proposed,
@@ -196,6 +201,9 @@ impl LearningRepository for InMemoryLearningRepository {
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
             promise: input.promise,
+            catalog_entry_id: input.catalog_entry_id,
+            catalog_entry_version: input.catalog_entry_version,
+            origin: input.origin,
             status: JourneyStatus::Onboarding,
             created_at: OffsetDateTime::now_utc(),
         };
@@ -292,6 +300,7 @@ impl LearningRepository for InMemoryLearningRepository {
         let objective = LearningObjective {
             id: Uuid::now_v7(),
             journey_id: input.journey_id,
+            course_revision_id: input.course_revision_id,
             subject_user_id: input.subject_user_id,
             verb: input.verb,
             statement: input.statement,
@@ -325,7 +334,33 @@ impl LearningRepository for InMemoryLearningRepository {
         let mut objectives: Vec<_> = state
             .objectives
             .values()
-            .filter(|objective| objective.journey_id == journey_id)
+            .filter(|objective| {
+                objective.journey_id == journey_id && objective.course_revision_id.is_none()
+            })
+            .cloned()
+            .collect();
+        objectives.sort_by_key(|objective| objective.order_index);
+        Ok(objectives)
+    }
+
+    async fn list_objectives_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningObjective>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut objectives: Vec<_> = state
+            .objectives
+            .values()
+            .filter(|objective| {
+                objective.journey_id == journey_id
+                    && objective.course_revision_id == Some(course_revision_id)
+            })
             .cloned()
             .collect();
         objectives.sort_by_key(|objective| objective.order_index);
@@ -367,6 +402,7 @@ impl LearningRepository for InMemoryLearningRepository {
         }
         if state.activities.values().any(|activity| {
             activity.journey_id == input.journey_id
+                && activity.course_revision_id == input.course_revision_id
                 && activity.chapter_id == input.chapter_id
                 && activity.order_index == input.order_index
         }) {
@@ -384,6 +420,7 @@ impl LearningRepository for InMemoryLearningRepository {
                     })?;
             if objective.journey_id != input.journey_id
                 || objective.subject_user_id != input.subject_user_id
+                || objective.course_revision_id != input.course_revision_id
             {
                 return Err(LearningRepositoryError::SubjectMismatch);
             }
@@ -392,6 +429,7 @@ impl LearningRepository for InMemoryLearningRepository {
         let activity = LearningActivity {
             id: Uuid::now_v7(),
             journey_id: input.journey_id,
+            course_revision_id: input.course_revision_id,
             subject_user_id: input.subject_user_id,
             source_actor_id: input.source_actor_id,
             chapter_id: input.chapter_id,
@@ -432,7 +470,9 @@ impl LearningRepository for InMemoryLearningRepository {
             return Err(LearningRepositoryError::SubjectMismatch);
         }
         if state.chapters.values().any(|chapter| {
-            chapter.journey_id == input.journey_id && chapter.order_index == input.order_index
+            chapter.journey_id == input.journey_id
+                && chapter.course_revision_id == input.course_revision_id
+                && chapter.order_index == input.order_index
         }) {
             return Err(LearningRepositoryError::OrderConflict {
                 resource: "chapter",
@@ -441,6 +481,7 @@ impl LearningRepository for InMemoryLearningRepository {
         let chapter = LearningChapter {
             id: Uuid::now_v7(),
             journey_id: input.journey_id,
+            course_revision_id: input.course_revision_id,
             subject_user_id: input.subject_user_id,
             title: input.title,
             summary: input.summary,
@@ -472,7 +513,33 @@ impl LearningRepository for InMemoryLearningRepository {
         let mut chapters: Vec<_> = state
             .chapters
             .values()
-            .filter(|chapter| chapter.journey_id == journey_id)
+            .filter(|chapter| {
+                chapter.journey_id == journey_id && chapter.course_revision_id.is_none()
+            })
+            .cloned()
+            .collect();
+        chapters.sort_by_key(|chapter| chapter.order_index);
+        Ok(chapters)
+    }
+
+    async fn list_chapters_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningChapter>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut chapters: Vec<_> = state
+            .chapters
+            .values()
+            .filter(|chapter| {
+                chapter.journey_id == journey_id
+                    && chapter.course_revision_id == Some(course_revision_id)
+            })
             .cloned()
             .collect();
         chapters.sort_by_key(|chapter| chapter.order_index);
@@ -500,10 +567,36 @@ impl LearningRepository for InMemoryLearningRepository {
         let mut activities: Vec<_> = state
             .activities
             .values()
-            .filter(|activity| activity.journey_id == journey_id)
+            .filter(|activity| {
+                activity.journey_id == journey_id && activity.course_revision_id.is_none()
+            })
             .cloned()
             .collect();
         activities.sort_by_key(|activity| activity.order_index);
+        Ok(activities)
+    }
+
+    async fn list_activities_for_revision(
+        &self,
+        subject_user_id: Uuid,
+        journey_id: Uuid,
+        course_revision_id: Uuid,
+    ) -> Result<Vec<LearningActivity>, LearningRepositoryError> {
+        self.get_journey(subject_user_id, journey_id).await?;
+        let state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let mut activities: Vec<_> = state
+            .activities
+            .values()
+            .filter(|activity| {
+                activity.journey_id == journey_id
+                    && activity.course_revision_id == Some(course_revision_id)
+            })
+            .cloned()
+            .collect();
+        activities.sort_by_key(|activity| (activity.chapter_id, activity.order_index));
         Ok(activities)
     }
 
@@ -575,6 +668,34 @@ impl LearningRepository for InMemoryLearningRepository {
         Ok(activity.clone())
     }
 
+    async fn transition_activity_publication(
+        &self,
+        input: TransitionActivityPublication,
+    ) -> Result<LearningActivity, LearningRepositoryError> {
+        validate_activity_publication_transition(&input)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(LearningRepositoryError::storage)?;
+        let activity = state.activities.get_mut(&input.activity_id).ok_or(
+            LearningRepositoryError::NotFound {
+                resource: "activity",
+            },
+        )?;
+        if activity.subject_user_id != input.subject_user_id {
+            return Err(LearningRepositoryError::SubjectMismatch);
+        }
+        if activity.publication_status != input.from {
+            return Err(LearningRepositoryError::InvalidActivityPublicationTransition);
+        }
+        if activity.status == ActivityStatus::Completed {
+            return Err(LearningRepositoryError::ActivityContentCompleted);
+        }
+        activity.publication_status = input.to;
+        activity.updated_at = OffsetDateTime::now_utc();
+        Ok(activity.clone())
+    }
+
     async fn start_learning_session(
         &self,
         input: CreateLearningSession,
@@ -597,6 +718,9 @@ impl LearningRepository for InMemoryLearningRepository {
         }
         if activity.status != ActivityStatus::Ready {
             return Err(LearningRepositoryError::ActivityNotReady);
+        }
+        if activity.publication_status != ActivityPublicationStatus::Published {
+            return Err(LearningRepositoryError::ActivityNotPublished);
         }
         let goal_id = state
             .journeys
@@ -753,6 +877,20 @@ impl LearningRepository for InMemoryLearningRepository {
             activity.status = ActivityStatus::Ready;
             activity.updated_at = OffsetDateTime::now_utc();
         }
+        let journey_complete = state
+            .activities
+            .values()
+            .filter(|activity| {
+                activity.journey_id == journey_id
+                    && activity.publication_status == ActivityPublicationStatus::Published
+            })
+            .all(|activity| activity.status == ActivityStatus::Completed);
+        if journey_complete
+            && let Some(journey) = state.journeys.get_mut(&journey_id)
+            && journey.status == JourneyStatus::Active
+        {
+            journey.status = JourneyStatus::Completed;
+        }
         Ok(finished_session)
     }
 }
@@ -769,6 +907,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         subject_user_id: subject,
         source_actor_id: actor,
         template_version_id: None,
+        catalog_entry_id: None,
+        catalog_entry_version: None,
         raw_intent: "I would like to learn a learner-selected topic".to_string(),
         normalized_statement: "Understand the learner-selected topic".to_string(),
         idempotency_key: idempotency_key.clone(),
@@ -798,6 +938,8 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
                 subject_user_id: subject,
                 source_actor_id: actor,
                 template_version_id: None,
+                catalog_entry_id: None,
+                catalog_entry_version: None,
                 raw_intent: String::new(),
                 normalized_statement: "Different goal".to_string(),
                 idempotency_key,
@@ -816,6 +958,9 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
         subject_user_id: subject,
         source_actor_id: actor,
         promise: "Identify notes, intervals, and basic chords".to_string(),
+        catalog_entry_id: None,
+        catalog_entry_version: None,
+        origin: JourneyOrigin::Learner,
     };
     let journey = repository
         .ensure_journey(journey_input.clone())
@@ -846,6 +991,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let objective = repository
         .create_objective(CreateObjective {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             verb: "identify".to_string(),
             statement: "Identify intervals by ear".to_string(),
@@ -865,6 +1011,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let chapter = repository
         .create_chapter(CreateChapter {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             title: "Interval foundations".to_string(),
             summary: "Learn how intervals are represented and analyzed.".to_string(),
@@ -883,6 +1030,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let activity = repository
         .create_activity(CreateActivity {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             source_actor_id: actor,
             chapter_id: Some(chapter.id),
@@ -902,6 +1050,7 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
     let next_activity = repository
         .create_activity(CreateActivity {
             journey_id: journey.id,
+            course_revision_id: None,
             subject_user_id: subject,
             source_actor_id: actor,
             chapter_id: Some(chapter.id),
@@ -1078,6 +1227,35 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             .status,
         ActivityStatus::Ready
     );
+    let final_activity = repository
+        .list_activities(subject, journey.id)
+        .await
+        .expect("final activity loads")[1]
+        .clone();
+    let final_session = repository
+        .start_learning_session(CreateLearningSession {
+            activity_id: final_activity.id,
+            ..session_input.clone()
+        })
+        .await
+        .expect("final learning session starts");
+    repository
+        .finish_learning_session(FinishLearningSession {
+            subject_user_id: subject,
+            session_id: final_session.id,
+            completed: true,
+            result: serde_json::json!({"completed": true}),
+        })
+        .await
+        .expect("final learning session finishes");
+    assert_eq!(
+        repository
+            .get_journey(subject, journey.id)
+            .await
+            .expect("completed journey")
+            .status,
+        JourneyStatus::Completed
+    );
     let finished_retry = repository
         .finish_learning_session(FinishLearningSession {
             subject_user_id: subject,
@@ -1113,7 +1291,8 @@ mod contract_tests {
     };
     use ame_learning_domain::{
         ActivityKind, ActivityPublicationStatus, ActivityStatus, CreateActivity, CreateChapter,
-        CreateGoal, CreateJourney, CreateObjective, LearningRepository, LearningRepositoryError,
+        CreateGoal, CreateJourney, CreateObjective, JourneyOrigin, LearningRepository,
+        LearningRepositoryError,
     };
     use uuid::Uuid;
 
@@ -1136,6 +1315,8 @@ mod contract_tests {
                 subject_user_id: subject,
                 source_actor_id: actor,
                 template_version_id: None,
+                catalog_entry_id: None,
+                catalog_entry_version: None,
                 raw_intent: "Learn indexing".to_string(),
                 normalized_statement: "Learn database indexing".to_string(),
                 idempotency_key: None,
@@ -1148,12 +1329,16 @@ mod contract_tests {
                 subject_user_id: subject,
                 source_actor_id: actor,
                 promise: "Read query plans and choose useful indexes".to_string(),
+                catalog_entry_id: None,
+                catalog_entry_version: None,
+                origin: JourneyOrigin::Learner,
             })
             .await
             .expect("journey creates");
         let chapter = repository
             .create_chapter(CreateChapter {
                 journey_id: journey.id,
+                course_revision_id: None,
                 subject_user_id: subject,
                 title: "Index model".to_string(),
                 summary: "Understand what an index changes.".to_string(),
@@ -1164,6 +1349,7 @@ mod contract_tests {
         let objective = repository
             .create_objective(CreateObjective {
                 journey_id: journey.id,
+                course_revision_id: None,
                 subject_user_id: subject,
                 verb: "Explain".to_string(),
                 statement: "Explain index lookup cost".to_string(),
@@ -1180,6 +1366,7 @@ mod contract_tests {
             repository
                 .create_activity(CreateActivity {
                     journey_id: journey.id,
+                    course_revision_id: None,
                     subject_user_id: subject,
                     source_actor_id: actor,
                     chapter_id,
@@ -1229,6 +1416,8 @@ mod contract_tests {
                     subject_user_id: subject,
                     source_actor_id: actor,
                     template_version_id: None,
+                    catalog_entry_id: None,
+                    catalog_entry_version: None,
                     raw_intent: " ".to_string(),
                     normalized_statement: "Valid".to_string(),
                     idempotency_key: None,

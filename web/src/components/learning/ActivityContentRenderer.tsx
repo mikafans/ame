@@ -38,6 +38,8 @@ export type ActivityContent =
       context: string;
       prompt: string;
       options: { id: string; label: string }[];
+      correct_option_id?: string;
+      feedback?: { correct: string; incorrect: string };
     };
 
 type UnknownContent = Record<string, unknown> & { type?: unknown };
@@ -248,6 +250,13 @@ export function ActivityContentRenderer({
           </div>
           {selectedOption && (
             <div className="space-y-3">
+              {parsed.correct_option_id && parsed.feedback && (
+                <p className="rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6">
+                  {selectedOption === parsed.correct_option_id
+                    ? parsed.feedback.correct
+                    : parsed.feedback.incorrect}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground">
                 {taskSubmission?.status === "reviewed" &&
                 typeof taskSubmission.score === "number"

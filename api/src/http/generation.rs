@@ -21,9 +21,34 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize, ToSchema)]
+pub enum GenerationOperation {
+    #[serde(rename = "learning.activity.content.compose")]
+    LearningActivityContentCompose,
+    #[serde(rename = "learning.activity.rubric.compose")]
+    LearningActivityRubricCompose,
+    #[serde(rename = "question.compose")]
+    QuestionCompose,
+    #[serde(rename = "deep_dive.create")]
+    DeepDiveCreate,
+}
+
+impl GenerationOperation {
+    fn into_operation(self) -> String {
+        match self {
+            Self::LearningActivityContentCompose => "learning.activity.content.compose",
+            Self::LearningActivityRubricCompose => "learning.activity.rubric.compose",
+            Self::QuestionCompose => "question.compose",
+            Self::DeepDiveCreate => "deep_dive.create",
+        }
+        .into()
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StartGenerationRunBody {
-    pub operation: String,
+    /// Literal operation required by the later content-authoring endpoint.
+    pub operation: GenerationOperation,
     pub provider: Option<String>,
     pub retry_key: Option<String>,
     #[serde(default = "default_content_version")]
@@ -74,8 +99,8 @@ pub async fn start(
     let value = PgGenerationRepository::new(state.pool)
         .start(StartGenerationRun {
             subject_user_id: auth.owner_id(),
-            source_actor_id: auth.owner_id(),
-            operation: body.operation,
+            source_actor_id: auth.actor_identity_id(),
+            operation: body.operation.into_operation(),
             provider: body.provider,
             retry_key: body.retry_key,
             content_version: body.content_version,

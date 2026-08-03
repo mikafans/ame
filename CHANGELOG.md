@@ -5,6 +5,57 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project is pre-1.0; releases are not yet tagged.
 
+## [0.4.0] - 2026-08-03
+
+### Added
+
+- Agent-first course authoring: immutable source imports and snapshots,
+  citation certification with grounding and licensing status, generation-run
+  provenance, and course revisions (draft, publish, fork) built from
+  objectives, chapters, activities, and versioned questions/assessments.
+  Publish validation rejects a generic or incomplete shell as publishable.
+- Delegated agent handoffs — a learner mints a scoped, revocable `dlg_*`
+  capability from their own browser session (`/agent`) instead of ever
+  sharing a raw learner bearer token with an agent.
+- Two source-grounded reference courses (Apache Flink, Netty), authored and
+  published end-to-end through the public agent workflow with no source-code
+  access required.
+- A course-scoped learner workspace: a "My Learning" multi-course library
+  (In progress / Completed) where each course keeps its own Learn, Course,
+  Progress, and Sources tabs, with explicit, isolated course switching.
+- Study Atelier native catalog: eight reviewed starting journeys (learning
+  science, Rust, Python, SQL, linear algebra, technical writing, Apache Flink,
+  classical mechanics), four persistent semantic themes, and a learner-facing
+  catalog with stable IDs, outcomes, and source/review summaries.
+- Retention and source-grounded learning: FSRS spaced review scheduling,
+  immutable source imports/snapshots, citation/licensing/grounding
+  certification, version-anchored learner notes, reviewed explanation/
+  example/difficulty variants, richer submissions with rubric-based revision
+  review, journey history export/import, and learner retention analytics.
+- An in-app About page rendering the learner-facing learning contract,
+  reachable as a persistent nav tab alongside Learning desk and Admin.
+- One containerized local dev stack behind Caddy (`make dev`) — replaces the
+  previous split between a native host-process stack and a separate
+  containerized stack, which had drifted into two independent databases.
+
+### Fixed
+
+- A reviews/due host-vs-database clock-skew race, a double-normalized
+  analytics average score, and a citation-UUID-as-URL bug that hid a
+  source-backed activity badge.
+- Cross-shell navigation dead ends: Learning desk was unreachable from any
+  `/admin/*` page, and a nav tab used a plain anchor instead of a client-side
+  link, forcing a full page reload.
+- A layout gap that silently rendered as zero pixels because the Tailwind
+  utility never compiled, and the "start a new course" entry point
+  disappearing once a learner had any course.
+- Desktop sidebar staying above page content so its sign-out action remains
+  reliably accessible.
+
+### Changed
+
+- Toolchain: the Nix devShell was replaced with mise-managed tools.
+
 ## [0.3.0] - 2026-07-02
 
 ### Added

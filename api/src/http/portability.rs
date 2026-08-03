@@ -222,6 +222,21 @@ fn validate_manifest(manifest: &JourneyExportManifest, owner_id: Uuid) -> Result
     {
         return Err(validation("journeyId", "does not match the journey record"));
     }
+    for journey in manifest.payload["journeys"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        match journey.get("origin").and_then(Value::as_str) {
+            Some("learner" | "fixture") => {}
+            _ => {
+                return Err(validation(
+                    "payload.journeys.origin",
+                    "must preserve the immutable learner or fixture origin",
+                ));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -495,7 +510,7 @@ mod tests {
         let owner = Uuid::now_v7();
         let journey = Uuid::now_v7();
         let payload = json!({
-            "goals": [], "journeys": [{"id": journey, "subject_user_id": owner}],
+            "goals": [], "journeys": [{"id": journey, "subject_user_id": owner, "origin": "learner"}],
             "objectives": [], "activities": [], "activityObjectives": [],
             "generationRuns": [], "sources": [], "sourceImportRuns": [],
             "sourceSnapshots": [], "citations": [], "taskSubmissions": [],
@@ -503,6 +518,11 @@ mod tests {
         });
         let mut value = manifest(owner, journey, payload).unwrap();
         assert!(validate_manifest(&value, owner).is_ok());
+        value.payload["journeys"][0]["origin"] = json!("unknown");
+        value.checksum = payload_checksum(&value.payload).unwrap();
+        assert!(validate_manifest(&value, owner).is_err());
+        value.payload["journeys"][0]["origin"] = json!("learner");
+        value.checksum = payload_checksum(&value.payload).unwrap();
         assert!(validate_manifest(&value, Uuid::now_v7()).is_err());
         value.payload["notes"] = json!([{"subject_user_id": Uuid::now_v7()}]);
         assert!(validate_manifest(&value, owner).is_err());

@@ -117,7 +117,9 @@
                 "id": "guess",
                 "label": "Act immediately without checking the idea"
               }
-            ]
+            ],
+            "correct_option_id": "make_model",
+            "feedback": { "correct": "Yes. Make the model explicit so your next action is testable.", "incorrect": "Pause first: make the core idea explicit, then choose an action you can test." }
           }
         },
         "status": "proposed"
@@ -366,9 +368,150 @@
     ]
   },
   {
+    "id": "learning-science-starter",
+    "template_id": "understand-a-subject",
+    "field": "learning science",
+    "catalog": { "version": 1, "title": "Learning how to learn", "description": "Build a practical study loop with retrieval, spacing, and feedback.", "level": "Beginner", "estimated_minutes": 45, "outcomes": ["Choose a retrieval cue", "Plan spaced review", "Use feedback to select the next step"], "source_summary": "Reviewed from Dunlosky et al., Psychological Science in the Public Interest (2013), effective learning techniques.", "sources": [{ "title": "Improving Students' Learning With Effective Learning Techniques", "url": "https://journals.sagepub.com/doi/10.1177/1529100612453266", "locator": "retrieval practice and distributed practice", "license": "publisher access terms", "source_version": "2013" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
+    "aliases": ["learning science", "study skills", "how to learn", "retrieval practice"],
+    "objectives": [
+      { "verb": "explain", "statement": "Explain why retrieving an answer strengthens a study session", "success_criteria": "Contrast retrieval with passive rereading" },
+      { "verb": "plan", "statement": "Plan a spaced review loop", "success_criteria": "Name a cue, a recall attempt, and a later revisit" },
+      { "verb": "adjust", "statement": "Use feedback to choose a next study action", "success_criteria": "Choose review or progress from an honest recall signal" }
+    ],
+    "chapters": [
+      { "title": "Retrieve before reviewing", "summary": "Make recall visible before looking at the answer.", "activity_orders": [0, 1] },
+      { "title": "Space and adjust", "summary": "Return later and use the result to choose the next step.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a useful learning signal", "purpose": "orientation", "estimated_minutes": 5, "context": "Choose one small idea you want to remember and describe what you can recall without looking.", "instructions": "Name the idea and your current recall confidence.", "questions": [{ "id": "confidence", "kind": "single_choice", "prompt": "How confidently can you recall the idea now?", "options": ["not_yet", "partly", "clearly"] }, { "id": "target", "kind": "short_text", "prompt": "What small idea will you practice recalling?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "explanation", "title": "Use retrieval as the first check", "objective_orders": [0, 1], "payload": { "purpose": "first_explanation", "estimated_minutes": 8, "content": { "type": "explanation", "heading": "Recall first, then inspect", "body": "Attempting to retrieve an answer makes the gap visible. Check the source after the attempt, then record the one cue that would help you retrieve it next time.", "key_points": ["Start with a cue, not the answer.", "Treat an incomplete recall as useful feedback.", "Schedule a later attempt instead of cramming repetitions."] } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose your next spaced recall", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "rust-ownership-starter",
+    "template_id": "understand-a-subject",
+    "field": "cs",
+    "catalog": { "version": 1, "title": "Rust ownership foundations", "description": "Reason about moves, borrowing, and references without a garbage collector.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Predict a move", "Choose shared or mutable borrowing", "Explain why references have rules"], "source_summary": "Reviewed from The Rust Programming Language, Chapter 4: Understanding Ownership.", "sources": [{ "title": "The Rust Programming Language", "url": "https://doc.rust-lang.org/book/ch04-00-understanding-ownership.html", "locator": "Chapter 4: Understanding Ownership", "license": "CC BY-SA 4.0 and MIT", "source_version": "current online edition" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
+    "aliases": ["rust ownership", "rust borrowing", "rust references", "learn rust"],
+    "objectives": [
+      { "verb": "predict", "statement": "Predict when assigning a Rust value moves ownership", "success_criteria": "Identify the binding that remains usable" },
+      { "verb": "choose", "statement": "Choose an appropriate borrow", "success_criteria": "Distinguish shared from one mutable reference" },
+      { "verb": "explain", "statement": "Explain Rust's reference rules", "success_criteria": "Connect the rule to memory safety" }
+    ],
+    "chapters": [
+      { "title": "Values and moves", "summary": "Track which binding owns a non-Copy value.", "activity_orders": [0, 1] },
+      { "title": "Borrow safely", "summary": "Read and change values through references.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Locate your Rust starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Rust ownership makes memory safety explicit. Start by naming your experience with values and references.", "instructions": "Choose your current familiarity and a Rust question you want to answer.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with Rust?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "What ownership question do you want to answer first?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "explanation", "title": "Track ownership before borrowing", "objective_orders": [0, 2], "payload": { "purpose": "first_explanation", "estimated_minutes": 10, "content": { "type": "code_example", "title": "A move changes which binding owns a String", "language": "rust", "code": "let first = String::from(\"note\");\nlet second = first;\n// first is no longer usable here", "explanation": "A String owns heap data. Assigning it transfers ownership, so Rust prevents use through the old binding." } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Review the next ownership question", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "python-foundations-starter",
+    "template_id": "understand-a-subject",
+    "field": "cs",
+    "catalog": { "version": 1, "title": "Python foundations", "description": "Use values, collections, and control flow to express small programs clearly.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Evaluate expressions", "Choose a built-in collection", "Trace a small loop"], "source_summary": "Reviewed from Python 3 Tutorial, informal introduction and control-flow chapters.", "sources": [{ "title": "The Python Tutorial", "url": "https://docs.python.org/3/tutorial/", "locator": "An Informal Introduction to Python and More Control Flow Tools", "license": "PSF License", "source_version": "Python 3 documentation" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
+    "aliases": ["python foundations", "learn python", "python basics", "python programming"],
+    "objectives": [
+      { "verb": "evaluate", "statement": "Evaluate basic Python expressions and assignments", "success_criteria": "Predict a value and its type" },
+      { "verb": "model", "statement": "Model a small collection of values", "success_criteria": "Choose a list, string, or mapping for the task" },
+      { "verb": "trace", "statement": "Trace a small Python control-flow path", "success_criteria": "Explain each iteration or branch" }
+    ],
+    "chapters": [
+      { "title": "Values and collections", "summary": "Use Python's built-in values deliberately.", "activity_orders": [0, 1] },
+      { "title": "Make flow visible", "summary": "Trace a condition or loop one step at a time.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a Python starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Python is easiest to learn through small, observable examples.", "instructions": "Name your familiarity and one task you would like Python to help with.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with Python?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "What small task would you like to automate or understand?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Trace a small Python calculation", "objective_orders": [0, 2], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "code_example", "title": "A loop builds a running total", "language": "python", "code": "total = 0\nfor number in [2, 4, 6]:\n    total = total + number\nprint(total)", "explanation": "Trace the value of total after each iteration: 2, then 6, then 12. AME explains this example; it does not execute learner code." } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next Python practice", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "sql-foundations-starter",
+    "template_id": "understand-a-subject",
+    "field": "data",
+    "catalog": { "version": 1, "title": "SQL foundations", "description": "Ask precise questions of relational tables with filtering, joins, and aggregates.", "level": "Beginner", "estimated_minutes": 55, "outcomes": ["Read a SELECT query", "Filter rows with WHERE", "Explain a simple join and aggregate"], "source_summary": "Reviewed from the PostgreSQL Tutorial: SQL language, querying, joins, and aggregate functions.", "sources": [{ "title": "PostgreSQL Tutorial", "url": "https://www.postgresql.org/docs/current/tutorial.html", "locator": "SQL language, joins, and aggregate functions", "license": "PostgreSQL Documentation License", "source_version": "current documentation" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
+    "aliases": ["sql foundations", "learn sql", "sql basics", "database queries"],
+    "objectives": [
+      { "verb": "read", "statement": "Read the shape of a SELECT query", "success_criteria": "Identify requested columns and table" },
+      { "verb": "filter", "statement": "Filter a relation with a clear condition", "success_criteria": "Explain which rows remain" },
+      { "verb": "combine", "statement": "Explain a small join or aggregate", "success_criteria": "State how rows are paired or summarized" }
+    ],
+    "chapters": [
+      { "title": "Ask one-table questions", "summary": "Read tables, columns, and filters as a single question.", "activity_orders": [0, 1] },
+      { "title": "Combine and summarize", "summary": "Connect related rows and count or group results.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a SQL starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Start from a question about rows, not from syntax to memorize.", "instructions": "Name your familiarity and a small question you want a database to answer.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with SQL?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "What data question would you like to answer first?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Read a filtered SQL question", "objective_orders": [0, 1], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "code_example", "title": "Select the rows that meet a condition", "language": "sql", "code": "SELECT title, minutes\nFROM lessons\nWHERE minutes <= 10\nORDER BY minutes;", "explanation": "The query asks for two columns from lessons, keeps only short lessons, and sorts the remaining rows. AME does not run database queries in this journey." } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next SQL question", "objective_orders": [2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "linear-algebra-starter",
+    "template_id": "understand-a-subject",
+    "field": "mathematics",
+    "catalog": { "version": 1, "title": "Linear algebra essentials", "description": "Build intuition for vectors, matrices, linear systems, and transformations.", "level": "Beginner", "estimated_minutes": 60, "outcomes": ["Interpret a vector and matrix", "Solve a small linear system", "Describe a linear transformation"], "source_summary": "Reviewed from MIT OpenCourseWare linear algebra materials on vectors, matrices, and linearity.", "sources": [{ "title": "MIT OpenCourseWare Linear Algebra", "url": "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/", "locator": "vectors, matrices, and linearity", "license": "CC BY-NC-SA 4.0", "source_version": "Spring 2010" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
+    "aliases": ["linear algebra", "vectors and matrices", "matrix algebra", "linear systems"],
+    "objectives": [
+      { "verb": "interpret", "statement": "Interpret vectors and matrices as mathematical objects", "success_criteria": "Name dimensions and the role of an entry" },
+      { "verb": "solve", "statement": "Solve a small linear system", "success_criteria": "Check a proposed solution by substitution" },
+      { "verb": "describe", "statement": "Describe a linear transformation", "success_criteria": "Explain what matrix multiplication does to a vector" }
+    ],
+    "chapters": [
+      { "title": "Vectors and matrices", "summary": "Read the objects before applying an operation.", "activity_orders": [0, 1] },
+      { "title": "Systems and transformations", "summary": "Use a matrix to express constraints and change vectors.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a linear algebra starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Linear algebra is a language for quantities that vary together and transformations between them.", "instructions": "Choose your familiarity and one setting where you have seen vectors or matrices.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with vectors and matrices?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "outcome", "kind": "short_text", "prompt": "Where would you like to use linear algebra first?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Read a matrix-vector product", "objective_orders": [0, 2], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "worked_example", "heading": "A matrix combines vector coordinates", "prompt": "Apply [[2, 1], [0, 3]] to [4, 2].", "steps": ["Multiply the first row: 2 × 4 + 1 × 2 = 10.", "Multiply the second row: 0 × 4 + 3 × 2 = 6.", "The transformed vector is [10, 6]."], "reflection": "Which row determines each output coordinate?" } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next linear algebra problem", "objective_orders": [1, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
+    "id": "technical-writing-starter",
+    "template_id": "understand-a-subject",
+    "field": "communication",
+    "catalog": { "version": 1, "title": "Technical writing for engineers", "description": "Make engineering explanations clear, concise, and useful to a defined audience.", "level": "Beginner", "estimated_minutes": 50, "outcomes": ["Name an audience and purpose", "Revise a sentence for clarity", "Organize a short technical explanation"], "source_summary": "Reviewed from Google Technical Writing One: clarity, concision, active voice, lists, and paragraph structure.", "sources": [{ "title": "Technical Writing One", "url": "https://developers.google.com/tech-writing/one", "locator": "clarity, active voice, lists, and paragraphs", "license": "Google Terms of Service", "source_version": "current online course" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
+    "aliases": ["technical writing", "engineering writing", "write documentation", "documentation writing"],
+    "objectives": [
+      { "verb": "identify", "statement": "Identify an audience and purpose for a technical explanation", "success_criteria": "State what the reader needs to do or understand" },
+      { "verb": "revise", "statement": "Revise a sentence for clarity and directness", "success_criteria": "Remove ambiguity and use an active construction when appropriate" },
+      { "verb": "organize", "statement": "Organize a short technical explanation", "success_criteria": "Lead with the key point and group related details" }
+    ],
+    "chapters": [
+      { "title": "Write for a reader", "summary": "Set a purpose before choosing words.", "activity_orders": [0, 1] },
+      { "title": "Make structure visible", "summary": "Use direct sentences, useful lists, and focused paragraphs.", "activity_orders": [2] }
+    ],
+    "first_activity": { "kind": "explanation", "title": "Set a writing starting point", "purpose": "orientation", "estimated_minutes": 5, "context": "Technical writing helps a specific reader act or understand with less effort.", "instructions": "Name the kind of document you want to improve and the person who will read it.", "questions": [{ "id": "familiarity", "kind": "single_choice", "prompt": "How familiar are you with technical writing?", "options": ["new_to_me", "some_exposure", "comfortable"] }, { "id": "audience", "kind": "short_text", "prompt": "Who is the reader you want to help?" }], "objective_orders": [0], "status": "ready" },
+    "follow_up_activities": [
+      { "kind": "example", "title": "Revise a deployment instruction", "objective_orders": [1, 2], "payload": { "purpose": "worked_example", "estimated_minutes": 10, "content": { "type": "worked_example", "heading": "Put the action first", "prompt": "Revise: 'The configuration file should be updated by the operator before deployment.'", "steps": ["Name the reader who acts.", "Use a direct verb.", "State when the action matters: 'Before deployment, update the configuration file.'"], "reflection": "What detail would a first-time operator still need?" } }, "status": "proposed" },
+      { "kind": "recommendation", "title": "Choose the next writing revision", "objective_orders": [0, 2], "payload": { "purpose": "next_action", "estimated_minutes": 5 }, "status": "proposed" }
+    ]
+  },
+  {
     "id": "flink-cs-starter",
     "template_id": "understand-a-subject",
     "field": "cs",
+    "catalog": {
+      "version": 1,
+      "title": "Apache Flink foundations",
+      "description": "Build a practical model of streaming dataflow, time, state, and operation.",
+      "level": "Intermediate",
+      "estimated_minutes": 70,
+      "outcomes": [
+        "Explain event time and processing time",
+        "Reason about state and checkpoint recovery",
+        "Deploy a bounded Flink job with the Kubernetes Operator"
+      ],
+      "source_summary": "Reviewed from Apache Flink documentation and Kubernetes Operator guides.",
+      "sources": [{ "title": "Apache Flink Documentation", "url": "https://nightlies.apache.org/flink/flink-docs-stable/", "locator": "state, time, and checkpointing", "license": "Apache License 2.0", "source_version": "stable documentation" }, { "title": "Apache Flink Kubernetes Operator", "url": "https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/", "locator": "deployment and operations", "license": "Apache License 2.0", "source_version": "stable documentation" }],
+      "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" }
+    },
     "aliases": ["flink", "apache flink", "stream processing"],
     "objectives": [
       {
@@ -519,7 +662,9 @@
                 "id": "restart",
                 "label": "Restart from scratch and reprocess everything from the beginning"
               }
-            ]
+            ],
+            "correct_option_id": "checkpoint",
+            "feedback": { "correct": "Correct. A completed checkpoint restores keyed state and coordinates the source rewind.", "incorrect": "Not quite. Flink recovers from the last completed checkpoint, restoring keyed state while rewinding the source." }
           }
         },
         "status": "proposed"
@@ -585,7 +730,9 @@
                 "id": "manual",
                 "label": "SSH into a node and start the job manager by hand"
               }
-            ]
+            ],
+            "correct_option_id": "flinkdeployment",
+            "feedback": { "correct": "Correct. The operator reconciles a FlinkDeployment resource into the running job.", "incorrect": "Use a FlinkDeployment resource first; the operator manages the job lifecycle from that declaration." }
           }
         },
         "status": "proposed"
@@ -603,6 +750,7 @@
     "id": "physics-mechanics-starter",
     "template_id": "understand-a-subject",
     "field": "physics",
+    "catalog": { "version": 1, "title": "Classical mechanics", "description": "Model motion, forces, energy, and momentum in bounded physical systems.", "level": "Beginner", "estimated_minutes": 75, "outcomes": ["Relate position, velocity, and acceleration", "Apply net force to predict motion", "Use energy and momentum conservation in a bounded problem"], "source_summary": "Reviewed from OpenStax University Physics mechanics materials covering Newton's laws, energy, and momentum.", "sources": [{ "title": "OpenStax University Physics Volume 1", "url": "https://openstax.org/details/books/university-physics-volume-1", "locator": "mechanics, energy, and momentum", "license": "CC BY 4.0", "source_version": "current online edition" }], "content_review": { "status": "reviewed", "reviewed_at": "2026-08-01", "reviewer": "AME curriculum review" } },
     "aliases": ["physics", "classical mechanics", "kinematics", "newtonian"],
     "objectives": [
       {
@@ -794,7 +942,9 @@
                 "id": "kinetic",
                 "label": "Total kinetic energy is conserved"
               }
-            ]
+            ],
+            "correct_option_id": "momentum",
+            "feedback": { "correct": "Correct. Total momentum is conserved for the isolated collision.", "incorrect": "For a sticking collision, total momentum—not total kinetic energy—is conserved." }
           }
         },
         "status": "proposed"

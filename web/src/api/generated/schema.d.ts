@@ -112,6 +112,38 @@ export interface paths {
         patch: operations["patch_user_admin"];
         trace?: never;
     };
+    "/api/v1/agent-delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-delegations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assessments": {
         parameters: {
             query?: never;
@@ -360,7 +392,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** GET /api/v1/learning/activities/{activity_id}/content — read immutable activity content without starting a session. */
+        get: operations["get_activity_content"];
         put?: never;
         post?: never;
         delete?: never;
@@ -368,6 +401,43 @@ export interface paths {
         head?: never;
         /** PATCH /api/v1/learning/activities/{activity_id}/content — replace an uncompleted explanation or example with reviewed agent-authored content. */
         patch: operations["author_activity_content"];
+        trace?: never;
+    };
+    "/api/v1/learning/activities/{activity_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /api/v1/learning/activities/{activity_id}/publish — retained only to
+         *     return a migration-safe error; course revisions are the publication boundary.
+         */
+        post: operations["publish_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/activities/{activity_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/activities/{activity_id}/review — submit a draft activity for review. */
+        post: operations["submit_activity_for_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/learning/activities/{activity_id}/rubric": {
@@ -385,6 +455,28 @@ export interface paths {
         head?: never;
         /** PATCH /api/v1/learning/activities/{activity_id}/rubric — attach a reviewed, source-backed scoring rubric to a task activity. */
         patch: operations["author_activity_rubric"];
+        trace?: never;
+    };
+    "/api/v1/learning/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /api/v1/learning/courses — the learner's published course library. */
+        get: operations["list_learner_courses"];
+        put?: never;
+        /**
+         * Create an empty, learner-owned course aggregate. This intentionally does
+         *     not seed generic material: agents must add outcomes, modules, instruction,
+         *     checks, and assessment/task work before the revision can publish.
+         */
+        post: operations["create_course"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/learning/imports": {
@@ -453,6 +545,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning/journeys/{id}/course": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /api/v1/learning/journeys/{id}/course — published learner syllabus. */
+        get: operations["get_learner_course"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning/journeys/{id}/export": {
         parameters: {
             query?: never;
@@ -463,6 +572,80 @@ export interface paths {
         get: operations["export_journey"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{id}/learner-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /api/v1/learning/journeys/{id}/learner-view — stable selected-course shell. */
+        get: operations["get_learner_view"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{id}/progress-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /api/v1/learning/journeys/{id}/progress-view — evidence first; no
+         *     synthetic mastery value appears before recorded evidence exists.
+         */
+        get: operations["get_learner_progress_view"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{id}/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /api/v1/learning/journeys/{id}/resources — course citation metadata,
+         *     never imported document bytes or storage hashes.
+         */
+        get: operations["get_learner_resources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/journeys/{journey_id}/activities — append a course activity. */
+        post: operations["create_activity"];
         delete?: never;
         options?: never;
         head?: never;
@@ -496,6 +679,142 @@ export interface paths {
         get: operations["list_journey_attempts"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/chapters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/journeys/{journey_id}/chapters — append a course chapter. */
+        post: operations["create_chapter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_course_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_course_revision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fork a published revision into an editable draft without changing the
+         *     learner-visible graph. Question versions remain immutable shared inputs;
+         *     activities, objectives, chapters, assessments, and assessment items receive
+         *     fresh IDs under the new revision.
+         */
+        post: operations["fork_course_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_course_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["review_course_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["validate_course_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/journeys/{journey_id}/objectives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POST /api/v1/learning/journeys/{journey_id}/objectives — append a measurable course outcome. */
+        post: operations["create_objective"];
         delete?: never;
         options?: never;
         head?: never;
@@ -955,6 +1274,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/v1/catalog/journeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /public/v1/catalog/journeys — list reviewed, selectable native journeys. */
+        get: operations["list_native_journeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/v1/onboarding/preview": {
         parameters: {
             query?: never;
@@ -1021,7 +1357,7 @@ export interface components {
             };
         } | {
             Validation: components["schemas"]["FieldError"][];
-        } | "SessionFinished" | "LearningSessionResultConflict" | "ActivityContentConflict" | "IdempotencyConflict" | "GenerationStateConflict" | "TooManyRequests" | "Maintenance" | {
+        } | "SessionFinished" | "LearningSessionResultConflict" | "ActivityContentConflict" | "IdempotencyConflict" | "GenerationStateConflict" | "CoursePublicationRequired" | "TooManyRequests" | "Maintenance" | {
             Internal: string;
         };
         AssessmentActivityQuery: {
@@ -1086,8 +1422,15 @@ export interface components {
             /** Format: float */
             correctness?: number | null;
             evaluationStatus: string;
+            explanation?: string | null;
             /** Format: uuid */
             questionVersionId: string;
+            /**
+             * @description Learner-facing feedback from the immutable question version. It is
+             *     returned with a finished attempt so a formative check never records an
+             *     opaque correct/incorrect state.
+             */
+            rationale?: string | null;
             response: unknown;
         };
         AttemptResponse: {
@@ -1141,12 +1484,16 @@ export interface components {
             /** Format: uuid */
             generationRunId: string;
             reviewStatus: string;
+            /** Format: uuid */
+            revisionId?: string | null;
             sourceReferences: string[];
         };
         AuthorActivityRubricBody: {
             /** Format: uuid */
             generationRunId: string;
             reviewStatus: string;
+            /** Format: uuid */
+            revisionId?: string | null;
             rubric: components["schemas"]["TaskRubric"];
             sourceReferences: string[];
         };
@@ -1171,12 +1518,61 @@ export interface components {
         };
         /** @enum {string} */
         ContentReviewStatus: "draft" | "review" | "approved" | "rejected" | "retired";
+        CourseRevisionResponse: {
+            brief: Record<string, never>;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: date-time */
+            publishedAt?: string | null;
+            review?: Record<string, never> | null;
+            sourceReferences: string[];
+            status: string;
+            /** Format: date-time */
+            updatedAt: string;
+            validation: components["schemas"]["CourseValidationIssue"][];
+            /** Format: int32 */
+            version: number;
+        };
+        CourseValidationIssue: {
+            blocking: boolean;
+            code: string;
+            message: string;
+            path: string;
+        };
+        /**
+         * @description A course author supplies the activity semantics and objective links; AME owns
+         *     ordering, versioning, publication, and the learner identity.
+         */
+        CreateActivityBody: {
+            /** Format: uuid */
+            chapterId?: string | null;
+            kind: components["schemas"]["ActivityKind"];
+            objectiveIds: string[];
+            payload: Record<string, never>;
+            /** Format: uuid */
+            revisionId?: string | null;
+            status: components["schemas"]["ActivityStatus"];
+            title: string;
+        };
         CreateAssessmentBody: {
             /** Format: uuid */
             activityId: string;
             items: components["schemas"]["AssessmentItemBody"][];
             mode: components["schemas"]["AssessmentMode"];
+            /** Format: uuid */
+            revisionId?: string | null;
             status?: components["schemas"]["AssessmentStatus"];
+        };
+        /** @description A new chapter is always appended after the journey's existing chapters. */
+        CreateChapterBody: {
+            /** Format: uuid */
+            revisionId?: string | null;
+            summary: string;
+            title: string;
         };
         CreateCitationBody: {
             /** Format: int32 */
@@ -1192,6 +1588,27 @@ export interface components {
             snapshotId: string;
             /** Format: int32 */
             startByte: number;
+        };
+        CreateCourseBody: {
+            brief: Record<string, never>;
+            idempotencyKey: string;
+            rawIntent: string;
+            sourceReferences: string[];
+        };
+        CreateCourseResponse: {
+            /** Format: uuid */
+            journeyId: string;
+            revision: components["schemas"]["CourseRevisionResponse"];
+        };
+        CreateCourseRevisionBody: {
+            /**
+             * @description Learner-facing contract: title, audience, estimatedMinutes,
+             *     prerequisites, outcomes, and modules. The validator retains it with the
+             *     release decision rather than trusting an agent's free-form assertion.
+             */
+            brief: Record<string, never>;
+            /** @description Citation certificate IDs used to ground the course-level source set. */
+            sourceReferences: string[];
         };
         CreateDeepDiveBody: {
             /** Format: uuid */
@@ -1212,6 +1629,16 @@ export interface components {
             /** Format: uuid */
             triggeringEvidenceId: string;
         };
+        CreateDelegationBody: {
+            /** Format: int64 */
+            expiresInMinutes: number;
+            goal: string;
+        };
+        CreateDelegationResponse: {
+            delegation: components["schemas"]["DelegationResponse"];
+            /** @description Returned once only. This is a scoped capability, never a login token. */
+            handoff: string;
+        };
         CreateNoteBody: {
             /** Format: uuid */
             activityId?: string | null;
@@ -1221,6 +1648,17 @@ export interface components {
             /** Format: uuid */
             journeyId: string;
             retryKey: string;
+        };
+        /**
+         * @description A course author declares observable outcomes before linking instruction,
+         *     formative checks, and mastery work to them.
+         */
+        CreateObjectiveBody: {
+            /** Format: uuid */
+            revisionId?: string | null;
+            statement: string;
+            successCriteria: string;
+            verb: string;
         };
         CreateQuestionBody: {
             acceptedAnswers?: string[];
@@ -1263,6 +1701,20 @@ export interface components {
             title: string;
             /** Format: uuid */
             triggeringEvidenceId: string;
+        };
+        DelegationResponse: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            goal: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lastUsedAt?: string | null;
+            /** Format: date-time */
+            revokedAt?: string | null;
+            scope: string;
         };
         DueReviewQuery: {
             /** Format: date-time */
@@ -1320,6 +1772,8 @@ export interface components {
             completed: boolean;
             responses: components["schemas"]["LearningResponseBody"][];
         };
+        /** @enum {string} */
+        GenerationOperation: "learning.activity.content.compose" | "learning.activity.rubric.compose" | "question.compose" | "deep_dive.create";
         GenerationRunResponse: {
             /** Format: int32 */
             contentVersion: number;
@@ -1365,6 +1819,12 @@ export interface components {
             payload: unknown;
             schemaVersion: string;
         };
+        /**
+         * @description Immutable reason the journey exists. Catalog selection is separate metadata:
+         *     it never changes a learner journey into a fixture.
+         * @enum {string}
+         */
+        JourneyOrigin: "learner" | "fixture";
         /** @enum {string} */
         JourneyStatus: "onboarding" | "active" | "paused" | "completed" | "failed";
         LearnerAnalyticsResponse: {
@@ -1382,11 +1842,156 @@ export interface components {
             timeSpent: components["schemas"]["TimeMetric"];
             timezone: string;
         };
+        LearnerAttemptSummaryResponse: {
+            /** Format: uuid */
+            activityId: string;
+            activityTitle: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: float */
+            maxScore?: number | null;
+            /** Format: float */
+            score?: number | null;
+            status: string;
+        };
+        LearnerCompletionResponse: {
+            /** Format: int32 */
+            completed: number;
+            /** Format: int32 */
+            total: number;
+        };
+        LearnerCourseResponse: {
+            audience?: string | null;
+            /** Format: int32 */
+            estimatedMinutes?: number | null;
+            goal: string;
+            /** Format: uuid */
+            journeyId: string;
+            modules: components["schemas"]["LearnerModuleResponse"][];
+            outcomes: components["schemas"]["LearnerOutcomeResponse"][];
+            prerequisites: string[];
+            promise: string;
+            publication: components["schemas"]["LearnerPublicationResponse"];
+            title: string;
+        };
+        /**
+         * @description A published course available to the signed-in learner. This deliberately
+         *     excludes draft and review revisions: authors can inspect those through the
+         *     authoring API, but they are never learner material.
+         */
+        LearnerCourseSummaryResponse: {
+            currentModule?: null | components["schemas"]["LearnerModuleReferenceResponse"];
+            goal: string;
+            /** Format: uuid */
+            journeyId: string;
+            /** Format: date-time */
+            lastLearningAt?: string | null;
+            next?: null | components["schemas"]["LearnerNextActivityResponse"];
+            progress: components["schemas"]["LearnerCompletionResponse"];
+            review: components["schemas"]["LearnerReviewSummaryResponse"];
+            status: string;
+            title: string;
+        };
+        LearnerDueReviewResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: date-time */
+            dueAt: string;
+            /** Format: uuid */
+            id: string;
+        };
+        LearnerModuleReferenceResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            position: number;
+            title: string;
+        };
+        LearnerModuleResponse: {
+            activityKinds: components["schemas"]["ActivityKind"][];
+            completion: components["schemas"]["LearnerCompletionResponse"];
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            position: number;
+            state: string;
+            summary: string;
+            title: string;
+        };
+        LearnerNextActivityResponse: {
+            /** Format: uuid */
+            activityId: string;
+            /** Format: int32 */
+            estimatedMinutes?: number | null;
+            title: string;
+        };
+        LearnerOutcomeResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            position: number;
+            statement: string;
+            successCriteria: string;
+        };
+        LearnerProgressOutcomeResponse: {
+            /** Format: int32 */
+            evidenceCount: number;
+            evidenceStatus: string;
+            /** Format: uuid */
+            objectiveId: string;
+            statement: string;
+        };
+        LearnerProgressViewResponse: {
+            attempts: components["schemas"]["LearnerAttemptSummaryResponse"][];
+            dueReviews: components["schemas"]["LearnerDueReviewResponse"][];
+            /** Format: uuid */
+            journeyId: string;
+            outcomes: components["schemas"]["LearnerProgressOutcomeResponse"][];
+        };
+        LearnerPublicationResponse: {
+            /** Format: date-time */
+            publishedAt: string;
+            reviewed: boolean;
+            sourceReviewed: boolean;
+        };
+        LearnerResourceResponse: {
+            activityIds: string[];
+            groundingStatus: string;
+            licenseName?: string | null;
+            licenseStatus: string;
+            licenseUrl?: string | null;
+            locator: string;
+            quote: string;
+            relevance: string;
+            title: string;
+        };
+        LearnerResourcesResponse: {
+            /** Format: uuid */
+            journeyId: string;
+            sources: components["schemas"]["LearnerResourceResponse"][];
+        };
+        LearnerReviewSummaryResponse: {
+            /** Format: int32 */
+            dueCount: number;
+        };
+        LearnerViewResponse: {
+            courseUrl: string;
+            /** Format: uuid */
+            journeyId: string;
+            next?: null | components["schemas"]["LearnerNextActivityResponse"];
+            /** Format: uuid */
+            publishedRevisionId: string;
+            status: string;
+            tabs: string[];
+            title: string;
+        };
         LearningActivityResponse: {
             /** Format: uuid */
             chapterId?: string | null;
             /** Format: int32 */
             contentVersion: number;
+            /** Format: uuid */
+            courseRevisionId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1413,6 +2018,8 @@ export interface components {
         };
         LearningChapterResponse: {
             activities: components["schemas"]["LearningActivityResponse"][];
+            /** Format: uuid */
+            courseRevisionId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1427,6 +2034,9 @@ export interface components {
             title: string;
         };
         LearningGoalResponse: {
+            catalogEntryId?: string | null;
+            /** Format: int32 */
+            catalogEntryVersion?: number | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1453,6 +2063,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             objectives: components["schemas"]["LearningObjectiveResponse"][];
+            origin: components["schemas"]["JourneyOrigin"];
             promise: string;
             recommendation?: null | components["schemas"]["LearningRecommendationResponse"];
             /** Format: uuid */
@@ -1465,16 +2076,20 @@ export interface components {
         LearningJourneySummaryResponse: {
             /** Format: date-time */
             createdAt: string;
+            goal: components["schemas"]["LearningGoalResponse"];
             /** Format: uuid */
             id: string;
             /** Format: uuid */
             nextActivityId?: string | null;
             nextActivityTitle?: string | null;
+            origin: components["schemas"]["JourneyOrigin"];
             promise: string;
             rawIntent: string;
             status: components["schemas"]["JourneyStatus"];
         };
         LearningObjectiveResponse: {
+            /** Format: uuid */
+            courseRevisionId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: uuid */
@@ -1560,6 +2175,33 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
         };
+        NativeJourneyCatalogResponse: {
+            contentReview: components["schemas"]["NativeJourneyContentReviewResponse"];
+            description: string;
+            /** Format: int64 */
+            estimatedMinutes: number;
+            field: string;
+            id: string;
+            level: string;
+            outcomes: string[];
+            sourceSummary: string;
+            sources: components["schemas"]["NativeJourneySourceResponse"][];
+            title: string;
+            /** Format: int32 */
+            version: number;
+        };
+        NativeJourneyContentReviewResponse: {
+            reviewedAt: string;
+            reviewer: string;
+            status: string;
+        };
+        NativeJourneySourceResponse: {
+            license: string;
+            locator?: string | null;
+            sourceVersion?: string | null;
+            title: string;
+            url: string;
+        };
         NoteResponse: {
             /** Format: uuid */
             activityId?: string | null;
@@ -1597,9 +2239,13 @@ export interface components {
             title: string;
         };
         PreviewLearningBody: {
+            catalogId?: string | null;
             prompt: string;
         };
         PreviewLearningResponse: {
+            catalogId?: string | null;
+            /** Format: int32 */
+            catalogVersion?: number | null;
             firstActivity: components["schemas"]["PreviewActivityResponse"];
             normalizedStatement: string;
             objectives: components["schemas"]["PreviewObjectiveResponse"][];
@@ -1689,6 +2335,9 @@ export interface components {
             sourceActivityId: string;
             variantKind: components["schemas"]["VariantKind"];
         };
+        ReviewCourseRevisionBody: {
+            review: Record<string, never>;
+        };
         ReviewHistoryPoint: {
             /** Format: date-time */
             dueAfter: string;
@@ -1749,6 +2398,11 @@ export interface components {
             assessmentItemId: string;
             /** Format: uuid */
             questionVersionId: string;
+            /**
+             * @description Question-kind response envelope: multiple choice uses `{"option_id":"option-id"}`;
+             *     true/false, short answer, and numeric use `{"value": ...}` (numeric accepts a JSON
+             *     number or numeric string); essay and code are retained for manual review.
+             */
             response: unknown;
         };
         SeedReviewBody: {
@@ -1807,23 +2461,29 @@ export interface components {
         StartGenerationRunBody: {
             /** Format: int32 */
             contentVersion?: number;
-            operation: string;
+            /** @description Literal operation required by the later content-authoring endpoint. */
+            operation: components["schemas"]["GenerationOperation"];
             provider?: string | null;
             retryKey?: string | null;
         };
         StartLearningBody: {
+            catalogId?: string | null;
             displayName: string;
             email: string;
             idempotencyKey: string;
             prompt: string;
         };
         StartLearningResponse: {
+            catalogId?: string | null;
+            /** Format: int32 */
+            catalogVersion?: number | null;
             displayName: string;
             email: string;
             /** Format: uuid */
             goalId: string;
             /** Format: uuid */
             journeyId: string;
+            origin: components["schemas"]["JourneyOrigin"];
             templateId: string;
             /** Format: int32 */
             templateVersion: number;
@@ -2245,6 +2905,67 @@ export interface operations {
             };
             /** @description User not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationResponse"][];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDelegationBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateDelegationResponse"];
+                };
+            };
+        };
+    };
+    revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2725,6 +3446,43 @@ export interface operations {
             };
         };
     };
+    get_activity_content: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Activity to review */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owned activity content */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     author_activity_content: {
         parameters: {
             query?: never;
@@ -2780,6 +3538,85 @@ export interface operations {
             };
         };
     };
+    publish_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Reviewed activity to publish */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity is not in review */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submit_activity_for_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Draft activity to submit */
+                activity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Activity submitted for review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity is not an editable draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     author_activity_rubric: {
         parameters: {
             query?: never;
@@ -2827,6 +3664,55 @@ export interface operations {
                 content?: never;
             };
             /** @description Rubric, provenance, or review status is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_learner_courses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerCourseSummaryResponse"][];
+                };
+            };
+        };
+    };
+    create_course: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCourseBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateCourseResponse"];
+                };
+            };
+            /** @description Brief or source set is invalid */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2945,6 +3831,34 @@ export interface operations {
             };
         };
     };
+    get_learner_course: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerCourseResponse"];
+                };
+            };
+            /** @description No published owned course */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     export_journey: {
         parameters: {
             query?: never;
@@ -2963,6 +3877,138 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["JourneyExportManifest"];
                 };
+            };
+        };
+    };
+    get_learner_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerViewResponse"];
+                };
+            };
+            /** @description No published owned course */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_learner_progress_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerProgressViewResponse"];
+                };
+            };
+            /** @description No published owned course */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_learner_resources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnerResourcesResponse"];
+                };
+            };
+            /** @description No published owned course */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Journey to extend */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateActivityBody"];
+            };
+        };
+        responses: {
+            /** @description Appended activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningActivityResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey, chapter, or objective does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Activity is invalid or cannot be learner-startable */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3039,6 +4085,270 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AttemptResponse"][];
                 };
+            };
+        };
+    };
+    create_chapter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Journey to extend */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChapterBody"];
+            };
+        };
+        responses: {
+            /** @description Appended chapter */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningChapterResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chapter is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Owned journey to author as a course */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCourseRevisionBody"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+            /** @description An editable course revision already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+        };
+    };
+    fork_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+            /** @description A draft revision already exists or the source revision is not published */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    publish_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+            /** @description Course has blocking validation issues */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    review_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCourseRevisionBody"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+            /** @description Course has blocking validation issues */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    validate_course_revision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseRevisionResponse"];
+                };
+            };
+        };
+    };
+    create_objective: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Journey to extend */
+                journey_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateObjectiveBody"];
+            };
+        };
+        responses: {
+            /** @description Appended objective */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningObjectiveResponse"];
+                };
+            };
+            /** @description Missing or invalid token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Journey does not exist for this learner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Objective is invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3795,6 +5105,26 @@ export interface operations {
             };
         };
     };
+    list_native_journeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reviewed native journeys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeJourneyCatalogResponse"][];
+                };
+            };
+        };
+    };
     preview_learning: {
         parameters: {
             query?: never;
@@ -3855,14 +5185,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Email already belongs to a learner */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
+            /** @description Validation failed; an existing learner must supply a valid bearer token */
             422: {
                 headers: {
                     [name: string]: unknown;

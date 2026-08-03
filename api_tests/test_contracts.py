@@ -46,6 +46,34 @@ def test_public_registration_and_authenticated_api_namespace(client):
     assert client.get("/public/v1/skill.json").status_code == 404
 
 
+def test_registered_learner_uses_bearer_token_to_start_first_journey(client):
+    email = f"start-contract-{uuid.uuid4()}@example.test"
+    registration = client.post(
+        "/public/v1/auth/register",
+        json={"email": email, "name": "Starting Learner", "password": "password123"},
+    )
+    assert registration.status_code == 201, registration.text
+    token = registration.json()["token"]
+    body = {
+        "email": email,
+        "displayName": "Starting Learner",
+        "prompt": "I want to learn Apache Flink checkpointing",
+        "idempotencyKey": f"start-contract-{uuid.uuid4()}",
+    }
+
+    client.cookies.clear()
+    unauthenticated = client.post("/public/v1/onboarding/start", json=body)
+    assert unauthenticated.status_code == 422, unauthenticated.text
+
+    started = client.post(
+        "/public/v1/onboarding/start",
+        json=body,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert started.status_code == 201, started.text
+    assert started.json()["email"] == email
+
+
 def test_active_docs_do_not_keep_retired_agent_surface():
     retired_docs = [
         "docs/audits/2026-05-28-principal-swe-audit.md",
@@ -66,17 +94,12 @@ def test_active_docs_do_not_keep_retired_agent_surface():
     assert [path for path in retired_docs if Path(path).exists()] == []
 
 
-def test_llms_entry_doc_lists_every_manifest_api_path():
+def test_llms_entry_doc_routes_agents_to_the_typed_contract():
     manifest = json.loads(Path("docs/public/skill.json").read_text())
     llms = Path("docs/public/llms.txt").read_text()
-    missing = sorted(
-        {
-            tool["path"].split("?", 1)[0]
-            for tool in manifest["tools"]
-            if tool["path"].split("?", 1)[0] not in llms
-        }
-    )
-    assert missing == []
+    assert manifest["entrypoint"] == "/public/llms.txt"
+    assert "/public/openapi.yaml" in llms
+    assert "POST /public/v1/onboarding/start" in llms
 
 
 def test_manifest_exposes_public_account_operations():
@@ -84,3 +107,55 @@ def test_manifest_exposes_public_account_operations():
     tools = {(tool["name"], tool["method"], tool["path"]) for tool in manifest["tools"]}
     assert ("identity.register", "POST", "/public/v1/auth/register") in tools
     assert ("identity.login", "POST", "/public/v1/auth/login") in tools
+
+
+def test_native_catalog_exposes_structured_reviewed_provenance(client):
+    response = client.get("/public/v1/catalog/journeys")
+    assert response.status_code == 200, response.text
+
+    journeys = response.json()
+    assert journeys
+    for journey in journeys:
+        assert journey["sourceSummary"]
+        assert journey["sources"]
+        for source in journey["sources"]:
+            assert source["title"]
+            assert source["url"].startswith("https://")
+            assert source["license"]
+        assert journey["contentReview"]["status"] == "reviewed"
+        assert journey["contentReview"]["reviewedAt"]
+        assert journey["contentReview"]["reviewer"]
+
+
+def test_learner_journey_origin_is_explicit_in_authenticated_reads(client):
+    email = f"origin-{uuid.uuid4()}@example.test"
+    registration = client.post(
+        "/public/v1/auth/register",
+        json={"email": email, "name": "Origin Learner", "password": "password123"},
+    )
+    assert registration.status_code == 201, registration.text
+    token = registration.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    started = client.post(
+        "/public/v1/onboarding/start",
+        json={
+            "email": email,
+            "displayName": "Origin Learner",
+            "prompt": "I would like to learn linear algebra",
+            "idempotencyKey": f"origin-{uuid.uuid4()}",
+        },
+        headers=headers,
+    )
+    assert started.status_code == 201, started.text
+    payload = started.json()
+    assert payload["origin"] == "learner"
+
+    journeys = client.get("/api/v1/learning/journeys", headers=headers)
+    assert journeys.status_code == 200, journeys.text
+    assert journeys.json()[0]["origin"] == "learner"
+
+    journey = client.get(
+        f"/api/v1/learning/journeys/{payload['journeyId']}", headers=headers
+    )
+    assert journey.status_code == 200, journey.text
+    assert journey.json()["origin"] == "learner"

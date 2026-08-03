@@ -7,9 +7,7 @@ from pathlib import Path
 from container_runtime import compose as run_compose
 
 ROOT = Path(__file__).resolve().parents[2]
-API_HOST = os.environ.get("API_HOST", "localhost")
 API_PORT = os.environ.get("API_PORT", "28080")
-WEB_PORT = os.environ.get("WEB_PORT", "23000")
 PREVIEW_PORT = os.environ.get("PREVIEW_PORT", "28900")
 DB_URL = os.environ.get(
     "AME_DATABASE_URL",

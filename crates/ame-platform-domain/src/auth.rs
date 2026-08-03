@@ -10,6 +10,12 @@ pub enum PrincipalRole {
     Admin,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrincipalScope {
+    Learner,
+    CourseAuthor,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthenticatedPrincipal {
     /// The authenticated learner and the owner of every learner resource.
@@ -20,6 +26,8 @@ pub struct AuthenticatedPrincipal {
     pub created_at: OffsetDateTime,
     pub credential_id: Uuid,
     pub expires_at: OffsetDateTime,
+    pub actor_identity_id: Uuid,
+    pub scope: PrincipalScope,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

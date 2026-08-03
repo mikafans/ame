@@ -11,14 +11,15 @@ use crate::{
     http::AppState,
 };
 
-/// The authenticated learner projection used by HTTP handlers.
-///
-/// There is deliberately no delegated-agent identity or per-client scope
-/// list. The authenticated user is also the owner of learner resources.
+/// The authenticated learner projection used by HTTP handlers. A delegated
+/// author retains the learner owner but has an agent actor identity and a
+/// deliberately narrow scope.
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
     pub user: AuthenticatedUserView,
     pub owner_id: Uuid,
+    pub actor_identity_id: Uuid,
+    pub scope: ame_platform_postgres::domain::auth::PrincipalScope,
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,14 @@ impl AuthenticatedUser {
         self.owner_id
     }
 
+    pub fn actor_identity_id(&self) -> Uuid {
+        self.actor_identity_id
+    }
+
+    pub fn is_delegated_course_author(&self) -> bool {
+        self.scope == ame_platform_postgres::domain::auth::PrincipalScope::CourseAuthor
+    }
+
     fn from_principal(principal: crate::domain::auth::AuthenticatedPrincipal) -> Self {
         let role = match principal.role {
             crate::domain::auth::PrincipalRole::Learner => crate::domain::user::Role::User,
@@ -51,6 +60,8 @@ impl AuthenticatedUser {
                 created_at: principal.created_at,
             },
             owner_id: principal.user_id,
+            actor_identity_id: principal.actor_identity_id,
+            scope: principal.scope,
         }
     }
 }
@@ -82,29 +93,41 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                         })
                     })
                     .and_then(|value| parse_token_value(&value))
+                    .filter(|token| token.kind == TokenKind::Login)
             })
-            .filter(|token| token.kind == TokenKind::Login)
             .ok_or(ApiError::Unauthorized)?;
 
         let now = time::OffsetDateTime::now_utc();
         let repository = PgAuthenticationRepository::new(state.pool.clone());
-        let principal = repository
-            .authenticate_login_session(parsed.id, &parsed.secret, now)
-            .await
-            .map_err(|error| match error {
-                crate::domain::auth::AuthenticationRepositoryError::Storage(error) => {
-                    ApiError::Internal(anyhow::anyhow!(error))
-                }
-                _ => ApiError::Unauthorized,
-            })?;
+        let is_login = parsed.kind == TokenKind::Login;
+        let principal = (if is_login {
+            repository
+                .authenticate_login_session(parsed.id, &parsed.secret, now)
+                .await
+        } else if parsed.kind == TokenKind::Delegation {
+            repository
+                .authenticate_agent_delegation(parsed.id, &parsed.secret, now)
+                .await
+        } else {
+            Err(crate::domain::auth::AuthenticationRepositoryError::NotFound)
+        })
+        .map_err(|error| match error {
+            crate::domain::auth::AuthenticationRepositoryError::Storage(error) => {
+                ApiError::Internal(anyhow::anyhow!(error))
+            }
+            _ => ApiError::Unauthorized,
+        })?;
 
         // Sliding-window sessions: each authenticated request extends the
         // session TTL so active learners are not logged out mid-session.
-        let renewed_expiry = now + time::Duration::seconds(state.config.login.ttl_seconds as i64);
-        repository
-            .renew_login_session(parsed.id, renewed_expiry)
-            .await
-            .map_err(|error| ApiError::Internal(anyhow::anyhow!(format!("{error:?}"))))?;
+        if is_login {
+            let renewed_expiry =
+                now + time::Duration::seconds(state.config.login.ttl_seconds as i64);
+            repository
+                .renew_login_session(parsed.id, renewed_expiry)
+                .await
+                .map_err(|error| ApiError::Internal(anyhow::anyhow!(format!("{error:?}"))))?;
+        }
 
         Ok(Self::from_principal(principal))
     }

@@ -15,7 +15,10 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = new Set([
   "/",
   "/login",
+  "/register",
   "/start",
+  "/agent",
+  "/about",
   "/self-hosting",
   "/public/llms.txt",
   "/public/skill.json",
@@ -41,5 +44,7 @@ export function proxy(req: NextRequest) {
 // Skip Next internals, static assets, and the API-proxied paths
 // (/public/*, /api/*) so only real app pages hit the gate.
 export const config = {
-  matcher: ["/((?!_next/|api/|public/|favicon.ico|.*\\.[\\w]+$).*)"],
+  matcher: [
+    "/((?!_next/|api/|public/|agent(?:/|$)|favicon.ico|.*\\.[\\w]+$).*)",
+  ],
 };

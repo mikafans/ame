@@ -16,7 +16,24 @@ fn skill_manifest_contains_namespaced_unified_learning_tools() {
     assert!(paths.contains(&"/public/v1/auth/register"));
     assert!(paths.contains(&"/public/v1/auth/login"));
     assert!(paths.contains(&"/api/v1/learning/journeys"));
+    assert!(paths.contains(&"/api/v1/learning/courses"));
+    assert!(paths.contains(&"/api/v1/learning/journeys/{journey_id}/objectives"));
+    assert!(paths.contains(&"/api/v1/learning/journeys/{journey_id}/chapters"));
+    assert!(paths.contains(&"/api/v1/learning/journeys/{journey_id}/activities"));
+    assert!(paths.contains(&"/api/v1/learning/activities/{activity_id}/review"));
+    assert!(paths.contains(
+        &"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate"
+    ));
+    assert!(
+        paths.contains(
+            &"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/review"
+        )
+    );
+    assert!(paths.contains(
+        &"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish"
+    ));
     assert!(paths.contains(&"/api/v1/learning/sessions/{id}"));
+    assert!(paths.contains(&"/api/v1/learning/activities/{activity_id}/content"));
     assert!(paths.contains(&"/api/v1/assessments?activityId={activity_id}"));
     assert!(paths.contains(&"/api/v1/deep-dives?activityId={activity_id}"));
     assert!(paths.contains(&"/api/v1/attempts/{attempt_id}/finish"));
@@ -55,5 +72,37 @@ fn advertised_activity_authoring_is_present_in_openapi() {
     let openapi = ame_api::http::openapi::openapi_yaml();
     assert!(openapi.contains("/api/v1/learning/activities/{activity_id}/content:"));
     assert!(openapi.contains("/api/v1/learning/activities/{activity_id}/rubric:"));
+    assert!(openapi.contains("/api/v1/learning/activities/{activity_id}/review:"));
+    assert!(openapi.contains("/api/v1/learning/courses:"));
+    assert!(openapi.contains(
+        "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/validate:"
+    ));
+    assert!(openapi.contains(
+        "/api/v1/learning/journeys/{journey_id}/course-revisions/{revision_id}/publish:"
+    ));
+    assert!(openapi.contains("/api/v1/learning/journeys/{journey_id}/chapters:"));
+    assert!(openapi.contains("/api/v1/learning/journeys/{journey_id}/activities:"));
     assert!(openapi.contains("  patch:\n"));
+}
+
+#[test]
+fn generation_operation_identifiers_are_public_and_machine_readable() {
+    let manifest = ame_api::http::agents::build_skill_manifest();
+    let tool = manifest["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "learning.generation.start")
+        .expect("generation start tool");
+    let operations = tool["input_schema"]["properties"]["operation"]["enum"]
+        .as_array()
+        .expect("generation operation enum");
+    for operation in [
+        "learning.activity.content.compose",
+        "learning.activity.rubric.compose",
+        "question.compose",
+        "deep_dive.create",
+    ] {
+        assert!(operations.iter().any(|value| value == operation));
+    }
 }

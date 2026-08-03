@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     auth::extractor::AuthenticatedUser,
     domain::error::{ApiError, FieldError},
-    http::AppState,
+    http::{AppState, fixture::require_learner_journey},
 };
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -104,6 +104,7 @@ pub async fn get_analytics(
     Path(journey_id): Path<Uuid>,
     Query(query): Query<AnalyticsQuery>,
 ) -> Result<Json<LearnerAnalyticsResponse>, ApiError> {
+    require_learner_journey(&state.pool, auth.owner_id(), journey_id).await?;
     query
         .timezone
         .parse::<Tz>()

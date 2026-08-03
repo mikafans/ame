@@ -3,10 +3,10 @@ from __future__ import annotations
 import argparse
 
 from .common import PREVIEW_PORT, ROOT, run, tool, web_ready
-from .database import admin, down, migrate, reset, seed, up
+from .database import down, migrate, reset, up
 from .quality import format_project, lint, test, test_db
 from container_runtime import engine
-from .runtime import dev, init_env, stop
+from .runtime import init_env
 
 
 def dispatch(target: str) -> int:
@@ -19,8 +19,6 @@ def dispatch(target: str) -> int:
     if target == "db-down": return down()
     if target == "db-reset": return reset()
     if target == "db-migrate": return migrate()
-    if target == "db-admin": return admin()
-    if target == "db-seed": return seed()
     if target == "openapi":
         status = tool("cargo", "run", "--quiet", "--bin", "gen-openapi", cwd=ROOT / "api")
         if status != 0 or not web_ready(): return status
@@ -29,8 +27,6 @@ def dispatch(target: str) -> int:
         return 0
     if target == "public-docs": return tool("cargo", "run", "--quiet", "--bin", "gen-public-docs", cwd=ROOT / "api")
     if target == "init-env": return init_env()
-    if target == "dev": return dev()
-    if target == "stop": return stop()
     if target == "preview": return tool("uv", "run", "--no-project", "python", "-m", "http.server", PREVIEW_PORT, "--bind", "0.0.0.0", "--directory", "design/preview")
     if target.startswith("docker-"):
         action = target.removeprefix("docker-")

@@ -1,5 +1,5 @@
 project: ame
-version: 0.3.0
+version: 0.4.0
 description: Agent-first, self-hostable learning platform with one owner-scoped learner API.
 
 runtime:
@@ -45,7 +45,7 @@ verification:
   unit_and_contract: make check
   api_black_box: uv run pytest api_tests -v
   browser: make local-uiux
-  full_stack: make local-up
+  full_stack: make dev
   public_contract_source: docs/public/
 
 documentation:

@@ -54,4 +54,28 @@ describe("AssessmentResultFeedback", () => {
     expect(html).toContain("reviewer will add feedback");
     expect(html).not.toContain("Graded ·");
   });
+
+  it("shows immutable answer feedback after a formative result", () => {
+    const html = renderToString(
+      <AssessmentResultFeedback
+        attempt={attempt({
+          items: [
+            {
+              assessmentItemId: "item-1",
+              questionVersionId: "question-1",
+              response: "processing_time",
+              correctness: 0,
+              awardedPoints: 0,
+              evaluationStatus: "incorrect",
+              explanation: "Event time is when the click occurred.",
+              rationale:
+                "This distinguishes delayed records from processing delay.",
+            },
+          ],
+        })}
+      />,
+    );
+    expect(html).toContain("Event time is when the click occurred.");
+    expect(html).toContain("Why this matters:");
+  });
 });

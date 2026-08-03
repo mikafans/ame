@@ -3,26 +3,24 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  Bot,
   Compass,
   FileQuestion,
   GraduationCap,
   History,
+  Info,
   LayoutDashboard,
   Lightbulb,
   LogOut,
-  Moon,
   Pencil,
   Play,
   Settings,
   Shield,
-  Sun,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
-import { useColorMode } from "@/components/ThemeRegistry";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { APP_VERSION } from "@/version";
 
 export const DRAWER_WIDTH = 232;
@@ -34,7 +32,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   author: Pencil,
   grade: GraduationCap,
   "deep-dives": Lightbulb,
-  agent: Bot,
+  about: Info,
   "admin-dashboard": Shield,
   "admin-users": Users,
   "admin-audit": History,
@@ -45,6 +43,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
 interface SidebarProps {
   route: string;
   setRoute: (route: string) => void;
+  desktop?: boolean;
   mobileOpen?: boolean;
   onClose?: () => void;
 }
@@ -67,11 +66,11 @@ function stringToColor(value: string): string {
 export function Sidebar({
   route,
   setRoute,
+  desktop = true,
   mobileOpen = false,
   onClose,
 }: SidebarProps) {
   const { user, logout: logoutContext } = useAuth();
-  const { mode, toggle } = useColorMode();
 
   const adminItems: NavigationItem[] =
     user?.role === "admin"
@@ -116,14 +115,15 @@ export function Sidebar({
       icon: "explore",
       section: "Learn",
     },
-    { id: "agent", label: "Agent API", icon: "agent", section: "Integrate" },
     ...adminItems,
+    {
+      id: "about",
+      label: "About AME",
+      icon: "about",
+      section: "Learn",
+    },
   ];
-  const sections = [
-    "Learn",
-    "Integrate",
-    ...(user?.role === "admin" ? ["Admin"] : []),
-  ];
+  const sections = ["Learn", ...(user?.role === "admin" ? ["Admin"] : [])];
   const initials =
     user?.displayName
       ?.split(" ")
@@ -151,7 +151,10 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-3">
+      <nav
+        aria-label="Main navigation"
+        className="min-h-0 flex-1 overflow-y-auto py-3"
+      >
         {sections.map((section) => {
           const sectionItems = items.filter((item) => item.section === section);
           if (!sectionItems.length) return null;
@@ -198,19 +201,6 @@ export function Sidebar({
           </span>
           <button
             type="button"
-            title={mode === "dark" ? "Use light mode" : "Use dark mode"}
-            aria-label={mode === "dark" ? "Use light mode" : "Use dark mode"}
-            onClick={toggle}
-            className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {mode === "dark" ? (
-              <Sun className="size-4" />
-            ) : (
-              <Moon className="size-4" />
-            )}
-          </button>
-          <button
-            type="button"
             title="Sign out"
             aria-label="Sign out"
             onClick={handleLogout}
@@ -219,13 +209,20 @@ export function Sidebar({
             <LogOut className="size-4" />
           </button>
         </div>
+        <ThemeSelector className="mt-3 min-w-0" />
       </div>
     </div>
   );
 
   return (
     <>
-      <aside className="hidden w-[232px] shrink-0 border-r border-border md:flex">
+      <aside
+        className={
+          desktop
+            ? "sticky top-0 z-20 hidden h-screen w-[232px] shrink-0 border-r border-border bg-background md:flex"
+            : "hidden"
+        }
+      >
         {navigation}
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose?.()}>

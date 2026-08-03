@@ -7,6 +7,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::Row;
+use std::collections::HashMap;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -38,6 +40,9 @@ pub struct StartAttemptBody {
 pub struct SaveAnswerBody {
     pub assessment_item_id: Uuid,
     pub question_version_id: Uuid,
+    /// Question-kind response envelope: multiple choice uses `{"option_id":"option-id"}`;
+    /// true/false, short answer, and numeric use `{"value": ...}` (numeric accepts a JSON
+    /// number or numeric string); essay and code are retained for manual review.
     pub response: Value,
 }
 
@@ -68,6 +73,11 @@ pub struct AttemptItemResponse {
     pub correctness: Option<f32>,
     pub awarded_points: Option<f32>,
     pub evaluation_status: String,
+    /// Learner-facing feedback from the immutable question version. It is
+    /// returned with a finished attempt so a formative check never records an
+    /// opaque correct/incorrect state.
+    pub rationale: Option<String>,
+    pub explanation: Option<String>,
 }
 
 pub fn router(state: AppState) -> Router<AppState> {
@@ -110,7 +120,7 @@ pub async fn start_attempt(
             resource: "assessment",
         });
     }
-    let attempt = PgAttemptRepository::new(state.pool)
+    let attempt = PgAttemptRepository::new(state.pool.clone())
         .start(
             StartAttempt {
                 subject_user_id: auth.owner_id(),
@@ -123,7 +133,7 @@ pub async fn start_attempt(
         )
         .await
         .map_err(map_attempt_error)?;
-    Ok(Json(attempt_response(attempt)))
+    Ok(Json(attempt_response(&state.pool, attempt).await?))
 }
 
 #[utoipa::path(
@@ -139,11 +149,11 @@ pub async fn get_attempt(
     auth: AuthenticatedUser,
     Path(attempt_id): Path<Uuid>,
 ) -> Result<Json<AttemptResponse>, ApiError> {
-    let attempt = PgAttemptRepository::new(state.pool)
+    let attempt = PgAttemptRepository::new(state.pool.clone())
         .get(auth.owner_id(), attempt_id)
         .await
         .map_err(map_attempt_error)?;
-    Ok(Json(attempt_response(attempt)))
+    Ok(Json(attempt_response(&state.pool, attempt).await?))
 }
 
 #[utoipa::path(
@@ -171,7 +181,7 @@ pub async fn list_journey_attempts(
             }
             other => ApiError::Internal(anyhow::anyhow!(other.to_string())),
         })?;
-    let repository = PgAttemptRepository::new(state.pool);
+    let repository = PgAttemptRepository::new(state.pool.clone());
     let mut attempts = Vec::new();
     for activity in activities {
         attempts.extend(
@@ -180,10 +190,14 @@ pub async fn list_journey_attempts(
                 .await
                 .map_err(map_attempt_error)?
                 .into_iter()
-                .map(attempt_response),
+                .collect::<Vec<_>>(),
         );
     }
-    Ok(Json(attempts))
+    let mut responses = Vec::with_capacity(attempts.len());
+    for attempt in attempts {
+        responses.push(attempt_response(&state.pool, attempt).await?);
+    }
+    Ok(Json(responses))
 }
 
 #[utoipa::path(
@@ -201,7 +215,7 @@ pub async fn save_answer(
     Path(attempt_id): Path<Uuid>,
     Json(body): Json<SaveAnswerBody>,
 ) -> Result<Json<AttemptResponse>, ApiError> {
-    let attempt = PgAttemptRepository::new(state.pool)
+    let attempt = PgAttemptRepository::new(state.pool.clone())
         .save_answer(
             auth.owner_id(),
             attempt_id,
@@ -211,7 +225,7 @@ pub async fn save_answer(
         )
         .await
         .map_err(map_attempt_error)?;
-    Ok(Json(attempt_response(attempt)))
+    Ok(Json(attempt_response(&state.pool, attempt).await?))
 }
 
 #[utoipa::path(
@@ -251,10 +265,13 @@ pub async fn finish_attempt(
         .finish(auth.owner_id(), attempt_id, &assessment, &questions)
         .await
         .map_err(map_attempt_error)?;
-    Ok(Json(attempt_response(attempt)))
+    Ok(Json(attempt_response(&state.pool, attempt).await?))
 }
 
-fn attempt_response(attempt: Attempt) -> AttemptResponse {
+async fn attempt_response(
+    pool: &sqlx::PgPool,
+    attempt: Attempt,
+) -> Result<AttemptResponse, ApiError> {
     let grade = attempt.grade;
     let answer_results = attempt.answer_results;
     let awarded_points = grade
@@ -266,7 +283,40 @@ fn attempt_response(attempt: Attempt) -> AttemptResponse {
                 .map(|item| item.awarded_points.unwrap_or_default())
                 .reduce(|total, points| total + points)
         });
-    AttemptResponse {
+    let answers = answer_results
+        .into_iter()
+        .map(|item| (item.assessment_item_id, item))
+        .collect::<HashMap<_, _>>();
+    let assessment_items = sqlx::query(
+        "SELECT id, question_version_id FROM tb_assessment_items WHERE assessment_id = $1 ORDER BY order_index",
+    )
+    .bind(attempt.input.assessment_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?;
+    let question_ids = assessment_items
+        .iter()
+        .map(|item| item.get::<Uuid, _>("question_version_id"))
+        .collect::<Vec<_>>();
+    let feedback = sqlx::query(
+        "SELECT id, rationale, explanation FROM tb_question_versions WHERE id = ANY($1)",
+    )
+    .bind(question_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| ApiError::Internal(anyhow::Error::new(error)))?
+    .into_iter()
+    .map(|row| {
+        (
+            row.get::<Uuid, _>("id"),
+            (
+                row.get::<Option<String>, _>("rationale"),
+                row.get::<Option<String>, _>("explanation"),
+            ),
+        )
+    })
+    .collect::<HashMap<_, _>>();
+    Ok(AttemptResponse {
         id: attempt.id,
         assessment_id: attempt.input.assessment_id,
         assessment_version: attempt.input.assessment_version,
@@ -280,15 +330,30 @@ fn attempt_response(attempt: Attempt) -> AttemptResponse {
         assessment_mode: attempt.assessment_mode,
         review_status: attempt.review_status,
         responses: attempt.responses,
-        items: answer_results
+        items: assessment_items
             .into_iter()
-            .map(|item| AttemptItemResponse {
-                assessment_item_id: item.assessment_item_id,
-                question_version_id: item.question_version_id,
-                response: item.response,
-                correctness: item.correctness,
-                awarded_points: item.awarded_points,
-                evaluation_status: item.evaluation_status,
+            .map(|assessment_item| {
+                let assessment_item_id: Uuid = assessment_item.get("id");
+                let question_version_id: Uuid = assessment_item.get("question_version_id");
+                let answer = answers.get(&assessment_item_id);
+                AttemptItemResponse {
+                    assessment_item_id,
+                    question_version_id,
+                    response: answer
+                        .map(|item| item.response.clone())
+                        .unwrap_or(Value::Null),
+                    correctness: answer.and_then(|item| item.correctness),
+                    awarded_points: answer.and_then(|item| item.awarded_points),
+                    evaluation_status: answer
+                        .map(|item| item.evaluation_status.clone())
+                        .unwrap_or_else(|| "unanswered".into()),
+                    rationale: feedback
+                        .get(&question_version_id)
+                        .and_then(|(rationale, _)| rationale.clone()),
+                    explanation: feedback
+                        .get(&question_version_id)
+                        .and_then(|(_, explanation)| explanation.clone()),
+                }
             })
             .collect(),
         score: grade
@@ -309,7 +374,7 @@ fn attempt_response(attempt: Attempt) -> AttemptResponse {
                 .format(&time::format_description::well_known::Rfc3339)
                 .unwrap_or_default()
         }),
-    }
+    })
 }
 
 fn map_attempt_error(error: AttemptError) -> ApiError {

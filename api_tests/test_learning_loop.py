@@ -48,6 +48,40 @@ def _published_generation_run(client, headers, operation):
     return run_id
 
 
+def _certified_reference(client, headers):
+    content = "A supported source statement."
+    source = client.post(
+        "/api/v1/sources/imports",
+        headers=headers,
+        json={
+            "kind": "document",
+            "locator": "test://grounding/source.txt",
+            "mediaType": "text/plain",
+            "content": content,
+            "retryKey": f"citation-source-{uuid.uuid4()}",
+        },
+    )
+    assert source.status_code == 200, source.text
+    citation = client.post(
+        "/api/v1/citations",
+        headers=headers,
+        json={
+            "snapshotId": source.json()["id"],
+            "startByte": 0,
+            "endByte": len(content),
+            "quote": content,
+            "extractionMethod": "exact_quote",
+            "groundingStatus": "supported",
+            "groundingNote": "The exact immutable source text supports this test content.",
+            "licenseStatus": "allowed",
+            "licenseName": "CC BY 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        },
+    )
+    assert citation.status_code == 200, citation.text
+    return [citation.json()["id"]]
+
+
 def _recommendation_candidates(journey_body):
     return [
         {"objectiveId": objective_id, "activityId": activity["id"]}
@@ -57,8 +91,199 @@ def _recommendation_candidates(journey_body):
     ]
 
 
+def test_agent_authored_activity_stays_private_until_review_and_publish(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    journey_id = started["journeyId"]
+    journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
+    assert journey.status_code == 200, journey.text
+    objective_id = journey.json()["objectives"][0]["id"]
+
+    created = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities",
+        headers=headers,
+        json={
+            "chapterId": None,
+            "kind": "practice",
+            "title": "Draft-only agent activity",
+            "payload": {"prompt": "A draft activity must not reach the learner."},
+            "objectiveIds": [objective_id],
+            "status": "ready",
+        },
+    )
+    assert created.status_code == 200, created.text
+    activity = created.json()
+    assert activity["publicationStatus"] == "draft"
+
+    blocked = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{activity['id']}/start",
+        headers=headers,
+        json={"questionPlan": {}},
+    )
+    assert blocked.status_code == 422, blocked.text
+
+    invalid_publish = client.post(
+        f"/api/v1/learning/activities/{activity['id']}/publish", headers=headers
+    )
+    assert invalid_publish.status_code == 409, invalid_publish.text
+
+    review = client.post(
+        f"/api/v1/learning/activities/{activity['id']}/review", headers=headers
+    )
+    assert review.status_code == 200, review.text
+    assert review.json()["publicationStatus"] == "review"
+
+    blocked_course_publish = client.post(
+        f"/api/v1/learning/activities/{activity['id']}/publish", headers=headers
+    )
+    assert blocked_course_publish.status_code == 409, blocked_course_publish.text
+    assert blocked_course_publish.json()["error"]["code"] == "course_publication_required"
+
+    still_blocked = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/activities/{activity['id']}/start",
+        headers=headers,
+        json={"questionPlan": {}},
+    )
+    assert still_blocked.status_code == 422, still_blocked.text
+
+
+def test_course_revision_returns_server_side_publish_diagnostics(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
+    journey_id = started["journeyId"]
+    created = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions",
+        headers=headers,
+        json={
+            "brief": {
+                "title": "A source-grounded course",
+                "audience": "A learner with a concrete goal",
+                "estimatedMinutes": 60,
+                "prerequisites": ["None beyond the stated learner level."],
+                "outcomes": ["Explain one verifiable course outcome."],
+                "modules": ["Foundations", "Practice"],
+            },
+            "sourceReferences": references,
+        },
+    )
+    assert created.status_code == 201, created.text
+    revision = created.json()
+    assert revision["status"] == "draft"
+
+    validated = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/validate",
+        headers=headers,
+    )
+    assert validated.status_code == 200, validated.text
+    issue_codes = {issue["code"] for issue in validated.json()["validation"]}
+    assert issue_codes == {"missing_modules", "missing_outcomes"}
+
+    invalid_review = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/review",
+        headers=headers,
+        json={"review": {"reviewer": "agent", "decision": "approved"}},
+    )
+    assert invalid_review.status_code == 422, invalid_review.text
+    assert invalid_review.json()["error"]["details"]["fields"][0]["field"] == "review"
+
+    publish = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/course-revisions/{revision['id']}/publish",
+        headers=headers,
+    )
+    assert publish.status_code == 409, publish.text
+
+
+def test_agent_can_start_an_empty_course_without_generic_template_material(client):
+    started, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
+    created = client.post(
+        "/api/v1/learning/courses",
+        headers=headers,
+        json={
+            "rawIntent": "Design a reliable asynchronous TCP service with Netty.",
+            "idempotencyKey": f"agent-course-{uuid.uuid4()}",
+            "brief": {
+                "title": "Netty service design",
+                "audience": "A Java maintainer",
+                "estimatedMinutes": 90,
+                "prerequisites": ["Basic Java concurrency"],
+                "outcomes": ["Explain a Netty pipeline design"],
+                "modules": ["Event loops"],
+            },
+            "sourceReferences": references,
+        },
+    )
+    assert created.status_code == 201, created.text
+    course = created.json()
+    assert course["journeyId"] != started["journeyId"]
+    assert course["revision"]["status"] == "draft"
+
+    journey = client.get(
+        f"/api/v1/learning/journeys/{course['journeyId']}", headers=headers
+    )
+    assert journey.status_code == 200, journey.text
+    assert journey.json()["activities"] == []
+    assert journey.json()["objectives"] == []
+
+
+def test_draft_course_graph_is_revision_owned_and_hidden_from_learners(client):
+    _, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
+    created = client.post(
+        "/api/v1/learning/courses",
+        headers=headers,
+        json={
+            "rawIntent": "Design a reliable Netty service.",
+            "idempotencyKey": f"revision-owned-{uuid.uuid4()}",
+            "brief": {
+                "title": "Netty service design",
+                "audience": "A Java maintainer",
+                "estimatedMinutes": 90,
+                "prerequisites": ["Basic Java concurrency"],
+                "outcomes": ["Explain an event-loop design"],
+                "modules": ["Event loops"],
+            },
+            "sourceReferences": references,
+        },
+    )
+    assert created.status_code == 201, created.text
+    journey_id = created.json()["journeyId"]
+    revision_id = created.json()["revision"]["id"]
+
+    missing_revision = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/objectives",
+        headers=headers,
+        json={
+            "verb": "Explain",
+            "statement": "Explain one event-loop responsibility.",
+            "successCriteria": "Names scheduling and I/O ownership.",
+        },
+    )
+    assert missing_revision.status_code == 422, missing_revision.text
+
+    objective = client.post(
+        f"/api/v1/learning/journeys/{journey_id}/objectives",
+        headers=headers,
+        json={
+            "revisionId": revision_id,
+            "verb": "Explain",
+            "statement": "Explain one event-loop responsibility.",
+            "successCriteria": "Names scheduling and I/O ownership.",
+        },
+    )
+    assert objective.status_code == 200, objective.text
+    assert objective.json()["courseRevisionId"] == revision_id
+
+    learner_view = client.get(
+        f"/api/v1/learning/journeys/{journey_id}", headers=headers
+    )
+    assert learner_view.status_code == 200, learner_view.text
+    assert learner_view.json()["objectives"] == []
+    assert learner_view.json()["activities"] == []
+
+
 def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     started, headers = _start_learner(client, "I want to learn a useful subject")
+    references = _certified_reference(client, headers)
     journey_id = started["journeyId"]
     journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
     assert journey.status_code == 200, journey.text
@@ -172,7 +397,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         json={
             "generationRunId": generation_run_id,
             "content": content,
-            "sourceReferences": ["https://example.test/subject/intro"],
+            "sourceReferences": references,
             "reviewStatus": "approved",
         },
     )
@@ -181,7 +406,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     assert grounded.json()["payload"]["contentProvenance"] == {
         "generationRunId": generation_run_id,
         "reviewStatus": "approved",
-        "sourceReferences": ["https://example.test/subject/intro"],
+        "sourceReferences": references,
     }
     worked_grounded = client.patch(
         f"/api/v1/learning/activities/{worked_example['id']}/content",
@@ -189,7 +414,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         json={
             "generationRunId": generation_run_id,
             "content": worked_example_content,
-            "sourceReferences": ["https://example.test/subject/example"],
+            "sourceReferences": references,
             "reviewStatus": "approved",
         },
     )
@@ -197,7 +422,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     assert worked_grounded.json()["payload"]["content"] == worked_example_content
     assert worked_grounded.json()["payload"]["contentProvenance"][
         "sourceReferences"
-    ] == ["https://example.test/subject/example"]
+    ] == references
 
     invalid_content = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",
@@ -303,7 +528,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
         json={
             "generationRunId": generation_run_id,
             "content": content,
-            "sourceReferences": ["https://example.test/subject/intro"],
+            "sourceReferences": references,
             "reviewStatus": "approved",
         },
     )
@@ -322,6 +547,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert empty_preview.status_code == 422
 
     started, headers = _start_learner(client, prompt)
+    references = _certified_reference(client, headers)
     journey_id = started["journeyId"]
 
     journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
@@ -380,7 +606,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "reviewStatus": "approved",
             "explanation": "The JobManager coordinates scheduling and execution.",
             "difficulty": "introductory",
-            "sourceReferences": ["https://nightlies.apache.org/flink/"],
+            "sourceReferences": references,
         },
     )
     assert question_response.status_code == 200, question_response.text
@@ -600,7 +826,11 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert recommendation.status_code == 200, recommendation.text
 
-    learner_day = datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    submitted_at = finished.json()["submittedAt"]
+    assert submitted_at is not None
+    learner_day = datetime.fromisoformat(submitted_at).astimezone(
+        ZoneInfo("Asia/Tokyo")
+    ).date()
     streak_body = {
         "journeyId": journey_id,
         "activityId": activity_id,
@@ -661,7 +891,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "caveats": [
                 "Deployment behavior depends on the configured operator version."
             ],
-            "sourceReferences": ["https://nightlies.apache.org/flink/"],
+            "sourceReferences": references,
             "applicationTask": "Explain the scheduling path in your own words.",
             "reviewStatus": "approved",
         },

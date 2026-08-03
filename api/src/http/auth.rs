@@ -1,7 +1,11 @@
 //! Email+password auth routes: register, login, logout.
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-use axum::{Json, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    http::{HeaderMap, HeaderValue, StatusCode, header},
+    response::IntoResponse,
+};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -55,6 +59,27 @@ fn set_token_cookie_header(token: &str, secure: bool) -> String {
     format!("ame_token={token}; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=2592000")
 }
 
+fn auth_cookie_headers(token: &str, secure: bool) -> HeaderMap {
+    let secure_suffix = if secure { "; Secure" } else { "" };
+    let mut headers = HeaderMap::new();
+    headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&set_token_cookie_header(token, secure))
+            .expect("valid session cookie"),
+    );
+    // This marker has no credential value. It only avoids an intentional 401
+    // on every anonymous public-page refresh; the HttpOnly login token remains
+    // the sole authority.
+    headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&format!(
+            "ame_session=1; SameSite=Lax; Path=/; Max-Age=2592000{secure_suffix}"
+        ))
+        .expect("valid session marker cookie"),
+    );
+    headers
+}
+
 fn registration_error(error: sqlx::Error) -> ApiError {
     if error
         .as_database_error()
@@ -85,7 +110,7 @@ fn registration_error(error: sqlx::Error) -> ApiError {
 pub async fn register(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<RegisterBody>,
-) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
+) -> Result<(StatusCode, HeaderMap, Json<AuthResponse>), ApiError> {
     // Validate email
     let trimmed_email = body.email.trim();
     if trimmed_email.is_empty() {
@@ -130,13 +155,13 @@ pub async fn register(
     let display_name = registered.display_name;
     let role = registered.role;
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
-    let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
+    let cookie_headers = auth_cookie_headers(&token_str, state.config.server.production);
 
     metrics::counter!("signup_total").increment(1);
 
     Ok((
         StatusCode::CREATED,
-        [("set-cookie".to_string(), cookie_header)],
+        cookie_headers,
         Json(AuthResponse {
             token: token_str,
             user: UserInfo {
@@ -163,7 +188,7 @@ pub async fn register(
 pub async fn login(
     axum::extract::State(state): axum::extract::State<AppState>,
     Json(body): Json<LoginBody>,
-) -> Result<(StatusCode, [(String, String); 1], Json<AuthResponse>), ApiError> {
+) -> Result<(StatusCode, HeaderMap, Json<AuthResponse>), ApiError> {
     let canonical = crate::auth::token::canonical_email(&body.email);
 
     // Per-account rate limiting to prevent distributed login brute force
@@ -227,13 +252,13 @@ pub async fn login(
     let role = user.role;
 
     let token_str = issue_token(&state.pool, state.config.login.ttl_seconds, user_id).await?;
-    let cookie_header = set_token_cookie_header(&token_str, state.config.server.production);
+    let cookie_headers = auth_cookie_headers(&token_str, state.config.server.production);
 
     metrics::counter!("login_total", "result" => "success").increment(1);
 
     Ok((
         StatusCode::OK,
-        [("set-cookie".to_string(), cookie_header)],
+        cookie_headers,
         Json(AuthResponse {
             token: token_str,
             user: UserInfo {
@@ -334,20 +359,27 @@ pub async fn logout(
         .await;
     }
 
-    (
-        StatusCode::OK,
-        [(
-            "set-cookie".to_string(),
-            format!(
-                "ame_token=; HttpOnly{}; SameSite=Lax; Path=/; Max-Age=0",
-                if state.config.server.production {
-                    "; Secure"
-                } else {
-                    ""
-                }
-            ),
-        )],
-    )
+    let secure_suffix = if state.config.server.production {
+        "; Secure"
+    } else {
+        ""
+    };
+    let mut headers = HeaderMap::new();
+    headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&format!(
+            "ame_token=; HttpOnly{secure_suffix}; SameSite=Lax; Path=/; Max-Age=0"
+        ))
+        .expect("valid expired session cookie"),
+    );
+    headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&format!(
+            "ame_session=;{secure_suffix}; SameSite=Lax; Path=/; Max-Age=0"
+        ))
+        .expect("valid expired session marker cookie"),
+    );
+    (StatusCode::OK, headers)
 }
 
 // Routes are mounted (with rate limiting) in `http::mod::router`. The handlers
