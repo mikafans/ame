@@ -61,9 +61,17 @@ function StartLearningForm() {
     };
   }, [routeCatalogId]);
 
+  // A signed-in visitor with no specific intent (no catalogId/prompt) has
+  // nothing to do on this new-account form — send them to the agent handoff
+  // page instead. But a signed-in learner picking a reviewed catalog path (or
+  // arriving with a prompt) is starting an additional journey on their
+  // existing account, so let them through to submit it.
+  const hasIntent = Boolean(routeCatalogId || routePrompt);
   useEffect(() => {
-    if (user && !onboardingComplete && !loading) router.replace("/agent");
-  }, [loading, onboardingComplete, router, user]);
+    if (user && !hasIntent && !onboardingComplete && !loading) {
+      router.replace("/agent");
+    }
+  }, [hasIntent, loading, onboardingComplete, router, user]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,8 +99,8 @@ function StartLearningForm() {
           ? { Authorization: `Bearer ${onboardingToken}` }
           : undefined,
         body: {
-          displayName,
-          email,
+          displayName: user ? user.displayName : displayName,
+          email: user ? (user.email ?? "") : email,
           idempotencyKey: crypto.randomUUID(),
           prompt,
           ...(routeCatalogId ? { catalogId: routeCatalogId } : {}),
@@ -121,7 +129,7 @@ function StartLearningForm() {
     }
   }
 
-  if (authLoading || user) {
+  if (authLoading || (user && !hasIntent)) {
     return (
       <main className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
         <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
@@ -179,39 +187,49 @@ function StartLearningForm() {
             className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="start-name"
-              className="mb-2 block text-sm font-medium"
-            >
-              Your name
-            </label>
-            <input
-              id="start-name"
-              required
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
-            />
+        {user ? (
+          <p className="text-sm text-muted-foreground">
+            Continuing as{" "}
+            <span className="font-medium text-foreground">
+              {user.displayName}
+            </span>
+            . This adds another journey to your existing account.
+          </p>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="start-name"
+                className="mb-2 block text-sm font-medium"
+              >
+                Your name
+              </label>
+              <input
+                id="start-name"
+                required
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="start-email"
+                className="mb-2 block text-sm font-medium"
+              >
+                Email identifier
+              </label>
+              <input
+                id="start-email"
+                required
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="start-email"
-              className="mb-2 block text-sm font-medium"
-            >
-              Email identifier
-            </label>
-            <input
-              id="start-email"
-              required
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-        </div>
+        )}
         {!user && (
           <div>
             <label
