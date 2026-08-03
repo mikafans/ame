@@ -1018,6 +1018,29 @@ impl LearningRepository for PgLearningRepository {
         .execute(&mut *transaction)
         .await
         .map_err(storage_error)?;
+        sqlx::query(
+            r#"
+            UPDATE tb_learning_journeys
+            SET status = 'completed'
+            WHERE id = (
+                SELECT journey_id FROM tb_activities WHERE id = $1
+            )
+              AND status = 'active'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM tb_activities
+                WHERE journey_id = (
+                    SELECT journey_id FROM tb_activities WHERE id = $1
+                )
+                  AND publication_status = 'published'
+                  AND status <> 'completed'
+            )
+            "#,
+        )
+        .bind(session.activity_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(storage_error)?;
         transaction.commit().await.map_err(storage_error)?;
         Ok(session)
     }

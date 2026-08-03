@@ -330,10 +330,10 @@ test("learner sees variant failure, retries, and uses reviewed source-backed con
   );
   expect(masteryAfter.status()).toBe(masteryBefore.status());
   if (masteryBefore.ok()) {
-    const { calculatedAt: _beforeCalculatedAt, ...before } =
-      await masteryBefore.json();
-    const { calculatedAt: _afterCalculatedAt, ...after } =
-      await masteryAfter.json();
+    const before = await masteryBefore.json();
+    const after = await masteryAfter.json();
+    delete before.calculatedAt;
+    delete after.calculatedAt;
     expect(after).toEqual(before);
   }
 });

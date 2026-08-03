@@ -85,6 +85,41 @@ def delegation_token(
     }
 
 
+def complete_as_learner(
+    client: httpx.Client, headers: dict[str, str], journey_id: str
+) -> int:
+    """Complete every ready activity through the learner session API.
+
+    This is an explicitly mechanical fixture state: it records completed
+    sessions but does not submit assessment answers or invent mastery evidence.
+    """
+    completed = 0
+    while True:
+        journey = require_ok(
+            client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
+        )
+        ready = next(
+            (activity for activity in journey["activities"] if activity["status"] == "ready"),
+            None,
+        )
+        if ready is None:
+            return completed
+        session = require_ok(
+            client.post(
+                f"/api/v1/learning/journeys/{journey_id}/activities/{ready['id']}/start",
+                headers=headers,
+            )
+        )
+        require_ok(
+            client.post(
+                f"/api/v1/learning/sessions/{session['id']}/finish",
+                headers=headers,
+                json={"completed": True, "responses": []},
+            )
+        )
+        completed += 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -94,6 +129,11 @@ def main() -> None:
         "--name", default=os.getenv("HARU_REFERENCE_NAME", DEFAULT_NAME)
     )
     parser.add_argument("--password", default=os.getenv("HARU_REFERENCE_PASSWORD"))
+    parser.add_argument(
+        "--complete-course",
+        choices=[course["slug"] for course in COURSES],
+        help="Mechanically complete one course through learner sessions without assessment answers.",
+    )
     args = parser.parse_args()
     if not args.password or len(args.password) < 8:
         raise SystemExit(
@@ -109,6 +149,23 @@ def main() -> None:
                 client, owner_headers, course["intent"]
             )
             built = build_reference_course(client, course, headers=author_headers)
+            completed_activities = 0
+            journey_status = "active"
+            if args.complete_course == course["slug"]:
+                completed_activities = complete_as_learner(
+                    client, owner_headers, built["journeyId"]
+                )
+                completed_journey = require_ok(
+                    client.get(
+                        f"/api/v1/learning/journeys/{built['journeyId']}",
+                        headers=owner_headers,
+                    )
+                )
+                journey_status = completed_journey["status"]
+                if journey_status != "completed":
+                    raise RuntimeError(
+                        "all learner activities completed but journey did not transition to completed"
+                    )
             courses.append(
                 {
                     "slug": course["slug"],
@@ -119,6 +176,11 @@ def main() -> None:
                         "id": str(delegation["id"]),
                         "scope": delegation["scope"],
                         "expiresAt": delegation["expiresAt"],
+                    },
+                    "learnerCompletion": {
+                        "completedActivities": completed_activities,
+                        "journeyStatus": journey_status,
+                        "assessmentEvidence": "not simulated",
                     },
                 }
             )
@@ -145,7 +207,12 @@ def main() -> None:
         "email": args.email,
         "learningUrl": f"{BASE_URL}/learning",
         "courses": courses,
-        "completion": "not simulated; these are active published courses",
+        "completion": (
+            f"{args.complete_course} was mechanically completed through learner sessions; "
+            "assessment answers and mastery evidence were not simulated"
+            if args.complete_course
+            else "not simulated; these are active published courses"
+        ),
     }
     handoff_dir = ROOT / ".tmp"
     handoff_dir.mkdir(exist_ok=True)

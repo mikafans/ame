@@ -877,6 +877,20 @@ impl LearningRepository for InMemoryLearningRepository {
             activity.status = ActivityStatus::Ready;
             activity.updated_at = OffsetDateTime::now_utc();
         }
+        let journey_complete = state
+            .activities
+            .values()
+            .filter(|activity| {
+                activity.journey_id == journey_id
+                    && activity.publication_status == ActivityPublicationStatus::Published
+            })
+            .all(|activity| activity.status == ActivityStatus::Completed);
+        if journey_complete
+            && let Some(journey) = state.journeys.get_mut(&journey_id)
+            && journey.status == JourneyStatus::Active
+        {
+            journey.status = JourneyStatus::Completed;
+        }
         Ok(finished_session)
     }
 }
@@ -1213,6 +1227,35 @@ pub async fn exercise_goal_and_journey_contract<R: LearningRepository>(
             .status,
         ActivityStatus::Ready
     );
+    let final_activity = repository
+        .list_activities(subject, journey.id)
+        .await
+        .expect("final activity loads")[1]
+        .clone();
+    let final_session = repository
+        .start_learning_session(CreateLearningSession {
+            activity_id: final_activity.id,
+            ..session_input.clone()
+        })
+        .await
+        .expect("final learning session starts");
+    repository
+        .finish_learning_session(FinishLearningSession {
+            subject_user_id: subject,
+            session_id: final_session.id,
+            completed: true,
+            result: serde_json::json!({"completed": true}),
+        })
+        .await
+        .expect("final learning session finishes");
+    assert_eq!(
+        repository
+            .get_journey(subject, journey.id)
+            .await
+            .expect("completed journey")
+            .status,
+        JourneyStatus::Completed
+    );
     let finished_retry = repository
         .finish_learning_session(FinishLearningSession {
             subject_user_id: subject,
@@ -1295,6 +1338,7 @@ mod contract_tests {
         let chapter = repository
             .create_chapter(CreateChapter {
                 journey_id: journey.id,
+                course_revision_id: None,
                 subject_user_id: subject,
                 title: "Index model".to_string(),
                 summary: "Understand what an index changes.".to_string(),
@@ -1305,6 +1349,7 @@ mod contract_tests {
         let objective = repository
             .create_objective(CreateObjective {
                 journey_id: journey.id,
+                course_revision_id: None,
                 subject_user_id: subject,
                 verb: "Explain".to_string(),
                 statement: "Explain index lookup cost".to_string(),
@@ -1321,6 +1366,7 @@ mod contract_tests {
             repository
                 .create_activity(CreateActivity {
                     journey_id: journey.id,
+                    course_revision_id: None,
                     subject_user_id: subject,
                     source_actor_id: actor,
                     chapter_id,

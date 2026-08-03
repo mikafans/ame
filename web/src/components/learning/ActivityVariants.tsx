@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 
@@ -25,17 +25,17 @@ export function ActivityVariants({
   const [variants, setVariants] = useState<Variant[]>([]);
   const [requesting, setRequesting] = useState<VariantKind | null>(null);
 
-  async function reload() {
+  const reload = useCallback(async () => {
     const result = await api.GET("/api/v1/learning-variants", {
       params: { query: { activityId } },
     });
     if (result.response.ok && result.data)
       setVariants(result.data as Variant[]);
-  }
+  }, [activityId]);
 
   useEffect(() => {
     void reload();
-  }, [activityId]);
+  }, [reload]);
 
   async function request(kind: VariantKind) {
     setRequesting(kind);

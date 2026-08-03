@@ -830,3 +830,54 @@ def test_learner_views_are_published_course_scoped_and_owner_scoped(client):
         headers=other_headers,
     )
     assert forbidden.status_code == 404, forbidden.text
+
+
+def test_finishing_every_published_activity_completes_the_course(client):
+    headers = register_author(client, COURSES[0])
+    built = build_reference_course(client, COURSES[0], headers)
+
+    while True:
+        journey = request(
+            client,
+            "get",
+            f"/api/v1/learning/journeys/{built['journeyId']}",
+            headers,
+        )
+        ready = next(
+            (
+                activity
+                for activity in journey["activities"]
+                if activity["status"] == "ready"
+            ),
+            None,
+        )
+        if ready is None:
+            break
+        session = request(
+            client,
+            "post",
+            f"/api/v1/learning/journeys/{built['journeyId']}/activities/{ready['id']}/start",
+            headers,
+        )
+        request(
+            client,
+            "post",
+            f"/api/v1/learning/sessions/{session['id']}/finish",
+            headers,
+            json={"completed": True, "responses": []},
+        )
+
+    finished = request(
+        client,
+        "get",
+        f"/api/v1/learning/journeys/{built['journeyId']}",
+        headers,
+    )
+    assert finished["status"] == "completed"
+    library = request(client, "get", "/api/v1/learning/courses", headers)
+    completed = next(
+        course for course in library if course["journeyId"] == built["journeyId"]
+    )
+    assert completed["status"] == "completed"
+    assert completed["next"] is None
+    assert completed["progress"] == {"completed": 10, "total": 10}
