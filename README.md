@@ -9,11 +9,11 @@ Agent-friendly learning platform with one owner-scoped journey API. Rust (Axum) 
 ![Landing page](docs/assets/screenshots/landing.png)
 
 <details>
-<summary>More screenshots — active session, learner analytics</summary>
+<summary>More screenshots — active session, course progress</summary>
 
-![Active learning session with private notes and alternate-angle variants](docs/assets/screenshots/learning-desk.png)
+![Active learning session with a practice assessment, private notes, and alternate-angle variants](docs/assets/screenshots/learning-desk.png)
 
-![Learning desk with course progress and retention analytics](docs/assets/screenshots/analytics.png)
+![Course progress tab with evidence-backed outcomes, attempts, and due reviews](docs/assets/screenshots/analytics.png)
 
 </details>
 
