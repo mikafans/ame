@@ -79,6 +79,11 @@ fn delegated_author_route(method: &axum::http::Method, path: &str) -> bool {
         || path.starts_with("/v1/citations/")
         || path.starts_with("/v1/generation-runs/")
         || path.starts_with("/v1/questions/")
+        || (path.starts_with("/v1/learning/activities/")
+            && matches!(
+                (method, path.rsplit('/').next()),
+                (&Method::PATCH, Some("content" | "rubric")) | (&Method::POST, Some("review"))
+            ))
         || (path.starts_with("/v1/learning/journeys/") && !path.contains("/activities/")
             || path.contains("/course-revisions/")
             || path.ends_with("/objectives")

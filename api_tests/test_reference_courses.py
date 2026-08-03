@@ -111,8 +111,14 @@ def question(client, headers, course, reference, number):
     )
 
 
-def build_reference_course(client, course):
-    headers = register_author(client, course)
+def build_reference_course(client, course, headers=None):
+    """Author and publish one reference course with the supplied authority.
+
+    Tests use a fresh learner by default.  Local-stack fixtures supply a
+    scoped delegation so the course is authored for an existing learner.
+    """
+    if headers is None:
+        headers = register_author(client, course)
     reference = source_reference(client, headers, course)
     created = request(
         client,
