@@ -68,9 +68,9 @@ def wait_for_web(timeout: int = 120) -> None:
     raise SystemExit("local web stack did not become ready within 120 seconds")
 
 
-def promote_admin() -> None:
-    email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-    name = os.environ.get("ADMIN_NAME", "Carol Admin")
+def promote_admin(email: str | None = None, name: str | None = None) -> None:
+    email = email or os.environ.get("ADMIN_EMAIL", "admin@example.com")
+    name = name or os.environ.get("ADMIN_NAME", "Carol Admin")
     password = os.environ.get("ADMIN_PASSWORD", "password123")
     password_hash = subprocess.check_output(
         [
@@ -316,6 +316,9 @@ def seed_stack(*, force: bool = False) -> None:
         cwd=ROOT,
         check=True,
     )
+    # haru is the demo learner; also grant admin so the same account can see
+    # both the learner desk and the admin console without switching accounts.
+    promote_admin(email="haru@example.com", name="Haru")
     fixture_account()
 
 

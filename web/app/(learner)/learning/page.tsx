@@ -92,17 +92,9 @@ function CourseLibrary({
       data-testid="course-library"
     >
       <header className="max-w-3xl">
-        <div className="flex items-center justify-between gap-4">
-          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
-            My learning
-          </p>
-          <Link
-            href="/about"
-            className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            What is AME?
-          </Link>
-        </div>
+        <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+          My learning
+        </p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">
           Continue where you left off.
         </h1>
@@ -264,14 +256,9 @@ function EmptyCourseLibrary({
           This is your private course library. Ask an agent to prepare a course
           for your goal, or begin one of the reviewed starting paths below.
         </p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button asChild className="rounded-full">
-            <Link href="/agent">How an agent sets up a course</Link>
-          </Button>
-          <Button asChild variant="ghost" className="rounded-full">
-            <Link href="/about">What is AME?</Link>
-          </Button>
-        </div>
+        <Button asChild className="mt-6 rounded-full">
+          <Link href="/agent">How an agent sets up a course</Link>
+        </Button>
       </section>
       <section>
         <div className="flex items-center gap-3">

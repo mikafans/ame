@@ -7,6 +7,7 @@ import {
   FileQuestion,
   GraduationCap,
   History,
+  Info,
   LayoutDashboard,
   Lightbulb,
   LogOut,
@@ -31,6 +32,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   author: Pencil,
   grade: GraduationCap,
   "deep-dives": Lightbulb,
+  about: Info,
   "admin-dashboard": Shield,
   "admin-users": Users,
   "admin-audit": History,
@@ -176,6 +178,17 @@ export function Sidebar({
             </div>
           );
         })}
+        <div className="mb-5">
+          <div className="space-y-0.5 px-2">
+            <a
+              href="/about"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Info className="size-4 shrink-0" />
+              <span>About AME</span>
+            </a>
+          </div>
+        </div>
       </nav>
 
       <div className="border-t border-border p-3">

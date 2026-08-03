@@ -63,6 +63,12 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
                 {label}
               </button>
             ))}
+            <a
+              href="/about"
+              className="flex items-center border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground transition hover:border-border hover:text-foreground"
+            >
+              About
+            </a>
           </nav>
           <div className="ml-auto hidden items-center gap-3 md:flex">
             <ThemeSelector />
