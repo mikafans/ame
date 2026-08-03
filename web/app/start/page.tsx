@@ -5,9 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { publicApi } from "@/api/client";
 import { responseErrorMessage } from "@/api/errors";
+import type { components } from "@/api/generated/schema.d.ts";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+
+type NativeJourney = components["schemas"]["NativeJourneyCatalogResponse"];
 
 function StartLearningForm() {
   const router = useRouter();
@@ -22,12 +25,41 @@ function StartLearningForm() {
   const [loading, setLoading] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [catalogEntry, setCatalogEntry] = useState<NativeJourney | null>(null);
 
   useEffect(() => {
     if (routePrompt) {
       setPrompt(routePrompt);
     }
   }, [routePrompt]);
+
+  // The catalogId query param alone carries no learner-facing content — fetch
+  // the matching reviewed path so the form shows what was actually picked
+  // instead of a blank "what would you like to learn?" box.
+  useEffect(() => {
+    if (!routeCatalogId) {
+      setCatalogEntry(null);
+      return;
+    }
+    let cancelled = false;
+    void publicApi
+      .GET("/public/v1/catalog/journeys")
+      .then((result) => {
+        if (cancelled || !result.response.ok || !result.data) return;
+        const entry = result.data.find(
+          (journey) => journey.id === routeCatalogId,
+        );
+        if (!entry) return;
+        setCatalogEntry(entry);
+        setPrompt((current) => (current ? current : entry.description));
+      })
+      .catch(() => {
+        // Non-fatal: the form still works with just catalogId at submit time.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [routeCatalogId]);
 
   useEffect(() => {
     if (user && !onboardingComplete && !loading) router.replace("/agent");
@@ -112,12 +144,21 @@ function StartLearningForm() {
         Start your journey
       </p>
       <h1 className="mt-3 text-3xl font-bold tracking-tight">
-        Turn your intent into a first useful session.
+        {catalogEntry
+          ? catalogEntry.title
+          : "Turn your intent into a first useful session."}
       </h1>
       <p className="mt-3 leading-6 text-muted-foreground">
-        AME creates a local learner account and a resumable journey. No email
-        delivery or external verification is required for this self-host flow.
+        {catalogEntry
+          ? catalogEntry.description
+          : "AME creates a local learner account and a resumable journey. No email delivery or external verification is required for this self-host flow."}
       </p>
+      {catalogEntry && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Reviewed starting path · about {catalogEntry.estimatedMinutes} minutes
+          · {catalogEntry.level}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
         <div>
@@ -125,7 +166,9 @@ function StartLearningForm() {
             htmlFor="start-prompt"
             className="mb-2 block text-sm font-medium"
           >
-            What would you like to learn?
+            {catalogEntry
+              ? "What would you like to learn? (from your selected path — edit if you'd like)"
+              : "What would you like to learn?"}
           </label>
           <textarea
             id="start-prompt"

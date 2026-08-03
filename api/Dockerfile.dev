@@ -12,6 +12,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY api api
 COPY crates crates
 COPY docs/public docs/public
+COPY sdk/python sdk/python
 COPY db/migrations db/migrations
 COPY ame.dev.toml ame.dev.toml
 
