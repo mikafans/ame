@@ -256,9 +256,14 @@ function EmptyCourseLibrary({
           This is your private course library. Ask an agent to prepare a course
           for your goal, or begin one of the reviewed starting paths below.
         </p>
-        <Button asChild className="mt-6 rounded-full">
-          <Link href="/agent">How an agent sets up a course</Link>
-        </Button>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Button asChild className="rounded-full">
+            <Link href="/agent">How an agent sets up a course</Link>
+          </Button>
+          <Button asChild variant="ghost" className="rounded-full">
+            <Link href="/about">What is AME?</Link>
+          </Button>
+        </div>
       </section>
       <section>
         <div className="flex items-center gap-3">

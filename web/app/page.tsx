@@ -272,6 +272,9 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4">
           <span>© 2026 AME</span>
           <div className="flex gap-5">
+            <Link href="/about" className="transition hover:text-primary">
+              About
+            </Link>
             <Link href="/agent" className="transition hover:text-primary">
               Agent API
             </Link>
