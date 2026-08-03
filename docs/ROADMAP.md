@@ -1,6 +1,6 @@
 # AME roadmap
 
-## 0.5.0 — agent-authored courses
+## 0.4.0 — agent-authored courses
 
 Status: locally certified. This is the next product release; it does not
 authorize a release, tag, push, or hosted publication.
@@ -11,7 +11,7 @@ templates, a chat transcript, or a browser shell around activity rows.
 
 The 0.3.1 foundation already provides owner-scoped journeys, chapters,
 activities, versioned questions and assessments, tasks, evidence, sources,
-provenance, and browser resume. 0.5.0 connects those capabilities into one
+provenance, and browser resume. 0.4.0 connects those capabilities into one
 reliable authoring and learner loop.
 
 ### Release outcome
@@ -46,7 +46,7 @@ An agent must not publish a course with substituted generic content, an
 outcome that has no instructional path, a lesson with no check, a check with no
 answer rationale, or an application task with no evaluation path.
 
-### What 0.5.0 delivers
+### What 0.4.0 delivers
 
 #### 1. Canonical learner and agent stories
 
@@ -178,15 +178,15 @@ behalf.
 
 | Phase   | Deliverable                                                                                    | Gate                                                                                                                                                                                            |
 | ------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.5.0-A | Rewrite canonical user stories, course schema, publication states, and agent playbook contract | Contract tests reject a generic shell as publishable.                                                                                                                                           |
-| 0.5.0-B | Implement course draft/publish validation and agent-visible diagnostics                        | API tests cover incomplete outcomes, missing rationales, missing rubrics, provenance, ownership, retries, immutable published versions, fresh account handoff, and source-acquisition failures. |
-| 0.5.0-C | Wire lesson checks, assessment feedback, and application rubrics into the learner flow         | Browser proves lesson → check → result/task → resume without false evidence.                                                                                                                    |
-| 0.5.0-D | Author Flink and Netty reference courses through the public agent workflow                     | API-only agent simulations create and inspect both courses without source-code access.                                                                                                          |
-| 0.5.0-E | Certify the local stack and public agent assets                                                | Fresh local stack, browser learner simulation, agent contract simulation, and documentation/OpenAPI drift checks all pass.                                                                      |
+| 0.4.0-A | Rewrite canonical user stories, course schema, publication states, and agent playbook contract | Contract tests reject a generic shell as publishable.                                                                                                                                           |
+| 0.4.0-B | Implement course draft/publish validation and agent-visible diagnostics                        | API tests cover incomplete outcomes, missing rationales, missing rubrics, provenance, ownership, retries, immutable published versions, fresh account handoff, and source-acquisition failures. |
+| 0.4.0-C | Wire lesson checks, assessment feedback, and application rubrics into the learner flow         | Browser proves lesson → check → result/task → resume without false evidence.                                                                                                                    |
+| 0.4.0-D | Author Flink and Netty reference courses through the public agent workflow                     | API-only agent simulations create and inspect both courses without source-code access.                                                                                                          |
+| 0.4.0-E | Certify the local stack and public agent assets                                                | Fresh local stack, browser learner simulation, agent contract simulation, and documentation/OpenAPI drift checks all pass.                                                                      |
 
-### 0.5.0 definition of done
+### 0.4.0 definition of done
 
-0.5.0 is not complete because a journey, activities, or a catalog card exists.
+0.4.0 is not complete because a journey, activities, or a catalog card exists.
 It is complete only when:
 
 - a real signed-in learner can deliberately grant an agent scoped, revocable
@@ -223,7 +223,7 @@ The API-only baseline across Flink, Netty, and physics is recorded in
 ## Prior foundations
 
 0.3.1 supplied the core durable learning, assessment, source/provenance,
-retention, and local-stack capabilities. They are inputs to 0.5.0, not proof
+retention, and local-stack capabilities. They are inputs to 0.4.0, not proof
 that an agent-authored course exists. Broader interactive ecosystems,
 marketplaces, payments, certificates, public social features, and hosted
 identity remain out of scope until this course-authoring release is proven.

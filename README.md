@@ -146,9 +146,9 @@ make db-down
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the next release: **v0.5.0 —
+[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the next release: **v0.4.0 —
 agent-authored courses**. The 0.3.1 foundation supplies the durable learner
-API, assessment, evidence, provenance, and self-hosted stack. 0.5.0 makes
+API, assessment, evidence, provenance, and self-hosted stack. 0.4.0 makes
 those primitives usable by agents to assemble, validate, publish, and adapt
 real source-grounded courses, proven with complete Flink and Netty references.
 

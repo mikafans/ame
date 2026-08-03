@@ -2,7 +2,7 @@
 
 Date: 2026-08-02
 
-Purpose: establish the 0.5.0 baseline by asking independent agents to act as
+Purpose: establish the 0.4.0 baseline by asking independent agents to act as
 external course authors. This is a black-box product test, not a source review.
 
 ## Method
@@ -103,7 +103,7 @@ No learner work, attempt, task, evidence, or recommendation was fabricated.
 
 ## Cross-field gap matrix
 
-| Required capability                 | Flink                | Netty                                                | Physics                              | 0.5.0 action                                                                             |
+| Required capability                 | Flink                | Netty                                                | Physics                              | 0.4.0 action                                                                             |
 | ----------------------------------- | -------------------- | ---------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
 | Public identity handoff             | Blocked              | Literal guide blocked; bearer retry happened to work | Blocked                              | Make the register-to-start/resume flow canonical, tested, and recoverable.               |
 | Brief honors scope and constraints  | Preview was relevant | Generic objectives                                   | Over-expanded beyond requested scope | Introduce a course brief and agent-authored/revisable objectives before modules.         |
@@ -120,7 +120,7 @@ release gate is not more catalog content. It is a documented, executable
 authoring workflow that reaches a truthful published course from a fresh
 account and source set, then proves a learner can complete it.
 
-This audit is the acceptance baseline for 0.5.0-A through 0.5.0-E in
+This audit is the acceptance baseline for 0.4.0-A through 0.4.0-E in
 [`../ROADMAP.md`](../ROADMAP.md).
 
 ## Real-user agent handoff smoke — 2026-08-03
