@@ -97,7 +97,7 @@ pub async fn create(
     tx.commit().await.map_err(db_error)?;
     let token = format_token(TokenKind::Delegation, id, &secret);
     let handoff = format!(
-        "Use AME to create one source-grounded course for this learner. Read http://localhost:28800/public/llms.txt first. Use Authorization: Bearer {token}. Scope: course authoring only; expires {}. Goal: {goal}. Import and certify sources, create a complete course, validate, review, publish, then return /learning/journeys/{{journeyId}}. Do not ask for or use a learner login token.",
+        "Use AME to create one source-grounded course for this learner. Read http://localhost:28800/public/llms.txt first.\nAuthorization: Bearer {token}\nScope: course authoring only; expires {}. Goal: {goal}. Import and certify sources, create a complete course, validate, review, publish, then return /learning/journeys/{{journeyId}}. Do not ask for or use a learner login token.",
         expires_at
             .format(&time::format_description::well_known::Rfc3339)
             .unwrap_or_default(),
