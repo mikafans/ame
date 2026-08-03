@@ -56,7 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchUser();
+    if (document.cookie.split(";").some((cookie) => cookie.trim() === "ame_session=1")) {
+      fetchUser();
+    } else {
+      setLoading(false);
+    }
   }, [fetchUser]);
 
   const logout = useCallback(async () => {
@@ -69,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Logout request failed:", err);
     }
     setUser(null);
+    document.cookie = "ame_session=; SameSite=Lax; Path=/; Max-Age=0";
     if (typeof window !== "undefined") {
       router.push("/login");
     }

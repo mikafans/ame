@@ -21,12 +21,7 @@ test.describe("public documentation", () => {
     const browserErrors: string[] = [];
     page.on("pageerror", (error) => browserErrors.push(error.message));
     page.on("console", (message) => {
-      if (
-        message.type() === "error" &&
-        !message.text().includes("status of 401 (Unauthorized)")
-      ) {
-        browserErrors.push(message.text());
-      }
+      if (message.type() === "error") browserErrors.push(message.text());
     });
 
     await page.goto("/agent");
