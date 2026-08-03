@@ -19,6 +19,7 @@ import time
 import json
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 
 from container_runtime import compose as run_compose, engine
@@ -219,6 +220,50 @@ def run_uiux() -> None:
     )
 
 
+def run_learner_workspace() -> None:
+    email = f"workspace-smoke-{uuid.uuid4()}@example.test"
+    password = "workspace-smoke-2026"
+    base_env = {
+        **os.environ,
+        "AME_API_URL": "http://localhost:28800",
+        "HARU_REFERENCE_EMAIL": email,
+        "HARU_REFERENCE_PASSWORD": password,
+    }
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "scripts/seed_reference_courses.py",
+            "--complete-course",
+            "flink-clickstream",
+        ],
+        cwd=ROOT,
+        env=base_env,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "bunx",
+            "playwright",
+            "test",
+            "e2e/learner-workspace.spec.ts",
+            "--project=chromium",
+        ],
+        cwd=ROOT / "web",
+        env={
+            **base_env,
+            "PORT": "28800",
+            "NEXT_PUBLIC_API_URL": "http://localhost:28800",
+            "E2E_API_URL": "http://localhost:28800",
+            "E2E_BASE_URL": "http://localhost:28800",
+            "E2E_EXTERNAL_SERVER": "1",
+            "E2E_REFERENCE_EMAIL": email,
+            "E2E_REFERENCE_PASSWORD": password,
+        },
+        check=True,
+    )
+
+
 def run_api_contracts() -> None:
     env = {**os.environ, "AME_API_URL": "http://localhost:28800"}
     subprocess.run(
@@ -271,7 +316,16 @@ def seed_stack(*, force: bool = False) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("up", "down", "logs", "seed", "uiux", "api-contracts")
+        "command",
+        choices=(
+            "up",
+            "down",
+            "logs",
+            "seed",
+            "uiux",
+            "api-contracts",
+            "learner-workspace",
+        ),
     )
     args = parser.parse_args()
 
@@ -294,6 +348,9 @@ def main() -> int:
     elif args.command == "api-contracts":
         wait_for_api()
         run_api_contracts()
+    elif args.command == "learner-workspace":
+        wait_for_api()
+        run_learner_workspace()
     else:
         wait_for_api()
         run_uiux()

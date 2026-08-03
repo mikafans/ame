@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs local-api-contracts local-haru-simulation local-reference-courses
+.PHONY: help fmt fmt-check lint test test-db test-api e2e uiux local-uiux preview check ci db-up db-down db-reset db-migrate db-shell db-backup db-restore db-admin db-seed init-env stop dev hooks-install openapi public-docs docker-build docker-up docker-down docker-logs local-up local-down local-seed local-logs local-api-contracts local-haru-simulation local-reference-courses local-learner-workspace
 
 API_HOST ?= localhost
 API_PORT ?= 28080
@@ -100,6 +100,8 @@ local-haru-simulation: ## Create a disposable three-round Haru journey; requires
 	uv run scripts/haru_simulation.py
 local-reference-courses: ## Create delegated Flink and Netty courses for one learner; requires HARU_REFERENCE_PASSWORD
 	uv run scripts/seed_reference_courses.py
+local-learner-workspace: ## Seed active/completed delegated courses and smoke the learner workspace through Caddy
+	uv run scripts/local_stack.py learner-workspace
 
 hooks-install: ## Configure the repository git hooks
 	git config core.hooksPath .githooks
