@@ -37,6 +37,7 @@ export default function AdminLayout({
   const handleRouteChange = (route: string) => {
     const routeMap: Record<string, string> = {
       learning: "/learning",
+      about: "/about",
       "admin-dashboard": "/admin",
       "admin-users": "/admin/users",
       "admin-audit": "/admin/audit",
