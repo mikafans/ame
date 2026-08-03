@@ -131,7 +131,7 @@ export default function LearningHomePage() {
         citationCertificates,
         nativeCatalog,
       ] = await Promise.all([
-        api.GET("/api/v1/learning/journeys" as never),
+        api.GET("/api/v1/learning/journeys"),
         api.GET("/api/v1/reviews/due"),
         api.GET("/api/v1/source-snapshots"),
         api.GET("/api/v1/citations"),
@@ -145,7 +145,7 @@ export default function LearningHomePage() {
         setDueReviews(reviews.data as ReviewItem[]);
       }
       if (sourceSnapshots.response.ok && sourceSnapshots.data) {
-        setSources(sourceSnapshots.data as SourceSnapshot[]);
+        setSources(sourceSnapshots.data as unknown as SourceSnapshot[]);
       }
       if (citationCertificates.response.ok && citationCertificates.data) {
         setCitations(citationCertificates.data as Citation[]);

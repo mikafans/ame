@@ -2,16 +2,15 @@
 -- authoring agent. The secret is never persisted and is intentionally not a
 -- browser cookie or a login session.
 ALTER TABLE tb_identities
-    DROP CONSTRAINT tb_identities_type_check,
-    ADD CONSTRAINT tb_identities_type_check
-        CHECK (identity_type IN ('human', 'agent', 'system'));
+DROP CONSTRAINT tb_identities_type_check,
+ADD CONSTRAINT tb_identities_type_check CHECK (identity_type IN ('human', 'agent', 'system'));
 
 ALTER TABLE tb_identities
-    DROP CONSTRAINT tb_identities_owner_check,
-    ADD CONSTRAINT tb_identities_owner_check CHECK (
-        (identity_type = 'system' AND owner_user_id IS NULL)
-        OR identity_type IN ('human', 'agent')
-    );
+DROP CONSTRAINT tb_identities_owner_check,
+ADD CONSTRAINT tb_identities_owner_check CHECK (
+    (identity_type = 'system' AND owner_user_id IS NULL)
+    OR identity_type IN ('human', 'agent')
+);
 
 CREATE TABLE tb_agent_delegations (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v7(),
@@ -29,6 +28,6 @@ CREATE TABLE tb_agent_delegations (
 );
 
 CREATE INDEX tb_agent_delegations_subject
-    ON tb_agent_delegations (subject_user_id, created_at DESC);
+ON tb_agent_delegations (subject_user_id, created_at DESC);
 CREATE INDEX tb_agent_delegations_active
-    ON tb_agent_delegations (expires_at) WHERE revoked_at IS NULL;
+ON tb_agent_delegations (expires_at) WHERE revoked_at IS NULL;
