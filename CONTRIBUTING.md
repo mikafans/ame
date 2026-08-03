@@ -10,12 +10,11 @@ repo, or explicitly via `mise x -- <command>` in non-interactive shells. Then:
 
 ```bash
 make init-env      # web deps + playwright browsers (toolchain is from mise)
-make db-up         # start Postgres in Docker/Podman
-make dev           # API on :28080, frontend on :23000
-make db-seed       # seed demo users, quizzes, questions
+make dev           # Postgres, Valkey, API, and web, all behind Caddy at :28800
 ```
 
-Demo credentials after seeding: `ada@example.com / password123` (primary user), `mira@example.com / password123` (second user).
+`make dev` is the one local stack and auto-seeds demo accounts on first boot.
+Demo credentials: `haru@example.com / password123` (learner), `admin@example.com / password123` (admin).
 
 Copy `.env.example` to `.env` if you need to override defaults.
 
@@ -24,11 +23,13 @@ Copy `.env.example` to `.env` if you need to override defaults.
 | Command | When |
 |---|---|
 | `make check` | Before every commit (fmt-check + lint + unit tests). Pre-commit hook enforces this — install with `make hooks-install`. |
-| `make test-db` | When touching DB-backed code. Requires `make db-up`. |
-| `make validate` | Before opening a PR (check + e2e). |
+| `make test-db` | When touching DB-backed code. Requires `make db-up` (a separate bare Postgres, unrelated to `make dev`'s own database). |
+| `make ci` | Before opening a PR (check + DB-backed tests + e2e, resetting the DB between them). |
 | `make openapi` | After changing Rust route handlers or DTOs. Regenerates `api/openapi.yaml` and the web TypeScript schema. |
 
-CI runs `make check` + `cargo audit` on every PR (see `.github/workflows/ci.yml`). The DB-backed and e2e suites need a Postgres service and are not run in CI — run `make validate` locally before opening a PR.
+CI runs `make check` plus an OpenAPI/schema drift check (`bun run api:check`) on
+every PR (see `.github/workflows/ci.yml`). The DB-backed and e2e suites need a
+live stack and are not run in CI — run `make ci` locally before opening a PR.
 
 ## Conventions
 
