@@ -68,7 +68,7 @@ function ActivityProvenance({
 }) {
   if (sourceReferences.length === 0) return null;
   return (
-    <div className="rounded-xl border border-primary/20 bg-background/70 p-4">
+    <div className="mt-5 rounded-xl border border-primary/20 bg-background/70 p-4">
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
         Source-backed activity
       </p>

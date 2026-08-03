@@ -92,9 +92,17 @@ function CourseLibrary({
       data-testid="course-library"
     >
       <header className="max-w-3xl">
-        <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
-          My learning
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
+            My learning
+          </p>
+          <Link
+            href="/about"
+            className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            What is AME?
+          </Link>
+        </div>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">
           Continue where you left off.
         </h1>
