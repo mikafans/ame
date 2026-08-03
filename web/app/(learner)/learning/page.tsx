@@ -92,7 +92,7 @@ function CourseLibrary({
     selectedCollection === "in-progress" ? active : completed;
   return (
     <main
-      className="mx-auto max-w-5xl space-y-10 py-4"
+      className="mx-auto flex max-w-5xl flex-col gap-10 py-4"
       data-testid="course-library"
     >
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -259,7 +259,7 @@ function EmptyCourseLibrary({
 }) {
   return (
     <main
-      className="mx-auto max-w-5xl space-y-10 py-4"
+      className="mx-auto flex max-w-5xl flex-col gap-10 py-4"
       data-testid="native-journey-catalog"
     >
       <section className="border border-dashed border-border bg-card p-7 sm:p-9">
