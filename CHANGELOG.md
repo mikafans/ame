@@ -61,6 +61,18 @@ This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
 - `api/Dockerfile` and `api/Dockerfile.dev` (the `make dev` local stack)
   didn't copy the workspace `crates/` members and/or `sdk/python`, breaking
   every containerized build path for this release.
+- **The production `docker compose` stack (`self-hosting.md`'s documented
+  path) had never actually booted**, since the commit that introduced it:
+  `api/Dockerfile` never baked in a config file or set `AME_CONFIG_PATH`, so
+  the API silently fell back to defaults — including dropping every env
+  override, `AME_DATABASE_URL` included — and crash-looped trying to reach a
+  database it was never actually told about. Its fallback port (28080) also
+  didn't match what the image exposes (8080), and the Makefile's own
+  `API_PORT`/`WEB_PORT` exports for the unrelated `make e2e`/`uiux`/`bench-*`
+  scripts silently clobbered the compose file's same-named port variables.
+  Fixed all three; verified by actually booting the stack, registering
+  through it, and promoting an admin via a new `make docker-admin` (the
+  production stack previously had no admin-promotion path at all).
 
 ### Removed
 
@@ -72,6 +84,19 @@ This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
   the only supported deploy shape. `docs/public/deploy.md` and
   `docs/public/k3s.md` are folded into `self-hosting.md` or removed as
   redundant.
+
+### Changed
+
+- Every deploy-related file now lives under `deploy/`: both Caddyfiles
+  (renamed `Caddyfile.dev`/`Caddyfile.prod` for what they are), both
+  `docker-compose.*.yml`, and `.env.example` — previously scattered across
+  the repo root. `docker compose -f deploy/docker-compose.prod.yml ...` from
+  the repo root, same as before, just a new path.
+- Makefile: dropped `db-seed` (an exact duplicate of `local-seed`), regrouped
+  `db-shell`/`db-admin` next to their actual siblings (they act on the
+  `make dev` stack, not the bare test Postgres the rest of the `db-*` family
+  touches), and wired the previously orphaned
+  `scripts/test_local_stack_persistence.py` in as `local-persistence-check`.
 
 ### Quality gates
 
