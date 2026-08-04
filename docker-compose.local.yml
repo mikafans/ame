@@ -80,7 +80,7 @@ services:
     ports:
       - "28800:80"
     volumes:
-      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./deploy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
       - ./docs:/srv/docs:ro
     depends_on:
       api:

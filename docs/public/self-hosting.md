@@ -63,7 +63,7 @@ podman machine stop
 podman machine start
 ```
 
-The Compose stack publishes only Caddy. API and web remain private services on the Compose network, so the proxy cannot accidentally be bypassed. For a deployment that already has a separately managed proxy, the optional [`Caddyfile.example`](../../deploy/Caddyfile.example) remains available, but that system-level arrangement is not the recommended path.
+The Compose stack publishes only Caddy. API and web remain private services on the Compose network, so the proxy cannot accidentally be bypassed. If you already run a separately managed proxy, route `/api/*`, `/public/*`, `/healthz`, `/readyz`, and `/metrics` to the API and everything else to web — that's the whole routing rule.
 
 ## First administrator and seed data
 
