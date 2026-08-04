@@ -151,9 +151,7 @@ def build_reference_course(client, course, headers=None):
                 headers,
                 json={
                     "revisionId": revision_id,
-                    "verb": "Design"
-                    if "design" in module["outcome"].lower()
-                    else "Explain",
+                    "verb": "Design" if "design" in module["outcome"].lower() else "Explain",
                     "statement": module["outcome"],
                     "successCriteria": module["success"],
                 },
@@ -323,9 +321,7 @@ def build_reference_course(client, course, headers=None):
             "status": "proposed",
         },
     )
-    rubric_run = published_run(
-        client, headers, "learning.activity.rubric.compose", course["slug"]
-    )
+    rubric_run = published_run(client, headers, "learning.activity.rubric.compose", course["slug"])
     request(
         client,
         "patch",
@@ -636,10 +632,7 @@ def test_reference_courses_publish_and_adapt_after_weak_evidence(client, course)
     )
     assert len(learner["chapters"]) == 4
     assert len(learner["objectives"]) == 4
-    assert all(
-        activity["publicationStatus"] == "published"
-        for activity in learner["activities"]
-    )
+    assert all(activity["publicationStatus"] == "published" for activity in learner["activities"])
 
     session = request(
         client,
@@ -814,7 +807,9 @@ def test_learner_views_are_published_course_scoped_and_owner_scoped(client):
         headers,
     )
     assert len(resources["sources"]) == 1
-    assert resources["sources"][0]["locator"] == f"reference://{COURSES[1]['slug']}/course-notes.txt"
+    assert (
+        resources["sources"][0]["locator"] == f"reference://{COURSES[1]['slug']}/course-notes.txt"
+    )
     assert "content" not in resources["sources"][0]
     assert "contentSha256" not in resources["sources"][0]
 
@@ -844,11 +839,7 @@ def test_finishing_every_published_activity_completes_the_course(client):
             headers,
         )
         ready = next(
-            (
-                activity
-                for activity in journey["activities"]
-                if activity["status"] == "ready"
-            ),
+            (activity for activity in journey["activities"] if activity["status"] == "ready"),
             None,
         )
         if ready is None:
@@ -875,9 +866,7 @@ def test_finishing_every_published_activity_completes_the_course(client):
     )
     assert finished["status"] == "completed"
     library = request(client, "get", "/api/v1/learning/courses", headers)
-    completed = next(
-        course for course in library if course["journeyId"] == built["journeyId"]
-    )
+    completed = next(course for course in library if course["journeyId"] == built["journeyId"])
     assert completed["status"] == "completed"
     assert completed["next"] is None
     assert completed["progress"] == {"completed": 10, "total": 10}

@@ -3,15 +3,10 @@
         reverse_proxy api:8080
     }
 
-    handle /public/v1/* {
-        reverse_proxy api:8080
-    }
-
-    # Everything else under /public is a static repository artifact from
-    # docs/public. Keep this after /public/v1/* so the public API remains API-backed.
+    # One public boundary: API routes, machine contracts, and the downloadable
+    # SDK are all served by the API and share the same strict public limiter.
     handle /public/* {
-        root * /srv/docs
-        file_server
+        reverse_proxy api:8080
     }
 
     handle /healthz {

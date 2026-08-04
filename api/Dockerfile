@@ -4,7 +4,7 @@
 #
 #   docker build -f api/Dockerfile -t ame-api:dev .
 
-ARG RUST_VERSION=1.95
+ARG RUST_VERSION=1.97.1
 ARG DEBIAN_VERSION=bookworm
 
 # ── builder ────────────────────────────────────────────────────────────────
@@ -15,24 +15,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# Cache deps separately from sources for faster rebuilds.
-COPY api/Cargo.toml api/Cargo.lock ./api/
-RUN mkdir -p api/src api/src/bin api/benches \
-  && echo "fn main() {}" > api/src/main.rs \
-  && echo "" > api/src/lib.rs \
-  && echo "fn main() {}" > api/src/bin/gen_openapi.rs \
-  && echo "fn main() {}" > api/benches/hot_paths.rs \
-  && cd api && cargo build --release --bin ame-api \
-  && rm -rf src
-
+# api depends on path crates under crates/, so the workspace root (not just
+# api/) must be present for cargo to resolve.
+COPY Cargo.toml Cargo.lock ./
+COPY api/Cargo.toml ./api/
 COPY api/src ./api/src
+COPY crates ./crates
 # Migrations are embedded into the binary via sqlx::migrate!, so they must be
 # present at compile time (resolved as ../db/migrations relative to the crate).
 COPY db/migrations ./db/migrations
-# Touch sources so cargo rebuilds them (the dummy lib.rs above is now stale).
-RUN touch api/src/main.rs api/src/lib.rs
+# Public agent contracts are embedded into the API so the runtime image serves
+# the exact documents it was built and tested with.
+COPY docs/public ./docs/public
+COPY sdk/python ./sdk/python
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cd api && cargo build --release --bin ame-api
+    cargo build --release -p ame-api --bin ame-api
 
 # ── runtime ────────────────────────────────────────────────────────────────
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
@@ -43,8 +40,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --system --create-home --uid 1000 ame
 
-COPY --from=builder /build/api/target/release/ame-api /usr/local/bin/ame-api
+COPY --from=builder /build/target/release/ame-api /usr/local/bin/ame-api
 # Migrations are embedded in the binary (sqlx::migrate!) and run on boot.
+
+# Config::load() requires ame.toml (rate-limit tiers, quotas, batch sizes have
+# no env override) — bake it in so the image is self-contained rather than
+# depending on an external volume mount the compose file doesn't provide.
+# AME_PORT/AME_PRODUCTION/AME_CORS_ORIGINS/etc. from the environment still
+# override the file's values once it loads successfully.
+COPY ame.toml /app/ame.toml
+ENV AME_CONFIG_PATH=/app/ame.toml
 
 USER ame
 EXPOSE 8080

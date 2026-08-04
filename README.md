@@ -46,7 +46,7 @@ up on its own.
 
 ### Admin users
 
-Registration only ever grants the `user` role — there is no API path to self-register
+Registration only ever grants the `learner` role — there is no API path to self-register
 as an admin (`POST /public/v1/auth/register` rejects `role: admin`). The seeded
 `admin@example.com` account above is already an admin. To promote a different,
 already-registered account **directly in the database**:
@@ -57,7 +57,7 @@ make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (passw
 
 After being promoted, log out and back in to refresh the session.
 
-Copy `.env.example` to `.env` if you need to override defaults.
+Copy `deploy/.env.example` to `deploy/.env` if you need to override defaults.
 
 ### Learning desk, themes, and local simulations
 
@@ -104,18 +104,17 @@ For interactive visual audits use `bunx @playwright/cli` — see `CLAUDE.md` for
 
 ## Deploy
 
-`docker-compose.prod.yml` is a production-shaped stack (Postgres + Valkey + API + web) for
-smoke deploys, demos, and CI integration testing — not a substitute for the k8s
-manifests. The API runs its migrations on boot, so no separate migration step is
-needed.
+`deploy/docker-compose.prod.yml` is a production-shaped stack (Postgres + Valkey + API + web) for
+smoke deploys, demos, and CI integration testing. The API runs its migrations on boot, so no
+separate migration step is needed.
 
 For a single-host self-hosted installation, follow
 [`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public
-`/public/llms.txt` file is the agent discovery contract, served statically by
-the recommended proxy rather than by the API.
+`/public/llms.txt` file is the agent discovery contract, served by the API
+through the unified `/public/*` proxy route.
 
 ```bash
-cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
+cp deploy/.env.example deploy/.env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
 make docker-build      # build api + web images
 make docker-up         # start the stack (-d)
 make docker-logs       # tail logs
@@ -146,13 +145,17 @@ make db-down
 
 ## Roadmap
 
-[`docs/ROADMAP.md`](docs/ROADMAP.md) tracks the next release: **v0.4.0 —
-agent-authored courses**. The 0.3.0 foundation supplies the durable learner
+[`CHANGELOG.md`](CHANGELOG.md) records the current release: **v0.4.1**.
+The 0.4.0 agent-authored course release supplies the durable learner
 API, assessment, evidence, provenance, and self-hosted stack. 0.4.0 makes
 those primitives usable by agents to assemble, validate, publish, and adapt
 real source-grounded courses, proven with complete Flink and Netty
 references, plus the Study Atelier native catalog and a course-scoped
-learner workspace.
+learner workspace. 0.4.1 makes the agent contract actually reachable at
+runtime (`/public/llms.txt`, `/public/skill.json`, `/public/openapi.yaml`,
+and a downloadable Python SDK), adds visible per-account rate-limit status
+and free/VIP tiers, and fixes several onboarding and route-split bugs found
+by deploying and using 0.4.1 end to end before tagging it.
 
 ## Contributing
 

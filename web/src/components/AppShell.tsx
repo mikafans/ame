@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { LogOut, Menu } from "lucide-react";
+import { api } from "@/api/client";
+import type { components } from "@/api/generated/schema.d.ts";
 import { Sidebar } from "@/components/Sidebar";
 import { Logo } from "@/components/Logo";
 import { ThemeSelector } from "@/components/ThemeSelector";
@@ -16,6 +19,19 @@ interface AppShellProps {
 export function AppShell({ route, setRoute, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
+  const [rateLimit, setRateLimit] = useState<
+    components["schemas"]["RateLimitStatusResponse"] | null
+  >(null);
+
+  useEffect(() => {
+    if (!user) {
+      setRateLimit(null);
+      return;
+    }
+    void api.GET("/api/v1/me/rate-limit").then((result) => {
+      if (result.response.ok && result.data) setRateLimit(result.data);
+    });
+  }, [user]);
 
   const handleRouteChange = (r: string) => {
     setMobileOpen(false);
@@ -67,9 +83,24 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
           </nav>
           <div className="ml-auto hidden items-center gap-3 md:flex">
             <ThemeSelector />
+            {rateLimit && (
+              <span
+                className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground"
+                title={`Rate budget resets in ${rateLimit.resetAfterSeconds} seconds`}
+              >
+                {rateLimit.tier === "premium" ? "VIP" : "Free"} ·{" "}
+                {rateLimit.remaining.toLocaleString()}/
+                {rateLimit.limit.toLocaleString()}
+              </span>
+            )}
             <span className="max-w-32 truncate text-sm font-medium">
               {user?.displayName}
             </span>
+            {user && (
+              <span className="rounded-full border border-primary/30 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                {user.plan === "premium" ? "VIP" : "Free"}
+              </span>
+            )}
             <button
               type="button"
               title="Sign out"
@@ -85,6 +116,31 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
       <main className="mx-auto min-w-0 max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {children}
       </main>
+      <footer className="border-t border-border px-4 py-6 text-sm text-muted-foreground sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4">
+          <span>© 2026 AME</span>
+          <div className="flex gap-5">
+            <Link href="/about" className="transition hover:text-primary">
+              About
+            </Link>
+            <Link href="/agent" className="transition hover:text-primary">
+              Agent API
+            </Link>
+            <a
+              href="https://github.com/mikafans/ame"
+              className="transition hover:text-primary"
+            >
+              GitHub
+            </a>
+            <Link
+              href="/self-hosting"
+              className="transition hover:text-primary"
+            >
+              Self-hosting
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

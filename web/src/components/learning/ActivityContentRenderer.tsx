@@ -15,7 +15,7 @@ export type ActivityContent =
       type: "explanation";
       heading: string;
       body: string;
-      key_points: string[];
+      keyPoints: string[];
     }
   | {
       type: "worked_example";
@@ -25,7 +25,7 @@ export type ActivityContent =
       reflection: string;
     }
   | { type: "rich_text"; heading: string; body: string }
-  | { type: "diagram"; title: string; source: string; alt_text: string }
+  | { type: "diagram"; title: string; source: string; altText: string }
   | {
       type: "code_example";
       title: string;
@@ -38,7 +38,7 @@ export type ActivityContent =
       context: string;
       prompt: string;
       options: { id: string; label: string }[];
-      correct_option_id?: string;
+      correctOptionId?: string;
       feedback?: { correct: string; incorrect: string };
     };
 
@@ -61,7 +61,7 @@ function parseContent(value: unknown): ActivityContent | null {
     if (
       isNonEmptyString(content.heading) &&
       isNonEmptyString(content.body) &&
-      isStringList(content.key_points)
+      isStringList(content.keyPoints)
     )
       return content as unknown as ActivityContent;
   }
@@ -82,7 +82,7 @@ function parseContent(value: unknown): ActivityContent | null {
     if (
       isNonEmptyString(content.title) &&
       isNonEmptyString(content.source) &&
-      isNonEmptyString(content.alt_text)
+      isNonEmptyString(content.altText)
     )
       return content as unknown as ActivityContent;
   }
@@ -180,7 +180,7 @@ export function ActivityContentRenderer({
           <CapabilityHeading label="Explanation" title={parsed.heading} />
           <MarkdownView content={parsed.body} />
           <ul className="space-y-2 rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6">
-            {parsed.key_points.map((point) => (
+            {parsed.keyPoints.map((point) => (
               <li key={point} className="flex gap-2">
                 <Check className="mt-1 size-4 shrink-0 text-primary" />
                 <span>{point}</span>
@@ -216,7 +216,7 @@ export function ActivityContentRenderer({
         <>
           <CapabilityHeading label="Diagram" title={parsed.title} />
           <MermaidView code={parsed.source} />
-          <p className="text-sm text-muted-foreground">{parsed.alt_text}</p>
+          <p className="text-sm text-muted-foreground">{parsed.altText}</p>
         </>
       )}
       {parsed.type === "code_example" && (
@@ -250,9 +250,9 @@ export function ActivityContentRenderer({
           </div>
           {selectedOption && (
             <div className="space-y-3">
-              {parsed.correct_option_id && parsed.feedback && (
+              {parsed.correctOptionId && parsed.feedback && (
                 <p className="rounded-xl border border-primary/20 bg-background/70 p-4 text-sm leading-6">
-                  {selectedOption === parsed.correct_option_id
+                  {selectedOption === parsed.correctOptionId
                     ? parsed.feedback.correct
                     : parsed.feedback.incorrect}
                 </p>

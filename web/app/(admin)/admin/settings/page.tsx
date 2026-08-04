@@ -134,6 +134,12 @@ export default function SettingsPage() {
       </section>
       <section className="mb-6 rounded-lg border border-border p-6">
         <h2 className="mb-5 text-lg font-bold">Rate Limits</h2>
+        <p className="mb-5 text-sm text-muted-foreground">
+          Authenticated requests use an owner-scoped bucket. Free defaults to
+          600 burst / 10 requests per second; VIP / Premium is 10×. Public
+          unauthenticated traffic remains protected by a separate strict per-IP
+          limit and is not relaxed by these settings.
+        </p>
         {saveError && <Notice tone="error">{saveError}</Notice>}
         {saved && (
           <Notice tone="success">Rate limits saved successfully.</Notice>
@@ -141,7 +147,9 @@ export default function SettingsPage() {
         <div className="grid gap-6 sm:grid-cols-2">
           {(["free", "premium"] as const).map((tier) => (
             <div key={tier}>
-              <h3 className="mb-3 font-semibold capitalize">{tier} tier</h3>
+              <h3 className="mb-3 font-semibold">
+                {tier === "premium" ? "VIP / Premium" : "Free"} tier
+              </h3>
               <Field
                 label="Burst"
                 value={ratelimit[tier].burst}
@@ -200,6 +208,7 @@ function Field({
       <input
         className={`${input} mt-1`}
         type="number"
+        min={1}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

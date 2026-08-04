@@ -4,7 +4,7 @@ info:
   description: ame — an agent-friendly learning API with one owner-scoped learner model.
   license:
     name: ''
-  version: 0.4.0
+  version: 0.4.1
 paths:
   /api/v1/admin/audit:
     get:
@@ -98,7 +98,7 @@ paths:
       tags:
       - admin
       summary: |-
-        PUT /v1/admin/settings — upsert one or more setting overrides. Each changed
+        PUT /api/v1/admin/settings — upsert one or more setting overrides. Each changed
         key is written to tb_settings, the settings cache is busted, and one audit
         row is emitted. Returns the new effective settings.
       operationId: put_settings
@@ -178,7 +178,7 @@ paths:
     patch:
       tags:
       - admin
-      summary: PATCH /v1/admin/users/{id} — update learner/admin role or account status
+      summary: PATCH /api/v1/admin/users/{id} — update learner/admin role or account status
       operationId: patch_user_admin
       parameters:
       - name: id
@@ -1522,6 +1522,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Unauthorized
+      security:
+      - bearer: []
+  /api/v1/me/rate-limit:
+    get:
+      tags:
+      - me
+      summary: |-
+        Read the current authenticated learner rate-limit bucket without consuming
+        an additional request from it.
+      operationId: get_rate_limit
+      responses:
+        '200':
+          description: Current learner rate-limit bucket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitStatusResponse'
         '401':
           description: Unauthorized
       security:
@@ -4345,6 +4364,7 @@ components:
       - id
       - displayName
       - role
+      - plan
       - createdAt
       properties:
         createdAt:
@@ -4359,6 +4379,8 @@ components:
         id:
           type: string
           format: uuid
+        plan:
+          type: string
         role:
           $ref: '#/components/schemas/Role'
     NativeJourneyCatalogResponse:
@@ -4497,6 +4519,10 @@ components:
     PatchUserAdminBody:
       type: object
       properties:
+        plan:
+          type:
+          - string
+          - 'null'
         role:
           type:
           - string
@@ -4607,11 +4633,11 @@ components:
       required:
       - id
       - text
-      - is_correct
+      - isCorrect
       properties:
         id:
           type: string
-        is_correct:
+        isCorrect:
           type: boolean
         text:
           type: string
@@ -4687,6 +4713,33 @@ components:
           $ref: '#/components/schemas/TierLimit'
         premium:
           $ref: '#/components/schemas/TierLimit'
+    RateLimitStatusResponse:
+      type: object
+      required:
+      - tier
+      - limit
+      - remaining
+      - resetAfterSeconds
+      - requestCost
+      properties:
+        limit:
+          type: integer
+          format: int32
+          minimum: 0
+        remaining:
+          type: integer
+          format: int32
+          minimum: 0
+        requestCost:
+          type: integer
+          format: int32
+          minimum: 0
+        resetAfterSeconds:
+          type: integer
+          format: int64
+          minimum: 0
+        tier:
+          type: string
     RateReviewBody:
       type: object
       required:
@@ -5463,6 +5516,7 @@ components:
       - id
       - displayName
       - role
+      - plan
       - status
       - createdAt
       properties:
@@ -5478,6 +5532,8 @@ components:
         id:
           type: string
           format: uuid
+        plan:
+          type: string
         role:
           $ref: '#/components/schemas/Role'
         status:
@@ -5489,6 +5545,7 @@ components:
       - name
       - email
       - role
+      - plan
       properties:
         email:
           type: string
@@ -5496,6 +5553,8 @@ components:
           type: string
           format: uuid
         name:
+          type: string
+        plan:
           type: string
         role:
           type: string

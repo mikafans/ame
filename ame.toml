@@ -11,12 +11,12 @@ log_format = "compact"
 trusted_proxies = 1
 
 [ratelimit.free]
-burst = 60
-rate = 1
-
-[ratelimit.premium]
 burst = 600
 rate = 10
+
+[ratelimit.premium]
+burst = 6000
+rate = 100
 
 [ratelimit.public]
 burst = 10

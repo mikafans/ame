@@ -36,6 +36,7 @@ pub struct ListUsersQuery {
 pub struct PatchUserAdminBody {
     pub status: Option<String>,
     pub role: Option<String>,
+    pub plan: Option<String>,
 }
 
 /// GET /api/v1/admin/users — list all users
@@ -67,7 +68,7 @@ pub async fn list_users(
     Ok(Json(ListUsersResponse { users, total }))
 }
 
-/// PATCH /v1/admin/users/{id} — update learner/admin role or account status
+/// PATCH /api/v1/admin/users/{id} — update learner/admin role or account status
 #[utoipa::path(
     patch,
     path = "/api/v1/admin/users/{id}",
@@ -182,6 +183,27 @@ pub async fn patch_user_admin(
             Some("user"),
             Some(user_id),
             serde_json::json!({ "status": status }),
+        );
+    }
+
+    if let Some(plan) = &body.plan {
+        let plan = plan.to_lowercase();
+        if !["free", "premium"].contains(&plan.as_str()) {
+            return Err(ApiError::Validation(vec![FieldError {
+                field: "plan".into(),
+                message: "must be 'free' or 'premium'".into(),
+            }]));
+        }
+        ame_platform_postgres::admin_users::update_plan(&state.pool, user_id, &plan)
+            .await
+            .map_err(|e| ApiError::Internal(e.into()))?;
+        crate::audit::audit(
+            state.pool.clone(),
+            Some(admin.0.user.id),
+            "user.update_plan",
+            Some("user"),
+            Some(user_id),
+            serde_json::json!({ "plan": plan }),
         );
     }
 

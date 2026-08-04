@@ -4,6 +4,7 @@ Start here for the public agent contract.
 OpenAPI: /public/openapi.yaml
 Machine manifest: /public/skill.json
 Learning safety contract: /public/learning-contract.json
+Python SDK: /public/sdk/python/ame.py
 Human handoff page: /agent
 
 Purpose
@@ -55,9 +56,23 @@ Quality requirements
 
 Content payload example
 PATCH /api/v1/learning/activities/{activity_id}/content
-{"content":{"type":"explanation","heading":"Event time","body":"Use the event timestamp.","key_points":["Event time is domain time."]}}
+{"content":{"type":"explanation","heading":"Event time","body":"Use the event timestamp.","keyPoints":["Event time is domain time."]}}
+
+Content wire convention
+Agent-authored `content` JSON object keys use lower camelCase. Use `keyPoints`, `altText`, and
+`correctOptionId`, never `key_points`, `alt_text`, or `correct_option_id`.
+The `type` value and other documented enum literals remain the exact values
+advertised by the manifest. Unknown content keys are rejected by the server.
 
 Use only operations advertised by /public/skill.json. /public/openapi.yaml is
 the endpoint and type reference; it includes privileged operations outside the
 agent workflow. Read /public/learning-contract.json before mutation. Do not
 infer undocumented state.
+
+Reusable Python client
+Download `/public/sdk/python/ame.py` and run it directly, or install the
+package from `sdk/python` when the repository is available. It provides
+`AmeClient.discover()`, `learning_contract()`, `register()`, `login()`,
+`start_journey()`, `rate_limit_status()`, and generic `request()` support for
+the operations in this manifest. `AmeClient.from_handoff(text)` extracts the
+temporary bearer capability and public origin from a learner handoff.

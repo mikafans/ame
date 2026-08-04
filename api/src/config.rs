@@ -9,6 +9,7 @@ pub struct ServerConfig {
     pub production: bool,
     pub cors_origins: String,
     pub log_format: String,
+    pub public_base_url: Option<String>,
     pub database_url: Option<String>,
     pub valkey_url: Option<String>,
 }
@@ -115,6 +116,9 @@ impl Config {
         }
         if let Ok(log) = std::env::var("AME_LOG_FORMAT") {
             config.server.log_format = log;
+        }
+        if let Ok(public_base_url) = std::env::var("AME_PUBLIC_BASE_URL") {
+            config.server.public_base_url = Some(public_base_url);
         }
         if let Ok(db) = std::env::var("AME_DATABASE_URL") {
             config.server.database_url = Some(db);

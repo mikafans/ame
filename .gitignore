@@ -48,6 +48,4 @@ __pycache__/
 test-results
 web/sidebar.png
 
-# K8s deploy secrets (real values; commit only the .example files)
-deploy/k8s/overlays/*/secret.env
 .tmp/

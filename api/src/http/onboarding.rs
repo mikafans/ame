@@ -303,6 +303,9 @@ fn map_start_learning_error(error: StartLearningError) -> ApiError {
         StartLearningError::Identity(
             crate::domain::identity::IdentityRepositoryError::AccountEmailMismatch,
         ) => ApiError::Unauthorized,
+        StartLearningError::Identity(
+            crate::domain::identity::IdentityRepositoryError::AccountNotFound,
+        ) => ApiError::Unauthorized,
         StartLearningError::Identity(error) => ApiError::Internal(error.into()),
         StartLearningError::Prompt(crate::onboarding::PromptInterpretationError::EmptyPrompt) => {
             ApiError::Validation(vec![crate::domain::error::FieldError {

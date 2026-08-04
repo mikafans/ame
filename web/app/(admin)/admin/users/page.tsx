@@ -9,7 +9,8 @@ interface UserType {
   id: string;
   email?: string | null;
   displayName: string;
-  role: "admin" | "user";
+  role: "admin" | "learner";
+  plan: "free" | "premium";
   status: "active" | "deactivated";
   createdAt: string;
 }
@@ -24,8 +25,9 @@ export default function ManageUsersPage() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<UserType | null>(null);
-  const [dialog, setDialog] = useState<"role" | "status" | null>(null);
+  const [dialog, setDialog] = useState<"role" | "plan" | "status" | null>(null);
   const [targetRole, setTargetRole] = useState("learner");
+  const [targetPlan, setTargetPlan] = useState<"free" | "premium">("free");
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const load = useCallback(async () => {
@@ -54,10 +56,11 @@ export default function ManageUsersPage() {
   useEffect(() => {
     load();
   }, [load]);
-  const open = (u: UserType, kind: "role" | "status") => {
+  const open = (u: UserType, kind: "role" | "plan" | "status") => {
     setSelected(u);
     setDialog(kind);
     setTargetRole(u.role);
+    setTargetPlan(u.plan);
     setConfirm(false);
   };
   const save = async () => {
@@ -68,7 +71,11 @@ export default function ManageUsersPage() {
       const body =
         dialog === "role"
           ? { role: targetRole }
-          : { status: selected.status === "active" ? "deactivated" : "active" };
+          : dialog === "plan"
+            ? { plan: targetPlan }
+            : {
+                status: selected.status === "active" ? "deactivated" : "active",
+              };
       const { error } = await api.PATCH("/api/v1/admin/users/{id}", {
         params: { path: { id: selected.id } },
         body,
@@ -90,7 +97,7 @@ export default function ManageUsersPage() {
       <header className="mb-8">
         <h1 className="text-3xl font-bold">Manage Users</h1>
         <p className="mt-2 text-muted-foreground">
-          Paginate, search, and update learner/admin roles or account status.
+          Paginate, search, and update roles, VIP plans, or account status.
         </p>
       </header>
       <form
@@ -122,6 +129,7 @@ export default function ManageUsersPage() {
           <thead className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">User</th>
+              <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Joined</th>
@@ -180,6 +188,11 @@ export default function ManageUsersPage() {
                   </td>
                   <td className="px-4 py-4">
                     <span className="rounded-full border px-2 py-1 text-xs uppercase">
+                      {u.plan === "premium" ? "VIP / Premium" : "Free"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className="rounded-full border px-2 py-1 text-xs uppercase">
                       {u.role}
                     </span>
                   </td>
@@ -201,6 +214,13 @@ export default function ManageUsersPage() {
                         onClick={() => open(u, "role")}
                       >
                         Role
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => open(u, "plan")}
+                      >
+                        Plan
                       </Button>
                       <Button
                         size="sm"
@@ -260,9 +280,11 @@ export default function ManageUsersPage() {
             <h2 className="text-lg font-semibold">
               {dialog === "role"
                 ? "Change role"
-                : selected.status === "deactivated"
-                  ? "Enable user"
-                  : "Disable user"}
+                : dialog === "plan"
+                  ? "Change service plan"
+                  : selected.status === "deactivated"
+                    ? "Enable user"
+                    : "Disable user"}
             </h2>
             {dialog === "role" && (
               <select
@@ -272,6 +294,18 @@ export default function ManageUsersPage() {
               >
                 <option value="learner">Learner</option>
                 <option value="admin">Admin</option>
+              </select>
+            )}
+            {dialog === "plan" && (
+              <select
+                className="mt-5 h-9 w-full rounded border border-input bg-background px-3"
+                value={targetPlan}
+                onChange={(e) =>
+                  setTargetPlan(e.target.value as "free" | "premium")
+                }
+              >
+                <option value="free">Free</option>
+                <option value="premium">VIP / Premium</option>
               </select>
             )}
             {dialog === "status" && selected.status === "active" && (

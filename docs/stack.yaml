@@ -1,5 +1,5 @@
 project: ame
-version: 0.4.0
+version: 0.4.1
 description: Agent-first, self-hostable learning platform with one owner-scoped learner API.
 
 runtime:
@@ -22,6 +22,9 @@ api:
     - /public/llms.txt
     - /public/skill.json
     - /public/openapi.yaml
+    - /public/learning-contract.json
+    - /public/learning-principles.md
+    - /public/sdk/python/ame.py
   authentication: learner bearer token or browser session cookie
   agent_model: agents use the same learner-owned API; no agent account or scope layer
   generated_contracts:

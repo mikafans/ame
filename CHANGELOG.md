@@ -5,6 +5,89 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
 
+## [0.4.1] - 2026-08-03
+
+### Added
+
+- Runtime-served agent contracts at `/public/llms.txt`, `/public/skill.json`,
+  `/public/openapi.yaml`, and `/public/learning-contract.json` through one
+  unified `/public/*` runtime route.
+- A downloadable, self-contained Python SDK at
+  `/public/sdk/python/ame.py` for discovery, authentication, onboarding,
+  generic typed-contract requests, and rate-limit status.
+- Visible authenticated rate-limit status at `/api/v1/me/rate-limit`, standard
+  `X-RateLimit-*` response headers, and dynamic `Retry-After` guidance.
+- Free and VIP/Premium user plans, with admin-panel plan changes and separate
+  owner-scoped rate-limit tiers. Free defaults are 600 burst / 10 tokens per
+  second; Premium is 10x at 6000 / 100.
+- A footer in the authenticated app shell (About, Agent API, GitHub,
+  Self-hosting) — previously only reachable from the logged-out landing page,
+  so a signed-in learner had no way back to the GitHub repo or self-hosting
+  guide without logging out.
+
+### Fixed
+
+- Delegation handoff URLs now use the configured public origin or trusted
+  request forwarding headers instead of hardcoded `localhost:28800`.
+- `QuestionOption` and agent-authored content use the canonical lower camelCase
+  wire convention, including `isCorrect`, `keyPoints`, `altText`, and
+  `correctOptionId`; unknown content keys are rejected.
+- Public unauthenticated traffic remains a strict per-IP limiter, while
+  authenticated journey authoring uses the free/VIP owner bucket.
+- An admin account could not start a catalog-onboarded journey ("Start this
+  path" 500'd): the identity lookup behind it excluded any non-`learner`-role
+  account. Admin accounts can now use the same self-serve onboarding flow as
+  any learner.
+- Catalog/prompt-bootstrapped journeys (every "Reviewed starting path" and
+  freeform onboarding journey — anything short of the agent-authored
+  course-revision workflow) showed a spurious "That item is no longer
+  available" error banner on load. The 404 from a journey with no published
+  course revision is expected there and already has a dedicated fallback
+  view; it no longer surfaces as an error.
+- Clicking a reviewed catalog path while already signed in silently
+  redirected to `/agent`, discarding the selection. A signed-in learner can
+  now start an additional journey on their existing account without
+  re-registering.
+- `/start?catalogId=...` showed a blank "what would you like to learn?" box
+  with no indication of which reviewed path was picked. It now shows the
+  catalog entry's title, description, and estimated time, and pre-fills the
+  prompt (still editable).
+- A relative link in `learning-principles.md` resolved to a different URL
+  depending on which page rendered it (404'd at `/about`, e.g. from `/`).
+  Fixed to an absolute `/public/...` path.
+- Two admin endpoint doc summaries still said `/v1/...` instead of
+  `/api/v1/...`, propagated into the served OpenAPI spec and generated
+  TypeScript client types.
+- `api/Dockerfile` and `api/Dockerfile.dev` (the `make dev` local stack)
+  didn't copy the workspace `crates/` members and/or `sdk/python`, breaking
+  every containerized build path for this release.
+
+### Removed
+
+- `deploy/k8s/` and `deploy/k3s/` — environment-specific Kubernetes manifests
+  and an image-build script tied to one operator's private cluster, leaking
+  real internal hostnames in the process. This repo ships container artifacts
+  (`api/Dockerfile`, `web/Dockerfile`) but no opinionated infra-as-code;
+  [`self-hosting.md`](docs/public/self-hosting.md) (Docker/Podman Compose) is
+  the only supported deploy shape. `docs/public/deploy.md` and
+  `docs/public/k3s.md` are folded into `self-hosting.md` or removed as
+  redundant.
+
+### Quality gates
+
+- `docs/public/**/*.md` is now covered by Prettier (`proseWrap: never`,
+  matching the no-manual-wrapping convention used elsewhere) and every Python
+  file (`scripts/`, `sdk/python/`, `api_tests/`) by `ruff format`/`ruff
+  check`. Previously neither had any automated formatting or linting, which
+  is how the `learning-principles.md` link bug above went unnoticed.
+
+### Breaking route documentation
+
+The 0.4 route split is explicit: authenticated endpoints are under
+`/api/v1/*`, unauthenticated endpoints are under `/public/v1/*`, and the old
+`/v1/*` surface is not supported. Reverse proxies must send both `/api/` and
+`/public/` to the API; discovery documents are served under `/public/`.
+
 ## [0.4.0] - 2026-08-03
 
 ### Added

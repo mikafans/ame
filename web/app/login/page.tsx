@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { responseErrorMessage } from "@/api/errors";
 import { Logo } from "@/components/Logo";
 import { useColorMode } from "@/components/ThemeRegistry";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,18 +64,15 @@ export default function LoginPage() {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        let message = "Authentication failed";
+        let body: unknown;
         try {
-          const data = await response.json();
-          message =
-            data?.error?.message ||
-            data?.message ||
-            (typeof data?.error === "string" ? data.error : null) ||
-            `Error: ${response.statusText}`;
+          body = await response.json();
         } catch {
-          message = `Authentication failed: ${response.status} ${response.statusText}`;
+          body = undefined;
         }
-        setError(message);
+        setError(
+          responseErrorMessage(response, body, "Authentication failed."),
+        );
         return;
       }
       await refresh();

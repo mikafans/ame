@@ -149,6 +149,7 @@ pub mod onboarding;
 pub mod openapi;
 pub mod portability;
 pub mod progress;
+pub mod public_docs;
 pub mod questions;
 pub mod reviews;
 pub mod sources;
@@ -206,6 +207,12 @@ pub fn router(pool: PgPool) -> Router {
             ])
             .allow_credentials(true)
     };
+    let cors = cors.expose_headers([
+        axum::http::header::HeaderName::from_static("x-ratelimit-limit"),
+        axum::http::header::HeaderName::from_static("x-ratelimit-remaining"),
+        axum::http::header::HeaderName::from_static("x-ratelimit-reset"),
+        axum::http::header::HeaderName::from_static("retry-after"),
+    ]);
 
     // Endpoints that should be logged (activity_log)
     let logged_router = Router::new()
@@ -290,9 +297,18 @@ pub fn router(pool: PgPool) -> Router {
             auth_extract_middleware,
         ));
 
+    // Discovery documents are public static assets, but they still pass
+    // through the strict per-IP limiter so an exposed deployment has one
+    // consistent unauthenticated attack boundary.
+    let public_docs = public_docs::router().layer(middleware::from_fn_with_state(
+        state.clone(),
+        crate::ratelimit::rate_limit_middleware,
+    ));
+
     Router::new()
         .nest("/api", api_routes)
         .nest("/public", public_routes)
+        .merge(public_docs)
         .route("/healthz", get(health::healthz))
         .route("/readyz", get(health::readyz))
         .layer(PropagateRequestIdLayer::new(

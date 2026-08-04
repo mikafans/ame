@@ -24,6 +24,7 @@ pub struct AuthenticationFixture {
     pub display_name: String,
     pub created_at: OffsetDateTime,
     pub role: PrincipalRole,
+    pub plan: String,
     pub expires_at: OffsetDateTime,
     pub revoked: bool,
     pub owner_active: bool,
@@ -73,6 +74,7 @@ impl AuthenticationRepository for InMemoryAuthenticationRepository {
         Ok(AuthenticatedPrincipal {
             user_id: fixture.user_id,
             role: fixture.role,
+            plan: fixture.plan,
             email: fixture.email,
             display_name: fixture.display_name,
             created_at: fixture.created_at,
@@ -101,6 +103,7 @@ mod tests {
             display_name: "Learner".into(),
             created_at: OffsetDateTime::now_utc(),
             role: PrincipalRole::Learner,
+            plan: "free".into(),
             expires_at: OffsetDateTime::now_utc() + time::Duration::hours(1),
             revoked: false,
             owner_active: true,

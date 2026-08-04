@@ -267,11 +267,12 @@ pub struct TransitionActivityPublication {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ActivityCapability {
     Explanation {
         heading: String,
         body: String,
+        #[serde(rename = "keyPoints")]
         key_points: Vec<String>,
     },
     WorkedExample {
@@ -287,6 +288,7 @@ pub enum ActivityCapability {
     Diagram {
         title: String,
         source: String,
+        #[serde(rename = "altText")]
         alt_text: String,
     },
     CodeExample {
@@ -777,7 +779,7 @@ mod capability_tests {
             (
                 ActivityKind::Explanation,
                 serde_json::json!({
-                    "type": "diagram", "title": "Flow", "source": "graph TD; A-->B", "alt_text": "A flows to B"
+                    "type": "diagram", "title": "Flow", "source": "graph TD; A-->B", "altText": "A flows to B"
                 }),
             ),
             (
@@ -798,6 +800,28 @@ mod capability_tests {
         for (kind, content) in cases {
             assert!(validate_activity_content(kind, &authored(content)).is_ok());
         }
+    }
+
+    #[test]
+    fn authored_content_requires_camel_case_keys() {
+        let canonical = authored(serde_json::json!({
+            "type": "explanation",
+            "heading": "Event time",
+            "body": "Use the event timestamp.",
+            "keyPoints": ["It is domain time."]
+        }));
+        assert!(validate_activity_content(ActivityKind::Explanation, &canonical).is_ok());
+
+        let legacy = authored(serde_json::json!({
+            "type": "explanation",
+            "heading": "Event time",
+            "body": "Use the event timestamp.",
+            "key_points": ["It is domain time."]
+        }));
+        assert_eq!(
+            validate_activity_content(ActivityKind::Explanation, &legacy),
+            Err(LearningRepositoryError::InvalidActivityContent)
+        );
     }
 
     fn authored_rubric(rubric: serde_json::Value) -> AuthorActivityRubric {
@@ -848,7 +872,7 @@ mod capability_tests {
     fn rejects_unknown_or_malformed_capabilities() {
         for content in [
             serde_json::json!({"type": "interactive_lab", "title": "Run it"}),
-            serde_json::json!({"type": "diagram", "title": "Flow", "source": "graph TD", "alt_text": ""}),
+            serde_json::json!({"type": "diagram", "title": "Flow", "source": "graph TD", "altText": ""}),
             serde_json::json!({"type": "scenario", "context": "Context", "prompt": "Choose", "options": [{"id": "only", "label": "Only choice"}]}),
         ] {
             assert_eq!(

@@ -16,7 +16,7 @@ make dev           # Postgres, Valkey, API, and web, all behind Caddy at :28800
 `make dev` is the one local stack and auto-seeds demo accounts on first boot.
 Demo credentials: `haru@example.com / password123` (learner), `admin@example.com / password123` (admin).
 
-Copy `.env.example` to `.env` if you need to override defaults.
+Copy `deploy/.env.example` to `deploy/.env` if you need to override defaults.
 
 ## Quality gates
 

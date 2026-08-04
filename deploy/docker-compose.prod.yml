@@ -1,9 +1,11 @@
-# Production-shaped compose stack. Not a substitute for k8s; intended for
-# smoke deploys, demos, and CI integration testing.
+# Production-shaped compose stack. Intended for smoke deploys, demos, and CI
+# integration testing. Run from the repo root:
 #
-#   docker compose -f docker-compose.prod.yml up --build
+#   docker compose -f deploy/docker-compose.prod.yml up --build
 #
-# Override secrets via a sibling .env file (POSTGRES_PASSWORD, NEXT_PUBLIC_API_URL, ...).
+# Override secrets via a sibling deploy/.env file (POSTGRES_PASSWORD, NEXT_PUBLIC_API_URL, ...).
+
+name: ame
 
 services:
   postgres:
@@ -33,7 +35,7 @@ services:
 
   api:
     build:
-      context: .
+      context: ..
       dockerfile: api/Dockerfile
     image: ame-api:latest
     restart: unless-stopped
@@ -45,13 +47,16 @@ services:
       valkey:
         condition: service_healthy
     environment:
+      # ame.toml (baked into the image) defaults to port 28080 for local/dev
+      # use; override to match EXPOSE 8080 and the healthcheck/port mapping.
+      AME_PORT: "8080"
       AME_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ame}
       AME_VALKEY_URL: redis://valkey:6379/0
       AME_PRODUCTION: ${AME_PRODUCTION:-1}
       AME_CORS_ORIGINS: ${AME_CORS_ORIGINS:?set AME_CORS_ORIGINS in .env}
       RUST_LOG: ${RUST_LOG:-ame_api=info,tower_http=info,sqlx=warn}
     ports:
-      - "127.0.0.1:${API_PORT:-8080}:8080"
+      - "127.0.0.1:${AME_API_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
       interval: 10s
@@ -60,7 +65,7 @@ services:
 
   web:
     build:
-      context: .
+      context: ..
       dockerfile: web/Dockerfile
       args:
         # Baked into the client bundle at build time — point at the public
@@ -72,7 +77,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+      - "127.0.0.1:${AME_WEB_PORT:-3000}:3000"
 
   caddy:
     image: caddy:2.10-alpine
@@ -88,8 +93,8 @@ services:
       - "${AME_HTTP_PORT:-80}:80"
       - "${AME_HTTPS_PORT:-443}:443"
     volumes:
-      - ./deploy/Caddyfile.compose:/etc/caddy/Caddyfile:ro
-      - ./docs:/srv/docs:ro
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - ../docs:/srv/docs:ro
       - caddy_data:/data
       - caddy_config:/config
 

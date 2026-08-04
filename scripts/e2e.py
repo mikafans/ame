@@ -16,12 +16,15 @@ API_URL = f"http://{API_HOST}:{API_PORT}"
 
 
 def ready() -> bool:
-    return subprocess.run(
-        ["curl", "-fsS", f"{API_URL}/healthz"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    ).returncode == 0
+    return (
+        subprocess.run(
+            ["curl", "-fsS", f"{API_URL}/healthz"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode
+        == 0
+    )
 
 
 def main() -> int:

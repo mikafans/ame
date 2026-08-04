@@ -15,20 +15,23 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
 import time
-import json
 import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
 
-from container_runtime import compose as run_compose, engine
+from container_runtime import admin_promotion_sql, engine
+from container_runtime import compose as run_compose
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPOSE_FILE = ROOT / "docker-compose.local.yml"
+COMPOSE_FILE = ROOT / "deploy/docker-compose.local.yml"
+
+
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     if check:
         return run_compose(COMPOSE_FILE, *args)
@@ -72,41 +75,7 @@ def promote_admin(email: str | None = None, name: str | None = None) -> None:
     email = email or os.environ.get("ADMIN_EMAIL", "admin@example.com")
     name = name or os.environ.get("ADMIN_NAME", "Carol Admin")
     password = os.environ.get("ADMIN_PASSWORD", "password123")
-    password_hash = subprocess.check_output(
-        [
-            "uvx",
-            "--quiet",
-            "--from",
-            "argon2-cffi",
-            "python",
-            "-c",
-            f"from argon2 import PasswordHasher; print(PasswordHasher().hash({password!r}))",
-        ],
-        cwd=ROOT,
-        text=True,
-    ).strip()
-    sql = f"""
-DO $$
-DECLARE
-  existing_user_id uuid;
-  new_user_id uuid;
-BEGIN
-  SELECT id INTO existing_user_id
-  FROM tb_users
-  WHERE email_canonical = {email!r};
-
-  IF existing_user_id IS NULL THEN
-    new_user_id := uuid_generate_v7();
-    INSERT INTO tb_identities (id, identity_type, label)
-    VALUES (new_user_id, 'human', {name!r});
-    INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
-    VALUES (new_user_id, {email!r}, {email!r}, {name!r}, 'admin', '{password_hash}');
-  ELSE
-    UPDATE tb_users SET role = 'admin' WHERE id = existing_user_id;
-  END IF;
-END
-$$;
-"""
+    sql = admin_promotion_sql(email, name, password)
     compose(
         "exec",
         "-T",

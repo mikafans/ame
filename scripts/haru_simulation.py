@@ -15,7 +15,6 @@ from pathlib import Path
 
 import httpx
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BASE_URL = os.getenv("AME_API_URL", "http://localhost:28800")
 PASSWORD = os.getenv("HARU_SIM_PASSWORD")
@@ -23,7 +22,9 @@ PASSWORD = os.getenv("HARU_SIM_PASSWORD")
 
 def require_ok(response: httpx.Response) -> dict:
     if not response.is_success:
-        raise RuntimeError(f"{response.request.method} {response.url.path}: {response.status_code} {response.text}")
+        raise RuntimeError(
+            f"{response.request.method} {response.url.path}: {response.status_code} {response.text}"
+        )
     return response.json()
 
 
@@ -60,9 +61,7 @@ def main() -> None:
             journey = require_ok(
                 client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
             )
-            activity = next(
-                item for item in journey["activities"] if item["status"] == "ready"
-            )
+            activity = next(item for item in journey["activities"] if item["status"] == "ready")
             session = require_ok(
                 client.post(
                     f"/api/v1/learning/journeys/{journey_id}/activities/{activity['id']}/start",
@@ -80,7 +79,9 @@ def main() -> None:
                     json={"completed": True, "responses": responses},
                 )
             )
-            completed.append({"round": round_number, "title": activity["title"], "activityId": activity["id"]})
+            completed.append(
+                {"round": round_number, "title": activity["title"], "activityId": activity["id"]}
+            )
 
     handoff = {
         "kind": "local-disposable-haru-simulation",

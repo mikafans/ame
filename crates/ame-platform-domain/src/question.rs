@@ -46,6 +46,7 @@ pub enum ContentReviewStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct QuestionOption {
     pub id: String,
     pub text: String,
@@ -212,4 +213,30 @@ pub fn validate_question(input: &CreateQuestion) -> Result<(), QuestionRepositor
         QuestionKind::Essay | QuestionKind::Code => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::QuestionOption;
+
+    #[test]
+    fn question_options_use_camel_case_on_the_wire() {
+        let option = QuestionOption {
+            id: "correct".into(),
+            text: "The JobManager".into(),
+            is_correct: true,
+        };
+
+        let json = serde_json::to_value(&option).unwrap();
+        assert_eq!(json["isCorrect"], true);
+        assert!(json.get("is_correct").is_none());
+
+        let decoded: QuestionOption = serde_json::from_value(serde_json::json!({
+            "id": "correct",
+            "text": "The JobManager",
+            "isCorrect": true
+        }))
+        .unwrap();
+        assert!(decoded.is_correct);
+    }
 }

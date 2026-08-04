@@ -4,9 +4,13 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { publicApi } from "@/api/client";
+import { responseErrorMessage } from "@/api/errors";
+import type { components } from "@/api/generated/schema.d.ts";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+
+type NativeJourney = components["schemas"]["NativeJourneyCatalogResponse"];
 
 function StartLearningForm() {
   const router = useRouter();
@@ -21,6 +25,7 @@ function StartLearningForm() {
   const [loading, setLoading] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [catalogEntry, setCatalogEntry] = useState<NativeJourney | null>(null);
 
   useEffect(() => {
     if (routePrompt) {
@@ -28,9 +33,45 @@ function StartLearningForm() {
     }
   }, [routePrompt]);
 
+  // The catalogId query param alone carries no learner-facing content — fetch
+  // the matching reviewed path so the form shows what was actually picked
+  // instead of a blank "what would you like to learn?" box.
   useEffect(() => {
-    if (user && !onboardingComplete && !loading) router.replace("/agent");
-  }, [loading, onboardingComplete, router, user]);
+    if (!routeCatalogId) {
+      setCatalogEntry(null);
+      return;
+    }
+    let cancelled = false;
+    void publicApi
+      .GET("/public/v1/catalog/journeys")
+      .then((result) => {
+        if (cancelled || !result.response.ok || !result.data) return;
+        const entry = result.data.find(
+          (journey) => journey.id === routeCatalogId,
+        );
+        if (!entry) return;
+        setCatalogEntry(entry);
+        setPrompt((current) => (current ? current : entry.description));
+      })
+      .catch(() => {
+        // Non-fatal: the form still works with just catalogId at submit time.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [routeCatalogId]);
+
+  // A signed-in visitor with no specific intent (no catalogId/prompt) has
+  // nothing to do on this new-account form — send them to the agent handoff
+  // page instead. But a signed-in learner picking a reviewed catalog path (or
+  // arriving with a prompt) is starting an additional journey on their
+  // existing account, so let them through to submit it.
+  const hasIntent = Boolean(routeCatalogId || routePrompt);
+  useEffect(() => {
+    if (user && !hasIntent && !onboardingComplete && !loading) {
+      router.replace("/agent");
+    }
+  }, [hasIntent, loading, onboardingComplete, router, user]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,34 +85,39 @@ function StartLearningForm() {
         });
         if (!registration.response.ok || !registration.data) {
           throw new Error(
-            registration.response.status === 422
-              ? "This email is already registered, or the password is invalid"
-              : "Could not create your learner account",
+            responseErrorMessage(
+              registration.response,
+              registration.error,
+              "Could not create your learner account",
+            ),
           );
         }
         onboardingToken = registration.data.token;
       }
-      const { data, response } = await publicApi.POST(
-        "/public/v1/onboarding/start",
-        {
-          headers: onboardingToken
-            ? { Authorization: `Bearer ${onboardingToken}` }
-            : undefined,
-          body: {
-            displayName,
-            email,
-            idempotencyKey: crypto.randomUUID(),
-            prompt,
-            ...(routeCatalogId ? { catalogId: routeCatalogId } : {}),
-          },
+      const startResult = await publicApi.POST("/public/v1/onboarding/start", {
+        headers: onboardingToken
+          ? { Authorization: `Bearer ${onboardingToken}` }
+          : undefined,
+        body: {
+          displayName: user ? user.displayName : displayName,
+          email: user ? (user.email ?? "") : email,
+          idempotencyKey: crypto.randomUUID(),
+          prompt,
+          ...(routeCatalogId ? { catalogId: routeCatalogId } : {}),
         },
-      );
-      if (!response.ok || !data) {
-        throw new Error("Could not start your learning journey");
+      });
+      if (!startResult.response.ok || !startResult.data) {
+        throw new Error(
+          responseErrorMessage(
+            startResult.response,
+            startResult.error,
+            "Could not start your learning journey",
+          ),
+        );
       }
       setOnboardingComplete(true);
       await refresh();
-      router.push(`/learning/journeys/${data.journeyId}`);
+      router.push(`/learning/journeys/${startResult.data.journeyId}`);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -83,7 +129,7 @@ function StartLearningForm() {
     }
   }
 
-  if (authLoading || user) {
+  if (authLoading || (user && !hasIntent)) {
     return (
       <main className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-10">
         <p className="font-mono text-xs uppercase tracking-[0.14em] text-primary">
@@ -106,12 +152,21 @@ function StartLearningForm() {
         Start your journey
       </p>
       <h1 className="mt-3 text-3xl font-bold tracking-tight">
-        Turn your intent into a first useful session.
+        {catalogEntry
+          ? catalogEntry.title
+          : "Turn your intent into a first useful session."}
       </h1>
       <p className="mt-3 leading-6 text-muted-foreground">
-        AME creates a local learner account and a resumable journey. No email
-        delivery or external verification is required for this self-host flow.
+        {catalogEntry
+          ? catalogEntry.description
+          : "AME creates a local learner account and a resumable journey. No email delivery or external verification is required for this self-host flow."}
       </p>
+      {catalogEntry && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Reviewed starting path · about {catalogEntry.estimatedMinutes} minutes
+          · {catalogEntry.level}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
         <div>
@@ -119,7 +174,9 @@ function StartLearningForm() {
             htmlFor="start-prompt"
             className="mb-2 block text-sm font-medium"
           >
-            What would you like to learn?
+            {catalogEntry
+              ? "What would you like to learn? (from your selected path — edit if you'd like)"
+              : "What would you like to learn?"}
           </label>
           <textarea
             id="start-prompt"
@@ -130,39 +187,49 @@ function StartLearningForm() {
             className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="start-name"
-              className="mb-2 block text-sm font-medium"
-            >
-              Your name
-            </label>
-            <input
-              id="start-name"
-              required
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
-            />
+        {user ? (
+          <p className="text-sm text-muted-foreground">
+            Continuing as{" "}
+            <span className="font-medium text-foreground">
+              {user.displayName}
+            </span>
+            . This adds another journey to your existing account.
+          </p>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="start-name"
+                className="mb-2 block text-sm font-medium"
+              >
+                Your name
+              </label>
+              <input
+                id="start-name"
+                required
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="start-email"
+                className="mb-2 block text-sm font-medium"
+              >
+                Email identifier
+              </label>
+              <input
+                id="start-email"
+                required
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="start-email"
-              className="mb-2 block text-sm font-medium"
-            >
-              Email identifier
-            </label>
-            <input
-              id="start-email"
-              required
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="h-11 w-full rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-        </div>
+        )}
         {!user && (
           <div>
             <label

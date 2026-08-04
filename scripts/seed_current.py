@@ -9,7 +9,9 @@ import urllib.request
 import uuid
 
 
-def request(api: str, method: str, path: str, body: dict, token: str | None = None) -> tuple[int, dict]:
+def request(
+    api: str, method: str, path: str, body: dict, token: str | None = None
+) -> tuple[int, dict]:
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
         f"{api.rstrip('/')}{path}",
