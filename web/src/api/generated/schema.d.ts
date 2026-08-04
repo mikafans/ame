@@ -50,7 +50,7 @@ export interface paths {
          */
         get: operations["get_settings"];
         /**
-         * PUT /v1/admin/settings — upsert one or more setting overrides. Each changed
+         * PUT /api/v1/admin/settings — upsert one or more setting overrides. Each changed
          *     key is written to tb_settings, the settings cache is busted, and one audit
          *     row is emitted. Returns the new effective settings.
          */
@@ -108,7 +108,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** PATCH /v1/admin/users/{id} — update learner/admin role or account status */
+        /** PATCH /api/v1/admin/users/{id} — update learner/admin role or account status */
         patch: operations["patch_user_admin"];
         trace?: never;
     };

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { LogOut, Menu } from "lucide-react";
 import { api } from "@/api/client";
 import type { components } from "@/api/generated/schema.d.ts";
@@ -115,6 +116,31 @@ export function AppShell({ route, setRoute, children }: AppShellProps) {
       <main className="mx-auto min-w-0 max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {children}
       </main>
+      <footer className="border-t border-border px-4 py-6 text-sm text-muted-foreground sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4">
+          <span>© 2026 AME</span>
+          <div className="flex gap-5">
+            <Link href="/about" className="transition hover:text-primary">
+              About
+            </Link>
+            <Link href="/agent" className="transition hover:text-primary">
+              Agent API
+            </Link>
+            <a
+              href="https://github.com/mikafans/ame"
+              className="transition hover:text-primary"
+            >
+              GitHub
+            </a>
+            <Link
+              href="/self-hosting"
+              className="transition hover:text-primary"
+            >
+              Self-hosting
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

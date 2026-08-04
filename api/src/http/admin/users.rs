@@ -68,7 +68,7 @@ pub async fn list_users(
     Ok(Json(ListUsersResponse { users, total }))
 }
 
-/// PATCH /v1/admin/users/{id} — update learner/admin role or account status
+/// PATCH /api/v1/admin/users/{id} — update learner/admin role or account status
 #[utoipa::path(
     patch,
     path = "/api/v1/admin/users/{id}",

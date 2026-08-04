@@ -37,7 +37,7 @@ pub async fn get_settings(
     Ok(Json(settings))
 }
 
-/// PUT /v1/admin/settings — upsert one or more setting overrides. Each changed
+/// PUT /api/v1/admin/settings — upsert one or more setting overrides. Each changed
 /// key is written to tb_settings, the settings cache is busted, and one audit
 /// row is emitted. Returns the new effective settings.
 #[utoipa::path(

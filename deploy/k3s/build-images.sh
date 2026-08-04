@@ -14,8 +14,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AME_REPO="${AME_REPO:-$(cd "$HERE/../.." && pwd)}"
-# Tracks the ame package version (api/Cargo.toml) by default — AGENTS.md forbids
-# floating tags. Override with TAG=... only to re-import an existing version.
+# Tracks the ame package version (api/Cargo.toml) by default — never use a
+# floating tag. Override with TAG=... only to re-import an existing version.
 TAG="${TAG:-$(grep -m1 '^version' "$AME_REPO/api/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')}"
 LOCAL_IMAGE=azusachino.icu
 # Empty = relative API calls, so the web is served same-origin behind the

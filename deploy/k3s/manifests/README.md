@@ -178,7 +178,7 @@ make delete-edge                                               # tear down (PVC/
 
 Bumping the image: build+import a new version from the ame repo
 (`deploy/k3s/build-images.sh`), then update `image:` in `api.yaml`/`web.yaml`
-here and re-apply. (AGENTS.md forbids floating tags.)
+here and re-apply. Never use a floating tag.
 
 ## Notes / known gaps for alpha
 
