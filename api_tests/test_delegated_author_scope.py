@@ -31,9 +31,7 @@ def test_delegated_author_can_finish_draft_content_but_cannot_read_learner_profi
         )
     )
     authorization = next(
-        line
-        for line in delegation["handoff"].splitlines()
-        if line.startswith("Authorization: ")
+        line for line in delegation["handoff"].splitlines() if line.startswith("Authorization: ")
     )
     author_headers = {"Authorization": authorization.removeprefix("Authorization: ")}
 

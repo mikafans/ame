@@ -8,7 +8,6 @@ from pathlib import Path
 
 import httpx
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BASE_URL = "http://localhost:28800"
 
@@ -47,9 +46,7 @@ def main() -> None:
         started.raise_for_status()
         journey_id = started.json()["journeyId"]
 
-        journey = client.get(
-            f"/api/v1/learning/journeys/{journey_id}", headers=headers
-        )
+        journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
         journey.raise_for_status()
         journey_body = journey.json()
         assert journey_body["goal"]["rawIntent"] == prompt
@@ -78,9 +75,7 @@ def main() -> None:
         )
         session_start.raise_for_status()
         session_id = session_start.json()["id"]
-        session_before = client.get(
-            f"/api/v1/learning/sessions/{session_id}", headers=headers
-        )
+        session_before = client.get(f"/api/v1/learning/sessions/{session_id}", headers=headers)
         session_before.raise_for_status()
         assert session_before.json()["status"] == "in_progress"
 

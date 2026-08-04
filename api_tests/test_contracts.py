@@ -166,8 +166,6 @@ def test_learner_journey_origin_is_explicit_in_authenticated_reads(client):
     assert journeys.status_code == 200, journeys.text
     assert journeys.json()[0]["origin"] == "learner"
 
-    journey = client.get(
-        f"/api/v1/learning/journeys/{payload['journeyId']}", headers=headers
-    )
+    journey = client.get(f"/api/v1/learning/journeys/{payload['journeyId']}", headers=headers)
     assert journey.status_code == 200, journey.text
     assert journey.json()["origin"] == "learner"

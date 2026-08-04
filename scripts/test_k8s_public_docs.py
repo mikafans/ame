@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 INGRESS = (ROOT / "deploy/k8s/base/ingress.yaml").read_text()
 WEB = (ROOT / "deploy/k8s/base/web.yaml").read_text()

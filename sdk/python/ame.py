@@ -13,8 +13,9 @@ import json
 import re
 import sys
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Self
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -54,7 +55,7 @@ class AmeClient:
         self.timeout = timeout
 
     @classmethod
-    def from_handoff(cls, handoff: str, **kwargs: Any) -> "AmeClient":
+    def from_handoff(cls, handoff: str, **kwargs: Any) -> AmeClient:
         """Build a client from the one-time handoff shown by the web app."""
 
         token_match = re.search(r"Authorization:\s*Bearer\s+(\S+)", handoff)
@@ -68,10 +69,10 @@ class AmeClient:
     def close(self) -> None:
         return None
 
-    def __enter__(self) -> "AmeClient":
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *_: Any) -> None:
+    def __exit__(self, *_: object) -> None:
         self.close()
 
     def request(
@@ -153,7 +154,11 @@ class AmeClient:
         return self.request("GET", "/api/v1/me/rate-limit")
 
     def _url(self, path: str, params: Mapping[str, Any] | None = None) -> str:
-        url = path if path.startswith(("http://", "https://")) else f"{self.base_url}/{path.lstrip('/')}"
+        url = (
+            path
+            if path.startswith(("http://", "https://"))
+            else f"{self.base_url}/{path.lstrip('/')}"
+        )
         if params:
             from urllib.parse import urlencode
 
@@ -164,13 +169,17 @@ class AmeClient:
     def _raise_error(response: Any) -> None:
         try:
             payload = json.loads(response.read().decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
+        except ValueError, UnicodeDecodeError:
             payload = {}
         envelope = payload.get("error", {}) if isinstance(payload, dict) else {}
         if isinstance(envelope, str):
             message, code, details = envelope, None, None
         else:
-            message = envelope.get("message") or payload.get("message") or getattr(response, "reason", "request failed")
+            message = (
+                envelope.get("message")
+                or payload.get("message")
+                or getattr(response, "reason", "request failed")
+            )
             code = envelope.get("code")
             details = envelope.get("details")
         raise AmeError(

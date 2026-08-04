@@ -16,13 +16,11 @@ from pathlib import Path
 
 import httpx
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from api_tests.test_reference_courses import COURSES, build_reference_course  # noqa: E402
-
+from api_tests.test_reference_courses import COURSES, build_reference_course
 
 DEFAULT_EMAIL = "haru-reference@example.test"
 DEFAULT_NAME = "Haru"
@@ -38,9 +36,7 @@ def require_ok(response: httpx.Response) -> dict:
     return response.json()
 
 
-def learner_headers(
-    client: httpx.Client, email: str, name: str, password: str
-) -> dict[str, str]:
+def learner_headers(client: httpx.Client, email: str, name: str, password: str) -> dict[str, str]:
     registered = client.post(
         "/public/v1/auth/register",
         json={"email": email, "name": name, "password": password},
@@ -49,9 +45,7 @@ def learner_headers(
         payload = registered.json()
     elif registered.status_code == 422:
         payload = require_ok(
-            client.post(
-                "/public/v1/auth/login", json={"email": email, "password": password}
-            )
+            client.post("/public/v1/auth/login", json={"email": email, "password": password})
         )
     else:
         payload = require_ok(registered)
@@ -77,17 +71,11 @@ def delegation_token(
         None,
     )
     if authorization is None:
-        raise RuntimeError(
-            "delegation response did not contain a dlg_* authorization line"
-        )
-    return payload["delegation"], {
-        "Authorization": authorization.removeprefix("Authorization: ")
-    }
+        raise RuntimeError("delegation response did not contain a dlg_* authorization line")
+    return payload["delegation"], {"Authorization": authorization.removeprefix("Authorization: ")}
 
 
-def complete_as_learner(
-    client: httpx.Client, headers: dict[str, str], journey_id: str
-) -> int:
+def complete_as_learner(client: httpx.Client, headers: dict[str, str], journey_id: str) -> int:
     """Complete every ready activity through the learner session API.
 
     This is an explicitly mechanical fixture state: it records completed
@@ -95,9 +83,7 @@ def complete_as_learner(
     """
     completed = 0
     while True:
-        journey = require_ok(
-            client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
-        )
+        journey = require_ok(client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers))
         ready = next(
             (activity for activity in journey["activities"] if activity["status"] == "ready"),
             None,
@@ -122,12 +108,8 @@ def complete_as_learner(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--email", default=os.getenv("HARU_REFERENCE_EMAIL", DEFAULT_EMAIL)
-    )
-    parser.add_argument(
-        "--name", default=os.getenv("HARU_REFERENCE_NAME", DEFAULT_NAME)
-    )
+    parser.add_argument("--email", default=os.getenv("HARU_REFERENCE_EMAIL", DEFAULT_EMAIL))
+    parser.add_argument("--name", default=os.getenv("HARU_REFERENCE_NAME", DEFAULT_NAME))
     parser.add_argument("--password", default=os.getenv("HARU_REFERENCE_PASSWORD"))
     parser.add_argument(
         "--complete-course",
@@ -145,9 +127,7 @@ def main() -> None:
         owner_headers = learner_headers(client, args.email, args.name, args.password)
         courses = []
         for course in COURSES:
-            delegation, author_headers = delegation_token(
-                client, owner_headers, course["intent"]
-            )
+            delegation, author_headers = delegation_token(client, owner_headers, course["intent"])
             built = build_reference_course(client, course, headers=author_headers)
             completed_activities = 0
             journey_status = "active"
@@ -220,9 +200,7 @@ def main() -> None:
     handoff_path.write_text(json.dumps(handoff, indent=2) + "\n")
     print(f"Delegated reference courses ready: {handoff['learningUrl']}")
     print(f"Login email: {args.email}")
-    print(
-        "Use the HARU_REFERENCE_PASSWORD value you supplied; it is never printed or saved."
-    )
+    print("Use the HARU_REFERENCE_PASSWORD value you supplied; it is never printed or saved.")
     print(f"Non-secret handoff: {handoff_path}")
 
 

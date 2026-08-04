@@ -1,6 +1,6 @@
+import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-import uuid
 
 
 def _start_learner(client, prompt):
@@ -126,9 +126,7 @@ def test_agent_authored_activity_stays_private_until_review_and_publish(client):
     )
     assert invalid_publish.status_code == 409, invalid_publish.text
 
-    review = client.post(
-        f"/api/v1/learning/activities/{activity['id']}/review", headers=headers
-    )
+    review = client.post(f"/api/v1/learning/activities/{activity['id']}/review", headers=headers)
     assert review.status_code == 200, review.text
     assert review.json()["publicationStatus"] == "review"
 
@@ -217,9 +215,7 @@ def test_agent_can_start_an_empty_course_without_generic_template_material(clien
     assert course["journeyId"] != started["journeyId"]
     assert course["revision"]["status"] == "draft"
 
-    journey = client.get(
-        f"/api/v1/learning/journeys/{course['journeyId']}", headers=headers
-    )
+    journey = client.get(f"/api/v1/learning/journeys/{course['journeyId']}", headers=headers)
     assert journey.status_code == 200, journey.text
     assert journey.json()["activities"] == []
     assert journey.json()["objectives"] == []
@@ -273,9 +269,7 @@ def test_draft_course_graph_is_revision_owned_and_hidden_from_learners(client):
     assert objective.status_code == 200, objective.text
     assert objective.json()["courseRevisionId"] == revision_id
 
-    learner_view = client.get(
-        f"/api/v1/learning/journeys/{journey_id}", headers=headers
-    )
+    learner_view = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
     assert learner_view.status_code == 200, learner_view.text
     assert learner_view.json()["objectives"] == []
     assert learner_view.json()["activities"] == []
@@ -334,9 +328,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
             "reviewStatus": "approved",
         },
     )
-    assert worked_example_kind_mismatch.status_code == 422, (
-        worked_example_kind_mismatch.text
-    )
+    assert worked_example_kind_mismatch.status_code == 422, worked_example_kind_mismatch.text
     non_string_field = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",
         headers=headers,
@@ -420,9 +412,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     )
     assert worked_grounded.status_code == 200, worked_grounded.text
     assert worked_grounded.json()["payload"]["content"] == worked_example_content
-    assert worked_grounded.json()["payload"]["contentProvenance"][
-        "sourceReferences"
-    ] == references
+    assert worked_grounded.json()["payload"]["contentProvenance"]["sourceReferences"] == references
 
     invalid_content = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",
@@ -471,9 +461,7 @@ def test_agent_can_ground_first_package_activity_and_cannot_forge_it(client):
     )
     assert unpublished.status_code == 409, unpublished.text
 
-    wrong_operation_run_id = _published_generation_run(
-        client, headers, "question.compose"
-    )
+    wrong_operation_run_id = _published_generation_run(client, headers, "question.compose")
     wrong_operation = client.patch(
         f"/api/v1/learning/activities/{explanation['id']}/content",
         headers=headers,
@@ -562,16 +550,13 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         headers=headers,
         json={"objectives": _recommendation_candidates(journey_body)},
     )
-    assert initial_progress_recommendation.status_code == 200, (
-        initial_progress_recommendation.text
-    )
+    assert initial_progress_recommendation.status_code == 200, initial_progress_recommendation.text
     assert (
         initial_recommendation["objectiveId"]
         == initial_progress_recommendation.json()["objectiveId"]
     )
     assert (
-        initial_recommendation["activityId"]
-        == initial_progress_recommendation.json()["activityId"]
+        initial_recommendation["activityId"] == initial_progress_recommendation.json()["activityId"]
     )
     assert (
         initial_recommendation["evidenceIds"]
@@ -587,9 +572,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert session_response.status_code == 201, session_response.text
     session_id = session_response.json()["id"]
-    question_generation_run_id = _published_generation_run(
-        client, headers, "question.compose"
-    )
+    question_generation_run_id = _published_generation_run(client, headers, "question.compose")
 
     question_response = client.post(
         "/api/v1/questions",
@@ -673,12 +656,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert projected_question["difficulty"] == "introductory"
     assert projected_question["options"]
     assert "is_correct" not in projected_question["options"][0]
-    assert (
-        client.get(
-            f"/api/v1/assessments/{assessment['id']}", headers=headers
-        ).status_code
-        == 200
-    )
+    assert client.get(f"/api/v1/assessments/{assessment['id']}", headers=headers).status_code == 200
 
     attempt_response = client.post(
         f"/api/v1/assessments/{assessment['id']}/attempts",
@@ -747,9 +725,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert attempt_history.status_code == 200, attempt_history.text
     assert [item["id"] for item in attempt_history.json()] == [attempt["id"]]
-    repeated_finish = client.post(
-        f"/api/v1/attempts/{attempt['id']}/finish", headers=headers
-    )
+    repeated_finish = client.post(f"/api/v1/attempts/{attempt['id']}/finish", headers=headers)
     assert repeated_finish.status_code == 409, repeated_finish.text
 
     forged_evidence = client.post(
@@ -782,9 +758,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert evidence_response.status_code == 200, evidence_response.text
     evidence_id = evidence_response.json()["id"]
 
-    _, other_headers = _start_learner(
-        client, "I want to understand a different subject"
-    )
+    _, other_headers = _start_learner(client, "I want to understand a different subject")
     cross_owner_evidence = client.post(
         "/api/v1/progress/evidence",
         headers=other_headers,
@@ -804,9 +778,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         headers=other_headers,
         json={"objectives": [{"objectiveId": objective_id, "activityId": activity_id}]},
     )
-    assert cross_owner_recommendation.status_code == 404, (
-        cross_owner_recommendation.text
-    )
+    assert cross_owner_recommendation.status_code == 404, cross_owner_recommendation.text
 
     snapshot = client.get(
         f"/api/v1/progress/{journey_id}/objectives/{objective_id}", headers=headers
@@ -828,9 +800,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
 
     submitted_at = finished.json()["submittedAt"]
     assert submitted_at is not None
-    learner_day = datetime.fromisoformat(submitted_at).astimezone(
-        ZoneInfo("Asia/Tokyo")
-    ).date()
+    learner_day = datetime.fromisoformat(submitted_at).astimezone(ZoneInfo("Asia/Tokyo")).date()
     streak_body = {
         "journeyId": journey_id,
         "activityId": activity_id,
@@ -864,18 +834,14 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     assert cross_owner_streak.status_code == 404, cross_owner_streak.text
     streak = client.post("/api/v1/progress/streaks", headers=headers, json=streak_body)
     assert streak.status_code == 200, streak.text
-    duplicate_streak = client.post(
-        "/api/v1/progress/streaks", headers=headers, json=streak_body
-    )
+    duplicate_streak = client.post("/api/v1/progress/streaks", headers=headers, json=streak_body)
     assert duplicate_streak.status_code == 200, duplicate_streak.text
     assert duplicate_streak.json()["id"] == streak.json()["id"]
     streaks = client.get(f"/api/v1/progress/{journey_id}/streaks", headers=headers)
     assert streaks.status_code == 200, streaks.text
     assert len(streaks.json()) == 1
 
-    deep_dive_generation_run_id = _published_generation_run(
-        client, headers, "deep_dive.create"
-    )
+    deep_dive_generation_run_id = _published_generation_run(client, headers, "deep_dive.create")
     deep_dive_response = client.post(
         "/api/v1/deep-dives",
         headers=headers,
@@ -888,9 +854,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
             "title": "Flink operator scheduling",
             "body": "The JobManager coordinates the deployment lifecycle.",
             "example": "Inspect the JobManager and TaskManager roles.",
-            "caveats": [
-                "Deployment behavior depends on the configured operator version."
-            ],
+            "caveats": ["Deployment behavior depends on the configured operator version."],
             "sourceReferences": references,
             "applicationTask": "Explain the scheduling path in your own words.",
             "reviewStatus": "approved",
@@ -949,9 +913,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         event["occurredAt"] for event in timeline_body
     )
 
-    resumed_journey = client.get(
-        f"/api/v1/learning/journeys/{journey_id}", headers=headers
-    )
+    resumed_journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
     assert resumed_journey.status_code == 200, resumed_journey.text
     resumed_journey_body = resumed_journey.json()
     resumed_progress_recommendation = client.post(
@@ -959,9 +921,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         headers=headers,
         json={"objectives": _recommendation_candidates(resumed_journey_body)},
     )
-    assert resumed_progress_recommendation.status_code == 200, (
-        resumed_progress_recommendation.text
-    )
+    assert resumed_progress_recommendation.status_code == 200, resumed_progress_recommendation.text
     assert resumed_journey_body["recommendation"] == {
         "activityId": resumed_progress_recommendation.json()["activityId"],
         "objectiveId": resumed_progress_recommendation.json()["objectiveId"],
@@ -988,9 +948,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
     )
     assert abandoned.status_code == 200, abandoned.text
     assert abandoned.json()["status"] == "abandoned"
-    after_abandon = client.get(
-        f"/api/v1/learning/journeys/{journey_id}", headers=headers
-    )
+    after_abandon = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=headers)
     assert after_abandon.status_code == 200, after_abandon.text
     assert (
         next(
@@ -1001,9 +959,7 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         == "ready"
     )
 
-    other_started, other_headers = _start_learner(
-        client, "I want to learn a different subject"
-    )
+    other_started, other_headers = _start_learner(client, "I want to learn a different subject")
     other_journey = client.get(
         f"/api/v1/learning/journeys/{other_started['journeyId']}",
         headers=other_headers,
@@ -1032,21 +988,15 @@ def test_agent_first_learning_loop_happy_evil_and_edge_paths(client):
         },
     )
     assert cross_owner_deep_dive.status_code == 404, cross_owner_deep_dive.text
-    other_streaks = client.get(
-        f"/api/v1/progress/{journey_id}/streaks", headers=other_headers
-    )
+    other_streaks = client.get(f"/api/v1/progress/{journey_id}/streaks", headers=other_headers)
     assert other_streaks.status_code == 404, other_streaks.text
     other_attempt_history = client.get(
         f"/api/v1/learning/journeys/{journey_id}/attempts", headers=other_headers
     )
     assert other_attempt_history.status_code == 404, other_attempt_history.text
-    other_timeline = client.get(
-        f"/api/v1/progress/{journey_id}/timeline", headers=other_headers
-    )
+    other_timeline = client.get(f"/api/v1/progress/{journey_id}/timeline", headers=other_headers)
     assert other_timeline.status_code == 404, other_timeline.text
-    forbidden_journey = client.get(
-        f"/api/v1/learning/journeys/{journey_id}", headers=other_headers
-    )
+    forbidden_journey = client.get(f"/api/v1/learning/journeys/{journey_id}", headers=other_headers)
     assert forbidden_journey.status_code == 404, forbidden_journey.text
 
 
@@ -1092,9 +1042,7 @@ def test_generation_runs_are_retryable_failure_safe_and_owner_scoped(client):
     )
     assert false_publish.status_code == 409, false_publish.text
 
-    other, other_headers = _start_learner(
-        client, "I want to understand another provider"
-    )
+    other, other_headers = _start_learner(client, "I want to understand another provider")
     assert other["userId"] != started["userId"]
     cross_owner = client.get(f"/api/v1/generation-runs/{run_id}", headers=other_headers)
     assert cross_owner.status_code == 404, cross_owner.text
@@ -1114,9 +1062,7 @@ def test_generated_content_requires_successful_owner_generation_run(client):
         "sourceReferences": ["https://nightlies.apache.org/flink/"],
     }
 
-    missing_provenance = client.post(
-        "/api/v1/questions", headers=headers, json=question
-    )
+    missing_provenance = client.post("/api/v1/questions", headers=headers, json=question)
     assert missing_provenance.status_code == 422, missing_provenance.text
 
     failed_run = client.post(
@@ -1189,6 +1135,4 @@ def test_generated_content_requires_successful_owner_generation_run(client):
             "applicationTask": "Apply the idea.",
         },
     )
-    assert deep_dive_missing_provenance.status_code == 422, (
-        deep_dive_missing_provenance.text
-    )
+    assert deep_dive_missing_provenance.status_code == 422, deep_dive_missing_provenance.text

@@ -15,20 +15,23 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
 import time
-import json
 import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
 
-from container_runtime import compose as run_compose, engine
+from container_runtime import compose as run_compose
+from container_runtime import engine
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = ROOT / "docker-compose.local.yml"
+
+
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     if check:
         return run_compose(COMPOSE_FILE, *args)

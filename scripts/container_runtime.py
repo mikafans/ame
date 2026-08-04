@@ -17,7 +17,10 @@ def engine() -> list[str]:
     # (engine executable to probe, compose invocation). podman-compose drives the
     # podman CLI directly, so it works over the machine's SSH connection without
     # a docker-compose provider or a DOCKER_HOST socket.
-    for probe_bin, invocation in (("podman", ["podman-compose"]), ("docker", ["docker", "compose"])):
+    for probe_bin, invocation in (
+        ("podman", ["podman-compose"]),
+        ("docker", ["docker", "compose"]),
+    ):
         if shutil.which(probe_bin) is None or shutil.which(invocation[0]) is None:
             continue
         probe = subprocess.run(

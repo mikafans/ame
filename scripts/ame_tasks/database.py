@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import shutil
 import time
-from pathlib import Path
 
 from .common import DB_URL, ROOT, compose, run
 
@@ -17,7 +16,14 @@ def down() -> int:
 
 
 def migrate() -> int:
-    return run("sqlx", "migrate", "run", "--source", "db/migrations", env={**os.environ, "DATABASE_URL": DB_URL})
+    return run(
+        "sqlx",
+        "migrate",
+        "run",
+        "--source",
+        "db/migrations",
+        env={**os.environ, "DATABASE_URL": DB_URL},
+    )
 
 
 def reset() -> int:
@@ -35,10 +41,18 @@ def reset() -> int:
         return 1
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
-        if run("sqlx", "migrate", "info", "--source", "db/migrations", env={**os.environ, "DATABASE_URL": DB_URL}) == 0:
+        if (
+            run(
+                "sqlx",
+                "migrate",
+                "info",
+                "--source",
+                "db/migrations",
+                env={**os.environ, "DATABASE_URL": DB_URL},
+            )
+            == 0
+        ):
             compose("exec", "-T", "valkey", "valkey-cli", "flushall")
             return migrate()
         time.sleep(1)
     raise SystemExit("Postgres did not become ready")
-
-
