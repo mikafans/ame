@@ -2,9 +2,7 @@
 
 This directory is the canonical source for documents exposed to unauthenticated users and external clients.
 
-- [`self-hosting.md`](self-hosting.md) — single-host Docker or Podman deployment.
-- [`deploy.md`](deploy.md) — supported deployment artifacts and production checklist.
-- [`k3s.md`](k3s.md) — k3s image build and release workflow.
+- [`self-hosting.md`](self-hosting.md) — single-host Docker or Podman deployment, the only supported deploy shape. The repo ships container artifacts but no opinionated infra-as-code (k8s manifests, Terraform, Helm) — bring your own if you need one.
 - [`llms.txt`](llms.txt) — compact agent discovery entrypoint, served at `/public/llms.txt`.
 - [`skill.json`](skill.json) — generated machine-readable agent manifest, served at `/public/skill.json`.
 - [`learning-contract.json`](learning-contract.json) — versioned learning stories, evidence rules, and fixture-simulation boundary, served at `/public/learning-contract.json`.

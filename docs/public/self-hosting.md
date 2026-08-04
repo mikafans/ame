@@ -47,6 +47,8 @@ curl -fsS https://ame.example.com/readyz
 
 The API runs embedded SQLx migrations during startup. There is no separate migration container. Do not run `down -v` during normal upgrades.
 
+Or via the Makefile shortcuts: `make docker-build`, `make docker-up`, `make docker-down`.
+
 For Podman, first verify the machine:
 
 ```bash

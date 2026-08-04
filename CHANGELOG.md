@@ -58,12 +58,20 @@ This project is pre-1.0. Releases are tagged as `vX.Y.Z` starting with 0.4.0.
 - Two admin endpoint doc summaries still said `/v1/...` instead of
   `/api/v1/...`, propagated into the served OpenAPI spec and generated
   TypeScript client types.
-- `api/Dockerfile`, `deploy/k3s/Dockerfile.api`, and `api/Dockerfile.dev` (the
-  `make dev` local stack) didn't copy the workspace `crates/` members and/or
-  `sdk/python`, breaking every containerized build path for this release.
-- `deploy/k3s/build-images.sh` now builds and imports images directly into
-  local containerd instead of pushing to a registry, matching the local-first
-  self-host workflow the k3s manifests already expected.
+- `api/Dockerfile` and `api/Dockerfile.dev` (the `make dev` local stack)
+  didn't copy the workspace `crates/` members and/or `sdk/python`, breaking
+  every containerized build path for this release.
+
+### Removed
+
+- `deploy/k8s/` and `deploy/k3s/` — environment-specific Kubernetes manifests
+  and an image-build script tied to one operator's private cluster, leaking
+  real internal hostnames in the process. This repo ships container artifacts
+  (`api/Dockerfile`, `web/Dockerfile`) but no opinionated infra-as-code;
+  [`self-hosting.md`](docs/public/self-hosting.md) (Docker/Podman Compose) is
+  the only supported deploy shape. `docs/public/deploy.md` and
+  `docs/public/k3s.md` are folded into `self-hosting.md` or removed as
+  redundant.
 
 ### Quality gates
 

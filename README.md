@@ -105,9 +105,8 @@ For interactive visual audits use `bunx @playwright/cli` — see `CLAUDE.md` for
 ## Deploy
 
 `docker-compose.prod.yml` is a production-shaped stack (Postgres + Valkey + API + web) for
-smoke deploys, demos, and CI integration testing — not a substitute for the k8s
-manifests. The API runs its migrations on boot, so no separate migration step is
-needed.
+smoke deploys, demos, and CI integration testing. The API runs its migrations on boot, so no
+separate migration step is needed.
 
 For a single-host self-hosted installation, follow
 [`docs/public/self-hosting.md`](docs/public/self-hosting.md). The public

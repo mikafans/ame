@@ -20,8 +20,8 @@ make preview PREVIEW_PORT=8010  # override the port
 
 Open from any Tailscale device:
 
-- Gallery: `http://harus-mini:28900/`
-- A board directly: `http://harus-mini:28900/styleboard.html`
+- Gallery: `http://<your-tailnet-hostname>:28900/`
+- A board directly: `http://<your-tailnet-hostname>:28900/styleboard.html`
 
 ## Add a board
 
