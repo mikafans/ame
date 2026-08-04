@@ -57,7 +57,7 @@ def dispatch(target: str) -> int:
         )
     if target.startswith("docker-"):
         action = target.removeprefix("docker-")
-        args = (*engine(), "-f", "docker-compose.prod.yml", action)
+        args = (*engine(), "-f", "deploy/docker-compose.prod.yml", action)
         if action == "up":
             args += ("-d",)
         if action == "logs":

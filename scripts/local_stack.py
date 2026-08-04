@@ -29,7 +29,7 @@ from container_runtime import compose as run_compose
 from container_runtime import engine
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPOSE_FILE = ROOT / "docker-compose.local.yml"
+COMPOSE_FILE = ROOT / "deploy/docker-compose.local.yml"
 
 
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:

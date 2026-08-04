@@ -1,3 +1,5 @@
+name: ame
+
 services:
   postgres:
     image: postgres:18
@@ -23,20 +25,20 @@ services:
 
   api:
     build:
-      context: .
+      context: ..
       dockerfile: api/Dockerfile.dev
     environment:
       AME_DATABASE_URL: postgres://postgres:postgres@postgres:5432/ame
       AME_VALKEY_URL: redis://valkey:6379/0
       AME_CORS_ORIGINS: http://localhost:28800
     volumes:
-      - ./api:/workspace/api
+      - ../api:/workspace/api
       # The API is a workspace crate: mount its shared crates as well so a
       # local source restart never compiles new handlers against stale image
       # copies of domain/application/Postgres contracts.
-      - ./crates:/workspace/crates
-      - ./db/migrations:/workspace/db/migrations:ro
-      - ./ame.dev.toml:/workspace/ame.dev.toml:ro
+      - ../crates:/workspace/crates
+      - ../db/migrations:/workspace/db/migrations:ro
+      - ../ame.dev.toml:/workspace/ame.dev.toml:ro
       - cargo-registry:/usr/local/cargo/registry
       - cargo-target:/workspace/api/target
     depends_on:
@@ -66,8 +68,8 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       NEXT_TELEMETRY_DISABLED: "1"
     volumes:
-      - ./web:/workspace/web
-      - ./docs:/workspace/docs:ro
+      - ../web:/workspace/web
+      - ../docs:/workspace/docs:ro
       - web-node-modules:/workspace/web/node_modules
       - web-next:/workspace/web/.next
     command: ["sh", "-c", "npm install --include=optional --no-package-lock --ignore-scripts && ./node_modules/.bin/next dev --webpack -H 0.0.0.0 --port 3000"]
@@ -80,8 +82,8 @@ services:
     ports:
       - "28800:80"
     volumes:
-      - ./deploy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
-      - ./docs:/srv/docs:ro
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ../docs:/srv/docs:ro
     depends_on:
       api:
         condition: service_healthy

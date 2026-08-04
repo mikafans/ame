@@ -44,7 +44,10 @@ def engine() -> list[str]:
 
 
 def compose(file: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    cwd = file.parent.parent if file.parent.name == "db" else file.parent
+    # Compose files live one directory below repo root (db/, deploy/) so their
+    # build contexts can reach the whole repo; run from the repo root they
+    # share rather than the compose file's own directory.
+    cwd = file.parent.parent if file.parent.name in ("db", "deploy") else file.parent
     return subprocess.run(
         [*engine(), "-f", str(file), *args],
         cwd=cwd,

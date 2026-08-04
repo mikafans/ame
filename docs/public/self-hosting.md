@@ -24,10 +24,10 @@ The Compose Caddy container terminates TLS when `AME_HOSTNAME` is a real DNS nam
 ## Configure and start a production deployment
 
 ```bash
-cp .env.example .env
+cp deploy/.env.example deploy/.env
 ```
 
-Set real values in `.env`:
+Set real values in `deploy/.env`:
 
 ```dotenv
 POSTGRES_PASSWORD=<long-random-password>
@@ -39,8 +39,8 @@ AME_HOSTNAME=ame.example.com
 `NEXT_PUBLIC_API_URL` is compiled into the browser bundle, so set it before building. Do not use internal service names (`api`, `postgres`, `valkey`) in the browser configuration.
 
 ```bash
-docker compose -f docker-compose.prod.yml up --build -d
-docker compose -f docker-compose.prod.yml ps
+docker compose -f deploy/docker-compose.prod.yml up --build -d
+docker compose -f deploy/docker-compose.prod.yml ps
 curl -fsS https://ame.example.com/healthz
 curl -fsS https://ame.example.com/readyz
 ```
@@ -97,7 +97,7 @@ https://ame.example.com/public/openapi.yaml
 
 1. Back up Postgres with `make db-backup BACKUP_FILE=...`.
 2. Pull the new revision and verify the release's clean baseline before using it with a new empty database.
-3. Rebuild with `docker compose -f docker-compose.prod.yml up --build -d`.
+3. Rebuild with `docker compose -f deploy/docker-compose.prod.yml up --build -d`.
 4. Check `/readyz`, logs, and the public discovery routes.
 5. Keep the previous image available until smoke checks pass.
 

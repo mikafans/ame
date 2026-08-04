@@ -57,7 +57,7 @@ make db-admin ADMIN_EMAIL=you@example.com      # promote your own account (passw
 
 After being promoted, log out and back in to refresh the session.
 
-Copy `.env.example` to `.env` if you need to override defaults.
+Copy `deploy/.env.example` to `deploy/.env` if you need to override defaults.
 
 ### Learning desk, themes, and local simulations
 
@@ -104,7 +104,7 @@ For interactive visual audits use `bunx @playwright/cli` — see `CLAUDE.md` for
 
 ## Deploy
 
-`docker-compose.prod.yml` is a production-shaped stack (Postgres + Valkey + API + web) for
+`deploy/docker-compose.prod.yml` is a production-shaped stack (Postgres + Valkey + API + web) for
 smoke deploys, demos, and CI integration testing. The API runs its migrations on boot, so no
 separate migration step is needed.
 
@@ -114,7 +114,7 @@ For a single-host self-hosted installation, follow
 through the unified `/public/*` proxy route.
 
 ```bash
-cp .env.example .env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
+cp deploy/.env.example deploy/.env   # set POSTGRES_PASSWORD (and NEXT_PUBLIC_API_URL for the web bundle)
 make docker-build      # build api + web images
 make docker-up         # start the stack (-d)
 make docker-logs       # tail logs
