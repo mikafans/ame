@@ -43,6 +43,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /build/target/release/ame-api /usr/local/bin/ame-api
 # Migrations are embedded in the binary (sqlx::migrate!) and run on boot.
 
+# Config::load() requires ame.toml (rate-limit tiers, quotas, batch sizes have
+# no env override) — bake it in so the image is self-contained rather than
+# depending on an external volume mount the compose file doesn't provide.
+# AME_PORT/AME_PRODUCTION/AME_CORS_ORIGINS/etc. from the environment still
+# override the file's values once it loads successfully.
+COPY ame.toml /app/ame.toml
+ENV AME_CONFIG_PATH=/app/ame.toml
+
 USER ame
 EXPOSE 8080
 ENV RUST_LOG=ame_api=info,tower_http=info,sqlx=warn

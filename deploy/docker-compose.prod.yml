@@ -47,13 +47,16 @@ services:
       valkey:
         condition: service_healthy
     environment:
+      # ame.toml (baked into the image) defaults to port 28080 for local/dev
+      # use; override to match EXPOSE 8080 and the healthcheck/port mapping.
+      AME_PORT: "8080"
       AME_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ame}
       AME_VALKEY_URL: redis://valkey:6379/0
       AME_PRODUCTION: ${AME_PRODUCTION:-1}
       AME_CORS_ORIGINS: ${AME_CORS_ORIGINS:?set AME_CORS_ORIGINS in .env}
       RUST_LOG: ${RUST_LOG:-ame_api=info,tower_http=info,sqlx=warn}
     ports:
-      - "127.0.0.1:${API_PORT:-8080}:8080"
+      - "127.0.0.1:${AME_API_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
       interval: 10s
@@ -74,7 +77,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+      - "127.0.0.1:${AME_WEB_PORT:-3000}:3000"
 
   caddy:
     image: caddy:2.10-alpine

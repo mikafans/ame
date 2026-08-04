@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 
-from container_runtime import engine
+from container_runtime import admin_promotion_sql, engine
+from container_runtime import compose as run_compose
 
 from .common import PREVIEW_PORT, ROOT, run, tool, web_ready
 from .database import down, migrate, reset, up
 from .quality import format_project, lint, test, test_db
 from .runtime import init_env
+
+PROD_COMPOSE_FILE = ROOT / "deploy/docker-compose.prod.yml"
 
 
 def dispatch(target: str) -> int:
@@ -55,6 +59,30 @@ def dispatch(target: str) -> int:
             "--directory",
             "design/preview",
         )
+    if target == "docker-shell":
+        run_compose(PROD_COMPOSE_FILE, "exec", "postgres", "psql", "-U", "postgres", "-d", "ame")
+        return 0
+    if target == "docker-admin":
+        email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
+        name = os.environ.get("ADMIN_NAME", "Carol Admin")
+        password = os.environ.get("ADMIN_PASSWORD", "password123")
+        sql = admin_promotion_sql(email, name, password)
+        run_compose(
+            PROD_COMPOSE_FILE,
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "ame",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            sql,
+        )
+        return 0
     if target.startswith("docker-"):
         action = target.removeprefix("docker-")
         args = (*engine(), "-f", "deploy/docker-compose.prod.yml", action)

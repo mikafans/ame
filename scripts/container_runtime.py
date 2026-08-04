@@ -54,3 +54,44 @@ def compose(file: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         check=True,
     )
+
+
+def admin_promotion_sql(email: str, name: str, password: str) -> str:
+    """Build the idempotent role='admin' upsert shared by every compose stack's
+    admin-promotion path. Matches identity_postgres.rs's tb_identities +
+    tb_users pairing: a brand-new admin needs both rows with the same id.
+    """
+    password_hash = subprocess.check_output(
+        [
+            "uvx",
+            "--quiet",
+            "--from",
+            "argon2-cffi",
+            "python",
+            "-c",
+            f"from argon2 import PasswordHasher; print(PasswordHasher().hash({password!r}))",
+        ],
+        text=True,
+    ).strip()
+    return f"""
+DO $$
+DECLARE
+  existing_user_id uuid;
+  new_user_id uuid;
+BEGIN
+  SELECT id INTO existing_user_id
+  FROM tb_users
+  WHERE email_canonical = {email!r};
+
+  IF existing_user_id IS NULL THEN
+    new_user_id := uuid_generate_v7();
+    INSERT INTO tb_identities (id, identity_type, label)
+    VALUES (new_user_id, 'human', {name!r});
+    INSERT INTO tb_users (id, email, email_canonical, display_name, role, password_hash)
+    VALUES (new_user_id, {email!r}, {email!r}, {name!r}, 'admin', '{password_hash}');
+  ELSE
+    UPDATE tb_users SET role = 'admin' WHERE id = existing_user_id;
+  END IF;
+END
+$$;
+"""

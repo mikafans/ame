@@ -70,16 +70,10 @@ The Compose stack publishes only Caddy. API and web remain private services on t
 Registration never grants the administrator role. Promote the first account in the database, then log in again so its token receives the new role:
 
 ```bash
-make db-admin ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='<initial-password>'
+make docker-admin ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='<initial-password>'
 ```
 
-For demo data only:
-
-```bash
-make db-seed
-```
-
-Do not use repository demo passwords on an internet-facing instance.
+Do not use repository demo passwords or demo seed data on an internet-facing instance.
 
 ## Agent discovery
 
