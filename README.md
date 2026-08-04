@@ -152,7 +152,11 @@ API, assessment, evidence, provenance, and self-hosted stack. 0.4.0 makes
 those primitives usable by agents to assemble, validate, publish, and adapt
 real source-grounded courses, proven with complete Flink and Netty
 references, plus the Study Atelier native catalog and a course-scoped
-learner workspace.
+learner workspace. 0.4.1 makes the agent contract actually reachable at
+runtime (`/public/llms.txt`, `/public/skill.json`, `/public/openapi.yaml`,
+and a downloadable Python SDK), adds visible per-account rate-limit status
+and free/VIP tiers, and fixes several onboarding and route-split bugs found
+by deploying and using 0.4.1 end to end before tagging it.
 
 ## Contributing
 
