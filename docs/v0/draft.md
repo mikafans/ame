@@ -8,7 +8,7 @@ This file is the un-edited working material in case anything got dropped.
 
 ## 1. Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  NAS (Tailscale)                                                │
 │                                                                 │
@@ -220,7 +220,7 @@ create index level_mappings_pattern on level_mappings(tag_pattern);
 
 ### Elo update (v3 with calibration)
 
-```
+```text
 On answer to question Q with tags [T1..Tn], score in [0,1]:
   user_avg     = mean(user_tag_ratings[Tᵢ], default=1200)
   expected     = 1 / (1 + 10^((Q.rating - user_avg) / 400))
@@ -305,7 +305,7 @@ checked into repo as `api/openapi.yaml`.
 
 ### Endpoints
 
-```
+```text
 # identity
 GET    /me
 POST   /me/tokens                       # own tokens
@@ -439,6 +439,7 @@ App Router, TypeScript. One deployment, public `/*` + admin `/admin/*` gated by 
 **Page map** — see spec for full list.
 
 **Stack:**
+
 - Components: `shadcn/ui` + Tailwind
 - API client: `openapi-typescript` from `api/openapi.yaml`
 - Forms: `react-hook-form` + `zod` (zod schemas mirror serde, parity test)
@@ -492,7 +493,7 @@ enforcement, mobile app. Each is schema-compatible for later.
 
 ## 8. Workspace layout
 
-```
+```text
 ame/
   api/                      Rust workspace member (single crate)
     src/{bank,engine,assess,stats,auth,http,domain}/

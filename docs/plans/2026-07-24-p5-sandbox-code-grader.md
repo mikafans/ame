@@ -62,7 +62,7 @@ seeded, tested consumer. Recommendation §7 reflects this.
 
 Regardless of how code runs, the graded unit is:
 
-```
+```text
 CodeGradingSpec {              # authored content, provenance-gated
   language: "python" | ...     # enumerated, closed set
   cases: [ { id, input, expected, weight, hidden } ]   # I/O test cases

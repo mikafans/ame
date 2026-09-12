@@ -48,6 +48,7 @@ analytics and user history. If they ever get heavy, the answer is
 Pruning old activity would silently shrink those totals.
 
 Resolve one of these before enabling activity-log pruning:
+
 1. **Roll up before delete (preferred):** maintain a counter (e.g. on
    `tb_agent_profiles` or a small `tb_agent_counters`) incremented at prune time
    by the number of grade rows about to be deleted; read = counter + live count.

@@ -18,6 +18,7 @@ moderation surface, "act blind" is a genuine break. This passes the gate.
 ## Scope
 
 **In:**
+
 - New admin-scoped read endpoint returning one assessment + its ordered questions
   **including answer content** (moderation must see what learners cannot), resolving
   **any** creator's assessment and **including soft-deleted** ones (so a deleted item
@@ -27,6 +28,7 @@ moderation surface, "act blind" is a genuine break. This passes the gate.
 - Question count surfaced in the drawer header (cheap, rides along).
 
 **Out (kill-gate fails — do not build):**
+
 - Bulk delete / multi-select — moderation is low-volume and individually judged.
 - Admin inline edit / re-authoring — admins moderate, they don't co-author; keep the
   role boundary.
@@ -69,6 +71,7 @@ to regenerate `api/openapi.yaml`. The schema-drift gate must pass.
 ## 3. Frontend — preview drawer on `/admin/assessments`
 
 `web/app/(admin)/admin/assessments/page.tsx`:
+
 - Add an **eye `IconButton`** (`VisibilityOutlined`) in the Actions column, left of the
   delete/restore icon, on every row (deleted rows too).
 - Open a right-side MUI **`Drawer`** that fetches `GET /v1/admin/assessments/{id}` and
@@ -88,6 +91,7 @@ to regenerate `api/openapi.yaml`. The schema-drift gate must pass.
 Per working-discipline rule 2, write these **first** and migrate until green.
 
 **API integration** (`api/tests/admin.rs`, gated on `AME_RUN_DB_TESTS`):
+
 - Admin `GET /v1/admin/assessments/{id}` returns 200 with `questions` populated
   including `payload` (assert the correct answer is present).
 - Admin can read an assessment owned by **a different creator** (200, not 404/403).
@@ -96,6 +100,7 @@ Per working-discipline rule 2, write these **first** and migrate until green.
 - Unknown id → **404**.
 
 **E2E** (`web/e2e/admin.spec.ts`):
+
 - As admin, open `/admin/assessments`, click the eye icon on a row → drawer opens and
   shows ≥1 question prompt.
 - Delete from inside the drawer → row reflects DELETED after the confirm.
@@ -104,7 +109,7 @@ Per working-discipline rule 2, write these **first** and migrate until green.
 
 On implementation, add under `## [0.2.0]` → `### Added`:
 
-```
+```text
 - Added an admin assessment preview drawer so moderators can inspect an
   assessment's questions (answers included) before deleting or restoring it,
   backed by a new admin-scoped `GET /v1/admin/assessments/{id}` endpoint.

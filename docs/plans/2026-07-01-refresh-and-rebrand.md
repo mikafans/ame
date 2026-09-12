@@ -42,6 +42,7 @@ Scan of the category leaders, filtered through the kill-gate ("what breaks for a
 real user if we ship without this?"). Ordered by value-to-effort.
 
 ### Anki → **Spaced Repetition (SRS)** — the headline addition
+
 Anki's whole value is one idea: **review the right card at the right time.** AME
 already has a question bank and a flashcards spec (`2026-05-28-flashcards-design.md`).
 Adding a scheduler turns a one-shot quiz tool into a daily-habit tool.
@@ -56,6 +57,7 @@ Adding a scheduler turns a one-shot quiz tool into a daily-habit tool.
   retention mechanic. Highest priority of the new track.
 
 ### Duolingo → **Streaks & daily goal** — the sweet, on-brand hook
+
 A streak is the cheapest retention multiplier in the industry, and it fits the
 **candy** identity perfectly (a growing candy jar, sweetness meter).
 
@@ -66,6 +68,7 @@ A streak is the cheapest retention multiplier in the industry, and it fits the
   Ship together or right after.
 
 ### Open edX / Coursera → **Learning Paths (course-lite)**
+
 edX/Coursera group content into an ordered sequence with progress. AME has
 assessments but no way to say "do these five, in order, to learn Rust."
 
@@ -76,6 +79,7 @@ assessments but no way to say "do these five, in order, to learn Rust."
   peer-review, or discussion forums — that's edX's weight, not ours.
 
 ### Open edX / Coursera → **Certificates of completion**
+
 A shareable, verifiable completion artifact — strong motivation, cheap to build.
 
 - On finishing a Path (or a graded assessment above a threshold), mint a
@@ -84,7 +88,9 @@ A shareable, verifiable completion artifact — strong motivation, cheap to buil
 - **Kill-gate:** 🟡 Depends on Paths landing first. Defer with Paths.
 
 ### Cross-cutting: **Cloze / occlusion question type**
+
 Anki's most-used card type. AME's question types are MC/TF/short/essay/code.
+
 - **Kill-gate:** 🟡 Nice, not load-bearing. Defer until SRS proves the flashcard
   loop is used.
 
@@ -97,6 +103,7 @@ before the task board.*
 ## Part 3 — The `ame` identity: 飴 (candy) × Hatsune Miku
 
 ### The story
+
 `ame` is **飴** — Japanese for candy / hard sweets. The product promise:
 **assessment that's sweet, not bitter.** Studying as a treat you come back for.
 Hatsune Miku — teal-haired, the world's most famous open/vocaloid icon — supplies
@@ -120,6 +127,7 @@ the palette. The two fuse: **Miku teal + candy pink**, playful but clean.
 | error | `#E4405F` (raspberry) | | on-brand red |
 
 Design cues, kept tasteful (kill-gate on cuteness — no motion sickness, no clutter):
+
 - **Candy motif, sparingly:** streak = a "candy jar" filling; XP = "sugar." A
   subtle wrapper-twist divider or rounded-pill chips (already `borderRadius: 8`).
 - **Gradient buttons** already exist — reskin to teal→pink.
@@ -131,6 +139,7 @@ Design cues, kept tasteful (kill-gate on cuteness — no motion sickness, no clu
   Dark mode must stay first-class.
 
 ### Scope guard
+
 Theme swap touches **one file** (`ThemeRegistry.tsx`) for ~90% of the surface,
 because the whole app is MUI-tokened. Wordmark + favicon + a streak widget are the
 only net-new components. **No** per-page restyling, **no** Tailwind, **no**
@@ -159,6 +168,7 @@ intends). Suggested ordering:
    metrics in the analytics dashboard: DAU, review completion, streak retention).
 
 ### Test-first reminder (retro rule #2)
+
 SRS is a refactor-adjacent feature touching the session/results flow. Pin the
 contract tests first: FSRS scheduling is a pure function — unit-test the
 `(state, rating) → next_due` table against known FSRS vectors **before** wiring

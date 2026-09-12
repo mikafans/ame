@@ -9,6 +9,7 @@
 **Tech Stack:** Rust (edition 2021), Axum 0.8, Tokio, tower-http, tracing; Next.js 15, React 19, TypeScript, Tailwind 4; Bun 1.x as the JS runtime + package manager (no node, no npm); Postgres 18; Docker Compose; mise; nix flake devShell; GNU Make.
 
 **End state (verifiable):**
+
 - `make check` passes with zero warnings.
 - `cargo run -p ame-api` boots; `curl localhost:8080/healthz` returns `{"status":"ok"}`.
 - `cd web && bun run dev` boots; `http://localhost:3000` renders the placeholder page.
@@ -21,7 +22,7 @@
 
 After this plan, the repo will look like:
 
-```
+```text
 ame/
   api/                              # standalone Rust binary crate (no workspace)
     Cargo.toml
@@ -78,6 +79,7 @@ The existing Dioxus crates (`ui/`, `desktop/`, `mobile/`, `web/` old, current `a
 ## Task 1: Snapshot uncommitted design docs before any wipe
 
 **Files:**
+
 - Add to git: `docs/specs/2026-05-19-question-exam-platform-design.md`
 - Add to git: `docs/v0/draft.md`, `docs/v0/decisions.md`, `docs/v0/research-notes.md`
 
@@ -86,7 +88,7 @@ The existing Dioxus crates (`ui/`, `desktop/`, `mobile/`, `web/` old, current `a
 - [ ] **Step 1: Verify current git state**
 
 Run: `git status --porcelain`
-Expected lines include: ` M Cargo.lock`, ` M api/Cargo.toml`, ` M api/src/lib.rs`, `?? api/src/req/`, `?? docs/`.
+Expected lines include: `M Cargo.lock`, `M api/Cargo.toml`, `M api/src/lib.rs`, `?? api/src/req/`, `?? docs/`.
 
 - [ ] **Step 2: Stage only the docs/ tree**
 
@@ -115,6 +117,7 @@ Expected: commit subject matches above; previous commit is `9346e54 feat. base f
 ## Task 2: Remove Dioxus scaffold
 
 **Files:**
+
 - Delete: `ui/`, `desktop/`, `mobile/`, `web/` (Dioxus version), `api/` (Dioxus version)
 - Delete: `Cargo.toml`, `Cargo.lock`, `clippy.toml`, `mise.toml` (current Dioxus-flavored), `README.md` (placeholder), `.markdownlint.json`
 - Delete: `target/` directory (untracked; just clear it)
@@ -156,10 +159,10 @@ git commit -m "chore: remove Dioxus scaffold for pivot to Axum + Next.js"
 ## Task 3: Add mise + nix toolchain config
 
 **Files:**
+
 - Create: `mise.toml`
 - Create: `flake.nix`
 - Create: `.gitignore` (update)
-
 - [ ] **Step 1: Write `mise.toml`**
 
 ```toml
@@ -282,9 +285,9 @@ git commit -m "chore: add mise + nix devShell toolchain config"
 ## Task 4: Postgres 18 docker-compose
 
 **Files:**
+
 - Create: `db/docker-compose.yml`
 - Create: `db/migrations/.gitkeep`
-
 - [ ] **Step 1: Write `db/docker-compose.yml`**
 
 ```yaml
@@ -345,6 +348,7 @@ git commit -m "chore: add Postgres 18 docker-compose for local dev"
 ## Task 5: Bootstrap Axum API skeleton with `/healthz` (TDD)
 
 **Files:**
+
 - Create: `api/Cargo.toml`
 - Create: `api/src/main.rs`
 - Create: `api/src/lib.rs`
@@ -352,7 +356,6 @@ git commit -m "chore: add Postgres 18 docker-compose for local dev"
 - Create: `api/src/bank/mod.rs`, `api/src/engine/mod.rs`, `api/src/assess/mod.rs`, `api/src/stats/mod.rs`, `api/src/auth/mod.rs`, `api/src/domain/mod.rs` (each empty)
 - Create: `api/tests/health.rs`
 - Create: `api/.gitignore` (just `target/`)
-
 - [ ] **Step 1: Write `api/Cargo.toml`**
 
 ```toml
@@ -428,31 +431,37 @@ mkdir -p api/src/{http,bank,engine,assess,stats,auth,domain}
 Then create each `mod.rs` (one line each) by writing the files:
 
 `api/src/bank/mod.rs`:
+
 ```rust
 //! Question bank: questions, versions, tags. Populated in Plan 3.
 ```
 
 `api/src/engine/mod.rs`:
+
 ```rust
 //! Sessions, attempts, grading, Elo. Populated in Plan 4.
 ```
 
 `api/src/assess/mod.rs`:
+
 ```rust
 //! Exam blueprints + result computation. Populated in Plan 5.
 ```
 
 `api/src/stats/mod.rs`:
+
 ```rust
 //! Per-tag analytics. Populated in Plan 6.
 ```
 
 `api/src/auth/mod.rs`:
+
 ```rust
 //! Token issuance + scope-gating middleware. Populated in Plan 2.
 ```
 
 `api/src/domain/mod.rs`:
+
 ```rust
 //! Shared domain types. Grows with each subsequent plan.
 ```
@@ -539,6 +548,7 @@ git commit -m "feat: bootstrap Axum API skeleton with /healthz"
 ## Task 6: Bootstrap Next.js 15 app with placeholder page
 
 **Files:**
+
 - Create: `web/package.json`
 - Create: `web/tsconfig.json`
 - Create: `web/next.config.mjs`
@@ -548,7 +558,6 @@ git commit -m "feat: bootstrap Axum API skeleton with /healthz"
 - Create: `web/app/page.tsx`
 - Create: `web/app/globals.css`
 - Create: `web/public/.gitkeep`
-
 - [ ] **Step 1: Write `web/package.json`**
 
 ```json
@@ -748,9 +757,9 @@ git commit -m "feat: bootstrap Next.js 15 app with placeholder landing page"
 ## Task 7: Makefile with fmt / lint / test / check / validate
 
 **Files:**
+
 - Create: `Makefile`
 - Create: `.editorconfig`
-
 - [ ] **Step 1: Write `.editorconfig`**
 
 ```ini
@@ -851,13 +860,13 @@ git commit -m "chore: add Makefile task runner and editorconfig"
 ## Task 8: Project briefings (AGENTS.md, CLAUDE.md, README.md, .agents/CONTEXT.md)
 
 **Files:**
+
 - Create: `AGENTS.md`
 - Create: `CLAUDE.md`
 - Create: `README.md`
 - Create: `.agents/CONTEXT.md`
 - Create: `.agents/CURRENT_TASK.md`
 - Update: `.gitignore` (ensure `.agents/CURRENT_TASK.md` and `.agents/MEMORY.md` are ignored if MCP is unavailable; spec keeps them out of git regardless)
-
 - [ ] **Step 1: Write `AGENTS.md`**
 
 ```markdown
@@ -934,7 +943,8 @@ cd web && bun install && bun run dev   # frontend on :3000
 - `db/` — docker-compose + sqlx migrations.
 
 See `AGENTS.md` for the working conventions.
-```
+
+```text
 
 (Note: the triple-backtick fences inside the README literal need to be written as-is to the file — when you create it via the Write tool, the file content will contain literal backticks.)
 
@@ -994,6 +1004,7 @@ Note: `.agents/CURRENT_TASK.md` is now in `.gitignore`, so it won't be staged. R
 ## Task 9: Pre-commit hook running `make check`
 
 **Files:**
+
 - Create: `.githooks/pre-commit`
 
 - [ ] **Step 1: Write the hook**
@@ -1138,6 +1149,7 @@ Out of scope for Plan 1 (handled in later plans, intentionally): sqlx + migratio
 **Type consistency:** The library is `ame_api` (crate name `ame-api`, Rust path uses underscores). `http::router()` is the single entry point referenced consistently between `main.rs` and `tests/health.rs`. Module stubs all use `mod.rs` (not the 2018-style flat layout).
 
 **Risks flagged:**
+
 - Tailwind 4 is still in beta as of 2026-05; if the beta dependency proves unstable, fall back to Tailwind 3.x in Task 6 — no other task depends on the version.
 - Next.js 15 + Bun: officially supported, but some Next.js internals occasionally shell out expecting `node` on PATH. If `bun run build` fails with a `node: command not found` from a transitive dep, add `node = "22"` back to `mise.toml` as a co-tenant — bun stays primary, node is shim-only. Document the workaround in `AGENTS.md` if it triggers.
 - `bun.lockb` is a binary lockfile; diffs are unreadable. Use `bun install --frozen-lockfile` in CI later, and trust bun's own `bun pm ls` for lockfile inspection.
@@ -1153,6 +1165,5 @@ Plan complete and saved to `docs/plans/2026-05-19-foundation.md`. Two execution 
 2. **Inline Execution** — execute tasks in this session using `superpowers:executing-plans`, batch execution with checkpoints.
 
 Which approach?
-
 
 Which approach?

@@ -35,6 +35,7 @@ and both are a few lines.
 ## Findings
 
 ### 🔴 HIGH 1 — Demotion does not revoke the demoted admin's live tokens
+
 **Where:** `api/src/http/admin.rs:366-396` (role path).
 **Issue:** admin power rides on the **token's** scope (fixed at login).
 The demote path only runs `UPDATE tb_users SET role`; `invalidate_user_tokens`
@@ -50,6 +51,7 @@ then `invalidate_user_tokens`. Re-login re-issues with `scopes_for_role("user")`
 **Test:** demote an admin with an active admin token → that token now 401s.
 
 ### 🔴 HIGH 2 — X-Forwarded-For spoofing bypasses per-IP rate limiting
+
 **Where:** `api/src/ratelimit.rs:217-221` (`get_client_ip`).
 **Issue:** uses the **leftmost** XFF value, which is client-controlled. An
 attacker rotates `X-Forwarded-For` per request → fresh limiter bucket each time →
@@ -61,18 +63,21 @@ or the ingress real-IP header — with the trusted-proxy count configurable
 **Test:** two requests with different spoofed XFF but same socket share a bucket.
 
 ### 🟠 MEDIUM 3 — Global token-revoke must invalidate the 30s cache
+
 **Where:** Feature #1 plan (`docs/plans/2026-06-03-admin-token-audit.md`).
 Existing revoke/rotate call `invalidate_token`; the new admin global revoke must
 too, or a "revoked" key keeps working ~30s — wrong for a panic button. Folded
 into the token-audit plan's checklist.
 
 ### 🟠 MEDIUM 4 — No defense-in-depth on the `/v1/admin` prefix
+
 Admin protection is per-handler; a future route that forgets `RequireScope` would
 be silently unprotected. Add a router-level guard on the admin sub-router **and**
 a test asserting every `/v1/admin/*` path 403s without admin scope. → v1.0
 hardening pass.
 
 ### 🟡 LOW
+
 - **Password policy / lockout:** ≥8 chars, no complexity/breach check; rate limit
   is per-IP, so distributed attempts on one account aren't slowed — consider
   per-account failed-login backoff.
@@ -83,6 +88,7 @@ hardening pass.
   X-Content-Type-Options / CSP); fine only if the ingress adds them — verify.
 
 ### ℹ️ INFO
+
 - `last_used_at` does a `tokio::spawn` + UPDATE on every authenticated request
   (`extractor.rs:162`) — perf, not security; batch/sample later (ties to the
   data-retention plan).

@@ -9,6 +9,7 @@
 ## Task 1: Sqlx setup & Initial Migration
 
 - [ ] **Step 1: Add DB dependencies to `api/Cargo.toml`**
+
   ```toml
   [dependencies]
   sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "time", "json"] }
@@ -17,14 +18,17 @@
   argon2 = "0.5"
   async-trait = "0.1"
   ```
+
 - [ ] **Step 2: Create initial migration**
   Run `mise exec -- sqlx migrate add init --source db/migrations`.
   Copy the exact schema from `docs/specs/2026-05-19-question-exam-platform-design.md` (the "Data Model" section) into `db/migrations/<timestamp>_init.sql`.
 - [ ] **Step 3: Run the migration**
+
   ```bash
   export DATABASE_URL=postgres://postgres:postgres@localhost:5432/ame
   mise exec -- sqlx migrate run --source db/migrations
   ```
+
 - [ ] **Step 4: Application State**
   In `api/src/http/mod.rs`, define `AppState` containing the `sqlx::PgPool`. Update `router()` to accept `pool` and `.with_state(AppState { pool })`.
 

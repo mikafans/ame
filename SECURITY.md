@@ -4,7 +4,7 @@
 
 Please **do not** open a public GitHub issue for security problems.
 
-Email **azusa146@gmail.com** with:
+Email **<azusa146@gmail.com>** with:
 
 - A description of the issue and its impact.
 - Reproduction steps or a proof-of-concept.

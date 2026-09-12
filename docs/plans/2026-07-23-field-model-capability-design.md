@@ -120,6 +120,7 @@ essay + task submissions, self-review, manual/agent review, practice-vs-graded
 mode, per-item points, per-assessment passing score.
 
 **Lack (matters):**
+
 - numeric-answer with tolerance/range — **physics-blocking**;
 - sandboxed code execution — **CS-blocking** (only exemplar exact-match today);
 - structured rubric object (criteria × scored options);
@@ -127,6 +128,7 @@ mode, per-item points, per-assessment passing score.
   peer assessment.
 
 **Minimal borrow set (priority):**
+
 1. numeric-answer type with tolerance/range (pure-Rust grader, cheap) — physics.
 2. code grading via a sandboxed external runner (edX XQueue/xqueue-watcher shape)
    feeding `tb_task_submissions.evaluation_method='automatic'` — CS.

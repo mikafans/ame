@@ -120,7 +120,8 @@ A loose 4/2 scale — `4 6 8 10 12 14 16 18 20 22 24 28 32 36 40 44 56`. No stri
 ## Component visual tokens
 
 ### Button
-```
+
+```text
 primary  → bg: accent, text: #0b1410, border: accent
 solid    → bg: surface-2, text: text, border: border
 ghost    → bg: transparent, text: text-2, border: border
@@ -129,12 +130,14 @@ quiet    → bg: transparent, text: muted, border: transparent
 ```
 
 Sizes:
+
 - sm: padding 6/10, font 12
 - md: padding 8/14, font 13
 - lg: padding 11/18, font 13
 
 ### Tag
-```
+
+```text
 default → bg: surface-2, fg: text-2, border: border
 accent  → bg: accent-dim, fg: accent, border: accent-line
 amber   → bg: amber-dim, fg: amber, border: amber
@@ -146,6 +149,7 @@ ghost   → bg: transparent, fg: muted, border: border
 All tags: padding 2/7, font 11, uppercase, letter-spacing 0.3.
 
 ### Input / textarea
+
 - Background `var(--surface)`
 - Border 1px `var(--border)`
 - Border-radius 6px
@@ -154,6 +158,7 @@ All tags: padding 2/7, font 11, uppercase, letter-spacing 0.3.
 - No focus ring color shift in the mocks; in production, add `:focus-visible` outline using `var(--accent)`.
 
 ### Chart conventions
+
 - Grid lines: `var(--border)` dashed `2 4`
 - Axis labels: mono 10, `var(--muted)`, letter-spacing 0.4
 - Line: `var(--accent)`, 1.8px, with a fill gradient from `rgba(accent,0.18)` to transparent
@@ -163,11 +168,13 @@ All tags: padding 2/7, font 11, uppercase, letter-spacing 0.3.
 - Donut: 10px stroke, `var(--surface-2)` track, `var(--accent)` progress, rounded line cap
 
 ### Iconography
+
 - Stroke width 1.6, line cap/join round, default size 16
 - All inline SVG, see `Icon` export in `src/atoms.jsx`
 - Available names: library, take, results, dashboard, author, agent, exam, stack, settings, arrow, arrowL, check, x, plus, clock, search, filter, bell, key, copy, download, upload, flag, user, sparkle, book, code
 
 ### Logo
+
 22px default. Two strokes + horizontal bar, accent-colored rounded square, "Harus" wordmark in serif 600, letter-spacing -0.3.
 
 ## Motion
